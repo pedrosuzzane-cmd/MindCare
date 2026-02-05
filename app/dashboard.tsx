@@ -1,8 +1,12 @@
+import { auth } from "@/constants/firebase";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React from "react";
+import { signOut } from "firebase/auth";
+import React, { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -33,6 +37,29 @@ export default function DashboardScreen() {
       console.log(`${feature} pressed`);
     }
   };
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  const doSignOut = async () => {
+    console.log("Signing out user", auth.currentUser?.uid);
+    setSigningOut(true);
+    try {
+      await signOut(auth);
+      console.log("Sign out successful");
+    } catch (err) {
+      console.error("Logout error", err);
+    } finally {
+      setSigningOut(false);
+      // Redirect to login regardless of signOut result to avoid stuck UI
+      router.replace("/login");
+    }
+  };
+
+  const handleLogoutPress = () => {
+    console.log("Logout pressed");
+    setShowLogoutConfirm(true);
+  };
+
+  const [signingOut, setSigningOut] = useState(false);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -64,10 +91,7 @@ export default function DashboardScreen() {
                   color="white"
                 />
               </Pressable>
-              <Pressable
-                style={styles.chatButton}
-                onPress={() => console.log("Logout pressed")}
-              >
+              <Pressable style={styles.chatButton} onPress={handleLogoutPress}>
                 <Ionicons name="log-out-outline" size={24} color="white" />
               </Pressable>
             </View>
@@ -164,6 +188,41 @@ export default function DashboardScreen() {
               essential. Your self-care is a necessity.&quot;
             </Text>
           </View>
+          {signingOut && (
+            <View style={styles.signOutOverlay} pointerEvents="auto">
+              <View style={styles.signOutBox}>
+                <ActivityIndicator size="large" color="#ffffff" />
+                <Text style={styles.signOutText}>Signing out...</Text>
+              </View>
+            </View>
+          )}
+          {showLogoutConfirm && (
+            <View style={styles.confirmOverlay} pointerEvents="auto">
+              <View style={styles.confirmBox}>
+                <Text style={styles.confirmTitle}>Confirm Logout</Text>
+                <Text style={styles.confirmMessage}>
+                  Are you sure you want to logout?
+                </Text>
+                <View style={styles.confirmButtons}>
+                  <Pressable
+                    style={[styles.confirmButton, styles.cancelButton]}
+                    onPress={() => setShowLogoutConfirm(false)}
+                  >
+                    <Text style={styles.cancelText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.confirmButton, styles.logoutButton]}
+                    onPress={() => {
+                      setShowLogoutConfirm(false);
+                      doSignOut();
+                    }}
+                  >
+                    <Text style={styles.logoutText}>Logout</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          )}
         </ScrollView>
       </LinearGradient>
     </SafeAreaView>
@@ -301,4 +360,63 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     lineHeight: 24,
   },
+  signOutOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  signOutBox: {
+    padding: 20,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+    gap: 12,
+  },
+  signOutText: {
+    color: "white",
+    marginTop: 8,
+    fontSize: 16,
+  },
+  confirmOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  confirmBox: {
+    width: "86%",
+    padding: 20,
+    borderRadius: 12,
+    backgroundColor: "white",
+    alignItems: "center",
+    gap: 12,
+  },
+  confirmTitle: { fontSize: 18, fontWeight: "600", color: "#333" },
+  confirmMessage: { fontSize: 14, color: "#666", textAlign: "center" },
+  confirmButtons: {
+    flexDirection: "row",
+    width: "100%",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+  confirmButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginHorizontal: 6,
+  },
+  cancelButton: { backgroundColor: "#F0F0F0" },
+  logoutButton: { backgroundColor: "#E53935" },
+  cancelText: { color: "#333", fontWeight: "600" },
+  logoutText: { color: "white", fontWeight: "600" },
 });
