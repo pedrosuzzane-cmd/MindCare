@@ -42,6 +42,7 @@ export default function RootLayout() {
           name="assessment-complete"
           options={{ headerShown: false }}
         />
+        <Stack.Screen name="profile" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
           name="modal"

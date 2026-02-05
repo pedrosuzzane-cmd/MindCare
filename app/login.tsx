@@ -3,13 +3,22 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-    Pressable,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
+
+// Firebase
+import { auth } from "@/constants/firebase";
+import {
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -19,15 +28,81 @@ export default function LoginScreen() {
     router.back();
   };
 
-  const handleLogin = () => {
-    // Handle login logic here
-    // For now, navigate to dashboard
-    router.push("/dashboard");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const validateEmail = (email: string) => {
+    const re =
+      /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\\.,;:\s@\"]+\.)+[^<>()[\]\\.,;:\s@\"]{2,})$/i;
+    return re.test(String(email).toLowerCase());
+  };
+
+  const handleLogin = async () => {
+    setError(null);
+
+    const emailClean = email.trim().toLowerCase();
+
+    if (!validateEmail(emailClean)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    if (!password) {
+      setError("Please enter your password.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, emailClean, password);
+      router.push("/dashboard");
+    } catch (err: any) {
+      console.error("Login error", err);
+      // Map Firebase auth errors to simple user-facing messages
+      const code = err?.code || "";
+      let msg = "Wrong Email/Password";
+      if (
+        code === "auth/user-not-found" ||
+        code === "auth/invalid-email" ||
+        code === "auth/user-disabled"
+      ) {
+        msg = "unregistered";
+      } else if (code === "auth/wrong-password") {
+        msg = "Wrong Email/Password";
+      }
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleForgotPassword = () => {
-    // Handle forgot password logic
-    console.log("Forgot password pressed");
+    // Send password reset email
+    const emailClean = email.trim().toLowerCase();
+    if (!validateEmail(emailClean)) {
+      Alert.alert(
+        "Reset Password",
+        "Please enter a valid email address above to reset your password.",
+      );
+      return;
+    }
+
+    setLoading(true);
+    sendPasswordResetEmail(auth, emailClean)
+      .then(() => {
+        Alert.alert(
+          "Reset Email Sent",
+          "A password reset email has been sent to your email address.",
+        );
+      })
+      .catch((err) => {
+        console.error("Password reset error", err);
+        Alert.alert(
+          "Error",
+          err?.message || "Unable to send password reset email.",
+        );
+      })
+      .finally(() => setLoading(false));
   };
 
   const handleRegister = () => {
@@ -111,15 +186,20 @@ export default function LoginScreen() {
         </View>
 
         {/* Login Button */}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
         <View style={styles.buttonContainer}>
-          <Pressable onPress={handleLogin}>
+          <Pressable onPress={handleLogin} disabled={loading}>
             <LinearGradient
               colors={["#2196F3", "#00BCD4", "#4CAF50"]}
-              style={styles.loginButton}
+              style={[styles.loginButton, loading && { opacity: 0.6 }]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
             >
-              <Text style={styles.loginButtonText}>Login</Text>
+              {loading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.loginButtonText}>Login</Text>
+              )}
             </LinearGradient>
           </Pressable>
         </View>
@@ -257,5 +337,10 @@ const styles = StyleSheet.create({
     color: "#2196F3",
     fontSize: 14,
     fontWeight: "500",
+  },
+  errorText: {
+    color: "#D32F2F",
+    textAlign: "center",
+    marginBottom: 12,
   },
 });

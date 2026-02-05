@@ -3,14 +3,18 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
+
+import { auth, db } from "@/constants/firebase";
+import { addDoc, collection, doc, serverTimestamp } from "firebase/firestore";
 
 interface Question {
   id: string;
@@ -137,7 +141,7 @@ export default function SelfAssessmentScreen() {
   const totalQuestions = questions.length;
 
   const handleBack = () => {
-    router.back();
+    router.replace("/dashboard");
   };
 
   const handleRatingSelect = (rating: number) => {
@@ -187,9 +191,32 @@ export default function SelfAssessmentScreen() {
     if (currentQuestionIndex < totalQuestions - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
     } else {
-      // Assessment complete - save results and navigate to completion page
-      console.log("Assessment complete:", answers);
-      router.push("/assessment-complete");
+      // Assessment complete - save results to Firestore and navigate to completion page
+      (async () => {
+        if (!auth.currentUser) {
+          Alert.alert(
+            "Not signed in",
+            "Please login to complete the assessment.",
+          );
+          router.replace("/login");
+          return;
+        }
+
+        try {
+          const uid = auth.currentUser.uid;
+          const payload = {
+            answers,
+            createdAt: serverTimestamp(),
+          } as Record<string, any>;
+
+          const col = collection(doc(db, "users", uid), "selfAssessments");
+          await addDoc(col, payload);
+          router.replace("/assessment-complete");
+        } catch (err) {
+          console.error("Error saving self-assessment", err);
+          Alert.alert("Error", "Unable to save assessment. Please try again.");
+        }
+      })();
     }
   };
 

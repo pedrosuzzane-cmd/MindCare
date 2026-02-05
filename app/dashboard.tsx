@@ -3,12 +3,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React from "react";
 import {
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 export default function DashboardScreen() {
@@ -53,12 +53,24 @@ export default function DashboardScreen() {
               </View>
               <Text style={styles.logoText}>MindCare</Text>
             </View>
-            <Pressable
-              style={styles.chatButton}
-              onPress={() => console.log("Logout pressed")}
-            >
-              <Ionicons name="log-out-outline" size={24} color="white" />
-            </Pressable>
+            <View style={styles.rightButtons}>
+              <Pressable
+                style={styles.profileButton}
+                onPress={() => router.push("/profile")}
+              >
+                <Ionicons
+                  name="person-circle-outline"
+                  size={26}
+                  color="white"
+                />
+              </Pressable>
+              <Pressable
+                style={styles.chatButton}
+                onPress={() => console.log("Logout pressed")}
+              >
+                <Ionicons name="log-out-outline" size={24} color="white" />
+              </Pressable>
+            </View>
           </View>
 
           {/* Greeting Section */}
@@ -203,6 +215,17 @@ const styles = StyleSheet.create({
     color: "white",
   },
   chatButton: {
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  rightButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  profileButton: {
     width: 40,
     height: 40,
     justifyContent: "center",

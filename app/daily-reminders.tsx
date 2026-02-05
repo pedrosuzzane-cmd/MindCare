@@ -3,13 +3,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    View,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
 } from "react-native";
 
 interface ReminderItem {
@@ -58,7 +58,7 @@ export default function DailyRemindersScreen() {
   ]);
 
   const handleBack = () => {
-    router.back();
+    router.replace("/dashboard");
   };
 
   const toggleReminder = (id: string) => {

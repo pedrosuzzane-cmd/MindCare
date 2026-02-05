@@ -1,20 +1,25 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
+
+import { auth, db } from "@/constants/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 
 interface JournalEntry {
   id: string;
   title: string;
-  content: string;
+  thoughts: string;
   date: Date;
   mood: string;
   tags: string[];
@@ -22,11 +27,12 @@ interface JournalEntry {
 }
 
 export default function DailyJournalScreen() {
-  // This will be populated from Firebase later
+  // This will be populated from Firebase
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const handleBack = () => {
-    router.back();
+    router.replace("/dashboard");
   };
 
   const handleAddEntry = () => {
@@ -56,7 +62,68 @@ export default function DailyJournalScreen() {
     });
   };
 
+  useEffect(() => {
+    let unsubSnapshot: (() => void) | null = null;
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        setJournalEntries([]);
+        setLoading(false);
+        router.replace("/login");
+        return;
+      }
+
+      const q = query(
+        collection(db, "users", user.uid, "journalEntries"),
+        orderBy("createdAt", "desc"),
+      );
+
+      unsubSnapshot = onSnapshot(q, (snap) => {
+        const entries = snap.docs.map((d) => {
+          const data = d.data() as any;
+          const createdAt = data.createdAt;
+          const date =
+            createdAt && typeof (createdAt as any).toDate === "function"
+              ? (createdAt as any).toDate()
+              : createdAt
+                ? new Date(createdAt)
+                : new Date();
+
+          return {
+            id: d.id,
+            title: data.title || "Untitled",
+            thoughts: data.thoughts || data.content || "",
+            date,
+            mood: data.mood || "",
+            tags: data.tags || [],
+            color: data.color || "#2196F3",
+          } as JournalEntry;
+        });
+
+        setJournalEntries(entries);
+        setLoading(false);
+      });
+    });
+
+    return () => {
+      try {
+        unsubAuth();
+      } catch (e) {
+        /* ignore */
+      }
+      if (unsubSnapshot) unsubSnapshot();
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator style={{ marginTop: 60 }} />
+      </SafeAreaView>
+    );
+  }
+
   const getPreviewText = (content: string, maxLength: number = 80) => {
+    if (!content) return "";
     if (content.length <= maxLength) return content;
     return content.slice(0, maxLength) + "...";
   };
@@ -79,7 +146,7 @@ export default function DailyJournalScreen() {
             </View>
             <Text style={styles.entryTitle}>{entry.title}</Text>
             <Text style={styles.entryPreview}>
-              {getPreviewText(entry.content)}
+              {getPreviewText(entry.thoughts)}
             </Text>
           </View>
         </View>

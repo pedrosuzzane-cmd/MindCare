@@ -3,14 +3,21 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
+
+// Firebase imports
+import { auth, db } from "@/constants/firebase";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
 
 export default function RegisterScreen() {
   const [fullName, setFullName] = useState("");
@@ -26,6 +33,12 @@ export default function RegisterScreen() {
   const [citizenship, setCitizenship] = useState("");
   const [genderIdentity, setGenderIdentity] = useState("");
   const [provincialAddress, setProvincialAddress] = useState("");
+
+  // Auth & form state
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const formatSchoolId = (text: string) => {
     // Remove all non-numeric characters
@@ -50,10 +63,75 @@ export default function RegisterScreen() {
     router.back();
   };
 
-  const handleCreateAccount = () => {
-    // Handle registration logic here
-    // For now, navigate to dashboard
-    router.push("/dashboard");
+  const validateEmail = (email: string) => {
+    const re =
+      /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\\.,;:\s@\"]+\.)+[^<>()[\]\\.,;:\s@\"]{2,})$/i;
+    return re.test(String(email).toLowerCase());
+  };
+
+  const validatePassword = (pw: string) => {
+    return pw.length >= 8 && /[A-Za-z]/.test(pw) && /[0-9]/.test(pw);
+  };
+
+  const sanitize = (value: string, maxLength = 256) => {
+    return value.trim().slice(0, maxLength);
+  };
+
+  const handleCreateAccount = async () => {
+    setError(null);
+
+    const emailClean = sanitize(email.toLowerCase());
+    const pw = password;
+
+    if (!fullName.trim())
+      return Alert.alert("Validation", "Full name is required.");
+    if (!validateEmail(emailClean))
+      return Alert.alert("Validation", "Please enter a valid email address.");
+    if (!validatePassword(pw))
+      return Alert.alert(
+        "Validation",
+        "Password must be at least 8 characters and include letters and numbers.",
+      );
+    if (pw !== confirmPassword)
+      return Alert.alert("Validation", "Passwords do not match.");
+
+    setLoading(true);
+
+    try {
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        emailClean,
+        pw,
+      );
+      const user = userCredential.user;
+
+      const profileData = {
+        fullName: sanitize(fullName, 200),
+        email: emailClean,
+        schoolId: sanitize(schoolId, 20),
+        academicProgram: sanitize(academicProgram, 100),
+        yearLevel: sanitize(yearLevel, 50),
+        nationality: sanitize(nationality, 50),
+        religiousAffiliation: sanitize(religiousAffiliation, 100),
+        culturalAffiliation: sanitize(culturalAffiliation, 100),
+        contactNo: sanitize(contactNo.replace(/[^0-9+]/g, ""), 20),
+        civilStatus: sanitize(civilStatus, 50),
+        citizenship: sanitize(citizenship, 50),
+        genderIdentity: sanitize(genderIdentity, 50),
+        provincialAddress: sanitize(provincialAddress, 500),
+        createdAt: new Date().toISOString(),
+      } as Record<string, any>;
+
+      await setDoc(doc(db, "users", user.uid), profileData);
+
+      router.push("/dashboard");
+    } catch (err: any) {
+      console.error("Registration error", err);
+      Alert.alert("Registration Error", err.message || "Unable to register");
+      setError(err?.message || "Registration failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogin = () => {
@@ -241,8 +319,44 @@ export default function RegisterScreen() {
                 placeholder="Enter your contact number"
                 placeholderTextColor="#999"
                 value={contactNo}
-                onChangeText={setContactNo}
+                onChangeText={(t) =>
+                  setContactNo(t.replace(/[^0-9+\-() ]/g, ""))
+                }
                 keyboardType="phone-pad"
+              />
+            </View>
+
+            {/* Password */}
+            <View style={styles.inputContainer}>
+              <View style={styles.inputHeader}>
+                <Ionicons name="lock-closed-outline" size={20} color="#666" />
+                <Text style={styles.inputLabel}>Password</Text>
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Create a password"
+                placeholderTextColor="#999"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={true}
+                autoCapitalize="none"
+              />
+            </View>
+
+            {/* Confirm Password */}
+            <View style={styles.inputContainer}>
+              <View style={styles.inputHeader}>
+                <Ionicons name="lock-closed" size={20} color="#666" />
+                <Text style={styles.inputLabel}>Confirm Password</Text>
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Confirm your password"
+                placeholderTextColor="#999"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={true}
+                autoCapitalize="none"
               />
             </View>
 
@@ -314,17 +428,27 @@ export default function RegisterScreen() {
           </View>
 
           {/* Create Account Button */}
+
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
           <View style={styles.buttonContainer}>
-            <Pressable onPress={handleCreateAccount}>
+            <Pressable onPress={handleCreateAccount} disabled={loading}>
               <LinearGradient
                 colors={["#4CAF50", "#00BCD4", "#2196F3"]}
-                style={styles.createAccountButton}
+                style={[
+                  styles.createAccountButton,
+                  loading && { opacity: 0.6 },
+                ]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                <Text style={styles.createAccountButtonText}>
-                  Create Account
-                </Text>
+                {loading ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.createAccountButtonText}>
+                    Create Account
+                  </Text>
+                )}
               </LinearGradient>
             </Pressable>
           </View>
@@ -446,6 +570,11 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "600",
+  },
+  errorText: {
+    color: "#D32F2F",
+    textAlign: "center",
+    marginBottom: 12,
   },
   loginContainer: {
     flexDirection: "row",

@@ -3,14 +3,19 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
+
+// Firebase
+import { auth, db } from "@/constants/firebase";
+import { addDoc, collection, doc, serverTimestamp } from "firebase/firestore";
 
 interface Category {
   id: string;
@@ -22,6 +27,7 @@ export default function NewJournalEntryScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [entryTitle, setEntryTitle] = useState<string>("");
   const [thoughts, setThoughts] = useState<string>("");
+  const [saving, setSaving] = useState(false);
 
   const categories: Category[] = [
     { id: "personal", name: "Personal", color: "#2196F3" },
@@ -37,15 +43,45 @@ export default function NewJournalEntryScreen() {
   };
 
   const handleSaveEntry = () => {
-    // Here you would save to Firebase
-    // For now, just navigate back
-    console.log("Saving entry:", {
-      category: selectedCategory,
-      title: entryTitle,
-      thoughts: thoughts,
-      date: new Date(),
-    });
-    router.back();
+    // Save to Firebase under users/{uid}/journalEntries
+    (async () => {
+      if (!auth.currentUser) {
+        Alert.alert("Not signed in", "Please login to save entries.");
+        router.push("/login");
+        return;
+      }
+
+      if (!selectedCategory || !entryTitle.trim() || !thoughts.trim()) {
+        Alert.alert(
+          "Validation",
+          "Please complete category, title, and thoughts.",
+        );
+        return;
+      }
+
+      setSaving(true);
+      try {
+        const uid = auth.currentUser.uid;
+        const sanitize = (s: string, max = 2000) => s.trim().slice(0, max);
+        const data = {
+          category: selectedCategory,
+          title: sanitize(entryTitle, 200),
+          thoughts: sanitize(thoughts, 2000),
+          createdAt: serverTimestamp(),
+        } as Record<string, any>;
+
+        const entriesRef = collection(doc(db, "users", uid), "journalEntries");
+        await addDoc(entriesRef, data);
+
+        Alert.alert("Saved", "Your journal entry has been saved.");
+        router.replace("/daily-journal");
+      } catch (err) {
+        console.error("Error saving journal entry", err);
+        Alert.alert("Error", "Unable to save entry. Please try again.");
+      } finally {
+        setSaving(false);
+      }
+    })();
   };
 
   const handleCategorySelect = (categoryId: string) => {

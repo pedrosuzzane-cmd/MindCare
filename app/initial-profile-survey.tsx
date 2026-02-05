@@ -3,14 +3,18 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
+
+import { auth, db } from "@/constants/firebase";
+import { addDoc, collection, doc, serverTimestamp } from "firebase/firestore";
 
 interface Question {
   id: string;
@@ -121,9 +125,32 @@ export default function InitialProfileSurveyScreen() {
     if (currentQuestionIndex < totalQuestions - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
     } else {
-      // Survey complete - save results and navigate to completion page
-      console.log("Survey complete:", answers);
-      router.push("/assessment-complete");
+      // Survey complete - save results to Firestore and navigate to completion page
+      (async () => {
+        if (!auth.currentUser) {
+          Alert.alert("Not signed in", "Please login to complete the survey.");
+          router.replace("/login");
+          return;
+        }
+
+        try {
+          const uid = auth.currentUser.uid;
+          const payload = {
+            answers,
+            createdAt: serverTimestamp(),
+          } as Record<string, any>;
+
+          const col = collection(
+            doc(db, "users", uid),
+            "initialProfileSurveys",
+          );
+          await addDoc(col, payload);
+          router.replace("/assessment-complete");
+        } catch (err) {
+          console.error("Error saving initial profile survey", err);
+          Alert.alert("Error", "Unable to save survey. Please try again.");
+        }
+      })();
     }
   };
 

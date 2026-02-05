@@ -3,13 +3,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React from "react";
 import {
-    Linking,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Linking,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 interface SupportHotline {
@@ -43,7 +43,7 @@ export default function SupportHotlinesScreen() {
       description: "Immediate support for mental health crises",
       availability: "24/7",
       contactType: "call",
-      contactInfo: "988",
+      contactInfo: "0917-989-8727",
       iconName: "call",
       iconColor: "#E84393",
     },
@@ -52,7 +52,7 @@ export default function SupportHotlinesScreen() {
       title: "Student Support Line",
       description: "Academic and personal support for students",
       contactType: "call",
-      contactInfo: "1-800-273-8255",
+      contactInfo: "(02) 8804-4673",
       iconName: "call",
       iconColor: "#3742FA",
     },
@@ -62,7 +62,7 @@ export default function SupportHotlinesScreen() {
       description: "Text-based support for those in crisis",
       availability: "24/7",
       contactType: "text",
-      contactInfo: "Text HOME to 741741",
+      contactInfo: "Text USAP to 4547",
       iconName: "chatbubble",
       iconColor: "#E84393",
     },
@@ -72,7 +72,7 @@ export default function SupportHotlinesScreen() {
       description: "Specialized support for anxiety and depression",
       availability: "Mon-Fri, 9 AM - 5 PM",
       contactType: "call",
-      contactInfo: "1-800-950-6264",
+      contactInfo: "(02) 8896-9292",
       iconName: "call",
       iconColor: "#2ED573",
     },
@@ -82,7 +82,7 @@ export default function SupportHotlinesScreen() {
       description: "Resources for learners with special needs",
       availability: "Mon-Fri, 8 AM - 6 PM",
       contactType: "call",
-      contactInfo: "1-800-234-5678",
+      contactInfo: "(02) 8632-1001",
       iconName: "call",
       iconColor: "#2ED573",
     },
@@ -92,14 +92,14 @@ export default function SupportHotlinesScreen() {
       description: "On-campus mental health resources",
       availability: "Mon-Fri, 9 AM - 5 PM",
       contactType: "call",
-      contactInfo: "1-800-555-0123",
+      contactInfo: "(02) 8988-4673",
       iconName: "mail",
       iconColor: "#FFA726",
     },
   ];
 
   const handleBack = () => {
-    router.back();
+    router.replace("/dashboard");
   };
 
   const handleContact = (hotline: SupportHotline) => {
@@ -207,7 +207,7 @@ export default function SupportHotlinesScreen() {
         {/* Subtitle */}
         <View style={styles.subtitleContainer}>
           <Text style={styles.subtitle}>
-            You're not alone. Reach out for support anytime.
+            You&apos;re not alone. Reach out for support anytime.
           </Text>
         </View>
       </LinearGradient>
