@@ -36,54 +36,54 @@ export default function InitialProfileSurveyScreen() {
 
   const questions: Question[] = [
     {
-      id: "siblings_count",
-      question: "Number of siblings (including yourself)",
-      type: "text",
-    },
-    {
-      id: "birth_order",
-      question: "Birth Order",
-      type: "text",
-    },
-    {
-      id: "parents_status",
-      question: "Parents are:",
+      id: "role",
+      question: "What best describes you?",
       type: "multiple",
       options: [
-        "Living together",
-        "Separated",
-        "One is living with another family",
-        "Both are living with another family",
-        "One is deceased",
-        "Both are deceased",
-        "One is abroad",
-        "Both are abroad",
-        "One is distantly working",
-        "Both are distantly working",
-        "Others (Specify)",
+        "High school student",
+        "College / University student",
+        "Other / Prefer not to say",
       ],
     },
     {
-      id: "living_conditions",
-      question: "Living with (living conditions at the moment)",
+      id: "age_range",
+      question: "Age range (optional)",
+      type: "multiple",
+      options: ["Under 16", "16–18", "19–22", "23+", "Prefer not to say"],
+    },
+    {
+      id: "living_with",
+      question: "Who do you live with?",
       type: "multiple",
       options: [
-        "Both parents",
-        "Mother only",
-        "Father only",
-        "Uncle/Aunt",
-        "Siblings only",
-        "Legal guardian",
-        "Grandparents",
-        "Living alone",
-        "Others (Specify)",
+        "Family",
+        "Roommates",
+        "Alone",
+        "Campus housing",
+        "Prefer not to say",
       ],
     },
     {
-      id: "family_relationship",
-      question: "Family Relationship (1 = not close, 10 = very close)",
-      type: "rating",
-      ratingLabels: ["Father", "Mother", "Siblings", "Legal Guardian"],
+      id: "stress_help",
+      question: "When you’re stressed, what helps most?",
+      type: "multiple",
+      options: [
+        "Journaling / writing",
+        "Talking to someone",
+        "Quiet time / reflection",
+        "Not sure",
+      ],
+    },
+    {
+      id: "reminder_pref",
+      question: "Daily reminders preference",
+      type: "multiple",
+      options: [
+        "Once a day",
+        "A few times a week",
+        "Only when I choose",
+        "Not sure",
+      ],
     },
   ];
 
@@ -187,9 +187,7 @@ export default function InitialProfileSurveyScreen() {
               placeholderTextColor="#999"
               value={answer?.text || ""}
               onChangeText={handleTextInput}
-              keyboardType={
-                currentQuestion.id === "siblings_count" ? "numeric" : "default"
-              }
+              keyboardType="default"
             />
           </View>
         );

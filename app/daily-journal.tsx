@@ -3,13 +3,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Pressable,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 
 import { auth, db } from "@/constants/firebase";
@@ -42,7 +42,7 @@ export default function DailyJournalScreen() {
 
   const handleEditEntry = (entryId: string) => {
     // Navigate to edit journal entry screen
-    console.log(`Edit entry ${entryId} pressed`);
+    // TODO: navigate to edit screen
   };
 
   const getInitials = (title: string) => {

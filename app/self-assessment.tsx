@@ -19,15 +19,9 @@ import { addDoc, collection, doc, serverTimestamp } from "firebase/firestore";
 interface Question {
   id: string;
   question: string;
-  type: "text" | "yesno" | "checkbox";
+  type: "text" | "yesno" | "checkbox" | "rating";
   options?: string[];
-  hasAdditionalFields?: boolean;
-  additionalFields?: {
-    reasons?: boolean;
-    when?: boolean;
-    specify?: boolean;
-    diagnosed?: boolean;
-  };
+  group?: string;
 }
 
 export default function SelfAssessmentScreen() {
@@ -35,105 +29,96 @@ export default function SelfAssessmentScreen() {
   const [answers, setAnswers] = useState<{ [key: string]: any }>({});
 
   const questions: Question[] = [
+    // A. Mood & Emotions
     {
-      id: "issues",
+      id: "q1",
+      group: "A. Mood & Emotions",
       question:
-        "What are the issues for which you are currently seeking assistance? Be as specific as possible.",
-      type: "text",
+        "Over the past 2 weeks, how often have you felt down, sad, or empty?",
+      type: "rating",
     },
     {
-      id: "coping",
-      question: "What are some of your coping strategies?",
-      type: "text",
-    },
-    {
-      id: "strengths",
-      question: "What do you consider your strengths?",
-      type: "text",
-    },
-    {
-      id: "currentServices",
+      id: "q2",
+      group: "A. Mood & Emotions",
       question:
-        "Are you currently receiving psychological services, professional counseling, psychiatric services, or any mental health services?",
-      type: "yesno",
+        "How often have you lost interest or enjoyment in things you usually like?",
+      type: "rating",
+    },
+
+    // B. Stress & Anxiety
+    {
+      id: "q3",
+      group: "B. Stress & Anxiety",
+      question: "How often have you felt nervous, anxious, or on edge?",
+      type: "rating",
     },
     {
-      id: "pastMedication",
+      id: "q4",
+      group: "B. Stress & Anxiety",
       question:
-        "Have you been prescribed psychiatric prescription medication in the past?",
-      type: "yesno",
+        "How often have you felt overwhelmed by academic or personal responsibilities?",
+      type: "rating",
     },
+
+    // C. Thinking & Focus
     {
-      id: "wishDead",
+      id: "q5",
+      group: "C. Thinking & Focus",
       question:
-        "Have you wished you were dead or wished you could go to sleep and not wake up?",
-      type: "yesno",
+        "How often have you had trouble concentrating on studies, work, or daily tasks?",
+      type: "rating",
     },
     {
-      id: "suicidalThoughts",
-      question: "Have you actually had any thoughts of killing yourself?",
-      type: "yesno",
+      id: "q6",
+      group: "C. Thinking & Focus",
+      question: "How often have you been overly critical or hard on yourself?",
+      type: "rating",
+    },
+
+    // D. Energy & Sleep
+    {
+      id: "q7",
+      group: "D. Energy & Sleep",
+      question: "How often have you felt mentally or physically exhausted?",
+      type: "rating",
     },
     {
-      id: "thinkingHow",
-      question: "Have you been thinking about how you might do this?",
-      type: "yesno",
-    },
-    {
-      id: "intentionActing",
+      id: "q8",
+      group: "D. Energy & Sleep",
       question:
-        "Have you had these thoughts and had some intention of acting on them?",
-      type: "yesno",
+        "How often have you had trouble sleeping (too little, too much, or poor quality)?",
+      type: "rating",
     },
+
+    // E. Coping & Support
     {
-      id: "workedOutDetails",
+      id: "q9",
+      group: "E. Coping & Support",
       question:
-        "Have you started to work out or worked out the details on how to kill yourself?",
-      type: "yesno",
+        "How often have you felt unable to cope with daily challenges on your own?",
+      type: "rating",
     },
     {
-      id: "intendCarryOut",
-      question: "Did you intend to carry out this plan?",
-      type: "yesno",
+      id: "q10",
+      group: "E. Coping & Support",
+      question: "How often have you felt disconnected or isolated from others?",
+      type: "rating",
     },
+
+    // F. Safety & Distress (Handle Gently)
     {
-      id: "startedAction",
+      id: "q11",
+      group: "F. Safety & Distress",
       question:
-        "Have you done anything, started to do anything, or prepared to do anything to end your life?",
-      type: "yesno",
+        "How often have you felt that things are becoming too much to handle?",
+      type: "rating",
     },
     {
-      id: "previousConsultations",
-      question: "Previous psychological consultations (check all that apply):",
-      type: "checkbox",
-      options: [
-        "Psychiatrist",
-        "Psychologist",
-        "Guidance Counselor",
-        "Social Worker",
-        "Priest/Pastor/Spiritual Leader",
-      ],
-      hasAdditionalFields: true,
-      additionalFields: {
-        reasons: true,
-        when: true,
-      },
-    },
-    {
-      id: "specialNeeds",
-      question: "Are you a learner with special needs? (check all that apply):",
-      type: "checkbox",
-      options: [
-        "Physical Disability",
-        "Developmental Disability",
-        "Chronic/Medical Disability",
-        "Psychological Disability",
-      ],
-      hasAdditionalFields: true,
-      additionalFields: {
-        specify: true,
-        diagnosed: true,
-      },
+      id: "q12",
+      group: "F. Safety & Distress",
+      question:
+        "How often have you had thoughts about hurting yourself or feeling that you don’t want to exist?",
+      type: "rating",
     },
   ];
 
@@ -220,6 +205,12 @@ export default function SelfAssessmentScreen() {
     }
   };
 
+  const handlePrevious = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex((prev) => prev - 1);
+    }
+  };
+
   const isAnswered = () => {
     const answer = answers[currentQuestion.id];
 
@@ -229,6 +220,10 @@ export default function SelfAssessmentScreen() {
 
     if (currentQuestion.type === "yesno") {
       return answer !== undefined;
+    }
+
+    if (currentQuestion.type === "rating") {
+      return answer !== undefined && answer !== null;
     }
 
     if (currentQuestion.type === "checkbox") {
@@ -334,6 +329,41 @@ export default function SelfAssessmentScreen() {
             </View>
           )}
 
+          {currentQuestion.type === "rating" && (
+            <View style={styles.ratingContainer}>
+              <View style={styles.ratingLabels}>
+                <Text style={styles.ratingLabel}>Not at all</Text>
+                <Text style={styles.ratingLabel}>Several days</Text>
+                <Text style={styles.ratingLabel}>More than half the days</Text>
+                <Text style={styles.ratingLabel}>Nearly every day</Text>
+              </View>
+
+              <View style={styles.ratingScale}>
+                {[0, 1, 2, 3].map((r) => (
+                  <Pressable
+                    key={r}
+                    style={[
+                      styles.ratingButton,
+                      answers[currentQuestion.id] === r &&
+                        styles.selectedRating,
+                    ]}
+                    onPress={() => handleRatingSelect(r)}
+                  >
+                    <Text
+                      style={[
+                        styles.ratingButtonText,
+                        answers[currentQuestion.id] === r &&
+                          styles.selectedRatingText,
+                      ]}
+                    >
+                      {r}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
+
           {currentQuestion.type === "checkbox" && (
             <View style={styles.checkboxContainer}>
               {currentQuestion.options?.map((option) => (
@@ -360,119 +390,25 @@ export default function SelfAssessmentScreen() {
                   )}
                 </Pressable>
               ))}
-
-              {/* Additional fields for certain checkbox questions */}
-              {currentQuestion.hasAdditionalFields &&
-                (answers[currentQuestion.id] || []).length > 0 && (
-                  <View style={styles.additionalFieldsContainer}>
-                    {currentQuestion.additionalFields?.reasons && (
-                      <View style={styles.additionalField}>
-                        <Text style={styles.additionalFieldLabel}>
-                          Reasons:
-                        </Text>
-                        <TextInput
-                          style={styles.additionalTextInput}
-                          value={answers[`${currentQuestion.id}_reasons`] || ""}
-                          onChangeText={(text) =>
-                            handleAdditionalFieldChange("reasons", text)
-                          }
-                          placeholder="Please specify reasons..."
-                          placeholderTextColor="#999"
-                          multiline={true}
-                        />
-                      </View>
-                    )}
-
-                    {currentQuestion.additionalFields?.when && (
-                      <View style={styles.additionalField}>
-                        <Text style={styles.additionalFieldLabel}>When:</Text>
-                        <TextInput
-                          style={styles.additionalTextInput}
-                          value={answers[`${currentQuestion.id}_when`] || ""}
-                          onChangeText={(text) =>
-                            handleAdditionalFieldChange("when", text)
-                          }
-                          placeholder="Please specify when..."
-                          placeholderTextColor="#999"
-                        />
-                      </View>
-                    )}
-
-                    {currentQuestion.additionalFields?.specify && (
-                      <View style={styles.additionalField}>
-                        <Text style={styles.additionalFieldLabel}>
-                          Specify medical condition/disability diagnosis:
-                        </Text>
-                        <TextInput
-                          style={styles.additionalTextInput}
-                          value={answers[`${currentQuestion.id}_specify`] || ""}
-                          onChangeText={(text) =>
-                            handleAdditionalFieldChange("specify", text)
-                          }
-                          placeholder="Please specify..."
-                          placeholderTextColor="#999"
-                          multiline={true}
-                        />
-                      </View>
-                    )}
-
-                    {currentQuestion.additionalFields?.diagnosed && (
-                      <View style={styles.additionalField}>
-                        <Text style={styles.additionalFieldLabel}>
-                          Diagnosed:
-                        </Text>
-                        <View style={styles.yesNoContainer}>
-                          <Pressable
-                            style={[
-                              styles.smallYesNoButton,
-                              answers[`${currentQuestion.id}_diagnosed`] ===
-                                true && styles.selectedYesNo,
-                            ]}
-                            onPress={() =>
-                              handleAdditionalFieldChange("diagnosed", true)
-                            }
-                          >
-                            <Text
-                              style={[
-                                styles.smallYesNoText,
-                                answers[`${currentQuestion.id}_diagnosed`] ===
-                                  true && styles.selectedYesNoText,
-                              ]}
-                            >
-                              Yes
-                            </Text>
-                          </Pressable>
-                          <Pressable
-                            style={[
-                              styles.smallYesNoButton,
-                              answers[`${currentQuestion.id}_diagnosed`] ===
-                                false && styles.selectedYesNo,
-                            ]}
-                            onPress={() =>
-                              handleAdditionalFieldChange("diagnosed", false)
-                            }
-                          >
-                            <Text
-                              style={[
-                                styles.smallYesNoText,
-                                answers[`${currentQuestion.id}_diagnosed`] ===
-                                  false && styles.selectedYesNoText,
-                              ]}
-                            >
-                              No
-                            </Text>
-                          </Pressable>
-                        </View>
-                      </View>
-                    )}
-                  </View>
-                )}
             </View>
           )}
         </View>
 
-        {/* Next Button */}
-        <View style={styles.buttonContainer}>
+        {/* Navigation Buttons */}
+        <View style={styles.buttonContainerRow}>
+          <Pressable
+            style={[
+              styles.previousButtonContainer,
+              currentQuestionIndex === 0 && styles.disabledButton,
+            ]}
+            onPress={handlePrevious}
+            disabled={currentQuestionIndex === 0}
+          >
+            <View style={styles.previousButton}>
+              <Text style={styles.previousButtonText}>Previous</Text>
+            </View>
+          </Pressable>
+
           <Pressable
             style={[
               styles.nextButtonContainer,
@@ -734,6 +670,29 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     marginTop: 20,
+  },
+  buttonContainerRow: {
+    marginTop: 20,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  previousButtonContainer: {
+    flex: 1,
+  },
+  previousButton: {
+    backgroundColor: "white",
+    borderRadius: 25,
+    paddingVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#9C27B0",
+  },
+  previousButtonText: {
+    color: "#9C27B0",
+    fontSize: 16,
+    fontWeight: "600",
   },
   nextButtonContainer: {
     borderRadius: 25,

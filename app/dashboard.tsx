@@ -5,13 +5,13 @@ import { router } from "expo-router";
 import { signOut } from "firebase/auth";
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View
+    ActivityIndicator,
+    Pressable,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 
 export default function DashboardScreen() {
@@ -33,13 +33,13 @@ export default function DashboardScreen() {
     } else if (feature === "Hotline Access") {
       router.push("/support-hotlines");
     } else {
-      console.log(`${feature} pressed`);
+      // no-op
     }
   };
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const doSignOut = async () => {
-    console.log("Signing out user", auth.currentUser?.uid);
+    // signing out
     setSigningOut(true);
     try {
       await signOut(auth);
@@ -54,7 +54,7 @@ export default function DashboardScreen() {
   };
 
   const handleLogoutPress = () => {
-    console.log("Logout pressed");
+    // logout requested
     setShowLogoutConfirm(true);
   };
 
