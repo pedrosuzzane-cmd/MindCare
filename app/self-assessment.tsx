@@ -9,7 +9,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 
@@ -22,6 +21,125 @@ interface Question {
   type: "text" | "yesno" | "checkbox" | "rating";
   options?: string[];
   group?: string;
+}
+
+/**
+ * Risk level returned by the classification algorithm.
+ */
+type RiskLevel = "low" | "medium" | "high";
+
+interface AssessmentResult {
+  /** Sum of all 12 ratings (0–36). */
+  totalScore: number;
+  /** Classified risk level. */
+  riskLevel: RiskLevel;
+  /** Per-section sub-scores (each 0–6). */
+  sectionScores: Record<string, number>;
+}
+
+/*
+ * ──────────────────────────────────────────────────────────────────────────────
+ *  RISK CLASSIFICATION ALGORITHM  –  Documentation
+ * ──────────────────────────────────────────────────────────────────────────────
+ *
+ *  Instrument
+ *  ──────────
+ *  • 12 self-report items rated on a 4-point Likert scale:
+ *      0 = Not at all
+ *      1 = Several days
+ *      2 = More than half the days
+ *      3 = Nearly every day
+ *  • Total possible score range: 0 – 36.
+ *
+ *  Sections (2 items each, max 6 per section)
+ *  ──────────────────────────────────────────────
+ *    A. Mood & Emotions       (q1, q2)
+ *    B. Stress & Anxiety       (q3, q4)
+ *    C. Thinking & Focus       (q5, q6)
+ *    D. Energy & Sleep         (q7, q8)
+ *    E. Coping & Support       (q9, q10)
+ *    F. Safety & Distress      (q11, q12)   ← critical section
+ *
+ *  Step 1 – Compute total score
+ *  ────────────────────────────
+ *  totalScore = Σ answer(q1..q12)
+ *
+ *  Step 2 – Critical-safety override (takes precedence)
+ *  ────────────────────────────────────────────────────
+ *  The "Safety & Distress" section contains sensitive self-harm / suicidal
+ *  ideation items. Any significant endorsement here warrants immediate
+ *  escalation:
+ *
+ *    • If q12 (self-harm thoughts) ≥ 2  →  HIGH risk  (regardless of total)
+ *    • If q11 (overwhelmed) ≥ 2  AND  q12 ≥ 1  →  HIGH risk
+ *
+ *  Step 3 – Score-based thresholds (when no critical flag is triggered)
+ *  ──────────────────────────────────────────────────────────────────────
+ *    •  0 – 12   →  LOW risk      (avg < 1 → "Not at all" to "Several days")
+ *    • 13 – 24   →  MEDIUM risk   (avg 1-2 → "Several days" to "More than half")
+ *    • 25 – 36   →  HIGH risk     (avg > 2 → "More than half" to "Nearly every day")
+ *
+ *  Rationale
+ *  ─────────
+ *  Thresholds are inspired by validated brief screeners (PHQ-2 / GAD-2 cut-off
+ *  logic scaled to 12 items). The critical-safety override mirrors Columbia
+ *  Suicide Severity Rating Scale (C-SSRS) triage guidelines — any meaningful
+ *  endorsement of suicidal ideation triggers the highest risk tier so the app
+ *  can surface crisis resources immediately.
+ *
+ *  Limitations
+ *  ───────────
+ *  This is a screening tool, NOT a diagnostic instrument. Results should
+ *  encourage professional follow-up, not replace it.
+ * ──────────────────────────────────────────────────────────────────────────────
+ */
+
+const SECTION_MAP: Record<string, string[]> = {
+  "Mood & Emotions": ["q1", "q2"],
+  "Stress & Anxiety": ["q3", "q4"],
+  "Thinking & Focus": ["q5", "q6"],
+  "Energy & Sleep": ["q7", "q8"],
+  "Coping & Support": ["q9", "q10"],
+  "Safety & Distress": ["q11", "q12"],
+};
+
+/**
+ * Classify the user's risk level from their 12 rating answers.
+ * See the documentation block above for the full algorithm description.
+ */
+function classifyRisk(answers: Record<string, number>): AssessmentResult {
+  // --- Step 1: compute total and section scores --------------------------
+  let totalScore = 0;
+  const sectionScores: Record<string, number> = {};
+
+  for (const [section, ids] of Object.entries(SECTION_MAP)) {
+    const sectionTotal = ids.reduce((sum, id) => sum + (answers[id] ?? 0), 0);
+    sectionScores[section] = sectionTotal;
+    totalScore += sectionTotal;
+  }
+
+  // --- Step 2: critical-safety override ----------------------------------
+  const q11 = answers["q11"] ?? 0;
+  const q12 = answers["q12"] ?? 0;
+
+  if (q12 >= 2) {
+    return { totalScore, riskLevel: "high", sectionScores };
+  }
+  if (q11 >= 2 && q12 >= 1) {
+    return { totalScore, riskLevel: "high", sectionScores };
+  }
+
+  // --- Step 3: score-based thresholds ------------------------------------
+  let riskLevel: RiskLevel;
+  if (totalScore <= 12) {
+    riskLevel = "low";
+  } else if (totalScore <= 24) {
+    riskLevel = "medium";
+  } else {
+    riskLevel = "high";
+  }
+
+  return { totalScore, riskLevel, sectionScores };
 }
 
 export default function SelfAssessmentScreen() {
@@ -136,42 +254,6 @@ export default function SelfAssessmentScreen() {
     }));
   };
 
-  const handleTextInput = (text: string) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [currentQuestion.id]: text,
-    }));
-  };
-
-  const handleYesNoSelect = (value: boolean) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [currentQuestion.id]: value,
-    }));
-  };
-
-  const handleCheckboxToggle = (option: string) => {
-    const currentAnswers = answers[currentQuestion.id] || [];
-    const updatedAnswers = currentAnswers.includes(option)
-      ? currentAnswers.filter((item: string) => item !== option)
-      : [...currentAnswers, option];
-
-    setAnswers((prev) => ({
-      ...prev,
-      [currentQuestion.id]: updatedAnswers,
-    }));
-  };
-
-  const handleAdditionalFieldChange = (
-    fieldType: string,
-    value: string | boolean,
-  ) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [`${currentQuestion.id}_${fieldType}`]: value,
-    }));
-  };
-
   const handleNext = () => {
     if (currentQuestionIndex < totalQuestions - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
@@ -189,14 +271,29 @@ export default function SelfAssessmentScreen() {
 
         try {
           const uid = auth.currentUser.uid;
+
+          // Classify risk using the documented algorithm
+          const result = classifyRisk(answers as Record<string, number>);
+
           const payload = {
             answers,
+            totalScore: result.totalScore,
+            riskLevel: result.riskLevel,
+            sectionScores: result.sectionScores,
             createdAt: serverTimestamp(),
           } as Record<string, any>;
 
           const col = collection(doc(db, "users", uid), "selfAssessments");
           await addDoc(col, payload);
-          router.replace("/assessment-complete");
+
+          // Navigate to completion page with risk level & score
+          router.replace({
+            pathname: "/assessment-complete",
+            params: {
+              riskLevel: result.riskLevel,
+              totalScore: String(result.totalScore),
+            },
+          });
         } catch (err) {
           console.error("Error saving self-assessment", err);
           Alert.alert("Error", "Unable to save assessment. Please try again.");
@@ -213,24 +310,7 @@ export default function SelfAssessmentScreen() {
 
   const isAnswered = () => {
     const answer = answers[currentQuestion.id];
-
-    if (currentQuestion.type === "text") {
-      return answer && answer.trim().length > 0;
-    }
-
-    if (currentQuestion.type === "yesno") {
-      return answer !== undefined;
-    }
-
-    if (currentQuestion.type === "rating") {
-      return answer !== undefined && answer !== null;
-    }
-
-    if (currentQuestion.type === "checkbox") {
-      return Array.isArray(answer) && answer.length > 0;
-    }
-
-    return answer !== undefined;
+    return answer !== undefined && answer !== null;
   };
 
   const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
@@ -274,61 +354,7 @@ export default function SelfAssessmentScreen() {
         <View style={styles.questionCard}>
           <Text style={styles.questionText}>{currentQuestion.question}</Text>
 
-          {/* Render different input types based on question type */}
-          {currentQuestion.type === "text" && (
-            <View style={styles.textInputContainer}>
-              <TextInput
-                style={styles.textInput}
-                value={answers[currentQuestion.id] || ""}
-                onChangeText={handleTextInput}
-                multiline={true}
-                numberOfLines={4}
-                placeholder="Please provide your response..."
-                placeholderTextColor="#999"
-                textAlignVertical="top"
-              />
-            </View>
-          )}
-
-          {currentQuestion.type === "yesno" && (
-            <View style={styles.yesNoContainer}>
-              <Pressable
-                style={[
-                  styles.yesNoButton,
-                  answers[currentQuestion.id] === true && styles.selectedYesNo,
-                ]}
-                onPress={() => handleYesNoSelect(true)}
-              >
-                <Text
-                  style={[
-                    styles.yesNoText,
-                    answers[currentQuestion.id] === true &&
-                      styles.selectedYesNoText,
-                  ]}
-                >
-                  Yes
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.yesNoButton,
-                  answers[currentQuestion.id] === false && styles.selectedYesNo,
-                ]}
-                onPress={() => handleYesNoSelect(false)}
-              >
-                <Text
-                  style={[
-                    styles.yesNoText,
-                    answers[currentQuestion.id] === false &&
-                      styles.selectedYesNoText,
-                  ]}
-                >
-                  No
-                </Text>
-              </Pressable>
-            </View>
-          )}
-
+          {/* Rating scale */}
           {currentQuestion.type === "rating" && (
             <View style={styles.ratingContainer}>
               <View style={styles.ratingLabels}>
@@ -361,35 +387,6 @@ export default function SelfAssessmentScreen() {
                   </Pressable>
                 ))}
               </View>
-            </View>
-          )}
-
-          {currentQuestion.type === "checkbox" && (
-            <View style={styles.checkboxContainer}>
-              {currentQuestion.options?.map((option) => (
-                <Pressable
-                  key={option}
-                  style={[
-                    styles.checkboxOption,
-                    (answers[currentQuestion.id] || []).includes(option) &&
-                      styles.selectedCheckbox,
-                  ]}
-                  onPress={() => handleCheckboxToggle(option)}
-                >
-                  <Text
-                    style={[
-                      styles.checkboxText,
-                      (answers[currentQuestion.id] || []).includes(option) &&
-                        styles.selectedCheckboxText,
-                    ]}
-                  >
-                    {option}
-                  </Text>
-                  {(answers[currentQuestion.id] || []).includes(option) && (
-                    <Ionicons name="checkmark" size={20} color="white" />
-                  )}
-                </Pressable>
-              ))}
             </View>
           )}
         </View>
@@ -514,117 +511,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 24,
     lineHeight: 24,
-  },
-  textInputContainer: {
-    marginTop: 16,
-  },
-  textInput: {
-    backgroundColor: "#F8F8F8",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    fontSize: 16,
-    color: "#333",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    minHeight: 100,
-  },
-  yesNoContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    gap: 16,
-    marginTop: 16,
-  },
-  yesNoButton: {
-    flex: 1,
-    backgroundColor: "#F8F8F8",
-    paddingVertical: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-  },
-  selectedYesNo: {
-    backgroundColor: "#9C27B0",
-    borderColor: "#9C27B0",
-  },
-  yesNoText: {
-    fontSize: 16,
-    color: "#333",
-    textAlign: "center",
-    fontWeight: "500",
-  },
-  selectedYesNoText: {
-    color: "white",
-  },
-  smallYesNoButton: {
-    flex: 1,
-    backgroundColor: "#F8F8F8",
-    paddingVertical: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-  },
-  smallYesNoText: {
-    fontSize: 14,
-    color: "#333",
-    textAlign: "center",
-    fontWeight: "500",
-  },
-  checkboxContainer: {
-    marginTop: 16,
-    gap: 12,
-  },
-  checkboxOption: {
-    backgroundColor: "#F8F8F8",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  selectedCheckbox: {
-    backgroundColor: "#9C27B0",
-    borderColor: "#9C27B0",
-  },
-  checkboxText: {
-    fontSize: 16,
-    color: "#333",
-    flex: 1,
-  },
-  selectedCheckboxText: {
-    color: "white",
-    fontWeight: "500",
-  },
-  additionalFieldsContainer: {
-    marginTop: 20,
-    backgroundColor: "#F9F9F9",
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E8E8E8",
-  },
-  additionalField: {
-    marginBottom: 16,
-  },
-  additionalFieldLabel: {
-    fontSize: 14,
-    color: "#555",
-    fontWeight: "500",
-    marginBottom: 8,
-  },
-  additionalTextInput: {
-    backgroundColor: "white",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 6,
-    fontSize: 14,
-    color: "#333",
-    borderWidth: 1,
-    borderColor: "#D0D0D0",
-    minHeight: 40,
   },
   ratingContainer: {
     alignItems: "center",

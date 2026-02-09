@@ -1,19 +1,84 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React from "react";
 import {
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
+type RiskLevel = "low" | "medium" | "high";
+
+/**
+ * Configuration for each risk tier — colours, titles, messages, and
+ * tailored recommendations shown to the user after assessment.
+ */
+const RISK_CONFIG: Record<
+  RiskLevel,
+  {
+    gradient: [string, string];
+    title: string;
+    description: string;
+    recommendations: string[];
+  }
+> = {
+  low: {
+    gradient: ["#4CAF50", "#66BB6A"],
+    title: "You\u2019re doing well!",
+    description:
+      "Your responses suggest you are coping well overall. Keep building on the positive habits you already have.",
+    recommendations: [
+      "Continue your daily journaling to maintain self-awareness",
+      "Practice mindfulness or relaxation exercises regularly",
+      "Stay connected with friends, family, or support groups",
+    ],
+  },
+  medium: {
+    gradient: ["#FF9800", "#FFA726"],
+    title: "Some areas need attention",
+    description:
+      "Your responses indicate moderate stress or emotional difficulty in some areas. Consider exploring additional support to stay on track.",
+    recommendations: [
+      "Try scheduling regular breaks and self-care activities",
+      "Talk to a trusted friend, mentor, or counselor about how you feel",
+      "Explore stress-management techniques such as deep breathing or exercise",
+      "Consider reaching out to a mental health professional for guidance",
+    ],
+  },
+  high: {
+    gradient: ["#F44336", "#E53935"],
+    title: "We\u2019re here for you",
+    description:
+      "Your responses suggest you may be experiencing significant distress. Please know that help is available and reaching out is a sign of strength.",
+    recommendations: [
+      "Please reach out to a mental health professional as soon as possible",
+      "Contact a crisis hotline if you are in immediate distress",
+      "Talk to someone you trust \u2014 you don\u2019t have to go through this alone",
+      "Use the Support Hotlines page in this app for immediate resources",
+    ],
+  },
+};
+
 export default function AssessmentCompleteScreen() {
+  const params = useLocalSearchParams<{
+    riskLevel?: string;
+    totalScore?: string;
+  }>();
+
+  const riskLevel: RiskLevel = (params.riskLevel as RiskLevel) ?? "low";
+  const totalScore = params.totalScore ? Number(params.totalScore) : null;
+  const config = RISK_CONFIG[riskLevel];
+
   const handleBackToHome = () => {
-    router.push("/dashboard");
+    router.replace("/dashboard");
+  };
+
+  const handleSupportHotlines = () => {
+    router.push("/support-hotlines");
   };
 
   return (
@@ -26,23 +91,49 @@ export default function AssessmentCompleteScreen() {
         {/* Success Icon */}
         <View style={styles.iconContainer}>
           <LinearGradient
-            colors={["#9C27B0", "#2196F3"]}
+            colors={config.gradient}
             style={styles.iconGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            <Ionicons name="checkmark" size={40} color="white" />
+            <Ionicons
+              name={
+                riskLevel === "low"
+                  ? "checkmark"
+                  : riskLevel === "medium"
+                    ? "alert"
+                    : "heart"
+              }
+              size={40}
+              color="white"
+            />
           </LinearGradient>
         </View>
 
         {/* Title */}
         <Text style={styles.title}>Assessment Complete!</Text>
 
-        {/* Description */}
-        <Text style={styles.description}>
-          Thank you for taking the time to check in with yourself. Your
-          responses help us understand your wellness journey better.
+        {/* Risk-specific heading */}
+        <Text style={[styles.riskTitle, { color: config.gradient[0] }]}>
+          {config.title}
         </Text>
+
+        {/* Score badge */}
+        {totalScore !== null && (
+          <View style={styles.scoreBadge}>
+            <Text style={styles.scoreText}>Score: {totalScore} / 36</Text>
+            <View
+              style={[styles.riskPill, { backgroundColor: config.gradient[0] }]}
+            >
+              <Text style={styles.riskPillText}>
+                {riskLevel.toUpperCase()} RISK
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Description */}
+        <Text style={styles.description}>{config.description}</Text>
 
         {/* Recommendations */}
         <View style={styles.recommendationsCard}>
@@ -51,28 +142,37 @@ export default function AssessmentCompleteScreen() {
           </Text>
 
           <View style={styles.recommendationsList}>
-            <View style={styles.recommendationItem}>
-              <View style={styles.bulletPoint} />
-              <Text style={styles.recommendationText}>
-                Continue with your daily journaling
-              </Text>
-            </View>
-
-            <View style={styles.recommendationItem}>
-              <View style={styles.bulletPoint} />
-              <Text style={styles.recommendationText}>
-                Practice mindfulness exercises
-              </Text>
-            </View>
-
-            <View style={styles.recommendationItem}>
-              <View style={styles.bulletPoint} />
-              <Text style={styles.recommendationText}>
-                Connect with support if needed
-              </Text>
-            </View>
+            {config.recommendations.map((rec, idx) => (
+              <View key={idx} style={styles.recommendationItem}>
+                <View
+                  style={[
+                    styles.bulletPoint,
+                    { backgroundColor: config.gradient[0] },
+                  ]}
+                />
+                <Text style={styles.recommendationText}>{rec}</Text>
+              </View>
+            ))}
           </View>
         </View>
+
+        {/* Support Hotlines link for medium / high risk */}
+        {riskLevel !== "low" && (
+          <Pressable
+            style={styles.hotlineButton}
+            onPress={handleSupportHotlines}
+          >
+            <LinearGradient
+              colors={config.gradient}
+              style={styles.hotlineGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Ionicons name="call-outline" size={20} color="white" />
+              <Text style={styles.hotlineText}>View Support Hotlines</Text>
+            </LinearGradient>
+          </Pressable>
+        )}
 
         {/* Back to Home Button */}
         <View style={styles.buttonContainer}>
@@ -132,9 +232,37 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#9C27B0",
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  riskTitle: {
+    fontSize: 20,
+    fontWeight: "600",
     textAlign: "center",
     marginBottom: 16,
+  },
+  scoreBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    marginBottom: 16,
+  },
+  scoreText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#555",
+  },
+  riskPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  riskPillText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "700",
   },
   description: {
     fontSize: 16,
@@ -177,7 +305,6 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#9C27B0",
     marginTop: 8,
   },
   recommendationText: {
@@ -201,6 +328,23 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 18,
+    fontWeight: "600",
+    color: "white",
+  },
+  hotlineButton: {
+    borderRadius: 25,
+    marginBottom: 16,
+  },
+  hotlineGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 25,
+    gap: 8,
+  },
+  hotlineText: {
+    fontSize: 16,
     fontWeight: "600",
     color: "white",
   },
