@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   SafeAreaView,
@@ -13,7 +14,14 @@ import {
 } from "react-native";
 
 import { auth, db } from "@/constants/firebase";
-import { addDoc, collection, doc, serverTimestamp } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
 
 interface Question {
   id: string;
@@ -145,6 +153,8 @@ function classifyRisk(answers: Record<string, number>): AssessmentResult {
 export default function SelfAssessmentScreen() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ [key: string]: any }>({});
+  const [assessmentLocked, setAssessmentLocked] = useState(false);
+  const [loadingLock, setLoadingLock] = useState(true);
 
   const questions: Question[] = [
     // A. Mood & Emotions
@@ -238,10 +248,68 @@ export default function SelfAssessmentScreen() {
         "How often have you had thoughts about hurting yourself or feeling that you don’t want to exist?",
       type: "rating",
     },
+    // Additional administrative/history questions (checkboxes)
+    {
+      id: "prevConsult",
+      group: "History",
+      question: "Previous psychological consultations (check all that apply):",
+      type: "checkbox",
+      options: [
+        "Psychiatrist",
+        "Psychologist",
+        "Guidance Counselor",
+        "Social Worker",
+        "Priest/Pastor",
+        "None",
+      ],
+    },
+    {
+      id: "specialNeeds",
+      group: "History",
+      question: "Are you a learner with special needs? (check all that apply):",
+      type: "checkbox",
+      options: [
+        "Physical Disability",
+        "Developmental Disability",
+        "Medical Disability",
+        "Psychological Disability",
+        "No, I don't have any Special needs",
+      ],
+    },
   ];
 
   const currentQuestion = questions[currentQuestionIndex];
   const totalQuestions = questions.length;
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) {
+          // no user signed in — nothing to lock
+          if (mounted) setLoadingLock(false);
+          return;
+        }
+
+        const udoc = await getDoc(doc(db, "users", user.uid));
+        if (mounted) {
+          const data = udoc.exists() ? udoc.data() : undefined;
+          if (data?.assessmentCompleted) {
+            setAssessmentLocked(true);
+          }
+          setLoadingLock(false);
+        }
+      } catch (err) {
+        console.error("Error checking assessment lock", err);
+        if (mounted) setLoadingLock(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleBack = () => {
     router.replace("/dashboard");
@@ -251,6 +319,18 @@ export default function SelfAssessmentScreen() {
     setAnswers((prev) => ({
       ...prev,
       [currentQuestion.id]: rating,
+    }));
+  };
+
+  const handleCheckboxToggle = (option: string) => {
+    const currentAnswers = (answers[currentQuestion.id] as string[]) || [];
+    const updatedAnswers = currentAnswers.includes(option)
+      ? currentAnswers.filter((item) => item !== option)
+      : [...currentAnswers, option];
+
+    setAnswers((prev) => ({
+      ...prev,
+      [currentQuestion.id]: updatedAnswers,
     }));
   };
 
@@ -286,6 +366,17 @@ export default function SelfAssessmentScreen() {
           const col = collection(doc(db, "users", uid), "selfAssessments");
           await addDoc(col, payload);
 
+          // Mark user's account as having completed the assessment to prevent
+          // re-taking. This sets a boolean and timestamp on the user document.
+          await setDoc(
+            doc(db, "users", uid),
+            {
+              assessmentCompleted: true,
+              assessmentCompletedAt: serverTimestamp(),
+            },
+            { merge: true },
+          );
+
           // Navigate to completion page with risk level & score
           router.replace({
             pathname: "/assessment-complete",
@@ -310,10 +401,63 @@ export default function SelfAssessmentScreen() {
 
   const isAnswered = () => {
     const answer = answers[currentQuestion.id];
+    if (currentQuestion.type === "checkbox") {
+      return Array.isArray(answer) && answer.length > 0;
+    }
     return answer !== undefined && answer !== null;
   };
 
   const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
+
+  if (loadingLock) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
+          <ActivityIndicator size="large" color="#9C27B0" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (assessmentLocked) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <LinearGradient
+          colors={["#9C27B0", "#7B1FA2"]}
+          style={styles.headerGradient}
+        >
+          <View style={styles.header}>
+            <Pressable style={styles.backButton} onPress={handleBack}>
+              <Ionicons name="arrow-back" size={24} color="white" />
+            </Pressable>
+            <Text style={styles.headerTitle}>Assessment Locked</Text>
+            <View style={styles.placeholder} />
+          </View>
+        </LinearGradient>
+
+        <View style={styles.scrollContent}>
+          <View style={styles.questionCard}>
+            <Text style={styles.questionText}>
+              Our records show you have already completed this assessment.
+            </Text>
+            <Text style={{ textAlign: "center", color: "#666", marginTop: 12 }}>
+              You cannot retake it now. Contact support if you need to update
+              your responses.
+            </Text>
+            <View style={{ marginTop: 20 }}>
+              <Pressable onPress={() => router.replace("/dashboard")}>
+                <View style={styles.nextButton}>
+                  <Text style={styles.nextButtonText}>Back to Home</Text>
+                </View>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -387,6 +531,35 @@ export default function SelfAssessmentScreen() {
                   </Pressable>
                 ))}
               </View>
+            </View>
+          )}
+
+          {currentQuestion.type === "checkbox" && (
+            <View style={styles.checkboxContainer}>
+              {currentQuestion.options?.map((option) => (
+                <Pressable
+                  key={option}
+                  style={[
+                    styles.checkboxOption,
+                    (answers[currentQuestion.id] || []).includes(option) &&
+                      styles.selectedCheckbox,
+                  ]}
+                  onPress={() => handleCheckboxToggle(option)}
+                >
+                  <Text
+                    style={[
+                      styles.checkboxText,
+                      (answers[currentQuestion.id] || []).includes(option) &&
+                        styles.selectedCheckboxText,
+                    ]}
+                  >
+                    {option}
+                  </Text>
+                  {(answers[currentQuestion.id] || []).includes(option) && (
+                    <Ionicons name="checkmark" size={20} color="white" />
+                  )}
+                </Pressable>
+              ))}
             </View>
           )}
         </View>
@@ -531,6 +704,34 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     width: "100%",
     paddingHorizontal: 10,
+  },
+  checkboxContainer: {
+    marginTop: 16,
+    gap: 12,
+  },
+  checkboxOption: {
+    backgroundColor: "#F8F8F8",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  selectedCheckbox: {
+    backgroundColor: "#9C27B0",
+    borderColor: "#9C27B0",
+  },
+  checkboxText: {
+    fontSize: 16,
+    color: "#333",
+    flex: 1,
+  },
+  selectedCheckboxText: {
+    color: "white",
+    fontWeight: "500",
   },
   ratingButton: {
     width: 48,

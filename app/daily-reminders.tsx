@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Pressable,
   SafeAreaView,
@@ -11,6 +11,9 @@ import {
   Text,
   View,
 } from "react-native";
+
+import { auth, db } from "@/constants/firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 interface ReminderItem {
   id: string;
@@ -61,14 +64,56 @@ export default function DailyRemindersScreen() {
     router.replace("/dashboard");
   };
 
-  const toggleReminder = (id: string) => {
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const udoc = await getDoc(doc(db, "users", user.uid));
+        if (!mounted) return;
+        if (udoc.exists()) {
+          const data = udoc.data();
+          const saved: Record<string, boolean> = data?.reminders || {};
+          setReminders((prev) =>
+            prev.map((r) => ({ ...r, enabled: saved[r.id] ?? r.enabled })),
+          );
+        }
+      } catch (err) {
+        console.error("Error loading reminders settings", err);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const toggleReminder = async (id: string) => {
+    let newEnabled = false;
     setReminders((prev) =>
-      prev.map((reminder) =>
-        reminder.id === id
-          ? { ...reminder, enabled: !reminder.enabled }
-          : reminder,
-      ),
+      prev.map((reminder) => {
+        if (reminder.id === id) {
+          newEnabled = !reminder.enabled;
+          return { ...reminder, enabled: !reminder.enabled };
+        }
+        return reminder;
+      }),
     );
+
+    try {
+      const user = auth.currentUser;
+      if (!user) return;
+      // write single-key update under 'reminders' map on users/{uid}
+      await setDoc(
+        doc(db, "users", user.uid),
+        { reminders: { [id]: newEnabled } },
+        { merge: true },
+      );
+    } catch (err) {
+      console.error("Error saving reminder setting", err);
+    }
   };
 
   return (

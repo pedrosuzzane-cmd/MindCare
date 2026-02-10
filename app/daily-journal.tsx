@@ -3,13 +3,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 import { auth, db } from "@/constants/firebase";
@@ -43,6 +43,10 @@ export default function DailyJournalScreen() {
   const handleEditEntry = (entryId: string) => {
     // Navigate to edit journal entry screen
     // TODO: navigate to edit screen
+  };
+
+  const handleViewEntry = (entryId: string) => {
+    router.push({ pathname: "/journal-detail", params: { id: entryId } });
   };
 
   const getInitials = (title: string) => {
@@ -107,7 +111,7 @@ export default function DailyJournalScreen() {
     return () => {
       try {
         unsubAuth();
-      } catch (e) {
+      } catch {
         /* ignore */
       }
       if (unsubSnapshot) unsubSnapshot();
@@ -150,12 +154,20 @@ export default function DailyJournalScreen() {
             </Text>
           </View>
         </View>
-        <Pressable
-          style={styles.editButton}
-          onPress={() => handleEditEntry(entry.id)}
-        >
-          <Ionicons name="pencil" size={20} color="#666" />
-        </Pressable>
+        <View style={styles.actionsRow}>
+          <Pressable
+            style={styles.viewButton}
+            onPress={() => handleViewEntry(entry.id)}
+          >
+            <Ionicons name="eye" size={20} color="#666" />
+          </Pressable>
+          <Pressable
+            style={styles.editButton}
+            onPress={() => handleEditEntry(entry.id)}
+          >
+            <Ionicons name="pencil" size={20} color="#666" />
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -303,6 +315,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  viewButton: {
+    width: 32,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 8,
   },
   entryHeader: {
     flexDirection: "row",

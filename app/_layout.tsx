@@ -21,6 +21,7 @@ export default function RootLayout() {
         <Stack.Screen name="dashboard" options={{ headerShown: false }} />
         <Stack.Screen name="daily-reminders" options={{ headerShown: false }} />
         <Stack.Screen name="daily-journal" options={{ headerShown: false }} />
+        <Stack.Screen name="journal-detail" options={{ headerShown: false }} />
         <Stack.Screen
           name="new-journal-entry"
           options={{ headerShown: false }}

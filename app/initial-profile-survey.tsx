@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   SafeAreaView,
@@ -14,7 +15,14 @@ import {
 } from "react-native";
 
 import { auth, db } from "@/constants/firebase";
-import { addDoc, collection, doc, serverTimestamp } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
 
 interface Question {
   id: string;
@@ -33,6 +41,8 @@ interface Answer {
 export default function InitialProfileSurveyScreen() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ [key: string]: Answer }>({});
+  const [surveyLocked, setSurveyLocked] = useState(false);
+  const [loadingLock, setLoadingLock] = useState(true);
 
   const questions: Question[] = [
     {
@@ -90,6 +100,35 @@ export default function InitialProfileSurveyScreen() {
   const currentQuestion = questions[currentQuestionIndex];
   const totalQuestions = questions.length;
 
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) {
+          if (mounted) setLoadingLock(false);
+          return;
+        }
+
+        const udoc = await getDoc(doc(db, "users", user.uid));
+        if (mounted) {
+          const data = udoc.exists() ? udoc.data() : undefined;
+          if (data?.initialProfileSurveyCompleted) {
+            setSurveyLocked(true);
+          }
+          setLoadingLock(false);
+        }
+      } catch (err) {
+        console.error("Error checking survey lock", err);
+        if (mounted) setLoadingLock(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const handleBack = () => {
     router.back();
   };
@@ -145,6 +184,16 @@ export default function InitialProfileSurveyScreen() {
             "initialProfileSurveys",
           );
           await addDoc(col, payload);
+
+          // Mark survey completed on user document to prevent re-taking
+          await setDoc(
+            doc(db, "users", uid),
+            {
+              initialProfileSurveyCompleted: true,
+              initialProfileSurveyCompletedAt: serverTimestamp(),
+            },
+            { merge: true },
+          );
           router.replace("/assessment-complete");
         } catch (err) {
           console.error("Error saving initial profile survey", err);
@@ -256,6 +305,60 @@ export default function InitialProfileSurveyScreen() {
     }
   };
   const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
+
+  if (loadingLock) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
+          <ActivityIndicator size="large" color="#9C27B0" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (surveyLocked) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <LinearGradient
+          colors={["#9C27B0", "#7B1FA2"]}
+          style={styles.headerGradient}
+        >
+          <View style={styles.header}>
+            <Pressable
+              style={styles.backButton}
+              onPress={() => router.replace("/dashboard")}
+            >
+              <Ionicons name="arrow-back" size={24} color="white" />
+            </Pressable>
+            <Text style={styles.headerTitle}>Survey Locked</Text>
+            <View style={styles.placeholder} />
+          </View>
+        </LinearGradient>
+
+        <View style={styles.scrollContent}>
+          <View style={styles.questionCard}>
+            <Text style={styles.questionText}>
+              Our records show you have already completed the initial profile
+              survey.
+            </Text>
+            <Text style={{ textAlign: "center", color: "#666", marginTop: 12 }}>
+              You cannot retake it now. Contact support if you need to update
+              your responses.
+            </Text>
+            <View style={{ marginTop: 20 }}>
+              <Pressable onPress={() => router.replace("/dashboard")}>
+                <View style={styles.nextButton}>
+                  <Text style={styles.nextButtonText}>Back to Home</Text>
+                </View>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
