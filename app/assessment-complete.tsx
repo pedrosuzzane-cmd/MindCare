@@ -121,7 +121,7 @@ export default function AssessmentCompleteScreen() {
         {/* Score badge */}
         {totalScore !== null && (
           <View style={styles.scoreBadge}>
-            <Text style={styles.scoreText}>Score: {totalScore} / 36</Text>
+            <Text style={styles.scoreText}>Score: {totalScore} / 70</Text>
             <View
               style={[styles.riskPill, { backgroundColor: config.gradient[0] }]}
             >
@@ -131,6 +131,11 @@ export default function AssessmentCompleteScreen() {
             </View>
           </View>
         )}
+
+        {/* Clarify direction: higher scores indicate better mental health */}
+        <Text style={{ textAlign: "center", color: "#666", marginTop: 6 }}>
+          Higher score indicates better overall mental health
+        </Text>
 
         {/* Description */}
         <Text style={styles.description}>{config.description}</Text>
@@ -250,9 +255,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   scoreText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#555",
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#333",
   },
   riskPill: {
     paddingHorizontal: 12,
