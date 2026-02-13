@@ -3,24 +3,25 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
 import { auth, db } from "@/constants/firebase";
 import {
-    addDoc,
-    collection,
-    doc,
-    getDoc,
-    serverTimestamp,
-    setDoc,
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
 } from "firebase/firestore";
 
 interface Question {
@@ -143,6 +144,31 @@ export default function SelfAssessmentScreen() {
       type: "rating",
     },
     { id: "q14", question: "I've been feeling cheerful", type: "rating" },
+    {
+      id: "q15",
+      question: "Are you a learner with special needs? (select all that apply)",
+      type: "checkbox",
+      options: [
+        "Physical Disability",
+        "Developmental Disability",
+        "Chronic/Medical Disability",
+        "Psychosocial Disability",
+        "Other (please specify)",
+      ],
+    },
+    {
+      id: "q16",
+      question: "Previous psychological consultations (select all that apply)",
+      type: "checkbox",
+      options: [
+        "Psychiatrist",
+        "Psychologist",
+        "Guidance Counselor",
+        "Social Worker",
+        "Priest/Pastor/Spiritual leader",
+        "None",
+      ],
+    },
   ];
 
   const currentQuestion = questions[currentQuestionIndex];
@@ -373,6 +399,72 @@ export default function SelfAssessmentScreen() {
               </View>
             </View>
           )}
+
+          {currentQuestion.type === "checkbox" && (
+            <View style={styles.checkboxContainer}>
+              {currentQuestion.options?.map((opt) => {
+                const selected =
+                  Array.isArray(answers[currentQuestion.id]) &&
+                  answers[currentQuestion.id].includes(opt);
+                return (
+                  <Pressable
+                    key={opt}
+                    style={[
+                      styles.checkboxRow,
+                      selected && styles.checkboxSelected,
+                    ]}
+                    onPress={() => {
+                      setAnswers((prev) => {
+                        const prevArr = Array.isArray(prev[currentQuestion.id])
+                          ? [...prev[currentQuestion.id]]
+                          : [];
+                        if (prevArr.includes(opt)) {
+                          return {
+                            ...prev,
+                            [currentQuestion.id]: prevArr.filter(
+                              (x) => x !== opt,
+                            ),
+                          };
+                        }
+                        return {
+                          ...prev,
+                          [currentQuestion.id]: [...prevArr, opt],
+                        };
+                      });
+                    }}
+                  >
+                    <Text style={styles.checkboxLabel}>{opt}</Text>
+                    {selected && (
+                      <Ionicons name="checkmark" size={20} color="#9C27B0" />
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+          {/* Text input for "other / details" under checkbox questions */}
+          {currentQuestion.type === "checkbox" && (
+            <View style={{ marginTop: 8 }}>
+              <TextInput
+                style={styles.otherInput}
+                placeholder={
+                  currentQuestion.id === "q15"
+                    ? "If other, please describe your disability"
+                    : "If other, please describe"
+                }
+                value={answers[`${currentQuestion.id}_other`] || ""}
+                onChangeText={(text) =>
+                  setAnswers((prev) => ({
+                    ...prev,
+                    [`${currentQuestion.id}_other`]: text,
+                  }))
+                }
+                multiline
+                numberOfLines={2}
+                returnKeyType="done"
+              />
+            </View>
+          )}
         </View>
 
         <View style={styles.buttonContainerRow}>
@@ -584,5 +676,40 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "white",
+  },
+  checkboxContainer: {
+    width: "100%",
+    marginTop: 8,
+  },
+  checkboxRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: "#F7F7F7",
+    marginBottom: 8,
+  },
+  checkboxSelected: {
+    backgroundColor: "#FFF0FF",
+    borderWidth: 1,
+    borderColor: "#9C27B0",
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    color: "#333",
+    flex: 1,
+    marginRight: 8,
+  },
+  otherInput: {
+    backgroundColor: "#FFF",
+    borderColor: "#E0E0E0",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: "#333",
   },
 });
