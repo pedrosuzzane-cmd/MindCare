@@ -1,23 +1,23 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    Pressable,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 
 // Firebase
 import { auth } from "@/constants/firebase";
 import {
-  sendPasswordResetEmail,
-  signInWithEmailAndPassword,
+    sendPasswordResetEmail,
+    signInWithEmailAndPassword,
 } from "firebase/auth";
 
 export default function LoginScreen() {

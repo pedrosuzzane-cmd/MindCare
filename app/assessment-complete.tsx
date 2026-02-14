@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 
-type RiskLevel = "low" | "medium" | "high";
+type RiskLevel = "low" | "normal" | "high";
 
 /**
  * Configuration for each risk tier — colours, titles, messages, and
@@ -21,6 +21,7 @@ const RISK_CONFIG: Record<
   RiskLevel,
   {
     gradient: [string, string];
+    icon: keyof typeof Ionicons.glyphMap;
     title: string;
     description: string;
     recommendations: string[];
@@ -28,36 +29,39 @@ const RISK_CONFIG: Record<
 > = {
   low: {
     gradient: ["#4CAF50", "#66BB6A"],
-    title: "You\u2019re doing well!",
+    icon: "checkmark-circle",
+    title: "You\u2019re doing great!",
     description:
-      "Your responses suggest you are coping well overall. Keep building on the positive habits you already have.",
+      "Your responses show that you\u2019re in a really good place mentally. Keep up the amazing work and continue nurturing the habits that are helping you thrive!",
     recommendations: [
-      "Continue your daily journaling to maintain self-awareness",
-      "Practice mindfulness or relaxation exercises regularly",
-      "Stay connected with friends, family, or support groups",
+      "Keep journaling \u2014 it\u2019s clearly working for you",
+      "Share your positivity with others; connection strengthens well-being",
+      "Continue practicing mindfulness or activities that bring you joy",
     ],
   },
-  medium: {
-    gradient: ["#FF9800", "#FFA726"],
-    title: "Some areas need attention",
+  normal: {
+    gradient: ["#2196F3", "#42A5F5"],
+    icon: "thumbs-up",
+    title: "You\u2019re doing great \u2014 keep it up!",
     description:
-      "Your responses indicate moderate stress or emotional difficulty in some areas. Consider exploring additional support to stay on track.",
+      "Your mental health is in a healthy range. You may experience ups and downs, and that\u2019s completely normal. Stay mindful and keep taking care of yourself.",
     recommendations: [
-      "Try scheduling regular breaks and self-care activities",
-      "Talk to a trusted friend, mentor, or counselor about how you feel",
-      "Explore stress-management techniques such as deep breathing or exercise",
-      "Consider reaching out to a mental health professional for guidance",
+      "Maintain a consistent self-care routine",
+      "Stay connected with the people who matter to you",
+      "Try new stress-relief techniques like deep breathing or exercise",
+      "Check in with yourself regularly through journaling",
     ],
   },
   high: {
     gradient: ["#F44336", "#E53935"],
-    title: "We\u2019re here for you",
+    icon: "heart",
+    title: "Help is available \u2014 you\u2019re not alone",
     description:
-      "Your responses suggest you may be experiencing significant distress. Please know that help is available and reaching out is a sign of strength.",
+      "Your responses suggest you may be going through a difficult time. Please know that seeking help is a sign of strength, and there are people ready to support you.",
     recommendations: [
-      "Please reach out to a mental health professional as soon as possible",
-      "Contact a crisis hotline if you are in immediate distress",
-      "Talk to someone you trust \u2014 you don\u2019t have to go through this alone",
+      "Reach out to a mental health professional for guidance",
+      "Contact a crisis hotline if you\u2019re in immediate distress",
+      "Talk to someone you trust \u2014 you don\u2019t have to face this alone",
       "Use the Support Hotlines page in this app for immediate resources",
     ],
   },
@@ -96,17 +100,7 @@ export default function AssessmentCompleteScreen() {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            <Ionicons
-              name={
-                riskLevel === "low"
-                  ? "checkmark"
-                  : riskLevel === "medium"
-                    ? "alert"
-                    : "heart"
-              }
-              size={40}
-              color="white"
-            />
+            <Ionicons name={config.icon} size={40} color="white" />
           </LinearGradient>
         </View>
 
@@ -161,8 +155,8 @@ export default function AssessmentCompleteScreen() {
           </View>
         </View>
 
-        {/* Support Hotlines link for medium / high risk */}
-        {riskLevel !== "low" && (
+        {/* Support Hotlines link for high risk */}
+        {riskLevel === "high" && (
           <Pressable
             style={styles.hotlineButton}
             onPress={handleSupportHotlines}

@@ -22,8 +22,6 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Note: `firebase/analytics` references browser globals like `window`.
-// Avoid initializing analytics in React Native / server environments.
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 

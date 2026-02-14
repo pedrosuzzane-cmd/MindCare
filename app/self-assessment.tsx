@@ -32,67 +32,36 @@ interface Question {
   group?: string;
 }
 
-type RiskLevel = "low" | "medium" | "high";
+type RiskLevel = "low" | "normal" | "high";
 
 interface AssessmentResult {
   totalScore: number;
   riskLevel: RiskLevel;
-  sectionScores: Record<string, number>;
 }
 
-const SECTION_MAP: Record<string, string[]> = {
-  "Mood & Emotions": ["q1", "q2"],
-  "Stress & Anxiety": ["q3", "q4"],
-  "Thinking & Focus": ["q5", "q6"],
-  "Energy & Sleep": ["q7", "q8"],
-  "Coping & Support": ["q9", "q10"],
-  "Safety & Distress": ["q11", "q12"],
-  "Positive Affect": ["q13", "q14"],
-};
+/** Rating question IDs (q1–q14). Checkbox questions are excluded from scoring. */
+const RATING_IDS = [
+  "q1", "q2", "q3", "q4", "q5", "q6", "q7",
+  "q8", "q9", "q10", "q11", "q12", "q13", "q14",
+];
 
 function classifyRisk(answers: Record<string, number>): AssessmentResult {
-  let totalScore = 0;
-  const sectionScores: Record<string, number> = {};
+  const totalScore = RATING_IDS.reduce(
+    (sum, id) => sum + (answers[id] ?? 0),
+    0,
+  );
 
-  for (const [section, ids] of Object.entries(SECTION_MAP)) {
-    const sectionTotal = ids.reduce((sum, id) => sum + (answers[id] ?? 0), 0);
-    sectionScores[section] = sectionTotal;
-    totalScore += sectionTotal;
-  }
-
-  const q11 = answers["q11"] ?? 0;
-  const q12 = answers["q12"] ?? 0;
-
-  // Adjusted critical-safety override to the 1-5 scale:
-  // - If q12 (safety/distress) is "often" or "all the time" (4 or 5) => HIGH
-  // - If q11 is "often" or "all the time" (4 or 5) AND q12 is at least "some of the time" (3) => HIGH
-  if (q12 >= 4) return { totalScore, riskLevel: "high", sectionScores };
-  if (q11 >= 4 && q12 >= 3)
-    return { totalScore, riskLevel: "high", sectionScores };
-
-  // Score-based thresholds (using 12 items × 1–5 => 12..60).
-  // User-specified mapping:
-  // 14 - 42 => HIGH
-  // 43 - 49 => MEDIUM
-  // 50 - 60 => LOW
-  // Score-based thresholds for 14 items (1..5 scale => 14..70).
-  // Scaled mapping (proportional to previous user-specified ranges):
-  // 16 - 49 => HIGH (higher distress)
-  // 50 - 57 => MEDIUM
-  // 58 - 70 => LOW (better mental health)
+  // 60-70  → low risk  (doing great)
+  // 42-59  → normal    (doing great, keep it up)
+  // 41 and below → high risk (help is available)
   let riskLevel: RiskLevel = "low";
-  if (totalScore >= 16 && totalScore <= 49) {
+  if (totalScore <= 41) {
     riskLevel = "high";
-  } else if (totalScore >= 50 && totalScore <= 57) {
-    riskLevel = "medium";
-  } else if (totalScore >= 58 && totalScore <= 70) {
-    riskLevel = "low";
-  } else {
-    // Fallback: treat out-of-range totals as low risk
-    riskLevel = "low";
+  } else if (totalScore <= 59) {
+    riskLevel = "normal";
   }
 
-  return { totalScore, riskLevel, sectionScores };
+  return { totalScore, riskLevel };
 }
 
 export default function SelfAssessmentScreen() {
@@ -229,7 +198,6 @@ export default function SelfAssessmentScreen() {
           answers,
           totalScore: result.totalScore,
           riskLevel: result.riskLevel,
-          sectionScores: result.sectionScores,
           createdAt: serverTimestamp(),
         } as Record<string, any>;
 

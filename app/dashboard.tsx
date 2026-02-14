@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { signOut } from "firebase/auth";
-import React, { useState } from "react";
+import { useState } from "react";
 import {
     ActivityIndicator,
     Pressable,
