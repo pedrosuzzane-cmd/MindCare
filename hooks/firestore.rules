@@ -1,0 +1,62 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if the requesting user is an admin.
+    // It checks for the existence of their UID in the 'admins' collection.
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Rules for the 'users' collection, which contains student data.
+    match /users/{userId} {
+
+      // READ:
+      // - Admins can read any user's profile.
+      // - A student can only read their own profile.
+      allow read: if isAdmin() || request.auth.uid == userId;
+
+      // CREATE:
+      // - A new user can create their own profile document upon registration.
+      allow create: if request.auth.uid == userId;
+
+      // UPDATE:
+      // - A student can update their own profile (e.g., assessment score).
+      allow update: if request.auth.uid == userId;
+
+      // DELETE:
+      // - Only an admin can delete a student's document.
+      allow delete: if isAdmin();
+
+      // --- Subcollections for each User ---
+
+      // Full access for the user to their own private data.
+      // Admins can read for analytics and delete for account removal, but cannot write.
+      match /journalEntries/{entryId} {
+        allow read, delete: if isAdmin() || request.auth.uid == userId;
+        allow write: if request.auth.uid == userId;
+      }
+
+      match /selfAssessments/{assessmentId} {
+        allow read, delete: if isAdmin() || request.auth.uid == userId;
+        allow write: if request.auth.uid == userId;
+      }
+
+      match /achievements/{achievementId} {
+        allow read, delete: if isAdmin() || request.auth.uid == userId;
+        allow write: if request.auth.uid == userId;
+      }
+    }
+
+    // Rules for the 'admins' collection.
+    match /admins/{adminId} {
+      // An admin can read their own document to verify their role.
+      allow read: if request.auth.uid == adminId;
+
+      // No client is allowed to write to the admins collection.
+      // This must be done via a secure backend with admin privileges.
+      allow write: if false;
+    }
+  }
+}
