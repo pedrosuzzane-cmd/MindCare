@@ -12,29 +12,12 @@ import {
   Text,
   TouchableOpacity,
   View,
-  useWindowDimensions,
 } from "react-native";
 import { useJournal } from "@/hooks/useJournal";
 import { JournalCalendar } from "@/components/student/JournalCalendar";
 import { WellnessChart } from "@/components/WellnessChart";
 
-const MOODS = [
-  { id: "happy", emoji: "😄", color: "#FFD700", wellness: 5 },
-  { id: "calm", emoji: "😊", color: "#98FB98", wellness: 5 },
-  { id: "relaxed", emoji: "😌", color: "#87CEEB", wellness: 5 },
-  { id: "good", emoji: "🙂", color: "#90EE90", wellness: 4 },
-  { id: "neutral", emoji: "😐", color: "#D3D3D3", wellness: 3 },
-  { id: "worried", emoji: "😟", color: "#FFA500", wellness: 2 },
-  { id: "sad", emoji: "😞", color: "#4169E1", wellness: 2 },
-  { id: "overwhelmed", emoji: "😣", color: "#8B0000", wellness: 1 },
-  { id: "exhausted", emoji: "😫", color: "#708090", wellness: 1 },
-  { id: "stressed", emoji: "😓", color: "#FF6347", wellness: 0 },
-  { id: "burnout", emoji: "😤", color: "#800020", wellness: 0 },
-  { id: "very-upset", emoji: "😢", color: "#000080", wellness: 0 },
-];
-
 export default function DailyJournalScreen() {
-  const { width: screenWidth } = useWindowDimensions();
   const {
     entries: journalEntries,
     loading,
