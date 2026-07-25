@@ -3,20 +3,20 @@ import * as DocumentPicker from "expo-document-picker";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context"; // This was already correct
 
 // Firebase imports
-import { API_URL } from "@/constants/config";
+import { API_URL } from "@/backend/config";
 import { auth } from "@/constants/firebase";
 import { createUserDocument } from "@/firestore/profileFirestore";
 import { createUserWithEmailAndPassword } from "firebase/auth";

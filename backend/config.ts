@@ -8,5 +8,4 @@
  * Example: "https://2ab3-49-144-80-90.ngrok-free.app"
  */
 export const API_URL =
-  process.env.EXPO_PUBLIC_API_URL ||
-  "https://heroism-upward-charity.ngrok-free.dev";
+  process.env.EXPO_PUBLIC_API_URL || "https://mindcare-api-wcqr.onrender.com";

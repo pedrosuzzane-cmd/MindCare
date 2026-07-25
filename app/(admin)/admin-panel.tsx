@@ -1,5 +1,5 @@
+import { API_URL } from "@/backend/config";
 import { StudentListModal } from "@/components/admin/StudentListModal";
-import { API_URL } from "@/constants/config";
 import { db } from "@/constants/firebase";
 import { useAuth } from "@/hooks/AuthContext";
 import { listenForAdminDashboardData } from "@/services/adminFirestoreService";
@@ -7,23 +7,23 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  writeBatch,
+    collection,
+    deleteDoc,
+    doc,
+    getDocs,
+    writeBatch,
 } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context"; // This was already correct
 
@@ -1030,7 +1030,11 @@ export default function AdminPanelScreen() {
                   >
                     <View style={styles.analyticsHeroTopRow}>
                       <View style={styles.analyticsHeroIcon}>
-                        <Ionicons name="stats-chart" size={25} color="#FFFFFF" />
+                        <Ionicons
+                          name="stats-chart"
+                          size={25}
+                          color="#FFFFFF"
+                        />
                       </View>
                       <Text style={styles.analyticsHeroEyebrow}>
                         LIVE WELLNESS OVERVIEW
@@ -1040,7 +1044,8 @@ export default function AdminPanelScreen() {
                       Department Analytics
                     </Text>
                     <Text style={styles.analyticsHeroSubtitle}>
-                      Monitor participation and wellness trends across the university.
+                      Monitor participation and wellness trends across the
+                      university.
                     </Text>
                     <View style={styles.analyticsHeroMetrics}>
                       <View style={styles.analyticsHeroMetric}>

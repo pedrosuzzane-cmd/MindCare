@@ -4,7 +4,7 @@
  * This keeps the API key secure on the server side.
  */
 
-import { API_URL } from "@/constants/config";
+import { API_URL } from "@/backend/config";
 
 export interface ChatResponse {
   text: string;
@@ -35,9 +35,7 @@ export async function sendMessage(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
-    throw new Error(
-      errorData?.error || `API Error: ${response.status}`,
-    );
+    throw new Error(errorData?.error || `API Error: ${response.status}`);
   }
 
   const data = await response.json();

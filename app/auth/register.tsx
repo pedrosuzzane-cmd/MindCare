@@ -3,20 +3,20 @@ import * as DocumentPicker from "expo-document-picker";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // Firebase imports
-import { API_URL } from "@/constants/config";
+import { API_URL } from "@/backend/config";
 import { auth } from "@/constants/firebase";
 import { createUserDocument } from "@/firestore/profileFirestore";
 import { createUserWithEmailAndPassword } from "firebase/auth";
@@ -224,7 +224,12 @@ export default function RegisterScreen() {
 
       xhr.onload = () => {
         onProgress(100);
-        let response: { error?: string; details?: string; secureUrl?: string; publicId?: string } = {};
+        let response: {
+          error?: string;
+          details?: string;
+          secureUrl?: string;
+          publicId?: string;
+        } = {};
         try {
           response = xhr.responseText ? JSON.parse(xhr.responseText) : {};
         } catch {
@@ -232,7 +237,9 @@ export default function RegisterScreen() {
         }
         if (xhr.status >= 200 && xhr.status < 300) {
           if (!response.secureUrl || !response.publicId) {
-            reject(new Error("The upload service returned an incomplete response."));
+            reject(
+              new Error("The upload service returned an incomplete response."),
+            );
             return;
           }
           resolve(response as { secureUrl: string; publicId: string });
