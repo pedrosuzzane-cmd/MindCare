@@ -1188,6 +1188,16 @@ export default function AdminPanelScreen() {
           <View style={styles.headerActions}>
             <Pressable
               style={styles.profileButton}
+              onPress={() => router.push("/(admin)/messages")}
+            >
+              <Ionicons
+                name="chatbubble-ellipses-outline"
+                size={20}
+                color="#0F172A"
+              />
+            </Pressable>
+            <Pressable
+              style={styles.profileButton}
               onPress={() => router.push("/profile")}
             >
               <Ionicons

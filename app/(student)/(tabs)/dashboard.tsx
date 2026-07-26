@@ -162,6 +162,26 @@ export default function DashboardScreen() {
             <View style={styles.rightButtons}>
               <Pressable
                 style={styles.profileButton}
+                onPress={() => router.push("/(student)/peer-messages")}
+              >
+                <Ionicons
+                  name="people-outline"
+                  size={24}
+                  color="white"
+                />
+              </Pressable>
+              <Pressable
+                style={styles.profileButton}
+                onPress={() => router.push("/(student)/messages")}
+              >
+                <Ionicons
+                  name="shield-outline"
+                  size={24}
+                  color="white"
+                />
+              </Pressable>
+              <Pressable
+                style={styles.profileButton}
                 onPress={() => router.push("/profile")}
               >
                 <Ionicons
