@@ -150,7 +150,7 @@ export default function JournalSuggestionsScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2196F3" />
+          <ActivityIndicator size="large" color="#8A63D2" />
           <Text style={styles.loadingText}>Loading your entries...</Text>
         </View>
       </SafeAreaView>
@@ -161,7 +161,7 @@ export default function JournalSuggestionsScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2196F3" />
+          <ActivityIndicator size="large" color="#8A63D2" />
           <Text style={styles.loadingText}>
             Analyzing your journal with AI...
           </Text>
@@ -173,7 +173,7 @@ export default function JournalSuggestionsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#E8F4FD", "#F0F8FF", "#E8F4FD"]}
+        colors={["#E8E0F5", "#F4F2F8", "#E8E0F5"]}
         style={styles.gradient}
       >
         {/* Header */}
@@ -235,7 +235,7 @@ export default function JournalSuggestionsScreen() {
             /* Show "Generating insights..." if no AI data yet but entries exist */
             journalEntries.length > 0 && (
               <View style={styles.generatingContainer}>
-                <ActivityIndicator size="small" color="#2196F3" />
+                <ActivityIndicator size="small" color="#8A63D2" />
                 <Text style={styles.generatingText}>
                   Generating insights...
                 </Text>
@@ -307,7 +307,7 @@ export default function JournalSuggestionsScreen() {
             disabled={analyzing}
           >
             <LinearGradient
-              colors={["#2196F3", "#00BCD4"]}
+              colors={["#9C7EEB", "#8A63D2"]}
               style={styles.regenerateBtnGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#2196F3",
+    color: "#8A63D2",
   },
   placeholder: {
     width: 40,
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
   introTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#2196F3",
+    color: "#8A63D2",
     marginBottom: 8,
   },
   introText: {
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 24,
     fontWeight: "600",
-    color: "#2196F3",
+    color: "#8A63D2",
   },
   regenerateButton: {
     borderRadius: 12,
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
   insightLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#2196F3",
+    color: "#8A63D2",
     textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 6,
@@ -513,7 +513,7 @@ const styles = StyleSheet.create({
   },
   suggestionBullet: {
     fontSize: 15,
-    color: "#2196F3",
+    color: "#8A63D2",
     marginRight: 8,
     lineHeight: 22,
   },

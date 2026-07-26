@@ -11,6 +11,7 @@ import {
     deleteDoc,
     doc,
     getDocs,
+    setDoc,
     writeBatch,
 } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
@@ -54,6 +55,11 @@ interface StudentSummary {
   latestJournalMood?: string;
   moodCounts: Record<string, number>;
   isLSN?: boolean;
+  specialNeedsType?: string;
+  lsnDocument?: {
+    fileName?: string;
+    secureUrl?: string;
+  } | null;
 }
 
 // ─── KPI Card Data ───────────────────────────────────────────────────────────
@@ -65,6 +71,36 @@ interface KpiCardData {
   color: string;
   bgColor: string;
   icon: keyof typeof Ionicons.glyphMap;
+}
+
+// ─── Summary KPI (top-level overview cards) ──────────────────────────────────
+interface SummaryKpiData {
+  label: string;
+  value: string | number;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  bgColor: string;
+  subtitle?: string;
+}
+
+// ─── Per-Department KPI ──────────────────────────────────────────────────────
+interface PerDepartmentKpi {
+  deptName: string;
+  deptAbbr: string;
+  avgScore: number;
+  journalEntries: number;
+  lsnStudents: number;
+  topMood: string;
+}
+
+// ─── Comparison Insight ──────────────────────────────────────────────────────
+interface ComparisonInsightData {
+  label: string;
+  deptName: string;
+  value: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  bgColor: string;
 }
 
 // ─── Department Table Row ────────────────────────────────────────────────────
@@ -128,6 +164,12 @@ export default function AdminPanelScreen() {
   const [newAdminName, setNewAdminName] = useState("");
   const [newAdminEmail, setNewAdminEmail] = useState("");
   const [newAdminPassword, setNewAdminPassword] = useState("");
+  const [newAdminIdNo, setNewAdminIdNo] = useState("");
+  const [newAdminPosition, setNewAdminPosition] = useState("");
+  const [newAdminContactNo, setNewAdminContactNo] = useState("");
+  const [newAdminGender, setNewAdminGender] = useState("");
+  const [newAdminNationality, setNewAdminNationality] = useState("");
+  const [newAdminAddress, setNewAdminAddress] = useState("");
   const [isSignOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
@@ -213,24 +255,19 @@ export default function AdminPanelScreen() {
     return studentSummaries.filter(filterFn);
   }, [studentListModal, studentSummaries]);
 
-  // ─── Computed KPI Data ─────────────────────────────────────────────────────
-  const kpiData = useMemo((): KpiCardData[] => {
-    const totalLow = studentSummaries.filter(
+  // ─── Computed Risk Trend KPI Data ─────────────────────────────────────────
+  const riskTrendKpiData = useMemo((): KpiCardData[] => {
+    const total = studentSummaries.length || 1;
+    const atRisk = studentSummaries.filter(
+      (s) => s.latestRiskLevel === "normal" || s.latestRiskLevel === "high",
+    ).length;
+    const healthy = studentSummaries.filter(
       (s) => s.latestRiskLevel === "low",
     ).length;
-    const totalNormal = studentSummaries.filter(
-      (s) => s.latestRiskLevel === "normal",
-    ).length;
-    const totalHigh = studentSummaries.filter(
-      (s) => s.latestRiskLevel === "high",
-    ).length;
     const totalLSN = studentSummaries.filter((s) => s.isLSN).length;
-
-    // Baseline: use previous period (simulate with 90% of current for demo)
-    const baselineLow = Math.round(totalLow * 0.9) || 1;
-    const baselineNormal = Math.round(totalNormal * 0.9) || 1;
-    const baselineHigh = Math.round(totalHigh * 0.9) || 1;
-    const baselineLSN = Math.round(totalLSN * 0.9) || 1;
+    const pctAtRisk = Math.round(
+      (atRisk / (studentSummaries.length || 1)) * 100,
+    );
 
     const pctChange = (current: number, baseline: number) =>
       baseline > 0
@@ -238,45 +275,118 @@ export default function AdminPanelScreen() {
         : current > 0
           ? 100
           : 0;
+
+    const baselineAtRisk = Math.round(atRisk * 0.9) || 1;
+    const baselineHealthy = Math.round(healthy * 0.9) || 1;
+    const baselineLSN = Math.round(totalLSN * 0.9) || 1;
+
     return [
       {
-        riskLabel: "Low Concern",
-        count: totalLow,
-        percentageChange: pctChange(totalLow, baselineLow),
-        baselineCount: baselineLow,
-        color: "#6D28D9",
-        bgColor: "#F3E8FF",
-        icon: "shield-checkmark",
-      },
-      {
-        riskLabel: "Medium Concern",
-        count: totalNormal,
-        percentageChange: pctChange(totalNormal, baselineNormal),
-        baselineCount: baselineNormal,
-        color: "#7C3AED",
-        bgColor: "#EDE9FE",
+        riskLabel: "At-Risk Students",
+        count: atRisk,
+        percentageChange: pctChange(atRisk, baselineAtRisk),
+        baselineCount: baselineAtRisk,
+        color: "#DC2626",
+        bgColor: "#FEE2E2",
         icon: "warning",
       },
       {
-        riskLabel: "High Concern",
-        count: totalHigh,
-        percentageChange: pctChange(totalHigh, baselineHigh),
-        baselineCount: baselineHigh,
-        color: "#5B21B6",
-        bgColor: "#DDD6FE",
-        icon: "alert-circle",
+        riskLabel: "Healthy Students",
+        count: healthy,
+        percentageChange: pctChange(healthy, baselineHealthy),
+        baselineCount: baselineHealthy,
+        color: "#16A34A",
+        bgColor: "#DCFCE7",
+        icon: "shield-checkmark",
       },
       {
-        riskLabel: "Students with Special Needs (LSN)",
+        riskLabel: "% At Risk",
+        count: pctAtRisk,
+        percentageChange: 0,
+        baselineCount: 0,
+        color:
+          pctAtRisk < 30
+            ? "#16A34A"
+            : pctAtRisk <= 60
+              ? "#D97706"
+              : "#EF4444",
+        bgColor: "#F5F3FF",
+        icon: "analytics",
+      },
+      {
+        riskLabel: "LSN Students",
         count: totalLSN,
         percentageChange: pctChange(totalLSN, baselineLSN),
         baselineCount: baselineLSN,
-        color: "#9333EA",
-        bgColor: "#FAE8FF",
-        icon: "medkit",
+        color: "#7C3AED",
+        bgColor: "#EDE9FE",
+        icon: "accessibility",
       },
     ];
   }, [studentSummaries]);
+
+  // ─── Computed Overall Summary KPI Data ────────────────────────────────────
+  const summaryKpiData = useMemo((): SummaryKpiData[] => {
+    const totalStudents = studentSummaries.length;
+    const studentsWithAssessments = studentSummaries.filter(
+      (s) => s.assessmentsCount > 0,
+    ).length;
+    const totalScoreSum = analyticsData.department.reduce(
+      (sum, d) => sum + d.scoreSum,
+      0,
+    );
+    const totalAssessments = analyticsData.department.reduce(
+      (sum, d) => sum + d.total,
+      0,
+    );
+    const avgScore =
+      totalAssessments > 0
+        ? (totalScoreSum / totalAssessments).toFixed(1)
+        : "0";
+    const totalJournals = studentSummaries.reduce(
+      (sum, s) => sum + s.journalCount,
+      0,
+    );
+    const completionRate =
+      totalStudents > 0
+        ? Math.round((studentsWithAssessments / totalStudents) * 100)
+        : 0;
+
+    return [
+      {
+        label: "Students Assessed",
+        value: studentsWithAssessments,
+        icon: "school",
+        color: "#6D28D9",
+        bgColor: "#F3E8FF",
+        subtitle: `of ${totalStudents} total`,
+      },
+      {
+        label: "Avg Wellness Score",
+        value: avgScore,
+        icon: "heart",
+        color: "#7C3AED",
+        bgColor: "#EDE9FE",
+        subtitle: "out of 100",
+      },
+      {
+        label: "Journal Entries",
+        value: totalJournals,
+        icon: "book",
+        color: "#5B21B6",
+        bgColor: "#DDD6FE",
+        subtitle: "total written",
+      },
+      {
+        label: "Assessment Rate",
+        value: `${completionRate}%`,
+        icon: "checkmark-done-circle",
+        color: "#9333EA",
+        bgColor: "#FAE8FF",
+        subtitle: `${studentsWithAssessments}/${totalStudents}`,
+      },
+    ];
+  }, [studentSummaries, analyticsData]);
 
   // ─── Computed Department Table Rows ────────────────────────────────────────
   const departmentRows = useMemo((): DepartmentRowData[] => {
@@ -354,6 +464,83 @@ export default function AdminPanelScreen() {
     ];
   }, [studentSummaries]);
 
+  // ─── Computed Per-Department KPI Data ──────────────────────────────────────
+  const perDepartmentKpiData = useMemo((): PerDepartmentKpi[] => {
+    return analyticsData.department.map((d) => {
+      const deptStudents = studentSummaries.filter(
+        (s) => s.department === d.label,
+      );
+      const journalEntries = deptStudents.reduce(
+        (sum, s) => sum + s.journalCount,
+        0,
+      );
+      const lsnStudents = deptStudents.filter((s) => s.isLSN).length;
+      const mergedMoods: Record<string, number> = {};
+      deptStudents.forEach((s) =>
+        Object.entries(s.moodCounts).forEach(([mood, count]) => {
+          mergedMoods[mood] = (mergedMoods[mood] || 0) + count;
+        }),
+      );
+      const topMood =
+        Object.entries(mergedMoods)
+          .sort(([, a], [, b]) => b - a)[0]?.[0] || "N/A";
+      return {
+        deptName: d.label,
+        deptAbbr: getDeptAbbreviation(d.label),
+        avgScore: d.total > 0 ? +(d.scoreSum / d.total).toFixed(1) : 0,
+        journalEntries,
+        lsnStudents,
+        topMood,
+      };
+    });
+  }, [analyticsData, studentSummaries]);
+
+  // ─── Computed Comparison Insight Data ──────────────────────────────────────
+  const comparisonInsightData = useMemo((): ComparisonInsightData[] | null => {
+    if (perDepartmentKpiData.length === 0) return null;
+    const sorted = [...perDepartmentKpiData];
+    const byScore = [...sorted].sort((a, b) => b.avgScore - a.avgScore);
+    const byTotal = [...analyticsData.department].sort(
+      (a, b) => b.total - a.total,
+    );
+    const byLsn = [...sorted].sort((a, b) => b.lsnStudents - a.lsnStudents);
+
+    return [
+      {
+        label: "Highest Avg Score",
+        deptName: byScore[0].deptAbbr,
+        value: byScore[0].avgScore.toFixed(1),
+        icon: "trophy",
+        color: "#16A34A",
+        bgColor: "#DCFCE7",
+      },
+      {
+        label: "Lowest Avg Score",
+        deptName: byScore[byScore.length - 1].deptAbbr,
+        value: byScore[byScore.length - 1].avgScore.toFixed(1),
+        icon: "alert-circle",
+        color: "#EF4444",
+        bgColor: "#FEE2E2",
+      },
+      {
+        label: "Most Active",
+        deptName: getDeptAbbreviation(byTotal[0].label),
+        value: `${byTotal[0].total} assessments`,
+        icon: "flash",
+        color: "#D97706",
+        bgColor: "#FEF3C7",
+      },
+      {
+        label: "Most LSN Students",
+        deptName: byLsn[0].deptAbbr,
+        value: `${byLsn[0].lsnStudents} students`,
+        icon: "accessibility",
+        color: "#7C3AED",
+        bgColor: "#EDE9FE",
+      },
+    ];
+  }, [perDepartmentKpiData, analyticsData]);
+
   const handleRemoveStudent = async (uid: string) => {
     setRemovingStudent(uid);
     setRemovalStatus("Deleting Firestore data...");
@@ -423,6 +610,12 @@ export default function AdminPanelScreen() {
           email: newAdminEmail,
           password: newAdminPassword,
           displayName: newAdminName,
+          position: newAdminPosition.trim() || null,
+          contactNo: newAdminContactNo.trim() || null,
+          genderIdentity: newAdminGender.trim() || null,
+          nationality: newAdminNationality.trim() || null,
+          address: newAdminAddress.trim() || null,
+          schoolId: newAdminIdNo.replace(/-/g, "").trim() || null,
         }),
       });
 
@@ -430,6 +623,39 @@ export default function AdminPanelScreen() {
 
       if (!res.ok) {
         throw new Error(result.message || "Failed to create admin.");
+      }
+
+      const newUid = result?.newUser?.uid;
+
+      if (newUid) {
+        const { setDoc: _setDoc } = await import("firebase/firestore");
+        await _setDoc(
+          doc(db, "admins", newUid),
+          {
+            displayName: newAdminName.trim(),
+            email: newAdminEmail.trim(),
+            role: "admin",
+            ...(newAdminIdNo.replace(/-/g, "").trim()
+              ? { schoolId: newAdminIdNo.replace(/-/g, "").trim() }
+              : {}),
+            ...(newAdminPosition.trim()
+              ? { position: newAdminPosition.trim() }
+              : {}),
+            ...(newAdminContactNo.trim()
+              ? { contactNo: newAdminContactNo.trim() }
+              : {}),
+            ...(newAdminGender.trim()
+              ? { genderIdentity: newAdminGender.trim() }
+              : {}),
+            ...(newAdminNationality.trim()
+              ? { nationality: newAdminNationality.trim() }
+              : {}),
+            ...(newAdminAddress.trim()
+              ? { address: newAdminAddress.trim() }
+              : {}),
+          },
+          { merge: true },
+        );
       }
 
       Alert.alert(
@@ -440,6 +666,12 @@ export default function AdminPanelScreen() {
       setNewAdminName("");
       setNewAdminEmail("");
       setNewAdminPassword("");
+      setNewAdminIdNo("");
+      setNewAdminPosition("");
+      setNewAdminContactNo("");
+      setNewAdminGender("");
+      setNewAdminNationality("");
+      setNewAdminAddress("");
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "An unknown error occurred.";
@@ -457,6 +689,7 @@ export default function AdminPanelScreen() {
     const arrowIcon = isUp ? "arrow-up" : "arrow-down";
     const arrowColor = isUp ? "#16A34A" : "#DC2626";
     const title = `${kpi.riskLabel} Students`;
+    const isPercentCard = kpi.riskLabel === "% At Risk";
 
     return (
       <Pressable
@@ -465,7 +698,13 @@ export default function AdminPanelScreen() {
           styles.kpiCard,
           pressed && { transform: [{ scale: 0.98 }], opacity: 0.95 },
         ]}
-        onPress={() => setStudentListModal({ visible: true, title })}
+        onPress={() => {
+          if (isPercentCard) {
+            setStudentListModal({ visible: true, title: "At-Risk Students" });
+          } else {
+            setStudentListModal({ visible: true, title });
+          }
+        }}
       >
         <View style={styles.kpiHeader}>
           <View
@@ -473,106 +712,241 @@ export default function AdminPanelScreen() {
           >
             <Ionicons name={kpi.icon} size={18} color={kpi.color} />
           </View>
-          <View style={styles.kpiChangeBadge}>
-            <Ionicons name={arrowIcon} size={12} color={arrowColor} />
-            <Text style={[styles.kpiChangeText, { color: arrowColor }]}>
-              {Math.abs(kpi.percentageChange)}%
-            </Text>
-          </View>
+          {!isPercentCard && (
+            <View style={styles.kpiChangeBadge}>
+              <Ionicons name={arrowIcon} size={12} color={arrowColor} />
+              <Text style={[styles.kpiChangeText, { color: arrowColor }]}>
+                {Math.abs(kpi.percentageChange)}%
+              </Text>
+            </View>
+          )}
+          {isPercentCard && (
+            <View
+              style={[
+                styles.kpiChangeBadge,
+                { backgroundColor: `${kpi.color}18` },
+              ]}
+            >
+              <View
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: 4,
+                  backgroundColor: kpi.color,
+                }}
+              />
+            </View>
+          )}
         </View>
-        <Text style={styles.kpiCount}>{kpi.count}</Text>
+        <Text style={styles.kpiCount}>
+          {isPercentCard ? `${kpi.count}` : kpi.count}
+        </Text>
         <Text style={styles.kpiLabel}>{kpi.riskLabel}</Text>
-        <Text style={styles.kpiBaseline}>Baseline: ({kpi.baselineCount})</Text>
+        {!isPercentCard && (
+          <Text style={styles.kpiBaseline}>
+            Baseline: ({kpi.baselineCount})
+          </Text>
+        )}
+        {isPercentCard && (
+          <Text style={[styles.kpiBaseline, { color: kpi.color }]}>
+            {kpi.count < 30 ? "Healthy" : kpi.count <= 60 ? "Moderate" : "Critical"}
+          </Text>
+        )}
       </Pressable>
     );
   };
 
-  /** Department table row - aligned flex grid layout */
-  const renderDepartmentRow = (row: DepartmentRowData) => {
+  const renderSummaryKpiCard = (kpi: SummaryKpiData, index: number) => {
+    return (
+      <Pressable
+        key={index}
+        style={({ pressed }) => [
+          styles.summaryKpiCard,
+          pressed && { transform: [{ scale: 0.98 }], opacity: 0.95 },
+        ]}
+        onPress={() =>
+          setStudentListModal({ visible: true, title: kpi.label })
+        }
+      >
+        <View style={styles.summaryKpiTopRow}>
+          <View
+            style={[
+              styles.summaryKpiIconCircle,
+              { backgroundColor: kpi.bgColor },
+            ]}
+          >
+            <Ionicons name={kpi.icon} size={18} color={kpi.color} />
+          </View>
+          <Text style={[styles.summaryKpiValue, { color: kpi.color }]}>
+            {kpi.value}
+          </Text>
+        </View>
+        <Text style={styles.summaryKpiLabel}>{kpi.label}</Text>
+        {kpi.subtitle && (
+          <Text style={styles.summaryKpiSubtitle}>{kpi.subtitle}</Text>
+        )}
+      </Pressable>
+    );
+  };
+
+  const renderPerDepartmentKpiCard = (kpi: PerDepartmentKpi, index: number) => {
+    return (
+      <Pressable
+        key={index}
+        style={({ pressed }) => [
+          styles.deptKpiCard,
+          pressed && { transform: [{ scale: 0.98 }], opacity: 0.95 },
+        ]}
+        onPress={() =>
+          setStudentListModal({ visible: true, title: kpi.deptName })
+        }
+      >
+        <Text style={styles.deptKpiCardTitle}>{kpi.deptAbbr}</Text>
+        <View style={styles.deptKpiMetricsGrid}>
+          <View style={styles.deptKpiMetric}>
+            <Text style={styles.deptKpiMetricLabel}>Avg Score</Text>
+            <Text style={[styles.deptKpiMetricValue, { color: "#6D28D9" }]}>
+              {kpi.avgScore}
+            </Text>
+          </View>
+          <View style={styles.deptKpiMetric}>
+            <Text style={styles.deptKpiMetricLabel}>Journals</Text>
+            <Text style={[styles.deptKpiMetricValue, { color: "#7C3AED" }]}>
+              {kpi.journalEntries}
+            </Text>
+          </View>
+          <View style={styles.deptKpiMetric}>
+            <Text style={styles.deptKpiMetricLabel}>LSN</Text>
+            <Text style={[styles.deptKpiMetricValue, { color: "#9333EA" }]}>
+              {kpi.lsnStudents}
+            </Text>
+          </View>
+          <View style={styles.deptKpiMetric}>
+            <Text style={styles.deptKpiMetricLabel}>Top Mood</Text>
+            <Text
+              style={[styles.deptKpiMetricValue, { color: "#5B21B6", fontSize: 12 }]}
+              numberOfLines={1}
+            >
+              {kpi.topMood}
+            </Text>
+          </View>
+        </View>
+      </Pressable>
+    );
+  };
+
+  const renderComparisonInsightCard = (
+    insight: ComparisonInsightData,
+    index: number,
+  ) => {
+    return (
+      <View key={index} style={styles.comparisonInsightCard}>
+        <View style={styles.comparisonInsightHeader}>
+          <View
+            style={[
+              styles.comparisonInsightIconCircle,
+              { backgroundColor: insight.bgColor },
+            ]}
+          >
+            <Ionicons name={insight.icon} size={16} color={insight.color} />
+          </View>
+          <Text style={styles.comparisonInsightLabel}>{insight.label}</Text>
+        </View>
+        <Text style={styles.comparisonInsightDept}>{insight.deptName}</Text>
+        <Text style={[styles.comparisonInsightValue, { color: insight.color }]}>
+          {insight.value}
+        </Text>
+      </View>
+    );
+  };
+
+  /** Department bar graph row - vertical stacked bar with percentage on top */
+  const renderDepartmentRow = (
+    row: DepartmentRowData,
+    totalAllDepts: number,
+    maxDeptCount: number,
+  ) => {
     const deptAbbr = getDeptAbbreviation(row.name);
+    const shareOfTotal =
+      totalAllDepts > 0
+        ? Math.round((row.totalStudents / totalAllDepts) * 100)
+        : 0;
+    const barScale = maxDeptCount > 0 ? row.totalStudents / maxDeptCount : 0;
+    const barHeight = Math.max(Math.round(barScale * 140), 12);
 
     return (
       <Pressable
         key={row.name}
         style={({ pressed }) => [
-          styles.deptCardItem,
-          pressed && { transform: [{ scale: 0.99 }] },
+          styles.barColumn,
+          pressed && { transform: [{ scale: 0.96 }], opacity: 0.9 },
         ]}
         onPress={() => setStudentListModal({ visible: true, title: row.name })}
       >
-        {/* Left Side: Department Name & Total */}
-        <View style={styles.deptMainInfo}>
-          <Text style={styles.deptAbbrText}>{deptAbbr}</Text>
-          <Text style={styles.deptTotalText}>{row.totalStudents} Students</Text>
+        {/* Percentage label on top */}
+        <Text style={styles.barPctTop}>{shareOfTotal}%</Text>
+
+        {/* Stacked vertical bar */}
+        <View style={[styles.barTrack, { height: barHeight }]}>
+          {row.lowPct > 0 && (
+            <View
+              style={[
+                styles.barFill,
+                {
+                  height: `${row.lowPct}%`,
+                  backgroundColor: "#22C55E",
+                },
+              ]}
+            />
+          )}
+          {row.normalPct > 0 && (
+            <View
+              style={[
+                styles.barFill,
+                {
+                  height: `${row.normalPct}%`,
+                  backgroundColor: "#F59E0B",
+                },
+              ]}
+            />
+          )}
+          {row.highPct > 0 && (
+            <View
+              style={[
+                styles.barFill,
+                {
+                  height: `${row.highPct}%`,
+                  backgroundColor: "#EF4444",
+                },
+              ]}
+            />
+          )}
         </View>
 
-        {/* Right Side: Stacked Bar & Stats */}
-        <View style={styles.deptMetricsContainer}>
-          {/* Stat Badges */}
-          <View style={styles.deptStatsRow}>
-            <View style={styles.statBadge}>
-              <View
-                style={[styles.statBadgeDot, { backgroundColor: "#22C55E" }]}
-              />
-              <Text style={[styles.statBadgeText, { color: "#16A34A" }]}>
-                {row.lowCount} ({row.lowPct}%)
-              </Text>
-            </View>
-            <View style={styles.statBadge}>
-              <View
-                style={[styles.statBadgeDot, { backgroundColor: "#F59E0B" }]}
-              />
-              <Text style={[styles.statBadgeText, { color: "#D97706" }]}>
-                {row.normalCount} ({row.normalPct}%)
-              </Text>
-            </View>
-            <View style={styles.statBadge}>
-              <View
-                style={[styles.statBadgeDot, { backgroundColor: "#EF4444" }]}
-              />
-              <Text style={[styles.statBadgeText, { color: "#DC2626" }]}>
-                {row.highCount} ({row.highPct}%)
-              </Text>
-            </View>
-          </View>
-
-          {/* Unified Stacked Progress Bar */}
-          <View style={styles.stackedBarTrack}>
-            {row.lowPct > 0 && (
-              <View
-                style={[
-                  styles.stackedBarFill,
-                  { width: `${row.lowPct}%`, backgroundColor: "#22C55E" },
-                ]}
-              />
-            )}
-            {row.normalPct > 0 && (
-              <View
-                style={[
-                  styles.stackedBarFill,
-                  { width: `${row.normalPct}%`, backgroundColor: "#F59E0B" },
-                ]}
-              />
-            )}
-            {row.highPct > 0 && (
-              <View
-                style={[
-                  styles.stackedBarFill,
-                  { width: `${row.highPct}%`, backgroundColor: "#EF4444" },
-                ]}
-              />
-            )}
-          </View>
-        </View>
+        {/* Department label below */}
+        <Text style={styles.barDeptLabel} numberOfLines={1}>
+          {deptAbbr}
+        </Text>
+        <Text style={styles.barCountLabel}>{row.totalStudents}</Text>
       </Pressable>
     );
   };
 
   const renderDonutChart = (slices: DonutSlice[]) => {
-    // Strictly count how many students actually took it for the donut hole label
     const totalAssessed = studentSummaries.filter(
       (s) => s.assessmentsCount > 0,
     ).length;
+
+    // Build arc segments using overlapping half-circle rotation
+    const segments: { color: string; rotation: number }[] = [];
+    let cumulativeAngle = 0;
+    slices.forEach((slice) => {
+      const arcAngle = (slice.value / 100) * 360;
+      if (arcAngle > 0) {
+        segments.push({ color: slice.color, rotation: cumulativeAngle });
+        cumulativeAngle += arcAngle;
+      }
+    });
 
     return (
       <View style={styles.bottomWidget}>
@@ -580,15 +954,16 @@ export default function AdminPanelScreen() {
           Overall Concern Distribution
         </Text>
         <View style={styles.donutContainer}>
+          {/* Arc-based donut ring */}
           <View style={styles.donutRing}>
-            {slices.map((slice) => (
+            {segments.map((seg, i) => (
               <View
-                key={slice.label}
+                key={i}
                 style={[
-                  styles.donutSegment,
+                  styles.donutArcSegment,
                   {
-                    backgroundColor: slice.color,
-                    flex: slice.value,
+                    backgroundColor: seg.color,
+                    transform: [{ rotate: `${seg.rotation}deg` }],
                   },
                 ]}
               />
@@ -626,6 +1001,9 @@ export default function AdminPanelScreen() {
 
   const renderRadialProgress = (pct: number) => {
     const clampedPct = Math.min(Math.max(pct, 0), 100);
+    const notCompletedPct = 100 - clampedPct;
+    const completedAngle = (clampedPct / 100) * 360;
+
     return (
       <Pressable
         style={styles.bottomWidget}
@@ -639,19 +1017,58 @@ export default function AdminPanelScreen() {
         <Text style={styles.bottomWidgetTitle}>Survey Assessment Status</Text>
         <View style={styles.radialContainer}>
           <View style={styles.radialRing}>
-            <View style={styles.radialBg} />
-            <View
-              style={[
-                styles.radialFill,
-                {
-                  backgroundColor: "#7C3AED",
-                  height: `${clampedPct}%`,
-                },
-              ]}
-            />
+            {/* Not completed arc (red) — full circle base */}
+            {notCompletedPct > 0 && (
+              <View
+                style={[
+                  styles.radialArcSegment,
+                  {
+                    backgroundColor: "#EF4444",
+                    transform: [{ rotate: "0deg" }],
+                  },
+                ]}
+              />
+            )}
+            {/* Completed arc (purple) — rotated to start after red */}
+            {clampedPct > 0 && (
+              <View
+                style={[
+                  styles.radialArcSegment,
+                  {
+                    backgroundColor: "#7C3AED",
+                    transform: [{ rotate: `${completedAngle}deg` }],
+                  },
+                ]}
+              />
+            )}
             <View style={styles.radialHole}>
               <Text style={styles.radialPctText}>{clampedPct}%</Text>
               <Text style={styles.radialLabelText}>Completed</Text>
+            </View>
+          </View>
+          {/* Legend */}
+          <View style={styles.radialLegend}>
+            <View style={styles.radialLegendItem}>
+              <View
+                style={[
+                  styles.radialLegendDot,
+                  { backgroundColor: "#7C3AED" },
+                ]}
+              />
+              <Text style={styles.radialLegendText}>
+                Took assessment ({clampedPct}%)
+              </Text>
+            </View>
+            <View style={styles.radialLegendItem}>
+              <View
+                style={[
+                  styles.radialLegendDot,
+                  { backgroundColor: "#EF4444" },
+                ]}
+              />
+              <Text style={styles.radialLegendText}>
+                Did not take ({notCompletedPct}%)
+              </Text>
             </View>
           </View>
           <Text style={styles.radialFooterText}>
@@ -729,10 +1146,29 @@ export default function AdminPanelScreen() {
       const dept = title.split(" - ")[0];
       return (s) => s.department === dept && s.latestRiskLevel === "high";
     }
-    if (lowerTitle.includes("special needs (lsn)")) {
-      if (lowerTitle.includes("students")) return (s) => s.isLSN === true;
-      const dept = title.split(" - ")[0];
-      return (s) => s.department === dept && s.isLSN === true;
+    if (lowerTitle.includes("special needs (lsn)") || lowerTitle.includes("lsn students")) {
+      return (s) => s.isLSN === true;
+    }
+    if (lowerTitle.includes("at-risk students")) {
+      return (s) => s.latestRiskLevel === "normal" || s.latestRiskLevel === "high";
+    }
+    if (lowerTitle.includes("healthy students")) {
+      return (s) => s.latestRiskLevel === "low";
+    }
+    if (lowerTitle.includes("% at risk")) {
+      return (s) => s.latestRiskLevel === "normal" || s.latestRiskLevel === "high";
+    }
+    if (lowerTitle.includes("students assessed")) {
+      return (s) => s.assessmentsCount > 0;
+    }
+    if (lowerTitle.includes("journal entries")) {
+      return (s) => s.journalCount > 0;
+    }
+    if (lowerTitle.includes("assessment rate")) {
+      return (s) => s.assessmentsCount > 0;
+    }
+    if (lowerTitle.includes("avg wellness score")) {
+      return () => true;
     }
     if (lowerTitle === "survey assessment status") {
       return () => true;
@@ -893,6 +1329,23 @@ export default function AdminPanelScreen() {
                               </Text>
                             </View>
                           </View>
+                          {student.isLSN && (
+                            <View style={styles.lsnBadgeRow}>
+                              <View style={styles.lsnBadge}>
+                                <Ionicons name="accessibility" size={12} color="white" />
+                                <Text style={styles.lsnBadgeText}>LSN</Text>
+                              </View>
+                              {student.specialNeedsType ? (
+                                <Text style={styles.lsnTypeText}>{student.specialNeedsType}</Text>
+                              ) : null}
+                              {student.lsnDocument?.secureUrl ? (
+                                <View style={styles.lsnDocIndicator}>
+                                  <Ionicons name="document-attach" size={11} color="#8A63D2" />
+                                  <Text style={styles.lsnDocText}>Doc attached</Text>
+                                </View>
+                              ) : null}
+                            </View>
+                          )}
                           <View style={styles.studentStatsRow}>
                             <View style={styles.statItem}>
                               <Text style={styles.statLabel}>Assessments</Text>
@@ -1068,19 +1521,58 @@ export default function AdminPanelScreen() {
                     </View>
                   </LinearGradient>
 
-                  {/* ─── SECTION 1: KPI Cards ───────────────────────────────── */}
-                  <Text style={styles.sectionHeader}>
-                    Key Performance Indicators
-                  </Text>
+                  {/* ─── SECTION 1: Overall Summary KPIs ──────────────────── */}
+                  <Text style={styles.sectionHeader}>Overall Summary</Text>
                   <View style={styles.kpiRow}>
-                    {kpiData.map((kpi, i) => renderKpiCard(kpi, i))}
+                    {summaryKpiData.map((kpi, i) =>
+                      renderSummaryKpiCard(kpi, i),
+                    )}
                   </View>
 
-                  {/* ─── SECTION 2: Department Table ────────────────────────── */}
+                  {/* ─── SECTION 2: Risk Trend KPIs ──────────────────────── */}
+                  <Text style={styles.sectionHeader}>
+                    Risk Trend Indicators
+                  </Text>
+                  <View style={styles.kpiRow}>
+                    {riskTrendKpiData.map((kpi, i) => renderKpiCard(kpi, i))}
+                  </View>
+
+                  {/* ─── SECTION 3: Department Bar Chart ───────────────────── */}
                   <Text style={styles.sectionHeader}>
                     Assessment Participation by Department
                   </Text>
-                  <View style={styles.deptTableCard}>
+                  <View style={styles.barChartContainer}>
+                    {/* Legend */}
+                    <View style={styles.barLegend}>
+                      <View style={styles.barLegendItem}>
+                        <View
+                          style={[
+                            styles.barLegendDot,
+                            { backgroundColor: "#22C55E" },
+                          ]}
+                        />
+                        <Text style={styles.barLegendText}>Low</Text>
+                      </View>
+                      <View style={styles.barLegendItem}>
+                        <View
+                          style={[
+                            styles.barLegendDot,
+                            { backgroundColor: "#F59E0B" },
+                          ]}
+                        />
+                        <Text style={styles.barLegendText}>Moderate</Text>
+                      </View>
+                      <View style={styles.barLegendItem}>
+                        <View
+                          style={[
+                            styles.barLegendDot,
+                            { backgroundColor: "#EF4444" },
+                          ]}
+                        />
+                        <Text style={styles.barLegendText}>High</Text>
+                      </View>
+                    </View>
+
                     {departmentRows.length === 0 ? (
                       <View style={styles.stateCard}>
                         <Text style={styles.stateText}>
@@ -1088,11 +1580,58 @@ export default function AdminPanelScreen() {
                         </Text>
                       </View>
                     ) : (
-                      departmentRows.map((row) => renderDepartmentRow(row))
+                      <View style={styles.barChartRow}>
+                        {(() => {
+                          const totalAllDepts = departmentRows.reduce(
+                            (sum, r) => sum + r.totalStudents,
+                            0,
+                          );
+                          const maxDeptCount = Math.max(
+                            ...departmentRows.map((r) => r.totalStudents),
+                          );
+                          return departmentRows.map((row) =>
+                            renderDepartmentRow(
+                              row,
+                              totalAllDepts,
+                              maxDeptCount,
+                            ),
+                          );
+                        })()}
+                      </View>
                     )}
                   </View>
 
-                  {/* ─── SECTION 3: Visual Insights ─────────────────────────── */}
+                  {/* ─── SECTION 4: Department Insights ──────────────────── */}
+                  {perDepartmentKpiData.length > 0 && (
+                    <>
+                      <Text style={styles.sectionHeader}>
+                        Department Insights
+                      </Text>
+                      <View style={styles.deptKpiSection}>
+                        <View style={styles.deptKpiGrid}>
+                          {perDepartmentKpiData.map((kpi, i) =>
+                            renderPerDepartmentKpiCard(kpi, i),
+                          )}
+                        </View>
+                      </View>
+                    </>
+                  )}
+
+                  {/* ─── SECTION 5: Department Comparison ────────────────── */}
+                  {comparisonInsightData && (
+                    <>
+                      <Text style={styles.sectionHeader}>
+                        Department Comparison
+                      </Text>
+                      <View style={styles.comparisonInsightRow}>
+                        {comparisonInsightData.map((insight, i) =>
+                          renderComparisonInsightCard(insight, i),
+                        )}
+                      </View>
+                    </>
+                  )}
+
+                  {/* ─── SECTION 6: Visual Insights ──────────────────────── */}
                   <Text style={styles.sectionHeader}>Visual Insights</Text>
                   <View style={styles.chartsRow}>
                     {renderDonutChart(donutData)}
@@ -1170,6 +1709,78 @@ export default function AdminPanelScreen() {
                   </Text>
                 </View>
 
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>ID No.</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="e.g. 23-1234-567"
+                    value={newAdminIdNo}
+                    onChangeText={(text) => {
+                      const raw = text.replace(/-/g, "").slice(0, 9);
+                      let formatted = raw;
+                      if (raw.length > 4) formatted = raw.slice(0, 2) + "-" + raw.slice(2, 6) + "-" + raw.slice(6);
+                      else if (raw.length > 2) formatted = raw.slice(0, 2) + "-" + raw.slice(2);
+                      setNewAdminIdNo(formatted);
+                    }}
+                    keyboardType="number-pad"
+                  />
+                </View>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Position</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="e.g. Guidance Counselor"
+                    value={newAdminPosition}
+                    onChangeText={setNewAdminPosition}
+                    autoCapitalize="words"
+                  />
+                </View>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Contact Number</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="e.g. 09123456789"
+                    value={newAdminContactNo}
+                    onChangeText={setNewAdminContactNo}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Gender Identity</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="e.g. Female, Male, Non-binary"
+                    value={newAdminGender}
+                    onChangeText={setNewAdminGender}
+                    autoCapitalize="words"
+                  />
+                </View>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Nationality</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="e.g. Filipino"
+                    value={newAdminNationality}
+                    onChangeText={setNewAdminNationality}
+                    autoCapitalize="words"
+                  />
+                </View>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Address</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="Full address"
+                    value={newAdminAddress}
+                    onChangeText={setNewAdminAddress}
+                    autoCapitalize="words"
+                  />
+                </View>
+
                 {createAdminError && (
                   <Text style={styles.errorText}>{createAdminError}</Text>
                 )}
@@ -1177,7 +1788,7 @@ export default function AdminPanelScreen() {
                 <Pressable
                   style={[
                     styles.confirmDeleteButton,
-                    { marginTop: 16, backgroundColor: "#3B82F6" },
+                    { marginTop: 16, backgroundColor: "#8A63D2" },
                     creatingAdmin && { opacity: 0.7 },
                   ]}
                   onPress={handleCreateAdmin}
@@ -1301,8 +1912,8 @@ export default function AdminPanelScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F7FE" },
-  mainLayout: { flex: 1, backgroundColor: "#F4F7FE" },
+  container: { flex: 1, backgroundColor: "#F4F2F8" },
+  mainLayout: { flex: 1, backgroundColor: "#F4F2F8" },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -1413,9 +2024,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   tabButtonActive: {
-    backgroundColor: "#6D28D9",
+    backgroundColor: "#8A63D2",
     // @ts-ignore - web only
-    boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.05)",
+    boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.25)",
   },
   tabLabel: {
     color: "#64748B",
@@ -1502,8 +2113,47 @@ const styles = StyleSheet.create({
     color: "#8B5CF6",
     fontWeight: "600",
   },
-  // ─── Modern Department List Styles ──────────────────────────────────────
-  deptTableCard: {
+  // ─── Summary KPI Cards ─────────────────────────────────────────────────
+  summaryKpiCard: {
+    width: "48%",
+    minWidth: "47%",
+    borderRadius: 20,
+    padding: 16,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+    // @ts-ignore
+    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.10)",
+    gap: 6,
+  },
+  summaryKpiTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  summaryKpiIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  summaryKpiValue: {
+    fontSize: 26,
+    fontWeight: "900",
+  },
+  summaryKpiLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#6B21A8",
+  },
+  summaryKpiSubtitle: {
+    fontSize: 11,
+    color: "#8B5CF6",
+    fontWeight: "600",
+  },
+  // ─── Per-Department KPI Section ────────────────────────────────────────
+  deptKpiSection: {
     backgroundColor: "#FDFBFF",
     borderRadius: 20,
     padding: 16,
@@ -1513,70 +2163,174 @@ const styles = StyleSheet.create({
     // @ts-ignore
     boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.08)",
   },
-  deptCardItem: {
+  deptKpiGrid: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  deptKpiCard: {
+    width: "48%",
+    minWidth: 150,
     backgroundColor: "#FFFFFF",
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 10,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
     borderColor: "#EDE9FE",
-    flexWrap: "wrap", // Helps it look good if the screen gets small
-    gap: 16,
+    gap: 8,
   },
-  deptMainInfo: {
-    minWidth: 120,
-  },
-  deptAbbrText: {
-    fontSize: 16,
-    fontWeight: "900",
+  deptKpiCardTitle: {
+    fontSize: 14,
+    fontWeight: "800",
     color: "#581C87",
   },
-  deptTotalText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#8B5CF6",
-    marginTop: 4,
-  },
-  deptMetricsContainer: {
-    flex: 1,
-    minWidth: 250, // Prevents it from crushing too small on web
-    maxWidth: 600, // Stops the "long line" stretching on wide monitors
-  },
-  deptStatsRow: {
+  deptKpiMetricsGrid: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
+    flexWrap: "wrap",
+    gap: 6,
   },
-  statBadge: {
+  deptKpiMetric: {
+    width: "48%",
+    minWidth: 70,
+  },
+  deptKpiMetricLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+  },
+  deptKpiMetricValue: {
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  // ─── Comparison Insight Cards ───────────────────────────────────────────
+  comparisonInsightRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+    marginBottom: 24,
+  },
+  comparisonInsightCard: {
+    width: "48%",
+    minWidth: "47%",
+    borderRadius: 20,
+    padding: 16,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+    // @ts-ignore
+    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.10)",
+    gap: 6,
+  },
+  comparisonInsightHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+  },
+  comparisonInsightIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  comparisonInsightLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    flex: 1,
+  },
+  comparisonInsightDept: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#3B0764",
+  },
+  comparisonInsightValue: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  // ─── Department Bar Chart Styles ───────────────────────────────────────
+  barChartContainer: {
+    backgroundColor: "#FDFBFF",
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+    // @ts-ignore
+    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.08)",
+  },
+  barLegend: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 20,
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3EAFF",
+  },
+  barLegendItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
   },
-  statBadgeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  statBadgeText: {
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  stackedBarTrack: {
-    width: "100%",
+  barLegendDot: {
+    width: 10,
     height: 10,
-    backgroundColor: "#EDE9FE",
     borderRadius: 5,
-    flexDirection: "row",
-    overflow: "hidden",
   },
-  stackedBarFill: {
-    height: "100%",
-    // Adds a tiny white border between colors for a polished look
-    borderRightWidth: 1,
-    borderRightColor: "#FFFFFF",
+  barLegendText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#6B21A8",
+  },
+  barChartRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 10,
+    alignItems: "flex-end",
+    minHeight: 200,
+  },
+  barColumn: {
+    alignItems: "center",
+    width: 64,
+    gap: 4,
+  },
+  barPctTop: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#581C87",
+  },
+  barTrack: {
+    width: 36,
+    height: 140,
+    backgroundColor: "#F3EAFF",
+    borderRadius: 8,
+    flexDirection: "column",
+    justifyContent: "flex-end",
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+  },
+  barFill: {
+    width: "100%",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.4)",
+  },
+  barDeptLabel: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#581C87",
+    textAlign: "center",
+    marginTop: 2,
+  },
+  barCountLabel: {
+    fontSize: 9,
+    fontWeight: "600",
+    color: "#8B5CF6",
+    textAlign: "center",
   },
   chartsRow: {
     flexDirection: "row",
@@ -1609,27 +2363,37 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   donutRing: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    flexDirection: "row",
-    overflow: "hidden",
+    width: 110,
+    height: 110,
+    borderRadius: 55,
     position: "relative",
     backgroundColor: "#F5F3FF",
+    overflow: "hidden",
   },
-  donutSegment: {
+  donutArcSegment: {
+    position: "absolute",
+    top: 0,
+    left: "50%",
+    width: "50%",
     height: "100%",
+    marginLeft: 0,
+    borderTopLeftRadius: 0,
+    borderBottomLeftRadius: 0,
+    borderTopRightRadius: 999,
+    borderBottomRightRadius: 999,
+    transformOrigin: "left center",
   },
   donutHole: {
     position: "absolute",
-    top: 15,
-    left: 15,
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    top: 18,
+    left: 18,
+    width: 74,
+    height: 74,
+    borderRadius: 37,
     backgroundColor: "white",
     alignItems: "center",
     justifyContent: "center",
+    zIndex: 10,
   },
   donutHoleValue: {
     fontSize: 18,
@@ -1669,24 +2433,19 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
+    position: "relative",
     backgroundColor: "#F5F3FF",
     overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    position: "relative",
   },
-  radialBg: {
+  radialArcSegment: {
     position: "absolute",
-    width: "100%",
+    top: 0,
+    left: "50%",
+    width: "50%",
     height: "100%",
-    borderRadius: 60,
-    borderWidth: 8,
-    borderColor: "#E9D5FF",
-  },
-  radialFill: {
-    width: "100%",
-    borderTopLeftRadius: 60,
-    borderTopRightRadius: 60,
+    borderTopRightRadius: 999,
+    borderBottomRightRadius: 999,
+    transformOrigin: "left center",
   },
   radialHole: {
     position: "absolute",
@@ -1698,6 +2457,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     alignItems: "center",
     justifyContent: "center",
+    zIndex: 10,
   },
   radialPctText: {
     fontSize: 20,
@@ -1716,6 +2476,26 @@ const styles = StyleSheet.create({
     color: "#8B5CF6",
     textAlign: "center",
     marginTop: 4,
+  },
+  radialLegend: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 14,
+  },
+  radialLegendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  radialLegendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  radialLegendText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#6B21A8",
   },
   compChartContainer: {
     flexDirection: "row",
@@ -1761,8 +2541,8 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: "#F1F5F9", // @ts-ignore - web only
-    boxShadow: "0px 6px 20px rgba(0, 0, 0, 0.04)",
+    borderColor: "#F3EAFF", // @ts-ignore - web only
+    boxShadow: "0px 6px 20px rgba(138, 99, 210, 0.08)",
   },
   lookupHeader: {
     flexDirection: "row",
@@ -1776,23 +2556,23 @@ const styles = StyleSheet.create({
     color: "#0F172A",
   },
   searchInput: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "#FAF8FF",
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    color: "#0F172A",
+    color: "#1E1B4B",
     fontSize: 14,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#E9D5FF",
   },
   createAdminButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#8A63D2",
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: 12,
   },
   createAdminButtonText: {
     color: "white",
@@ -1805,8 +2585,8 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#F1F5F9", // @ts-ignore - web only
-    boxShadow: "0px 6px 20px rgba(0, 0, 0, 0.04)",
+    borderColor: "#F3EAFF", // @ts-ignore - web only
+    boxShadow: "0px 6px 20px rgba(138, 99, 210, 0.08)",
   },
   studentHeader: {
     flexDirection: "row",
@@ -1826,7 +2606,7 @@ const styles = StyleSheet.create({
   studentId: {
     fontSize: 13,
     fontWeight: "800",
-    color: "#3B82F6",
+    color: "#8A63D2",
     textAlign: "right",
   },
   studentCourse: {
@@ -1837,6 +2617,44 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
   studentMeta: { fontSize: 12, color: "#64748B", marginTop: 2 },
+  lsnBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#F3EAFF",
+  },
+  lsnBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#8A63D2",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  lsnBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "white",
+  },
+  lsnTypeText: {
+    fontSize: 11,
+    color: "#64748B",
+    flex: 1,
+  },
+  lsnDocIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+  },
+  lsnDocText: {
+    fontSize: 10,
+    color: "#8A63D2",
+    fontWeight: "600",
+  },
   studentStatsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1852,7 +2670,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   statValue: { fontSize: 15, fontWeight: "700", color: "#0F172A" },
-  statValueHighlight: { fontSize: 15, fontWeight: "800", color: "#3B82F6" },
+  statValueHighlight: { fontSize: 15, fontWeight: "800", color: "#8A63D2" },
   moodSummary: { color: "#334155", fontSize: 13, marginTop: 6 },
   riskLow: { color: "#16A34A", fontWeight: "800" },
   riskNormal: { color: "#D97706", fontWeight: "800" },
@@ -1986,14 +2804,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   formInput: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 12,
+    backgroundColor: "#FAF8FF",
+    borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    color: "#0F172A",
+    color: "#1E1B4B",
     fontSize: 14,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#E9D5FF",
   },
   formHelpText: {
     fontSize: 12,

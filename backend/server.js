@@ -363,6 +363,90 @@ app.post("/api/delete-student", async (req, res) => {
   }
 });
 
+// ── Mindy Chat (Gemini multi-turn with system instruction) ──
+const MINDY_SYSTEM_INSTRUCTION = `You are Mindy, a supportive wellness companion for university students. Respond with empathy, encouragement, and practical coping strategies. Do not diagnose medical or mental health conditions, prescribe medication, or claim to be a licensed professional. If the user expresses thoughts of self-harm, suicide, or harming others, respond calmly, encourage them to seek immediate help from trusted people or local emergency services, and recommend professional support. Keep responses concise (under 200 words), warm, and conversational.`;
+
+app.post("/api/chat", async (req, res) => {
+  const { message, history } = req.body;
+
+  if (!message || typeof message !== "string") {
+    return res.status(400).json({ error: "Missing message." });
+  }
+
+  if (!GEMINI_API_KEY) {
+    return res
+      .status(500)
+      .json({ error: "Gemini API key is not configured on the server." });
+  }
+
+  try {
+    // Build contents array: system instruction as user/model turn + history + new message
+    const contents = [];
+
+    // Prepend system instruction as a "user" + "model" turn so Gemini respects it
+    contents.push({
+      role: "user",
+      parts: [{ text: `System instruction: ${MINDY_SYSTEM_INSTRUCTION}` }],
+    });
+    contents.push({
+      role: "model",
+      parts: [{ text: "Understood. I will follow these guidelines." }],
+    });
+
+    // Add conversation history
+    if (Array.isArray(history)) {
+      for (const msg of history) {
+        if (msg.role && msg.content) {
+          contents.push({
+            role: msg.role === "user" ? "user" : "model",
+            parts: [{ text: msg.content }],
+          });
+        }
+      }
+    }
+
+    // Add the new user message
+    contents.push({
+      role: "user",
+      parts: [{ text: message }],
+    });
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1024,
+          },
+        }),
+      },
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("Gemini chat error:", data.error?.message || response.status);
+      return res
+        .status(500)
+        .json({ error: data.error?.message || "Gemini request failed." });
+    }
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) {
+      return res.status(500).json({ error: "Invalid Gemini response." });
+    }
+
+    return res.json({ reply: text });
+  } catch (err) {
+    console.error("Chat route error:", err.message || err);
+    return res.status(500).json({ error: "Chat request failed." });
+  }
+});
+
 app.post("/api/ai-proxy", async (req, res) => {
   const { prompt, provider } = req.body;
 

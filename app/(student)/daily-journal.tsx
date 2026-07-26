@@ -71,7 +71,7 @@ export default function DailyJournalScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#4CAF50", "#2E7D32"]}
+        colors={["#8A63D2", "#7C5AC8"]}
         style={styles.headerGradient}
       >
         {/* Header */}
@@ -112,7 +112,7 @@ export default function DailyJournalScreen() {
           <RefreshControl
             refreshing={syncing}
             onRefresh={onRefresh}
-            colors={["#2E7D32", "#4CAF50"]}
+              colors={["#7C5AC8", "#8A63D2"]}
           />
         }
       >
@@ -148,7 +148,7 @@ export default function DailyJournalScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#F4F2F8",
   },
   headerGradient: {
     paddingBottom: 20,
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 22,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "white",
   },
   headerTitleContainer: {
@@ -211,16 +211,16 @@ const styles = StyleSheet.create({
   // Wellness chart styles
   wellnessCard: {
     backgroundColor: "white",
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
+    padding: 20,
     marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
+    // @ts-ignore — web-only shadow property
+    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
+    elevation: 3,
     paddingTop: 24,
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
   },
   wellnessHeader: {
     flexDirection: "row",

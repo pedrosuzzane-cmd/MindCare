@@ -8,6 +8,8 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -60,12 +62,12 @@ export default function NewJournalEntryScreen() {
   }, [params.date]);
 
   const categories: Category[] = [
-    { id: "personal", name: "Personal", color: "#2196F3" },
-    { id: "academic", name: "Academic", color: "#4CAF50" },
+    { id: "personal", name: "Personal", color: "#9C7EEB" },
+    { id: "academic", name: "Academic", color: "#8A63D2" },
     { id: "wellness", name: "Wellness", color: "#9C27B0" },
     { id: "social", name: "Social", color: "#E91E63" },
     { id: "goals", name: "Goals", color: "#FF9800" },
-    { id: "gratitude", name: "Gratitude", color: "#00BCD4" },
+    { id: "gratitude", name: "Gratitude", color: "#7C5AC8" },
     { id: "work", name: "Work", color: "#FF5722" },
     { id: "spiritual", name: "Spiritual", color: "#7B1FA2" },
   ];
@@ -182,9 +184,13 @@ export default function NewJournalEntryScreen() {
   };
 
   return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ flex: 1 }}
+    >
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#4CAF50", "#00BCD4", "#2196F3"]}
+        colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
         style={styles.headerGradient}
       >
         {/* Header */}
@@ -207,6 +213,7 @@ export default function NewJournalEntryScreen() {
       <ScrollView
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {/* Category Selection */}
@@ -324,7 +331,7 @@ export default function NewJournalEntryScreen() {
               <ActivityIndicator color="white" />
             ) : (
               <LinearGradient
-                colors={["#4CAF50", "#00BCD4", "#2196F3"]}
+                colors={["#9C7EEB", "#8A63D2"]}
                 style={styles.saveButtonGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
@@ -336,13 +343,14 @@ export default function NewJournalEntryScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#F4F2F8",
   },
   headerGradient: {
     paddingBottom: 20,
@@ -363,7 +371,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "white",
   },
   placeholder: {
@@ -403,19 +411,16 @@ const styles = StyleSheet.create({
   },
   categoryGrid: {
     backgroundColor: "white",
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 20,
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-around",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    // @ts-ignore — web-only shadow property
+    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
     elevation: 3,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
   },
   categoryItem: {
     alignItems: "center",
@@ -440,16 +445,16 @@ const styles = StyleSheet.create({
   },
   moodGrid: {
     backgroundColor: "white",
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 16,
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    // @ts-ignore — web-only shadow property
+    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
     elevation: 3,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
   },
   moodItem: {
     alignItems: "center",
@@ -460,7 +465,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   selectedMoodItem: {
-    backgroundColor: "#2196F3",
+    backgroundColor: "#8A63D2",
     borderWidth: 2,
     borderColor: "#1976D2",
   },
@@ -476,15 +481,12 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     backgroundColor: "white",
-    borderRadius: 16,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    borderRadius: 20,
+    // @ts-ignore — web-only shadow property
+    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
     elevation: 3,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
   },
   titleInput: {
     paddingHorizontal: 20,

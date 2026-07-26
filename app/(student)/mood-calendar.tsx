@@ -3,18 +3,18 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
+import { auth, db } from "@/constants/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
-import { auth, db } from "@/constants/firebase";
 
 interface JournalEntry {
   id: string;
@@ -180,7 +180,7 @@ export default function MoodCalendarScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2196F3" />
+          <ActivityIndicator size="large" color="#8A63D2" />
         </View>
       </SafeAreaView>
     );
@@ -189,7 +189,7 @@ export default function MoodCalendarScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#E8F4FD", "#F0F8FF", "#E8F4FD"]}
+        colors={["#E8E0F5", "#F4F2F8", "#E8E0F5"]}
         style={styles.gradient}
       >
         {/* Header */}
@@ -199,7 +199,7 @@ export default function MoodCalendarScreen() {
           </Pressable>
           <Text style={styles.headerTitle}>Mood Calendar</Text>
           <Pressable onPress={handleAddEntry}>
-            <Ionicons name="add-circle-outline" size={28} color="#2196F3" />
+            <Ionicons name="add-circle-outline" size={28} color="#8A63D2" />
           </Pressable>
         </View>
 
@@ -211,11 +211,11 @@ export default function MoodCalendarScreen() {
           {/* Month Navigation */}
           <View style={styles.monthNavigator}>
             <Pressable onPress={prevMonth}>
-              <Ionicons name="chevron-back" size={24} color="#2196F3" />
+              <Ionicons name="chevron-back" size={24} color="#8A63D2" />
             </Pressable>
             <Text style={styles.monthText}>{monthName}</Text>
             <Pressable onPress={nextMonth}>
-              <Ionicons name="chevron-forward" size={24} color="#2196F3" />
+              <Ionicons name="chevron-forward" size={24} color="#8A63D2" />
             </Pressable>
           </View>
 
@@ -244,8 +244,9 @@ export default function MoodCalendarScreen() {
                     key={idx}
                     style={[
                       styles.dayCell,
-                      dayObj.isCurrentMonth &&
-                        mood && { backgroundColor: moodColor },
+                      dayObj.isCurrentMonth && mood && moodColor
+                        ? { backgroundColor: moodColor }
+                        : undefined,
                       !dayObj.isCurrentMonth && styles.otherMonthDay,
                     ]}
                     onPress={() => {
@@ -292,7 +293,7 @@ export default function MoodCalendarScreen() {
             onPress={handleGetSuggestions}
           >
             <LinearGradient
-              colors={["#2196F3", "#00BCD4", "#4CAF50"]}
+              colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
               style={styles.suggestionsBtnGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -369,8 +370,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: "600",
-    color: "#2196F3",
+    fontWeight: "700",
+    color: "#8A63D2",
   },
   scrollContainer: {
     flex: 1,
@@ -393,14 +394,16 @@ const styles = StyleSheet.create({
   },
   calendarContainer: {
     backgroundColor: "white",
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 12,
     marginBottom: 24,
-    shadowColor: "#000",
+    shadowColor: "#8A63D2",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
   },
   dayHeaderRow: {
     flexDirection: "row",
@@ -453,13 +456,15 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "space-around",
     backgroundColor: "white",
-    borderRadius: 12,
+    borderRadius: 20,
     padding: 12,
-    shadowColor: "#000",
+    shadowColor: "#8A63D2",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowRadius: 4,
     elevation: 1,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
   },
   legendItem: {
     alignItems: "center",
@@ -477,7 +482,7 @@ const styles = StyleSheet.create({
   },
   suggestionsButton: {
     marginBottom: 24,
-    borderRadius: 12,
+    borderRadius: 25,
     overflow: "hidden",
   },
   suggestionsBtnGradient: {
@@ -504,14 +509,16 @@ const styles = StyleSheet.create({
   },
   previewCard: {
     backgroundColor: "white",
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 12,
     marginBottom: 12,
-    shadowColor: "#000",
+    shadowColor: "#8A63D2",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
   },
   previewHeader: {
     flexDirection: "row",
@@ -537,7 +544,7 @@ const styles = StyleSheet.create({
   },
   tapToViewText: {
     fontSize: 11,
-    color: "#2196F3",
+    color: "#8A63D2",
     fontWeight: "500",
   },
 });

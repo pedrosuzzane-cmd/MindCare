@@ -122,11 +122,11 @@ export default function AIReflectionCardScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <LinearGradient
-          colors={["#E8F5E9", "#F1F8E9", "#E8F5E9"]}
+          colors={["#E8E0F5", "#F4F2F8", "#E8E0F5"]}
           style={styles.gradient}
         >
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4CAF50" />
+            <ActivityIndicator size="large" color="#8A63D2" />
             <Text style={styles.loadingTitle}>🌱 Creating Your Reflection</Text>
             <Text style={styles.loadingSubtitle}>
               Mindy is reading your journal entry and preparing a thoughtful
@@ -140,7 +140,7 @@ export default function AIReflectionCardScreen() {
                     styles.dot,
                     {
                       backgroundColor:
-                        i === 0 ? "#4CAF50" : i === 1 ? "#00BCD4" : "#2196F3",
+                        i === 0 ? "#8A63D2" : i === 1 ? "#9C7EEB" : "#7C5AC8",
                     },
                   ]}
                 />
@@ -155,7 +155,7 @@ export default function AIReflectionCardScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#E8F5E9", "#F1F8E9", "#E8F5E9"]}
+        colors={["#E8E0F5", "#F4F2F8", "#E8E0F5"]}
         style={styles.gradient}
       >
         {/* Header */}
@@ -192,7 +192,7 @@ export default function AIReflectionCardScreen() {
                   <View
                     style={[styles.iconCircle, { backgroundColor: "#E8F5E9" }]}
                   >
-                    <Ionicons name="document-text" size={22} color="#4CAF50" />
+                    <Ionicons name="document-text" size={22} color="#8A63D2" />
                   </View>
                   <Text style={styles.cardTitle}>Summary</Text>
                 </View>
@@ -251,7 +251,7 @@ export default function AIReflectionCardScreen() {
                           { backgroundColor: "#E3F2FD" },
                         ]}
                       >
-                        <Ionicons name="bulb" size={22} color="#2196F3" />
+                        <Ionicons name="bulb" size={22} color="#9C7EEB" />
                       </View>
                       <Text style={styles.cardTitle}>Suggestions</Text>
                     </View>
@@ -286,7 +286,7 @@ export default function AIReflectionCardScreen() {
                   onPress={handleBackToJournal}
                 >
                   <LinearGradient
-                    colors={["#4CAF50", "#43A047"]}
+                    colors={["#9C7EEB", "#8A63D2"]}
                     style={styles.buttonGradient}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
@@ -299,7 +299,7 @@ export default function AIReflectionCardScreen() {
                 </Pressable>
 
                 <Pressable style={styles.secondaryButton} onPress={handleRetry}>
-                  <Ionicons name="refresh" size={18} color="#4CAF50" />
+                  <Ionicons name="refresh" size={18} color="#8A63D2" />
                   <Text style={styles.secondaryButtonText}>Regenerate</Text>
                 </Pressable>
               </View>
@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 20,
     padding: 20,
-    shadowColor: "#000",
+    shadowColor: "#8A63D2",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -471,13 +471,13 @@ const styles = StyleSheet.create({
   },
   // Encouragement
   encouragementCard: {
-    backgroundColor: "#FFF8E1",
+    backgroundColor: "#F3EAFF",
     borderWidth: 1,
-    borderColor: "#FFE082",
+    borderColor: "#E0D0FF",
   },
   encouragementText: {
     fontSize: 16,
-    color: "#5D4037",
+    color: "#3B2F6B",
     lineHeight: 26,
     fontStyle: "italic",
     letterSpacing: 0.3,
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   primaryButton: {
-    borderRadius: 16,
+    borderRadius: 25,
     overflow: "hidden",
   },
   buttonGradient: {
@@ -509,14 +509,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 14,
-    borderRadius: 16,
+    borderRadius: 25,
     borderWidth: 1.5,
-    borderColor: "#4CAF50",
+    borderColor: "#8A63D2",
     backgroundColor: "white",
     gap: 6,
   },
   secondaryButtonText: {
-    color: "#4CAF50",
+    color: "#8A63D2",
     fontSize: 15,
     fontWeight: "600",
   },

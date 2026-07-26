@@ -38,7 +38,7 @@
     return (
       <SafeAreaView style={styles.container}>
         <LinearGradient
-          colors={["#FF9800", "#FF5722", "#E91E63"]}
+          colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
           style={styles.headerGradient}
         >
           {/* Header */}
@@ -203,7 +203,7 @@
           </Text>
           {achievement.unlocked ? (
             <View style={styles.unlockedBadge}>
-              <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+              <Ionicons name="checkmark-circle" size={16} color="#8A63D2" />
               <Text style={styles.unlockedText}>Unlocked</Text>
             </View>
           ) : (
@@ -229,7 +229,7 @@
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: "#F5F5F5",
+      backgroundColor: "#F4F2F8",
     },
     headerGradient: {
       paddingBottom: 24,
@@ -250,7 +250,7 @@
     },
     headerTitle: {
       fontSize: 18,
-      fontWeight: "600",
+      fontWeight: "700",
       color: "white",
     },
     placeholder: {
@@ -315,10 +315,13 @@
     card: {
       width: CARD_WIDTH,
       backgroundColor: "white",
-      borderRadius: 16,
-      boxShadow: "0px 2px 8px rgba(0,0,0,0.08)",
+      borderRadius: 20,
+      // @ts-ignore — web-only shadow property
+      boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
       elevation: 3,
       overflow: "hidden",
+      borderWidth: 1,
+      borderColor: "rgba(156, 126, 235, 0.06)",
     },
     cardLocked: {
       opacity: 0.7,
@@ -360,7 +363,7 @@
     },
     unlockedText: {
       fontSize: 12,
-      color: "#4CAF50",
+      color: "#8A63D2",
       fontWeight: "600",
     },
     progressContainer: {
@@ -378,7 +381,7 @@
     },
     cardProgressFill: {
       height: "100%",
-      backgroundColor: "#FF9800",
+      backgroundColor: "#9C7EEB",
       borderRadius: 2,
     },
     cardProgressText: {
@@ -403,9 +406,11 @@
     modalContent: {
       width: "82%",
       backgroundColor: "white",
-      borderRadius: 20,
+      borderRadius: 24,
       padding: 28,
       alignItems: "center",
+      // @ts-ignore — web-only shadow property
+      boxShadow: "0px 16px 48px rgba(0,0,0,0.15)",
     },
     modalEmoji: {
       fontSize: 48,
@@ -440,7 +445,7 @@
     },
     modalDate: {
       fontSize: 12,
-      color: "#4CAF50",
+      color: "#8A63D2",
       fontWeight: "500",
       marginBottom: 16,
     },
@@ -459,7 +464,7 @@
     },
     modalProgressFill: {
       height: "100%",
-      backgroundColor: "#FF9800",
+      backgroundColor: "#9C7EEB",
       borderRadius: 4,
     },
     modalProgressText: {
@@ -470,8 +475,8 @@
     modalCloseButton: {
       paddingHorizontal: 32,
       paddingVertical: 12,
-      backgroundColor: "#FF9800",
-      borderRadius: 20,
+      backgroundColor: "#8A63D2",
+      borderRadius: 25,
     },
     modalCloseText: {
       fontSize: 14,

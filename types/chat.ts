@@ -1,5 +1,5 @@
 /**
- * Chat message types for the AI Wellness Chat.
+ * Chat message types for Mindy.
  */
 
 export interface ChatMessage {

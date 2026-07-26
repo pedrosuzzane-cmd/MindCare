@@ -16,20 +16,21 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { handleSignOut } from "@/services/authService";
+import GeminiChat from "@/components/GeminiChat";
 
 const FEATURES = [
   {
     title: "Daily Reminders",
     description: "Set helpful reminders for your day",
     icon: "notifications",
-    color: "#2196F3",
+    color: "#8A63D2",
     route: "/daily-reminders",
   },
   {
     title: "Daily Journal",
     description: "Reflect on your thoughts and feelings",
     icon: "book",
-    color: "#4CAF50",
+    color: "#8A63D2",
     route: "/daily-journal",
   },
   {
@@ -50,7 +51,7 @@ const FEATURES = [
     title: "Wellness Suggestions",
     description: "AI-powered tips based on your journal",
     icon: "bulb",
-    color: "#00BCD4",
+    color: "#9C7EEB",
     route: "/journal-suggestions",
   },
   {
@@ -71,11 +72,6 @@ export default function DashboardScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width > 768;
   const numColumns = isDesktop ? 3 : 2;
-  const CARD_GAP = 16;
-  const CONTAINER_PADDING = 48; // 24px padding on each side
-  const CARD_WIDTH = Math.floor(
-    (width - CONTAINER_PADDING - CARD_GAP * (numColumns - 1)) / numColumns,
-  );
 
   // Safety check: If an admin somehow lands here, redirect them.
   if (role === "admin") {
@@ -124,7 +120,7 @@ export default function DashboardScreen() {
 
     return (
       <Animated.View
-        style={[{ transform: [{ scale: scaleAnim }], width: CARD_WIDTH }]}
+        style={[{ transform: [{ scale: scaleAnim }], flex: 1 }]}
       >
         <Pressable
           style={styles.card}
@@ -145,7 +141,9 @@ export default function DashboardScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#2196F3", "#00BCD4", "#4CAF50"]}
+        colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
         <ScrollView
@@ -191,9 +189,21 @@ export default function DashboardScreen() {
 
           {/* Feature Cards */}
           <View style={styles.cardsContainer}>
-            {FEATURES.map((feature) => (
-              <FeatureCard key={feature.route} feature={feature} />
-            ))}
+            {Array.from({ length: Math.ceil(FEATURES.length / numColumns) }).map(
+              (_, rowIdx) => {
+                const rowFeatures = FEATURES.slice(
+                  rowIdx * numColumns,
+                  rowIdx * numColumns + numColumns,
+                );
+                return (
+                  <View key={rowIdx} style={styles.cardRow}>
+                    {rowFeatures.map((feature) => (
+                      <FeatureCard key={feature.route} feature={feature} />
+                    ))}
+                  </View>
+                );
+              },
+            )}
           </View>
 
           {/* Inspirational Quote */}
@@ -241,6 +251,9 @@ export default function DashboardScreen() {
             </View>
           )}
         </ScrollView>
+
+        {/* Floating AI Chat Bubble */}
+        <GeminiChat />
       </LinearGradient>
     </SafeAreaView>
   );
@@ -282,7 +295,7 @@ const styles = StyleSheet.create({
   },
   heartIcon: {
     fontSize: 16,
-    color: "#2196F3",
+    color: "#8A63D2",
     fontWeight: "bold",
   },
   logoText: {
@@ -324,19 +337,24 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   cardsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
     gap: 16,
     marginBottom: 30,
   },
+  cardRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 16,
+  },
   card: {
     backgroundColor: "white",
-    borderRadius: 16,
-    padding: 16,
-    boxShadow: "0px 4px 8px rgba(0,0,0,0.1)",
-    elevation: 6,
+    borderRadius: 20,
+    padding: 18,
+    // @ts-ignore — web-only shadow property
+    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.10)",
+    elevation: 4,
     gap: 12,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.08)",
   },
   cardIcon: {
     width: 48,
@@ -357,10 +375,12 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   quoteContainer: {
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    borderRadius: 16,
-    padding: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    borderRadius: 20,
+    padding: 24,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.18)",
   },
   quote: {
     fontSize: 16,
@@ -403,14 +423,16 @@ const styles = StyleSheet.create({
   },
   confirmBox: {
     width: "86%",
-    padding: 20,
-    borderRadius: 12,
+    padding: 24,
+    borderRadius: 20,
     backgroundColor: "white",
     alignItems: "center",
-    gap: 12,
+    gap: 14,
+    // @ts-ignore — web-only shadow property
+    boxShadow: "0px 12px 40px rgba(0,0,0,0.12)",
   },
-  confirmTitle: { fontSize: 18, fontWeight: "600", color: "#333" },
-  confirmMessage: { fontSize: 14, color: "#666", textAlign: "center" },
+  confirmTitle: { fontSize: 18, fontWeight: "700", color: "#2D1B69" },
+  confirmMessage: { fontSize: 14, color: "#6B7280", textAlign: "center", lineHeight: 20 },
   confirmButtons: {
     flexDirection: "row",
     width: "100%",
@@ -424,8 +446,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginHorizontal: 6,
   },
-  cancelButton: { backgroundColor: "#F0F0F0" },
-  logoutButton: { backgroundColor: "#E53935" },
-  cancelText: { color: "#333", fontWeight: "600" },
+  cancelButton: { backgroundColor: "#F3F0FF", borderRadius: 14 },
+  logoutButton: { backgroundColor: "#EF4444", borderRadius: 14 },
+  cancelText: { color: "#4B5563", fontWeight: "600" },
   logoutText: { color: "white", fontWeight: "600" },
 });

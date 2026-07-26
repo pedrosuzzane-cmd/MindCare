@@ -27,15 +27,13 @@ export default function AIHelperScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#E8F4FD", "#F0F8FF", "#E8F4FD"]}
+        colors={["#E8E0F5", "#F4F2F8", "#E8E0F5"]}
         style={styles.gradient}
       >
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#666" />
           </Pressable>
-          <View style={{ width: 40 }} />
-          <View style={styles.placeholder} />
         </View>
 
         <ScrollView
@@ -82,19 +80,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  placeholder: { width: 40 },
   scrollContainer: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 40 },
   introCard: {
     backgroundColor: "white",
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 18,
     marginBottom: 18,
-    shadowColor: "#000",
+    shadowColor: "#8A63D2",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
-    shadowRadius: 5,
+    shadowRadius: 8,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
   },
   introTitle: {
     fontSize: 18,
@@ -104,15 +103,17 @@ const styles = StyleSheet.create({
   },
   introText: { fontSize: 14, color: "#666", lineHeight: 20 },
   safeReminderCard: {
-    backgroundColor: "#FFF3E0",
-    borderRadius: 16,
+    backgroundColor: "#F3EAFF",
+    borderRadius: 20,
     padding: 18,
+    borderWidth: 1,
+    borderColor: "#E0D0FF",
   },
   safeReminderTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#E65100",
+    color: "#8A63D2",
     marginBottom: 8,
   },
-  safeReminderText: { fontSize: 14, color: "#5D4037", lineHeight: 20 },
+  safeReminderText: { fontSize: 14, color: "#3B2F6B", lineHeight: 20 },
 });

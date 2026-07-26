@@ -168,7 +168,7 @@ export default function InitialProfileSurveyScreen() {
       (async () => {
         if (!auth.currentUser) {
           Alert.alert("Not signed in", "Please login to complete the survey.");
-          router.replace("/login");
+          router.replace("/auth/login");
           return;
         }
 

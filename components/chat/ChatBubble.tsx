@@ -4,7 +4,7 @@
  */
 
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 import type { ChatMessage } from "@/types/chat";
 
 interface ChatBubbleProps {
@@ -28,7 +28,11 @@ export default function ChatBubble({ message }: ChatBubbleProps) {
           isUser ? styles.userAvatar : styles.assistantAvatar,
         ]}
       >
-        <Text style={styles.avatarText}>{isUser ? "👤" : "🤖"}</Text>
+        {isUser ? (
+          <Text style={styles.avatarText}>👤</Text>
+        ) : (
+          <Image source={require("@/assets/images/mindyai.png")} style={styles.assistantAvatarImage} />
+        )}
       </View>
 
       {/* Message content */}
@@ -89,6 +93,12 @@ const styles = StyleSheet.create({
   assistantAvatar: {
     backgroundColor: "#F3E5F5",
     marginRight: 8,
+    overflow: "hidden",
+  },
+  assistantAvatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   avatarText: {
     fontSize: 16,
@@ -100,7 +110,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   userBubble: {
-    backgroundColor: "#2196F3",
+    backgroundColor: "#8A63D2",
     borderBottomRightRadius: 4,
   },
   assistantBubble: {

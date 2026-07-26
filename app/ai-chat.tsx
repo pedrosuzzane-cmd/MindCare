@@ -1,7 +1,7 @@
 /**
- * AI Wellness Chat screen.
- * Full-screen chat interface with the MindCare AI companion.
- * Uses the backend proxy for secure Gemini API access.
+ * Mindy chat screen.
+ * Full-screen chat interface with Mindy, the AI wellness companion.
+ * Calls the Gemini API directly via the useChat hook.
  */
 
 import { Ionicons } from "@expo/vector-icons";
@@ -24,9 +24,11 @@ import ChatInput from "@/components/chat/ChatInput";
 import SuggestedQuestions from "@/components/chat/SuggestedQuestions";
 import TypingIndicator from "@/components/chat/TypingIndicator";
 import { useChat } from "@/hooks/useChat";
+import { useNetwork } from "@/contexts/NetworkContext";
 
 export default function AiChatScreen() {
-  const { messages, isTyping, error, sendMessage, clearChat } = useChat();
+  const { isConnected } = useNetwork();
+  const { messages, isTyping, error, sendMessage, clearChat } = useChat(isConnected ?? false);
   const flatListRef = useRef<FlatList>(null);
 
   // Auto-scroll to bottom when new messages arrive
@@ -64,8 +66,8 @@ export default function AiChatScreen() {
             <Ionicons name="arrow-back" size={24} color="white" />
           </Pressable>
           <View style={styles.headerCenter}>
-            <Text style={styles.headerTitle}>AI Wellness Companion</Text>
-            <Text style={styles.headerSubtitle}>MindCare AI</Text>
+            <Text style={styles.headerTitle}>Mindy</Text>
+            <Text style={styles.headerSubtitle}>AI Wellness Companion</Text>
           </View>
           <Pressable style={styles.clearButton} onPress={clearChat}>
             <Ionicons name="refresh-outline" size={22} color="white" />

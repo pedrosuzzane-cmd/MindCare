@@ -1,8 +1,10 @@
 /**
  * Gemini AI service for analyzing journal entries and generating wellness suggestions.
- * Calls the Gemini REST API directly from the client using EXPO_PUBLIC_GEMINI_API_KEY.
- * Never hardcodes the API key.
+ * Uses the @google/generative-ai SDK.
  */
+
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getGeminiApiKey } from "@/backend/config";
 
 export interface GeminiAnalysis {
   emotion: string;
@@ -19,60 +21,40 @@ export interface JournalSuggestions {
   }[];
 }
 
-const GEMINI_API_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+const MODEL_NAME = "gemini-2.0-flash";
 
-/**
- * Reads the Gemini API key from environment variables.
- */
-function getApiKey(): string | null {
-  return process.env.EXPO_PUBLIC_GEMINI_API_KEY || null;
+let genAI: GoogleGenerativeAI | null = null;
+
+function getModel() {
+  if (!genAI) {
+    const apiKey = getGeminiApiKey();
+    if (!apiKey) {
+      if (__DEV__) console.warn("EXPO_PUBLIC_GEMINI_API_KEY is not set.");
+      return null;
+    }
+    genAI = new GoogleGenerativeAI(apiKey);
+  }
+  return genAI.getGenerativeModel({ model: MODEL_NAME });
 }
 
 /**
- * Calls the Gemini API with the given prompt and returns the raw response text.
+ * Calls Gemini with the given prompt and returns the raw response text.
  * Never throws - returns null on any failure.
  */
 async function callGemini(prompt: string): Promise<string | null> {
-  const apiKey = getApiKey();
-
-  if (!apiKey) {
-    console.warn("EXPO_PUBLIC_GEMINI_API_KEY is not set.");
-    return null;
-  }
+  const model = getModel();
+  if (!model) return null;
 
   try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: prompt }],
-          },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "Unknown error");
-      console.warn(`Gemini API error (${response.status}): ${errorText}`);
-      return null;
-    }
-
-    const data = await response.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
     if (!text) {
-      console.warn("Gemini returned empty response");
+      if (__DEV__) console.warn("Gemini returned empty response");
       return null;
     }
-
     return text;
   } catch (err) {
-    console.warn("Gemini API call failed:", err);
+    if (__DEV__) console.warn("Gemini API call failed:", err);
     return null;
   }
 }
@@ -88,7 +70,7 @@ function parseJsonFromText<T>(text: string): T | null {
     }
     return JSON.parse(cleaned) as T;
   } catch (err) {
-    console.warn("Failed to parse Gemini response as JSON:", err);
+    if (__DEV__) console.warn("Failed to parse Gemini response as JSON:", err);
     return null;
   }
 }
@@ -124,7 +106,7 @@ Required JSON format:
     typeof parsed.encouragement !== "string" ||
     !Array.isArray(parsed.suggestions)
   ) {
-    console.warn("Gemini response missing required fields:", parsed);
+    if (__DEV__) console.warn("Gemini response missing required fields:", parsed);
     return null;
   }
 
@@ -177,7 +159,7 @@ IMPORTANT: Respond ONLY with valid JSON, no other text.`;
 
   const parsed = parseJsonFromText<{ suggestions: { title: string; description: string; icon: string }[] }>(text);
   if (!parsed || !Array.isArray(parsed.suggestions)) {
-    console.warn("Gemini suggestions response missing suggestions array:", parsed);
+    if (__DEV__) console.warn("Gemini suggestions response missing suggestions array:", parsed);
     return null;
   }
 

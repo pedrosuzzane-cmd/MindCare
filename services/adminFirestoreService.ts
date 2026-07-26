@@ -41,6 +41,11 @@ export interface StudentSummary {
   latestJournalMood?: string;
   moodCounts: Record<string, number>;
   isLSN?: boolean;
+  specialNeedsType?: string;
+  lsnDocument?: {
+    fileName?: string;
+    secureUrl?: string;
+  } | null;
 }
 
 export interface AdminDashboardData {
@@ -119,6 +124,8 @@ export function listenForAdminDashboardData(
             latestJournalMood,
             moodCounts,
             isLSN: userData.isLSN || false,
+            specialNeedsType: userData.specialNeedsType || "",
+            lsnDocument: userData.lsnDocument || null,
           };
 
           let latestAssessment: AssessmentRecord | undefined;

@@ -359,7 +359,7 @@ export default function SelfAssessmentScreen() {
         <View
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
-          <ActivityIndicator size="large" color="#9C27B0" />
+          <ActivityIndicator size="large" color="#8A63D2" />
         </View>
       </SafeAreaView>
     );
@@ -368,7 +368,7 @@ export default function SelfAssessmentScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#9C27B0", "#7B1FA2"]}
+        colors={["#9C7EEB", "#8A63D2"]}
         style={styles.headerGradient}
       >
         <View style={styles.header}>
@@ -437,7 +437,7 @@ export default function SelfAssessmentScreen() {
           <Ionicons
             name="information-circle-outline"
             size={18}
-            color="#9C27B0"
+            color="#8A63D2"
           />
           <Text style={styles.disclaimerText}>{DISCLAIMER}</Text>
         </View>
@@ -465,7 +465,7 @@ export default function SelfAssessmentScreen() {
             disabled={!isAnswered()}
           >
             <LinearGradient
-              colors={["#9C27B0", "#2196F3"]}
+              colors={["#9C7EEB", "#8A63D2"]}
               style={styles.nextButton}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -487,7 +487,7 @@ export default function SelfAssessmentScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#F4F2F8",
   },
   headerGradient: {
     paddingBottom: 20,
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "white",
   },
   placeholder: {
@@ -544,17 +544,14 @@ const styles = StyleSheet.create({
   },
   questionCard: {
     backgroundColor: "white",
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 24,
     marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+    // @ts-ignore — web-only shadow property
+    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
   },
   questionText: {
     fontSize: 18,
@@ -594,8 +591,8 @@ const styles = StyleSheet.create({
     marginVertical: 6,
   },
   selectedRating: {
-    backgroundColor: "#9C27B0",
-    borderColor: "#9C27B0",
+    backgroundColor: "#8A63D2",
+    borderColor: "#8A63D2",
   },
   ratingButtonText: {
     fontSize: 16,
@@ -622,10 +619,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#9C27B0",
+    borderColor: "#8A63D2",
   },
   previousButtonText: {
-    color: "#9C27B0",
+    color: "#8A63D2",
     fontSize: 16,
     fontWeight: "600",
   },
@@ -651,8 +648,8 @@ const styles = StyleSheet.create({
     color: "white",
   },
   disclaimerCard: {
-    backgroundColor: "rgba(156, 39, 176, 0.08)",
-    borderRadius: 12,
+    backgroundColor: "rgba(138, 99, 210, 0.08)",
+    borderRadius: 16,
     padding: 16,
     flexDirection: "row",
     alignItems: "flex-start",

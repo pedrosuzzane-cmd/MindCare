@@ -6,23 +6,23 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 export default function WelcomeScreen() {
   const handleLogin = () => {
     // Navigate to login screen
-    router.push("/login");
+    router.push("/auth/login");
   };
 
   const handleRegister = () => {
     // Navigate to register screen
-    router.push("/register");
+    router.push("/auth/register");
   };
 
   return (
     <LinearGradient
-      colors={["#E8F4FD", "#F0F8FF", "#E8F4FD"]}
+      colors={["#E8E0F5", "#F4F2F8", "#E8E0F5"]}
       style={styles.container}
     >
       {/* Heart Icon with Gradient Background */}
       <View style={styles.iconContainer}>
         <LinearGradient
-          colors={["#4DD0E1", "#26C6DA", "#00BCD4", "#009688"]}
+          colors={["#B794F6", "#9C7EEB", "#8A63D2", "#7C5AC8"]}
           style={styles.iconGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -98,8 +98,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: "600",
-    color: "#2196F3",
+    fontWeight: "700",
+    color: "#8A63D2",
     marginBottom: 16,
   },
   subtitle: {
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   loginButton: {
-    backgroundColor: "#2196F3",
+    backgroundColor: "#8A63D2",
     paddingVertical: 16,
     borderRadius: 25,
     alignItems: "center",
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
     borderColor: "#E0E0E0",
   },
   registerButtonText: {
-    color: "#2196F3",
+    color: "#8A63D2",
     fontSize: 16,
     fontWeight: "600",
   },

@@ -48,7 +48,7 @@ export default function JournalDetailScreen() {
         <View style={styles.center}>
           <Text style={{ color: "#666" }}>Entry not found.</Text>
           <Pressable onPress={() => router.replace("/daily-journal")}>
-            <Text style={{ color: "#2196F3", marginTop: 12 }}>
+            <Text style={{ color: "#8A63D2", marginTop: 12 }}>
               Back to Journal
             </Text>
           </Pressable>
@@ -59,7 +59,7 @@ export default function JournalDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient colors={["#4CAF50", "#2E7D32"]} style={styles.header}>
+      <LinearGradient colors={["#8A63D2", "#7C5AC8"]} style={styles.header}>
         <View style={styles.headerRow}>
           <Pressable onPress={handleBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="white" />
@@ -92,7 +92,7 @@ export default function JournalDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F5F5F5" },
+  container: { flex: 1, backgroundColor: "#F4F2F8" },
   header: { paddingVertical: 18, paddingHorizontal: 16 },
   headerRow: {
     flexDirection: "row",
@@ -105,29 +105,37 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  headerTitle: { color: "white", fontSize: 18, fontWeight: "600" },
+  headerTitle: { color: "white", fontSize: 18, fontWeight: "700" },
   content: { flex: 1 },
-  card: { borderRadius: 12, padding: 16, elevation: 2 },
-  title: { fontSize: 20, fontWeight: "700", color: "#333" },
-  date: { fontSize: 12, color: "#999", marginTop: 6 },
+  card: {
+    borderRadius: 20,
+    padding: 20,
+    elevation: 3,
+    // @ts-ignore — web-only shadow property
+    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
+  },
+  title: { fontSize: 20, fontWeight: "700", color: "#1E1B4B" },
+  date: { fontSize: 12, color: "#8B7FA8", marginTop: 6 },
   tagsRow: { flexDirection: "row", gap: 8, marginTop: 8 },
   tag: {
-    backgroundColor: "#E3F2FD",
-    paddingHorizontal: 8,
+    backgroundColor: "#F3EAFF",
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 10,
+    borderRadius: 12,
   },
-  tagText: { color: "#2196F3", fontSize: 12, fontWeight: "600" },
-  body: { marginTop: 12, fontSize: 16, color: "#444", lineHeight: 22 },
+  tagText: { color: "#8A63D2", fontSize: 12, fontWeight: "600" },
+  body: { marginTop: 12, fontSize: 16, color: "#4B4453", lineHeight: 22 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   categoryRow: { marginTop: 8 },
   categoryText: {
     alignSelf: "flex-start",
     backgroundColor: "#FFF3E0",
-    color: "#FB8C00",
-    paddingHorizontal: 8,
+    color: "#E65100",
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 10,
     fontWeight: "600",
   },
 });

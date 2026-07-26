@@ -13,7 +13,7 @@ interface ToastProps {
 const TOAST_CONFIG = {
   success: {
     icon: "checkmark-circle" as keyof typeof Ionicons.glyphMap,
-    color: "#4CAF50",
+    color: "#8A63D2",
   },
   error: {
     icon: "alert-circle" as keyof typeof Ionicons.glyphMap,
@@ -21,7 +21,7 @@ const TOAST_CONFIG = {
   },
   info: {
     icon: "information-circle" as keyof typeof Ionicons.glyphMap,
-    color: "#2196F3",
+    color: "#9C7EEB",
   },
   warning: {
     icon: "warning" as keyof typeof Ionicons.glyphMap,

@@ -183,7 +183,7 @@ export default function SupportHotlinesScreen() {
           onPress={() => handleContact(hotline)}
         >
           <LinearGradient
-            colors={["#E84393", "#3742FA"]}
+            colors={["#8A63D2", "#7C5AC8"]}
             style={styles.contactButton}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
@@ -203,7 +203,7 @@ export default function SupportHotlinesScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#E84393", "#E84393"]}
+        colors={["#8A63D2", "#8A63D2"]}
         style={styles.headerGradient}
       >
         {/* Header */}
@@ -248,7 +248,7 @@ export default function SupportHotlinesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#F4F2F8",
   },
   headerGradient: {
     paddingBottom: 20,
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "white",
   },
   placeholder: {
@@ -295,10 +295,10 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   emergencyCard: {
-    backgroundColor: "#FF4757",
-    borderRadius: 16,
+    backgroundColor: "#EF4444",
+    borderRadius: 20,
     padding: 20,
-    shadowColor: "#FF4757",
+    shadowColor: "#EF4444",
     shadowOffset: {
       width: 0,
       height: 4,
@@ -341,16 +341,13 @@ const styles = StyleSheet.create({
   },
   hotlineCard: {
     backgroundColor: "white",
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    // @ts-ignore — web-only shadow property
+    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
     elevation: 4,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
   },
   cardHeader: {
     flexDirection: "row",
@@ -361,7 +358,7 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: 40,
     height: 40,
-    borderRadius: 8,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -407,14 +404,14 @@ const styles = StyleSheet.create({
     color: "white",
   },
   encouragementCard: {
-    backgroundColor: "#E3F2FD",
-    borderRadius: 12,
+    backgroundColor: "#F3EAFF",
+    borderRadius: 16,
     padding: 16,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
     borderLeftWidth: 4,
-    borderLeftColor: "#3742FA",
+    borderLeftColor: "#8A63D2",
     marginTop: 8,
   },
   encouragementIcon: {
@@ -423,7 +420,7 @@ const styles = StyleSheet.create({
   encouragementText: {
     flex: 1,
     fontSize: 14,
-    color: "#1976D2",
+    color: "#6D28D9",
     lineHeight: 20,
   },
 });

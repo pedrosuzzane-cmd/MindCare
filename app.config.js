@@ -1,6 +1,6 @@
 const dotenv = require("dotenv");
 
-dotenv.config({ path: ".env.local" });
+dotenv.config({ path: ".env" });
 
 module.exports = ({ config }) => {
   // Set APP_DOMAIN in your environment for production (e.g. example.com)

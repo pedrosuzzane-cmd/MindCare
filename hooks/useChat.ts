@@ -1,21 +1,25 @@
 /**
- * Hook for managing AI Wellness Chat state and interactions.
+ * Hook for managing Mindy chat state and interactions.
  * Conversation is kept in React state (no Firestore persistence yet).
+ * Accepts an optional isConnected flag to block sends when offline.
  */
 
 import { useCallback, useRef, useState } from "react";
 import { sendMessage } from "@/services/chatService";
 import type { ChatMessage } from "@/types/chat";
 
+const OFFLINE_ERROR =
+  "Cannot access the chatbot if there is no network connection. Please check your internet and try again.";
+
 const WELCOME_MESSAGE: ChatMessage = {
   id: "welcome",
   role: "assistant",
   content:
-    "Hello! I'm your MindCare wellness companion. I'm here to listen, support, and help you navigate your feelings. How are you feeling today?",
+    "Hello! I'm Mindy, your MindCare wellness companion. I'm here to listen, support, and help you navigate your feelings. How are you feeling today?",
   timestamp: Date.now(),
 };
 
-export function useChat() {
+export function useChat(isConnected: boolean = true) {
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +45,11 @@ export function useChat() {
 
       setError(null);
 
+      if (!isConnected) {
+        setError(OFFLINE_ERROR);
+        return;
+      }
+
       // Add user message
       addMessage("user", content.trim());
 
@@ -58,7 +67,7 @@ export function useChat() {
         // Add assistant response
         addMessage("assistant", response.text);
       } catch (err) {
-        console.error("Chat error:", err);
+        if (__DEV__) console.error("Chat error:", err);
         setError(
           "I'm having trouble connecting right now. Please try again in a moment.",
         );
@@ -66,7 +75,7 @@ export function useChat() {
         setIsTyping(false);
       }
     },
-    [messages, addMessage],
+    [messages, addMessage, isConnected],
   );
 
   const clearChat = useCallback(() => {

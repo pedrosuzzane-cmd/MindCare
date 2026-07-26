@@ -1,10 +1,11 @@
 import { auth } from "@/constants/firebase";
+import { useAuth } from "@/hooks/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -25,7 +26,25 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const { user, role, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+    if (role === "admin") {
+      router.replace("/admin-panel");
+    } else if (role === "student") {
+      router.replace("/(student)/(tabs)/dashboard");
+    }
+  }, [user, role, authLoading]);
+
+  if (authLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: isDark ? "#10091F" : "#F5F3FF" }}>
+        <ActivityIndicator size="large" color="#7C3AED" />
+      </View>
+    );
+  }
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -33,13 +52,13 @@ export default function LoginScreen() {
       return;
     }
 
-    setLoading(true);
+    setSubmitting(true);
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password);
     } catch (error: any) {
       Alert.alert("Login failed", error.message || "Invalid credentials.");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -48,7 +67,7 @@ export default function LoginScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent} bounces={false}>
+      <ScrollView contentContainerStyle={styles.scrollContent} bounces={false} keyboardShouldPersistTaps="handled">
         <LinearGradient
           colors={
             isDark
@@ -139,9 +158,9 @@ export default function LoginScreen() {
           </View>
 
           <Pressable
-            style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+            style={[styles.loginButton, submitting && styles.loginButtonDisabled]}
             onPress={handleLogin}
-            disabled={loading}
+            disabled={submitting}
           >
             <LinearGradient
               colors={isDark ? ["#A78BFA", "#7C3AED"] : ["#7C3AED", "#5B21B6"]}
@@ -149,7 +168,7 @@ export default function LoginScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.gradientButton}
             >
-              {loading ? (
+              {submitting ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
                 <>

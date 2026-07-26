@@ -1,40 +1,38 @@
 import {
-    HydrationState,
-    ReminderState,
-    RepeatSchedule,
-    StandardState,
+  HydrationState,
+  ReminderState,
+  RepeatSchedule,
+  StandardState,
 } from "@/hooks/reminderDefaults";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useReminderSettings } from "@/hooks/useReminderSettings";
+import ClockTimePicker from "@/components/ClockTimePicker";
 import { requestNotificationPermissions } from "@/services/notificationService";
-import { Ionicons } from "@expo/vector-icons";
-import DateTimePicker, {
-  DateTimePickerEvent,
-} from "expo-datetimepicker";
+import { Ionicons } from "@expo/vector-icons"; // Keep this for icons
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    NativeScrollEvent,
-    NativeSyntheticEvent,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import Animated, {
-    Extrapolation,
-    interpolate,
-    SharedValue,
-    useAnimatedScrollHandler,
-    useAnimatedStyle,
-    useSharedValue,
+  Extrapolation,
+  interpolate,
+  SharedValue,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
 } from "react-native-reanimated";
 
 // ── Constants ──
@@ -54,13 +52,13 @@ const REMINDER_META: Record<
 > = {
   hydration: {
     icon: "water-outline",
-    color: "#2196F3",
+    color: "#9C7EEB",
     label: "Hydration Reminder",
     desc: "Interval-based hydration reminders",
   },
   sleep: {
     icon: "moon-outline",
-    color: "#9C27B0",
+    color: "#9C7EEB",
     label: "Sleep Schedule Reminder",
     desc: "Encourages a consistent sleep routine",
   },
@@ -72,7 +70,7 @@ const REMINDER_META: Record<
   },
   task: {
     icon: "checkmark-circle-outline",
-    color: "#4CAF50",
+    color: "#8A63D2",
     label: "Task Submission Reminder",
     desc: "Helps remember upcoming deadlines",
   },
@@ -285,75 +283,6 @@ function ScrollWheelPicker<T>({
   );
 }
 
-// ── Native Time Picker (Android clock / iOS spinner) ──
-function NativeTimePicker({
-  val,
-  onChange,
-}: {
-  val: { hour: number; minute: number; period: "AM" | "PM" };
-  onChange: (v: { hour: number; minute: number; period: "AM" | "PM" }) => void;
-}) {
-  const [show, setShow] = useState(false);
-
-  // Convert 12h time to a Date object for the picker
-  const toDate = (t: typeof val): Date => {
-    let h = t.hour;
-    if (t.period === "PM" && h !== 12) h += 12;
-    if (t.period === "AM" && h === 12) h = 0;
-    const d = new Date();
-    d.setHours(h, t.minute, 0, 0);
-    return d;
-  };
-
-  // Convert Date back to 12h format
-  const fromDate = (d: Date): typeof val => {
-    const h = d.getHours();
-    const m = d.getMinutes();
-    const period: "AM" | "PM" = h >= 12 ? "PM" : "AM";
-    let hour12 = h % 12;
-    if (hour12 === 0) hour12 = 12;
-    return { hour: hour12, minute: m, period };
-  };
-
-  const handleChange = useCallback(
-    (_event: DateTimePickerEvent, selectedDate?: Date) => {
-      // On Android, the picker closes automatically after any event
-      setShow(false);
-
-      // If user pressed Cancel, selectedDate is undefined — keep previous time
-      if (!selectedDate) return;
-
-      const newTime = fromDate(selectedDate);
-      onChange(newTime);
-    },
-    [onChange],
-  );
-
-  return (
-    <View>
-      {/* Display current time as a tappable button */}
-      <Pressable
-        style={s.timeDisplayButton}
-        onPress={() => setShow(true)}
-      >
-        <Ionicons name="time-outline" size={20} color="#4CAF50" />
-        <Text style={s.timeDisplayText}>{fmt(val)}</Text>
-        <Ionicons name="chevron-down" size={16} color="#999" />
-      </Pressable>
-
-      {/* Show native picker on Android (clock) and iOS (spinner) */}
-      {show && (
-        <DateTimePicker
-          value={toDate(val)}
-          mode="time"
-          display={Platform.OS === "android" ? "clock" : "spinner"}
-          onChange={handleChange}
-        />
-      )}
-    </View>
-  );
-}
-
 // ── Sub-components ──
 function PillRow({
   items,
@@ -501,7 +430,7 @@ function HydrationCard({
           ) : null}
         </View>
         <Switch
-          trackColor={{ false: "#E0E0E0", true: "#4CAF50" }}
+          trackColor={{ false: "#E0E0E0", true: "#8A63D2" }}
           thumbColor="#FFFFFF"
           ios_backgroundColor="#E0E0E0"
           onValueChange={onToggle}
@@ -523,14 +452,14 @@ function HydrationCard({
           </View>
           <View style={s.field}>
             <Text style={s.label}>Start Time</Text>
-            <NativeTimePicker
+            <ClockTimePicker
               val={r.startTime || { hour: 8, minute: 0, period: "AM" }}
               onChange={(v) => onUpdate({ startTime: v })}
             />
           </View>
           <View style={s.field}>
             <Text style={s.label}>End Time</Text>
-            <NativeTimePicker
+            <ClockTimePicker
               val={r.endTime || { hour: 10, minute: 0, period: "PM" }}
               onChange={(v) => onUpdate({ endTime: v })}
             />
@@ -644,7 +573,7 @@ function StandardCard({
           ) : null}
         </View>
         <Switch
-          trackColor={{ false: "#E0E0E0", true: "#4CAF50" }}
+          trackColor={{ false: "#E0E0E0", true: "#8A63D2" }}
           thumbColor="#FFFFFF"
           ios_backgroundColor="#E0E0E0"
           onValueChange={onToggle}
@@ -655,7 +584,7 @@ function StandardCard({
         <View style={s.settings}>
           <View style={s.field}>
             <Text style={s.label}>Time</Text>
-            <NativeTimePicker
+            <ClockTimePicker
               val={r.time || { hour: 9, minute: 0, period: "AM" }}
               onChange={(v) => onUpdate({ time: v })}
             />
@@ -790,7 +719,7 @@ export default function DailyRemindersScreen() {
 
   return (
     <SafeAreaView style={s.container}>
-      <LinearGradient colors={["#4CAF50", "#2E7D32"]} style={s.headerBg}>
+      <LinearGradient colors={["#8A63D2", "#7C5AC8"]} style={s.headerBg}>
         <View style={s.header}>
           <Pressable
             style={s.backBtn}
@@ -839,7 +768,7 @@ export default function DailyRemindersScreen() {
           <Ionicons
             name="information-circle-outline"
             size={20}
-            color="#4CAF50"
+            color="#8A63D2"
           />
           <Text style={s.infoText}>
             Notifications at scheduled times. Enable permissions to receive
@@ -852,7 +781,7 @@ export default function DailyRemindersScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F5F5F5" },
+  container: { flex: 1, backgroundColor: "#F4F2F8" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   loadText: { fontSize: 16, color: "#888" },
   headerBg: { paddingBottom: 20 },
@@ -886,13 +815,13 @@ const s = StyleSheet.create({
   // Card
   card: {
     backgroundColor: "white",
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
+    // @ts-ignore — web-only shadow property
+    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
     elevation: 3,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
   },
   cardH: { flexDirection: "row", alignItems: "center" },
   icon: {
@@ -908,7 +837,7 @@ const s = StyleSheet.create({
   cardDesc: { fontSize: 13, color: "#888", marginTop: 2 },
   badge: {
     fontSize: 11,
-    color: "#4CAF50",
+    color: "#8A63D2",
     fontWeight: "600",
     marginTop: 4,
     backgroundColor: "rgba(76, 175, 80, 0.1)",
@@ -1026,7 +955,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E0E0E0",
   },
-  pillSelected: { backgroundColor: "#4CAF50", borderColor: "#4CAF50" },
+  pillSelected: { backgroundColor: "#8A63D2", borderColor: "#8A63D2" },
   pillText: { color: "#333", fontWeight: "600", fontSize: 13 },
   pillTextSelected: { color: "white" },
   periodRow: { flexDirection: "row", gap: 6 },
@@ -1051,7 +980,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E0E0E0",
   },
-  repeatPillSelected: { backgroundColor: "#4CAF50", borderColor: "#4CAF50" },
+  repeatPillSelected: { backgroundColor: "#8A63D2", borderColor: "#8A63D2" },
   repeatPillText: { color: "#555", fontWeight: "600", fontSize: 12 },
   repeatPillTextSelected: { color: "white" },
   dayPill: {
@@ -1064,7 +993,7 @@ const s = StyleSheet.create({
     minWidth: 40,
     alignItems: "center",
   },
-  dayPillSelected: { backgroundColor: "#4CAF50", borderColor: "#4CAF50" },
+  dayPillSelected: { backgroundColor: "#8A63D2", borderColor: "#8A63D2" },
   dayPillText: { color: "#555", fontWeight: "600", fontSize: 11 },
   dayPillTextSelected: { color: "white" },
   // Inputs

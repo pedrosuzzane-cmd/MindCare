@@ -6,8 +6,11 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -246,11 +249,21 @@ export default function ForgotPasswordScreen() {
   };
 
   return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ flex: 1 }}
+    >
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#E8F4FD", "#F0F8FF", "#E8F4FD"]}
+        colors={["#E8E0F5", "#F4F2F8", "#E8E0F5"]}
         style={styles.gradient}
       >
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+        >
         {/* Header with back button */}
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={handleBack}>
@@ -264,7 +277,7 @@ export default function ForgotPasswordScreen() {
         {/* Icon */}
         <View style={styles.iconContainer}>
           <LinearGradient
-            colors={["#FF6B6B", "#FF8E72", "#FFA569", "#FFB856"]}
+            colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
             style={styles.iconGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -305,7 +318,7 @@ export default function ForgotPasswordScreen() {
             <View style={styles.buttonContainer}>
               <Pressable onPress={handleSendResetCode} disabled={loading}>
                 <LinearGradient
-                  colors={["#2196F3", "#00BCD4", "#4CAF50"]}
+                  colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
                   style={[styles.button, loading && { opacity: 0.6 }]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
@@ -347,7 +360,7 @@ export default function ForgotPasswordScreen() {
                 />
                 <Pressable onPress={handleUseLink} style={{ marginTop: 8 }}>
                   <LinearGradient
-                    colors={["#2196F3", "#00BCD4"]}
+                    colors={["#9C7EEB", "#8A63D2"]}
                     style={[
                       styles.button,
                       {
@@ -388,7 +401,7 @@ export default function ForgotPasswordScreen() {
             <View style={styles.buttonContainer}>
               <Pressable onPress={handleVerifyCode} disabled={loading}>
                 <LinearGradient
-                  colors={["#2196F3", "#00BCD4", "#4CAF50"]}
+                  colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
                   style={[styles.button, loading && { opacity: 0.6 }]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
@@ -485,7 +498,7 @@ export default function ForgotPasswordScreen() {
                         : "close-circle"
                     }
                     size={16}
-                    color={newPassword.length >= 8 ? "#4CAF50" : "#999"}
+                    color={newPassword.length >= 8 ? "#8A63D2" : "#999"}
                   />
                   <Text style={styles.requirementText}>
                     At least 8 characters
@@ -499,7 +512,7 @@ export default function ForgotPasswordScreen() {
                         : "close-circle"
                     }
                     size={16}
-                    color={/[A-Za-z]/.test(newPassword) ? "#4CAF50" : "#999"}
+                    color={/[A-Za-z]/.test(newPassword) ? "#8A63D2" : "#999"}
                   />
                   <Text style={styles.requirementText}>
                     Contains letters (A-Z, a-z)
@@ -513,7 +526,7 @@ export default function ForgotPasswordScreen() {
                         : "close-circle"
                     }
                     size={16}
-                    color={/[0-9]/.test(newPassword) ? "#4CAF50" : "#999"}
+                    color={/[0-9]/.test(newPassword) ? "#8A63D2" : "#999"}
                   />
                   <Text style={styles.requirementText}>
                     Contains numbers (0-9)
@@ -531,7 +544,7 @@ export default function ForgotPasswordScreen() {
                     color={
                       newPassword === confirmPassword &&
                       confirmPassword.length > 0
-                        ? "#4CAF50"
+                        ? "#8A63D2"
                         : "#999"
                     }
                   />
@@ -545,7 +558,7 @@ export default function ForgotPasswordScreen() {
             <View style={styles.buttonContainer}>
               <Pressable onPress={handleResetPassword} disabled={loading}>
                 <LinearGradient
-                  colors={["#2196F3", "#00BCD4", "#4CAF50"]}
+                  colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
                   style={[styles.button, loading && { opacity: 0.6 }]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
@@ -570,7 +583,7 @@ export default function ForgotPasswordScreen() {
 
             <View style={styles.successContainer}>
               <LinearGradient
-                colors={["#4CAF50", "#45a049", "#388E3C"]}
+                colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
                 style={styles.successIconContainer}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
@@ -590,7 +603,7 @@ export default function ForgotPasswordScreen() {
             <View style={styles.buttonContainer}>
               <Pressable onPress={handleLoginRedirect}>
                 <LinearGradient
-                  colors={["#2196F3", "#00BCD4", "#4CAF50"]}
+                  colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
                   style={styles.button}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
@@ -601,8 +614,10 @@ export default function ForgotPasswordScreen() {
             </View>
           </>
         )}
+        </ScrollView>
       </LinearGradient>
     </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -642,15 +657,15 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#E8F4FD",
+    backgroundColor: "#F3EAFF",
     borderWidth: 2,
-    borderColor: "#D0E8F2",
+    borderColor: "#E0D0FF",
     justifyContent: "center",
     alignItems: "center",
   },
   stepCircleActive: {
-    backgroundColor: "#2196F3",
-    borderColor: "#1976D2",
+    backgroundColor: "#8A63D2",
+    borderColor: "#7C5AC8",
   },
   stepNumber: {
     fontSize: 14,
@@ -663,11 +678,11 @@ const styles = StyleSheet.create({
   stepLine: {
     width: 30,
     height: 2,
-    backgroundColor: "#D0E8F2",
+    backgroundColor: "#E0D0FF",
     marginHorizontal: -22,
   },
   stepLineActive: {
-    backgroundColor: "#2196F3",
+    backgroundColor: "#8A63D2",
   },
   iconContainer: {
     alignItems: "center",
@@ -682,8 +697,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: "600",
-    color: "#2196F3",
+    fontWeight: "700",
+    color: "#8A63D2",
     textAlign: "center",
     marginBottom: 8,
   },

@@ -93,7 +93,7 @@ export default function SelfAssessmentMenuScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#9C27B0", "#7B1FA2"]}
+        colors={["#9C7EEB", "#8A63D2"]}
         style={styles.headerGradient}
       >
         {/* Header */}
@@ -115,7 +115,7 @@ export default function SelfAssessmentMenuScreen() {
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#9C27B0" />
+          <ActivityIndicator size="large" color="#8A63D2" />
         </View>
       ) : (
         <ScrollView
@@ -127,7 +127,7 @@ export default function SelfAssessmentMenuScreen() {
           <View style={styles.optionsContainer}>
             {cooldownActive ? (
               <View style={styles.cooldownCard}>
-                <Ionicons name="lock-closed" size={28} color="#9C27B0" />
+                <Ionicons name="lock-closed" size={28} color="#8A63D2" />
                 <Text style={styles.cooldownTitle}>
                   Assessment Locked
                 </Text>
@@ -167,7 +167,7 @@ export default function SelfAssessmentMenuScreen() {
 
           {/* Disclaimer */}
           <View style={styles.disclaimerCard}>
-            <Ionicons name="information-circle-outline" size={20} color="#9C27B0" />
+            <Ionicons name="information-circle-outline" size={20} color="#8A63D2" />
             <Text style={styles.disclaimerText}>{DISCLAIMER}</Text>
           </View>
         </ScrollView>
@@ -179,7 +179,7 @@ export default function SelfAssessmentMenuScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#F4F2F8",
   },
   headerGradient: {
     paddingBottom: 20,
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "white",
   },
   placeholder: {
@@ -234,16 +234,13 @@ const styles = StyleSheet.create({
   },
   optionCard: {
     backgroundColor: "white",
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 20,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+    // @ts-ignore — web-only shadow property
+    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
   },
   cardContent: {
     flexDirection: "row",
@@ -274,22 +271,19 @@ const styles = StyleSheet.create({
   },
   cooldownCard: {
     backgroundColor: "white",
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 24,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+    // @ts-ignore — web-only shadow property
+    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
   },
   cooldownTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#9C27B0",
+    color: "#8A63D2",
     marginTop: 12,
     marginBottom: 8,
   },
@@ -312,7 +306,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   journalButton: {
-    backgroundColor: "#9C27B0",
+    backgroundColor: "#8A63D2",
     borderRadius: 25,
     paddingVertical: 12,
     paddingHorizontal: 32,
@@ -323,8 +317,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   disclaimerCard: {
-    backgroundColor: "rgba(156, 39, 176, 0.08)",
-    borderRadius: 12,
+    backgroundColor: "rgba(138, 99, 210, 0.08)",
+    borderRadius: 16,
     padding: 16,
     flexDirection: "row",
     alignItems: "flex-start",

@@ -192,7 +192,7 @@ export default function AssessmentCompleteScreen() {
             onPress={handleBackToHome}
           >
             <LinearGradient
-              colors={["#9C27B0", "#2196F3"]}
+              colors={["#9C7EEB", "#8A63D2"]}
               style={styles.backButton}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -209,7 +209,7 @@ export default function AssessmentCompleteScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#F4F2F8",
   },
   scrollContainer: {
     flex: 1,
@@ -284,22 +284,19 @@ const styles = StyleSheet.create({
   },
   recommendationsCard: {
     backgroundColor: "white",
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 24,
     marginBottom: 40,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+    // @ts-ignore — web-only shadow property
+    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
   },
   recommendationsTitle: {
     fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
+    fontWeight: "700",
+    color: "#1E1B4B",
     marginBottom: 20,
     textAlign: "center",
   },

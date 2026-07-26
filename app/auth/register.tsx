@@ -5,7 +5,9 @@ import { useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -437,6 +439,7 @@ export default function RegisterScreen() {
       } as Record<string, any>;
 
       await createUserDocument(user.uid, profileData);
+      router.replace("/(student)/(tabs)/dashboard");
     } catch (err: any) {
       setShowConfirmModal(false);
       console.error("Registration error", err);
@@ -460,6 +463,10 @@ export default function RegisterScreen() {
   };
 
   return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={{ flex: 1 }}
+    >
     <SafeAreaView style={styles.container}>
       <View style={styles.mainLayout}>
         {/* Header */}
@@ -475,6 +482,7 @@ export default function RegisterScreen() {
           style={styles.scrollContainer}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {/* Tab Navigation Header */}
           <View style={styles.tabNavContainer}>
@@ -1521,6 +1529,7 @@ export default function RegisterScreen() {
         </Modal>
       </View>
     </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 

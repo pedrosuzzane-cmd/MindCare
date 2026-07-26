@@ -3,7 +3,7 @@
  */
 
 import React, { useEffect, useRef } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
+import { Animated, Image, StyleSheet, Text, View } from "react-native";
 
 export default function TypingIndicator() {
   const dot1 = useRef(new Animated.Value(0)).current;
@@ -62,7 +62,7 @@ export default function TypingIndicator() {
   return (
     <View style={styles.container}>
       <View style={styles.avatar}>
-        <Text style={styles.avatarText}>🤖</Text>
+        <Image source={require("@/assets/images/mindyai.png")} style={styles.avatarImage} />
       </View>
       <View style={styles.bubble}>
         <View style={styles.dotsContainer}>
@@ -90,9 +90,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 8,
     marginTop: 4,
+    overflow: "hidden",
   },
-  avatarText: {
-    fontSize: 16,
+  avatarImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   bubble: {
     backgroundColor: "#F5F5F5",
@@ -110,6 +113,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#2196F3",
+    backgroundColor: "#8A63D2",
   },
 });
