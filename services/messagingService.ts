@@ -361,26 +361,33 @@ export async function refreshPeerConversationNames(
 /**
  * Searches for students to start a peer conversation with.
  * Returns all students from the "users" collection except the current user.
+ * Includes try/catch with fallback and returns empty array on failure.
  */
 export async function searchStudents(
   currentUserId: string,
 ): Promise<StudentSearchResult[]> {
-  const usersRef = collection(db, "users");
-  const snapshot = await getDocs(usersRef);
+  try {
+    const usersRef = collection(db, "users");
+    const snapshot = await getDocs(usersRef);
 
-  const students: StudentSearchResult[] = [];
-  for (const d of snapshot.docs) {
-    if (d.id === currentUserId) continue;
-    const data = d.data();
-    students.push({
-      uid: d.id,
-      fullName: data.fullName || data.displayName || "Student",
-      department: data.department || undefined,
-      yearLevel: data.yearLevel || undefined,
-    });
+    const students: StudentSearchResult[] = [];
+    for (const d of snapshot.docs) {
+      if (d.id === currentUserId) continue;
+      const data = d.data();
+      students.push({
+        uid: d.id,
+        fullName: data.fullName || data.displayName || "Student",
+        department: data.department || undefined,
+        yearLevel: data.yearLevel || undefined,
+      });
+    }
+
+    return students.sort((a, b) => a.fullName.localeCompare(b.fullName));
+  } catch (error) {
+    console.error("searchStudents error:", error);
+    // Return empty array instead of crashing — the UI will show "No students found"
+    return [];
   }
-
-  return students.sort((a, b) => a.fullName.localeCompare(b.fullName));
 }
 
 /**

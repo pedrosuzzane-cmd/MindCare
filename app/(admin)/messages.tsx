@@ -32,9 +32,9 @@ import {
   deleteMessage,
   getOrCreateConversation,
   getPeerName,
+  listenForAllPeerConversations,
   listenForConversations,
   listenForMessages,
-  listenForPeerConversations,
   markAsRead,
   searchStudents,
   sendMessage as sendMsg,
@@ -89,10 +89,10 @@ export default function AdminMessagesScreen() {
     return () => unsub();
   }, [user?.uid]);
 
-  // Listen for peer conversations (admin moderation view)
+  // Listen for ALL peer conversations (admin moderation view)
   useEffect(() => {
     if (!user?.uid) return;
-    const unsub = listenForPeerConversations(user.uid, (convs) => {
+    const unsub = listenForAllPeerConversations((convs) => {
       setPeerConversations(convs);
     });
     return () => unsub();
