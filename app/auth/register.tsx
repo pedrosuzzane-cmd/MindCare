@@ -16,6 +16,7 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import NetInfo from "@react-native-community/netinfo";
 
 // Firebase imports
 import { API_URL } from "@/backend/config";
@@ -257,11 +258,20 @@ export default function RegisterScreen() {
       };
 
       xhr.onerror = () => {
-        reject(
-          new Error(
-            "The document-upload service could not be reached. Please try again later.",
-          ),
-        );
+        // Differentiate between DNS/network failure vs server not responding
+        if (xhr.status === 0) {
+          reject(
+            new Error(
+              "The upload service is temporarily unavailable. If this is the first upload attempt, the server may still be starting up. Please try again in 30-60 seconds.",
+            ),
+          );
+        } else {
+          reject(
+            new Error(
+              "The document-upload service could not be reached. Please try again later.",
+            ),
+          );
+        }
       };
 
       xhr.ontimeout = () => {
@@ -397,6 +407,14 @@ export default function RegisterScreen() {
 
       let lsnDocumentData = null;
       if (lsnStatus === "yes-with-id" && lsnDocument && !lsnDocument.canceled) {
+        // Check network connectivity before attempting upload
+        const netState = await NetInfo.fetch();
+        if (!netState.isConnected) {
+          throw new Error(
+            "No internet connection detected. Please check your network and try again.",
+          );
+        }
+
         const asset = lsnDocument.assets[0];
         const { secureUrl, publicId } = await uploadToCloudinary(
           asset,

@@ -72,7 +72,8 @@ try {
   );
 }
 
-app.use(bodyParser.json({ limit: "10mb" }));
+app.use(bodyParser.json({ limit: "50mb" }));
+app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 
 // Middleware to verify Firebase ID token and check for admin claims
 const checkAdmin = async (req, res, next) => {
@@ -444,6 +445,97 @@ app.post("/api/chat", async (req, res) => {
   } catch (err) {
     console.error("Chat route error:", err.message || err);
     return res.status(500).json({ error: "Chat request failed." });
+  }
+});
+
+// ── Content Moderation for Peer Messaging (Gemini classification) ──
+const MODERATION_SYSTEM_PROMPT = `You are a content moderation system for a school wellness messaging app. Your job is to classify student messages as safe, flagged, or blocked.
+
+Classification rules:
+- "safe": Normal, respectful conversation. Friendly, supportive, or neutral messages.
+- "flagged": Potentially inappropriate — mild bullying, insensitive language, passive-aggressive tone, or mild profanity. May need attention but not necessarily harmful.
+- "blocked": Clearly inappropriate — threats, harassment, explicit content, hate speech, self-harm references, or severe bullying.
+
+CRITICAL: Respond ONLY with valid JSON. No markdown, no code fences, no extra text.
+
+Respond with this exact JSON schema:
+{
+  "status": "safe" | "flagged" | "blocked",
+  "reason": "Brief explanation if not safe, empty string if safe"
+}`;
+
+app.post("/api/moderate", async (req, res) => {
+  const { text } = req.body;
+
+  if (!text || typeof text !== "string") {
+    return res.status(400).json({ error: "Missing text." });
+  }
+
+  if (!GEMINI_API_KEY) {
+    // If Gemini is not configured, fail open — return safe
+    return res.json({ status: "safe", reason: "" });
+  }
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: `System instruction: ${MODERATION_SYSTEM_PROMPT}` }],
+            },
+            {
+              role: "model",
+              parts: [{ text: "Understood. I will classify messages accordingly." }],
+            },
+            {
+              role: "user",
+              parts: [{ text: `Classify this message: "${text.substring(0, 500)}"` }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 256,
+          },
+        }),
+      },
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("Moderation error:", data.error?.message || response.status);
+      // Fail open
+      return res.json({ status: "safe", reason: "" });
+    }
+
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!responseText) {
+      return res.json({ status: "safe", reason: "" });
+    }
+
+    let parsed;
+    try {
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { status: "safe", reason: "" };
+    } catch {
+      parsed = { status: "safe", reason: "" };
+    }
+
+    // Validate status value
+    if (!["safe", "flagged", "blocked"].includes(parsed.status)) {
+      parsed.status = "safe";
+    }
+
+    return res.json(parsed);
+  } catch (err) {
+    console.error("Moderation route error:", err.message || err);
+    // Fail open
+    return res.json({ status: "safe", reason: "" });
   }
 });
 
