@@ -1,41 +1,41 @@
-import DateTimePicker, {
-  DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import Animated, {
-  Extrapolation,
-  interpolate,
-  SharedValue,
-  useAnimatedScrollHandler,
-  useAnimatedStyle,
-  useSharedValue,
-} from "react-native-reanimated";
-import {
-  HydrationState,
-  ReminderState,
-  RepeatSchedule,
-  StandardState,
+    HydrationState,
+    ReminderState,
+    RepeatSchedule,
+    StandardState,
 } from "@/hooks/reminderDefaults";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useReminderSettings } from "@/hooks/useReminderSettings";
 import { requestNotificationPermissions } from "@/services/notificationService";
+import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker, {
+  DateTimePickerEvent,
+} from "expo-datetimepicker";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+    Alert,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    Platform,
+    Pressable,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    View,
+} from "react-native";
+import Animated, {
+    Extrapolation,
+    interpolate,
+    SharedValue,
+    useAnimatedScrollHandler,
+    useAnimatedStyle,
+    useSharedValue,
+} from "react-native-reanimated";
 
 // ── Constants ──
 const HOURS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];

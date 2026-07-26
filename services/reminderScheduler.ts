@@ -1,6 +1,5 @@
 import {
   HydrationState,
-  ReminderType,
   ReminderState,
   ReminderTime,
   RepeatSchedule,
@@ -10,7 +9,6 @@ import {
   cancelReminderType,
   scheduleNotification,
 } from "@/services/notificationService";
-import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
 const REMINDER_CONTENT = {
@@ -74,10 +72,10 @@ async function scheduleStandard(id: "sleep" | "breakTime", r: StandardState) {
         channelId: "reminders",
       },
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
         weekday: day,
         hour: to24h(r.time),
         minute: r.time.minute,
+        repeats: true,
       },
     });
   }
@@ -102,10 +100,10 @@ async function scheduleTask(r: StandardState) {
         channelId: "tasks",
       },
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
         weekday: day,
         hour: to24h(r.time),
         minute: r.time.minute,
+        repeats: true,
       },
     });
   }
@@ -137,10 +135,10 @@ async function scheduleHydration(r: HydrationState) {
         },
       },
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
         weekday: day,
         hour: to24h(r.startTime),
         minute: r.startTime.minute,
+        repeats: true,
       },
     });
   }

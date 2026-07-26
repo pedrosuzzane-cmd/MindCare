@@ -11,8 +11,7 @@ if (
 ) {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowBanner: true, // For iOS dropdown
-      shouldShowList: true, // For Android notification center
+      shouldShowAlert: true, // Required: Show the notification alert
       shouldPlaySound: true,
       shouldSetBadge: false,
     }),

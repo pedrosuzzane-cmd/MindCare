@@ -40,7 +40,8 @@ const port = process.env.PORT || 3000;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-// Lets the mobile app and deployment checks confirm that this exact backend is
+// Lets the mobile app
+//  and deployment checks confirm that this exact backend is
 // online before attempting a document upload.
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", service: "mindcare-backend" });

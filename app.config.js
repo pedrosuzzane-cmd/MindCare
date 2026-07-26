@@ -12,7 +12,6 @@ module.exports = ({ config }) => {
       ...config.expo,
       plugins: [
         ...(config.expo?.plugins || []),
-        "@react-native-community/datetimepicker",
       ],
       scheme: config.expo?.scheme || "mindcarev2",
       ios: {
