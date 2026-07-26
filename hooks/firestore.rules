@@ -9,6 +9,15 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
+    // Helper: checks if the requesting user is a participant in a conversation.
+    // Supports both admin-student (studentId/adminId fields) and peer (participants array) formats.
+    function isParticipant(conversationData) {
+      return request.auth.uid == conversationData.studentId
+          || request.auth.uid == conversationData.adminId
+          || (conversationData.participants != null
+              && conversationData.participants.hasAny([request.auth.uid]));
+    }
+
     // Rules for the 'users' collection, which contains student data.
     match /users/{userId} {
 
@@ -57,6 +66,70 @@ service cloud.firestore {
       // No client is allowed to write to the admins collection.
       // This must be done via a secure backend with admin privileges.
       allow write: if false;
+    }
+
+    // ==========================
+    // CHATS / CONVERSATIONS
+    // ==========================
+    // Supports two conversation formats:
+    //   1. Admin-Student: { studentId, adminId, studentName, adminName, ... }
+    //   2. Peer-to-Peer:  { type: "peer", participants: [uidA, uidB], participantNames: {...}, ... }
+    // Both share: lastMessage, lastMessageAt, unreadBy[]
+    match /conversations/{conversationId} {
+
+      // READ:
+      // - Participants can read their own conversations.
+      // - Admins can read all conversations (for moderation and support).
+      allow read: if isAdmin() || isParticipant(resource.data);
+
+      // CREATE:
+      // - Any authenticated user can create a new conversation.
+      // - The creator MUST include their own UID as a participant.
+      allow create: if request.auth != null
+        && (
+          // Admin-student: creator must be studentId or adminId
+          request.auth.uid == request.resource.data.studentId
+          || request.auth.uid == request.resource.data.adminId
+          // Peer: creator must be in the participants array
+          || (request.resource.data.participants != null
+              && request.resource.data.participants.hasAny([request.auth.uid]))
+        );
+
+      // UPDATE:
+      // - Participants can update conversation metadata (lastMessage, unreadBy, etc.).
+      // - Admins can update any conversation (e.g., moderation actions).
+      allow update: if isAdmin() || isParticipant(resource.data);
+
+      // DELETE:
+      // - Only admins can delete entire conversations.
+      allow delete: if isAdmin();
+
+      // --- Messages Subcollection ---
+      match /messages/{messageId} {
+
+        // READ:
+        // - Participants can read messages in their conversations.
+        // - Admins can read all messages (for moderation).
+        allow read: if isAdmin()
+          || isParticipant(get(/databases/$(database)/documents/conversations/$(conversationId)).data);
+
+        // CREATE:
+        // - Participants can send messages in their conversations.
+        // - The sender UID must match their own auth UID.
+        allow create: if (isAdmin()
+          || isParticipant(get(/databases/$(database)/documents/conversations/$(conversationId)).data))
+          && request.resource.data.senderId == request.auth.uid;
+
+        // UPDATE:
+        // - The original sender can update their own message (e.g., soft-delete).
+        // - Admins can update any message (e.g., moderation deletion).
+        allow update: if request.auth.uid == resource.data.senderId
+          || isAdmin();
+
+        // DELETE:
+        // - Only admins can permanently delete messages.
+        allow delete: if isAdmin();
+      }
     }
   }
 }
