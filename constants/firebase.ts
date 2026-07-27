@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -21,16 +22,21 @@ const app = initializeApp(firebaseConfig);
 
 // initializeAuth throws auth/already-initialized during HMR re-renders.
 // Fall back to getAuth if the app was already initialized.
+// On web, getReactNativePersistence is not available, so use getAuth directly.
 let auth;
-try {
-  auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(ReactNativeAsyncStorage),
-  });
-} catch (e: any) {
-  if (e?.code === "auth/already-initialized") {
-    auth = getAuth(app);
-  } else {
-    throw e;
+if (Platform.OS === "web") {
+  auth = getAuth(app);
+} else {
+  try {
+    auth = initializeAuth(app, {
+      persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+    });
+  } catch (e: any) {
+    if (e?.code === "auth/already-initialized") {
+      auth = getAuth(app);
+    } else {
+      throw e;
+    }
   }
 }
 
