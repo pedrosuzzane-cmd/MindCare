@@ -8,15 +8,12 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { useReminderSettings } from "@/hooks/useReminderSettings";
 import ClockTimePicker from "@/components/ClockTimePicker";
 import { requestNotificationPermissions } from "@/services/notificationService";
-import { Ionicons } from "@expo/vector-icons"; // Keep this for icons
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -26,25 +23,10 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Animated, {
-  Extrapolation,
-  interpolate,
-  SharedValue,
-  useAnimatedScrollHandler,
-  useAnimatedStyle,
-  useSharedValue,
-} from "react-native-reanimated";
 
 // ── Constants ──
-const HOURS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-const MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
-const PERIODS: ("AM" | "PM")[] = ["AM", "PM"];
 const WEEKDAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const HYDRATION_INTERVALS = [15, 30, 45, 60, 90, 120];
-
-const ITEM_HEIGHT = 44;
-const VISIBLE_ITEMS = 5;
-const PICKER_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
 
 const REMINDER_META: Record<
   string,
@@ -106,180 +88,30 @@ function fmt(t?: { hour: number; minute: number; period: string }): string {
   return `${hour}:${String(minute).padStart(2, "0")} ${t.period || "AM"}`;
 }
 
-function WheelItem<T>({
-  item,
-  index,
-  scrollY,
-  renderItem,
+/** Tappable time field that opens the native OS time dialog. */
+function TimeField({
+  value,
+  onChange,
 }: {
-  item: T;
-  index: number;
-  scrollY: SharedValue<number>;
-  renderItem: (item: T, isSelected: boolean) => React.ReactNode;
+  value: { hour: number; minute: number; period: "AM" | "PM" };
+  onChange: (v: { hour: number; minute: number; period: "AM" | "PM" }) => void;
 }) {
-  const itemOffset = index * ITEM_HEIGHT;
-
-  const animatedStyle = useAnimatedStyle(() => {
-    // Calculate the distance of the item from the center of the picker
-    const distance = Math.abs(scrollY.value - itemOffset);
-
-    // Interpolate opacity: fully opaque at the center, fading out towards the edges
-    const opacity = interpolate(
-      distance,
-      [0, PICKER_HEIGHT / 2],
-      [1, 0.2],
-      Extrapolation.CLAMP,
-    );
-
-    // Interpolate scale for a subtle 3D effect
-    const scale = interpolate(
-      distance,
-      [0, PICKER_HEIGHT / 2],
-      [1, 0.8],
-      Extrapolation.CLAMP,
-    );
-
-    return {
-      opacity,
-      transform: [{ scale }],
-    };
-  });
+  const [open, setOpen] = useState(false);
 
   return (
-    <Animated.View style={animatedStyle}>
-      {renderItem(item, false)}
-    </Animated.View>
-  );
-}
-
-/**
- * A generic, reusable scroll wheel picker component.
- */
-function ScrollWheelPicker<T>({
-  items,
-  selectedValue,
-  onValueChange,
-  renderItem,
-  width = 60,
-  isInfinite = true,
-}: {
-  items: T[];
-  selectedValue: T;
-  onValueChange: (value: T) => void;
-  renderItem: (item: T, isSelected: boolean) => React.ReactNode;
-  width?: number;
-  isInfinite?: boolean;
-}) {
-  // Create a looped data source for infinite scroll illusion
-  const loopedItems = isInfinite ? [...items, ...items, ...items] : items;
-  const middleBlockStartIndex = isInfinite ? items.length : 0;
-
-  const scrollRef = useRef<Animated.ScrollView>(null);
-  const initialIndex = isInfinite
-    ? items.indexOf(selectedValue) + middleBlockStartIndex
-    : items.indexOf(selectedValue);
-  const [currentIndex, setCurrentIndex] = useState(
-    initialIndex >= 0 ? initialIndex : 0,
-  );
-
-  useEffect(() => {
-    const idx = items.indexOf(selectedValue);
-    if (idx >= 0 && idx !== currentIndex) {
-      setCurrentIndex(idx);
-      scrollRef.current?.scrollTo({
-        y: isInfinite
-          ? (idx + middleBlockStartIndex) * ITEM_HEIGHT
-          : idx * ITEM_HEIGHT,
-        animated: true,
-      });
-    }
-  }, [selectedValue, items, currentIndex, isInfinite, middleBlockStartIndex]);
-
-  const scrollY = useSharedValue(initialIndex * ITEM_HEIGHT);
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      scrollY.value = event.contentOffset.y;
-    },
-  });
-
-  const handleMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y;
-    const newIndex = Math.round(y / ITEM_HEIGHT);
-
-    // "Teleport" to the middle block if we're near the edges
-    if (isInfinite) {
-      if (newIndex < items.length / 2) {
-        const targetIndex = newIndex + middleBlockStartIndex;
-        scrollRef.current?.scrollTo({
-          y: targetIndex * ITEM_HEIGHT,
-          animated: false,
-        });
-      } else if (newIndex >= items.length * 2.5) {
-        const targetIndex = newIndex - middleBlockStartIndex;
-        scrollRef.current?.scrollTo({
-          y: targetIndex * ITEM_HEIGHT,
-          animated: false,
-        });
-      }
-    }
-
-    const selectedValueIndex = isInfinite ? newIndex % items.length : newIndex;
-
-    if (newIndex !== currentIndex) {
-      setCurrentIndex(newIndex);
-      onValueChange(items[selectedValueIndex]);
-    }
-    scrollRef.current?.scrollTo({
-      y: newIndex * ITEM_HEIGHT,
-      animated: true,
-    });
-  };
-
-  const handleScrollEndDrag = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y;
-    const idx = Math.round(y / ITEM_HEIGHT);
-    const newIndex = Math.max(0, Math.min(idx, loopedItems.length - 1));
-    scrollRef.current?.scrollTo({
-      y: newIndex * ITEM_HEIGHT,
-      animated: true,
-    });
-  };
-
-  return (
-    <View style={[s.wheelColumn, { width }]}>
-      <View style={s.wheelHighlight} pointerEvents="none" />
-      <Animated.ScrollView
-        ref={scrollRef}
-        style={s.wheelScroll}
-        contentContainerStyle={s.wheelScrollContent}
-        showsVerticalScrollIndicator={false}
-        scrollEventThrottle={16}
-        onScroll={scrollHandler}
-        snapToInterval={ITEM_HEIGHT}
-        snapToAlignment="start"
-        decelerationRate={0.998}
-        onMomentumScrollEnd={handleMomentumEnd}
-        onScrollEndDrag={handleScrollEndDrag}
-        bounces={false}
-        // Set initial scroll position
-        contentOffset={{ x: 0, y: initialIndex * ITEM_HEIGHT }}
-      >
-        <View style={{ height: PICKER_HEIGHT / 2 - ITEM_HEIGHT / 2 }} />
-        {loopedItems.map((item, idx) => {
-          // The new WheelItem handles its own animation
-          return (
-            <WheelItem
-              key={idx}
-              item={item}
-              index={idx}
-              scrollY={scrollY}
-              renderItem={(it) => renderItem(it, idx === currentIndex)}
-            />
-          );
-        })}
-        <View style={{ height: PICKER_HEIGHT / 2 - ITEM_HEIGHT / 2 }} />
-      </Animated.ScrollView>
-    </View>
+    <>
+      <Pressable style={s.timeField} onPress={() => setOpen(true)}>
+        <Ionicons name="alarm-outline" size={18} color="#8A63D2" />
+        <Text style={s.timeFieldText}>{fmt(value)}</Text>
+        <Ionicons name="chevron-forward" size={16} color="#C4B5D0" />
+      </Pressable>
+      <ClockTimePicker
+        visible={open}
+        val={value}
+        onChange={onChange}
+        onDismiss={() => setOpen(false)}
+      />
+    </>
   );
 }
 
@@ -452,15 +284,15 @@ function HydrationCard({
           </View>
           <View style={s.field}>
             <Text style={s.label}>Start Time</Text>
-            <ClockTimePicker
-              val={r.startTime || { hour: 8, minute: 0, period: "AM" }}
+            <TimeField
+              value={r.startTime || { hour: 8, minute: 0, period: "AM" as const }}
               onChange={(v) => onUpdate({ startTime: v })}
             />
           </View>
           <View style={s.field}>
             <Text style={s.label}>End Time</Text>
-            <ClockTimePicker
-              val={r.endTime || { hour: 10, minute: 0, period: "PM" }}
+            <TimeField
+              value={r.endTime || { hour: 10, minute: 0, period: "PM" as const }}
               onChange={(v) => onUpdate({ endTime: v })}
             />
           </View>
@@ -584,8 +416,8 @@ function StandardCard({
         <View style={s.settings}>
           <View style={s.field}>
             <Text style={s.label}>Time</Text>
-            <ClockTimePicker
-              val={r.time || { hour: 9, minute: 0, period: "AM" }}
+            <TimeField
+              value={r.time || { hour: 9, minute: 0, period: "AM" as const }}
               onChange={(v) => onUpdate({ time: v })}
             />
           </View>
@@ -900,44 +732,6 @@ const s = StyleSheet.create({
     fontWeight: "700",
     color: "#333",
   },
-  wheelColumn: {
-    height: PICKER_HEIGHT,
-    overflow: "hidden",
-    position: "relative",
-  },
-  wheelHighlight: {
-    position: "absolute",
-    top: PICKER_HEIGHT / 2 - ITEM_HEIGHT / 2,
-    left: 2,
-    right: 2,
-    height: ITEM_HEIGHT,
-    backgroundColor: "rgba(76, 175, 80, 0.1)",
-    borderRadius: 12,
-    zIndex: 10,
-  },
-  wheelScroll: {
-    flex: 1,
-  },
-  wheelScrollContent: {
-    alignItems: "center",
-  },
-  wheelItem: {
-    height: ITEM_HEIGHT,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 4,
-  },
-  wheelItemSelected: {},
-  wheelItemText: {
-    fontSize: 18,
-    fontWeight: "500",
-    color: "#999",
-  },
-  wheelItemTextSelected: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#2E7D32",
-  },
   // Time (legacy - kept for reference, not used)
   row: { gap: 8 },
   pillScroll: { flexDirection: "row" },
@@ -1047,4 +841,24 @@ const s = StyleSheet.create({
     alignItems: "flex-start",
   },
   infoText: { fontSize: 13, color: "#2E7D32", lineHeight: 20, flex: 1 },
+
+  /* ── Time Field + Modal ── */
+  timeField: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F9FAFB",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  timeFieldText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#333",
+    fontVariant: ["tabular-nums"],
+  },
 });

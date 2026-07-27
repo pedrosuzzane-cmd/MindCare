@@ -16,6 +16,7 @@ export default function StudentLayout() {
       <Stack.Screen name="mood-calendar" />
       <Stack.Screen name="new-journal-entry" />
       <Stack.Screen name="peer-messages" />
+      <Stack.Screen name="reminders" />
       <Stack.Screen name="self-assessment-menu" />
       <Stack.Screen name="self-assessment" />
       <Stack.Screen name="support-hotlines" />
