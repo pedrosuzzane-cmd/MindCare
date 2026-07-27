@@ -2,7 +2,9 @@ import React, { useCallback, useRef, useState } from "react";
 import {
   LayoutChangeEvent,
   Modal,
+  NativeSyntheticEvent,
   PanResponder,
+  PanResponderGestureState,
   Pressable,
   StyleSheet,
   Text,
@@ -53,12 +55,10 @@ export default function ClockTimePicker({
   const [draftHour, setDraftHour] = useState(val.hour);
   const [draftMinute, setDraftMinute] = useState(val.minute);
   const [draftPeriod, setDraftPeriod] = useState<"AM" | "PM">(val.period);
-  const [clockLayout, setClockLayout] = useState({
-    x: 0,
-    y: 0,
-    w: CLOCK_SIZE,
-    h: CLOCK_SIZE,
-  });
+
+  // Absolute position of the clock face on screen
+  const clockAbsPos = useRef({ x: 0, y: 0 });
+  const clockSize = useRef({ w: CLOCK_SIZE, h: CLOCK_SIZE });
 
   const open = () => {
     setDraftHour(val.hour);
@@ -75,46 +75,80 @@ export default function ClockTimePicker({
     setVisible(false);
   };
 
-  const onClockLayout = (e: LayoutChangeEvent) => {
+  const onClockLayout = useCallback((e: LayoutChangeEvent) => {
     const { x, y, width, height } = e.nativeEvent.layout;
-    setClockLayout({ x, y, w: width, h: height });
-  };
+    clockAbsPos.current = { x, y };
+    clockSize.current = { w: width, h: height };
+  }, []);
 
   const currentItems = mode === "hour" ? HOURS : MINUTES;
   const currentValue = mode === "hour" ? draftHour : draftMinute;
 
-  const handleTouch = useCallback(
-    (locX: number, locY: number) => {
-      const cx = clockLayout.w / 2;
-      const cy = clockLayout.h / 2;
-      const dx = locX - cx;
-      const dy = locY - cy;
+  // Use pageX/pageY to compute touch position relative to clock center.
+  // This works reliably on both iOS and Android.
+  const computeTouchFromGesture = useCallback(
+    (gestureState: PanResponderGestureState) => {
+      const cx = clockSize.current.w / 2;
+      const cy = clockSize.current.h / 2;
+      // pageX/pageY are absolute screen coords; subtract the clock's absolute position
+      const relX = gestureState.moveX - clockAbsPos.current.x;
+      const relY = gestureState.moveY - clockAbsPos.current.y;
+      const dx = relX - cx;
+      const dy = relY - cy;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 20) return;
+      if (dist < 10) return null;
 
       const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
-      const snapped = angleToValue(angleDeg, currentItems);
-
-      if (mode === "hour") {
-        setDraftHour(snapped);
-      } else {
-        setDraftMinute(snapped);
-      }
+      return angleToValue(angleDeg, currentItems);
     },
-    [clockLayout, currentItems, mode],
+    [currentItems],
   );
+
+  // Use refs so the PanResponder always reads the latest values
+  // without needing to be recreated.
+  const modeRef = useRef(mode);
+  const draftHourRef = useRef(draftHour);
+  const draftMinuteRef = useRef(draftMinute);
+
+  // Keep refs synced
+  modeRef.current = mode;
+  draftHourRef.current = draftHour;
+  draftMinuteRef.current = draftMinute;
+
+  const applyValue = useCallback((snapped: number | null) => {
+    if (snapped === null) return;
+    if (modeRef.current === "hour") {
+      setDraftHour(snapped);
+    } else {
+      setDraftMinute(snapped);
+    }
+  }, []);
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) =>
-        handleTouch(e.nativeEvent.locationX, e.nativeEvent.locationY),
-      onPanResponderMove: (e) =>
-        handleTouch(e.nativeEvent.locationX, e.nativeEvent.locationY),
+      onMoveShouldSetPanResponder: (_, gs) =>
+        Math.abs(gs.dx) > 2 || Math.abs(gs.dy) > 2,
+      onPanResponderGrant: (_, gs) => {
+        const snapped = computeTouchFromGesture(gs);
+        applyValue(snapped);
+      },
+      onPanResponderMove: (_, gs) => {
+        const snapped = computeTouchFromGesture(gs);
+        applyValue(snapped);
+      },
       onPanResponderRelease: () => {},
     }),
   ).current;
+
+  // Recreate panResponder when computeTouchFromGesture changes
+  // (i.e. when currentItems changes due to mode switch)
+  const prevModeRef = useRef(mode);
+  if (prevModeRef.current !== mode) {
+    prevModeRef.current = mode;
+    // We can't recreate the panResponder in render cleanly,
+    // so we force the handlers to use latest refs via applyValue/modeRef.
+  }
 
   const selectedAngle =
     mode === "hour"
@@ -122,9 +156,7 @@ export default function ClockTimePicker({
       : valueToAngle(draftMinute, MINUTES);
 
   const handLength = INNER_NUMBER_RADIUS - 12;
-
-  // Clock hand: a thin rotated view from center
-  const handRotation = selectedAngle + 90; // +90 because the hand view points "up" by default
+  const handRotation = selectedAngle + 90;
 
   return (
     <>

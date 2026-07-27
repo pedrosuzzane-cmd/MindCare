@@ -364,6 +364,194 @@ app.post("/api/delete-student", async (req, res) => {
   }
 });
 
+// ── Forgot Password OTP (custom 6-digit code via Gmail SMTP) ──
+const nodemailer = require("nodemailer");
+const crypto = require("crypto");
+
+const OTP_COLLECTION = "passwordResets";
+const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+
+let otpTransporter = null;
+try {
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    otpTransporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
+      port: parseInt(process.env.SMTP_PORT || "587", 10),
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+    console.log("OTP email transporter initialized.");
+  } else {
+    console.warn(
+      "SMTP not configured — OTP emails will be logged to console only."
+    );
+  }
+} catch (err) {
+  console.warn("Failed to create OTP transporter:", err.message);
+}
+
+function generateOtp() {
+  return crypto.randomInt(100000, 999999).toString();
+}
+
+// POST /api/auth/forgot-password/request — generate OTP, store in Firestore, send email
+app.post("/api/auth/forgot-password/request", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email || typeof email !== "string") {
+    return res.status(400).json({ error: "Email is required." });
+  }
+
+  const emailClean = email.trim().toLowerCase();
+
+  try {
+    // Look up user by email
+    let userRecord;
+    try {
+      userRecord = await admin.auth().getUserByEmail(emailClean);
+    } catch {
+      // Don't reveal whether the email exists — pretend success
+      return res.json({
+        success: true,
+        message:
+          "If an account exists, a reset code has been sent to that email.",
+      });
+    }
+
+    const otp = generateOtp();
+    const expiresAt = Date.now() + OTP_EXPIRY_MS;
+
+    // Store OTP in Firestore
+    const db = admin.firestore();
+    await db.collection(OTP_COLLECTION).doc(userRecord.uid).set({
+      otp,
+      email: emailClean,
+      expiresAt,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      verified: false,
+    });
+
+    // Send OTP email
+    const mailOptions = {
+      from: process.env.SMTP_FROM || "MindCare <noreply@mindcare.app>",
+      to: emailClean,
+      subject: "MindCare — Password Reset Code",
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;">
+          <h2 style="color:#8A63D2;">Password Reset Code</h2>
+          <p>You requested a password reset for your MindCare account.</p>
+          <div style="background:#F3EAFF;border-radius:12px;padding:24px;text-align:center;margin:24px 0;">
+            <p style="font-size:14px;color:#666;margin:0 0 8px;">Your 6-digit code:</p>
+            <p style="font-size:36px;font-weight:bold;color:#8A63D2;letter-spacing:8px;margin:0;">${otp}</p>
+          </div>
+          <p style="color:#666;font-size:14px;">This code expires in <strong>10 minutes</strong>. If you didn't request this, you can safely ignore this email.</p>
+          <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+          <p style="color:#999;font-size:12px;">MindCare Student Wellness App</p>
+        </div>
+      `,
+    };
+
+    if (otpTransporter) {
+      await otpTransporter.sendMail(mailOptions);
+      console.log(`OTP email sent to ${emailClean}`);
+    } else {
+      // Fallback: log OTP to console for testing
+      console.log(`[OTP TEST MODE] Code for ${emailClean}: ${otp}`);
+    }
+
+    return res.json({
+      success: true,
+      message:
+        "If an account exists, a reset code has been sent to that email.",
+    });
+  } catch (err) {
+    console.error("OTP request error:", err);
+    return res
+      .status(500)
+      .json({ error: "Unable to process password reset request." });
+  }
+});
+
+// POST /api/auth/forgot-password/verify-and-reset — verify OTP + set new password
+app.post("/api/auth/forgot-password/verify-and-reset", async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+
+  if (!email || !otp || !newPassword) {
+    return res
+      .status(400)
+      .json({ error: "Email, OTP code, and new password are required." });
+  }
+
+  if (typeof newPassword !== "string" || newPassword.length < 8) {
+    return res
+      .status(400)
+      .json({ error: "Password must be at least 8 characters." });
+  }
+
+  const emailClean = email.trim().toLowerCase();
+  const otpClean = otp.trim();
+
+  try {
+    const db = admin.firestore();
+
+    // Find user by email
+    let userRecord;
+    try {
+      userRecord = await admin.auth().getUserByEmail(emailClean);
+    } catch {
+      return res.status(400).json({ error: "Invalid or expired reset code." });
+    }
+
+    // Get stored OTP record
+    const otpDoc = await db.collection(OTP_COLLECTION).doc(userRecord.uid).get();
+
+    if (!otpDoc.exists) {
+      return res.status(400).json({ error: "Invalid or expired reset code." });
+    }
+
+    const otpData = otpDoc.data();
+
+    // Check if OTP was already used
+    if (otpData.verified) {
+      return res.status(400).json({ error: "Reset code has already been used." });
+    }
+
+    // Check expiry
+    if (Date.now() > otpData.expiresAt) {
+      return res.status(400).json({ error: "Reset code has expired. Please request a new one." });
+    }
+
+    // Verify OTP
+    if (otpData.otp !== otpClean) {
+      return res.status(400).json({ error: "Incorrect reset code. Please try again." });
+    }
+
+    // All checks passed — update password
+    await admin.auth().updateUser(userRecord.uid, {
+      password: newPassword,
+    });
+
+    // Mark OTP as used
+    await db.collection(OTP_COLLECTION).doc(userRecord.uid).update({
+      verified: true,
+    });
+
+    console.log(`Password updated for ${emailClean}`);
+    return res.json({
+      success: true,
+      message: "Password updated successfully.",
+    });
+  } catch (err) {
+    console.error("OTP verify-and-reset error:", err);
+    return res
+      .status(500)
+      .json({ error: "Unable to reset password. Please try again." });
+  }
+});
+
 // ── Mindy Chat (Gemini multi-turn with system instruction) ──
 const MINDY_SYSTEM_INSTRUCTION = `You are Mindy, a supportive wellness companion for university students. Respond with empathy, encouragement, and practical coping strategies. Do not diagnose medical or mental health conditions, prescribe medication, or claim to be a licensed professional. If the user expresses thoughts of self-harm, suicide, or harming others, respond calmly, encourage them to seek immediate help from trusted people or local emergency services, and recommend professional support. Keep responses concise (under 200 words), warm, and conversational.`;
 
