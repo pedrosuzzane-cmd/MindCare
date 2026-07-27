@@ -21,7 +21,7 @@ export interface JournalSuggestions {
   }[];
 }
 
-const MODEL_NAME = "gemini-2.0-flash";
+const MODEL_NAME = "gemini-flash-latest";
 
 let genAI: GoogleGenerativeAI | null = null;
 

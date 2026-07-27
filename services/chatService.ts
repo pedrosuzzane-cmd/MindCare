@@ -10,6 +10,7 @@ export interface ChatResponse {
   text: string;
 }
 
+const BASE_URL = API_URL.replace(/\/+$/, "");
 const COLD_START_TIMEOUT = 90_000;
 const RETRY_DELAY = 2_000;
 const MAX_RETRIES = 1;
@@ -34,7 +35,7 @@ export async function sendMessage(
     const timer = setTimeout(() => controller.abort(), COLD_START_TIMEOUT);
 
     try {
-      const res = await fetch(`${API_URL}/api/chat`, {
+      const res = await fetch(`${BASE_URL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -82,7 +83,10 @@ export async function sendMessage(
         lastError = new Error(
           "Request timed out. The server may be starting up — please try again in a moment.",
         );
-      } else if (err instanceof Error && err.message.includes("Network")) {
+      } else if (
+        err instanceof Error &&
+        (err.name === "TypeError" || err.message.toLowerCase().includes("network"))
+      ) {
         lastError = new Error(
           "Network error. Please check your internet connection and try again.",
         );
