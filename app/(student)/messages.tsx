@@ -14,6 +14,7 @@ import {
   Alert,
   Clipboard,
   FlatList,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -369,11 +370,15 @@ export default function StudentMessagesScreen() {
           isPeer ? styles.userAvatarPeer : styles.userAvatarAdmin,
         ]}
       >
-        <Ionicons
-          name={isPeer ? "person" : "shield-checkmark"}
-          size={22}
-          color={isPeer ? "#8A63D2" : "#6D5BBF"}
-        />
+        {item.profileImage ? (
+          <Image source={{ uri: item.profileImage }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+        ) : (
+          <Ionicons
+            name={isPeer ? "person" : "shield-checkmark"}
+            size={22}
+            color={isPeer ? "#8A63D2" : "#6D5BBF"}
+          />
+        )}
       </View>
       <View style={styles.userInfo}>
         <Text style={styles.userName} numberOfLines={1}>

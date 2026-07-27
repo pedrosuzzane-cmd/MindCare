@@ -1,55 +1,204 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  Animated,
-  LayoutChangeEvent,
-  Modal,
-  PanResponder,
-  PanResponderGestureState,
-  Pressable,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Platform,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-
-const CLOCK_SIZE = 260;
-const CLOCK_RADIUS = CLOCK_SIZE / 2 - 16;
-const CENTER = CLOCK_SIZE / 2;
-const INNER_NUMBER_RADIUS = CLOCK_RADIUS - 18;
+import Animated, {
+  Extrapolation,
+  interpolate,
+  SharedValue,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 
 const HOURS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-const MINUTES_FACE = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+const MINUTES = [
+  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+  20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37,
+  38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55,
+  56, 57, 58, 59,
+];
+const PERIODS: ("AM" | "PM")[] = ["AM", "PM"];
 
-function angleToHour(angleDeg: number): number {
-  const offset = -90;
-  const normalized = ((angleDeg - offset) % 360 + 360) % 360;
-  const sector = 360 / 12;
-  const index = Math.round(normalized / sector) % 12;
-  return HOURS[index];
+const ITEM_HEIGHT = 40;
+const VISIBLE_ITEMS = 5;
+const PICKER_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
+
+// ── Animated wheel item ──
+function WheelItem<T>({
+  item,
+  index,
+  scrollY,
+  renderItem,
+}: {
+  item: T;
+  index: number;
+  scrollY: SharedValue<number>;
+  renderItem: (item: T) => React.ReactNode;
+}) {
+  const itemOffset = index * ITEM_HEIGHT;
+
+  const animatedStyle = useAnimatedStyle(() => {
+    const distance = Math.abs(scrollY.value - itemOffset);
+    const opacity = interpolate(
+      distance,
+      [0, PICKER_HEIGHT / 2],
+      [1, 0.25],
+      Extrapolation.CLAMP,
+    );
+    const scale = interpolate(
+      distance,
+      [0, PICKER_HEIGHT / 2],
+      [1, 0.85],
+      Extrapolation.CLAMP,
+    );
+    return { opacity, transform: [{ scale }] };
+  });
+
+  return (
+    <Animated.View style={animatedStyle}>
+      {renderItem(item)}
+    </Animated.View>
+  );
 }
 
-function angleToMinute(angleDeg: number): number {
-  const offset = -90;
-  const normalized = ((angleDeg - offset) % 360 + 360) % 360;
-  const minute = Math.round((normalized / 360) * 60) % 60;
-  return minute;
+// ── Single scroll column with infinite loop ──
+function ScrollColumn<T>({
+  items,
+  selectedValue,
+  onValueChange,
+  renderItem,
+  width,
+}: {
+  items: T[];
+  selectedValue: T;
+  onValueChange: (value: T) => void;
+  renderItem: (item: T, isSelected: boolean) => React.ReactNode;
+  width: number;
+}) {
+  const loopedItems = [...items, ...items, ...items];
+  const middleStart = items.length;
+
+  const scrollRef = useRef<Animated.ScrollView>(null);
+  const initialIndex =
+    items.indexOf(selectedValue) >= 0
+      ? items.indexOf(selectedValue) + middleStart
+      : middleStart;
+
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+
+  useEffect(() => {
+    const idx = items.indexOf(selectedValue);
+    if (idx >= 0) {
+      const target = idx + middleStart;
+      if (target !== currentIndex) {
+        setCurrentIndex(target);
+        scrollRef.current?.scrollTo({
+          y: target * ITEM_HEIGHT,
+          animated: false,
+        });
+      }
+    }
+  }, [selectedValue]);
+
+  const scrollY = useSharedValue(initialIndex * ITEM_HEIGHT);
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
+
+  const snapToNearest = (y: number) => {
+    const idx = Math.round(y / ITEM_HEIGHT);
+    const clamped = Math.max(0, Math.min(idx, loopedItems.length - 1));
+    scrollRef.current?.scrollTo({
+      y: clamped * ITEM_HEIGHT,
+      animated: true,
+    });
+    return clamped;
+  };
+
+  const handleMomentumEnd = (
+    e: NativeSyntheticEvent<NativeScrollEvent>,
+  ) => {
+    const y = e.nativeEvent.contentOffset.y;
+    let newIndex = Math.round(y / ITEM_HEIGHT);
+
+    // Teleport back to middle block if near edges
+    if (newIndex < items.length / 2) {
+      newIndex += middleStart;
+      scrollRef.current?.scrollTo({
+        y: newIndex * ITEM_HEIGHT,
+        animated: false,
+      });
+    } else if (newIndex >= items.length * 2.5) {
+      newIndex -= middleStart;
+      scrollRef.current?.scrollTo({
+        y: newIndex * ITEM_HEIGHT,
+        animated: false,
+      });
+    }
+
+    const selectedIdx = newIndex % items.length;
+    if (newIndex !== currentIndex) {
+      setCurrentIndex(newIndex);
+      onValueChange(items[selectedIdx]);
+    }
+    scrollRef.current?.scrollTo({
+      y: newIndex * ITEM_HEIGHT,
+      animated: true,
+    });
+  };
+
+  const handleScrollEndDrag = (
+    e: NativeSyntheticEvent<NativeScrollEvent>,
+  ) => {
+    const y = e.nativeEvent.contentOffset.y;
+    snapToNearest(y);
+  };
+
+  return (
+    <View style={[styles.column, { width }]}>
+      <View style={styles.highlight} pointerEvents="none" />
+      <Animated.ScrollView
+        ref={scrollRef}
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={scrollHandler}
+        snapToInterval={ITEM_HEIGHT}
+        snapToAlignment="start"
+        decelerationRate={0.998}
+        onMomentumScrollEnd={handleMomentumEnd}
+        onScrollEndDrag={handleScrollEndDrag}
+        bounces={false}
+        contentOffset={{ x: 0, y: initialIndex * ITEM_HEIGHT }}
+      >
+        <View style={{ height: PICKER_HEIGHT / 2 - ITEM_HEIGHT / 2 }} />
+        {loopedItems.map((item, idx) => (
+          <WheelItem
+            key={idx}
+            item={item}
+            index={idx}
+            scrollY={scrollY}
+            renderItem={(it) =>
+              renderItem(it, idx === currentIndex)
+            }
+          />
+        ))}
+        <View style={{ height: PICKER_HEIGHT / 2 - ITEM_HEIGHT / 2 }} />
+      </Animated.ScrollView>
+    </View>
+  );
 }
 
-function valueToAngle(value: number, items: number[]): number {
-  const sector = 360 / items.length;
-  const index = items.indexOf(value);
-  if (index === -1) return 0;
-  return index * sector - 90;
-}
-
-function minuteToAngle(minute: number): number {
-  return (minute / 60) * 360 - 90;
-}
-
-function getItemLabel(item: number, mode: "hour" | "minute"): string {
-  if (mode === "hour") return String(item);
-  return String(item).padStart(2, "0");
-}
-
+// ── Main component ──
 interface ClockTimePickerProps {
   val: { hour: number; minute: number; period: "AM" | "PM" };
   onChange: (v: { hour: number; minute: number; period: "AM" | "PM" }) => void;
@@ -61,563 +210,168 @@ export default function ClockTimePicker({
   onChange,
   accentColor = "#8A63D2",
 }: ClockTimePickerProps) {
-  const [visible, setVisible] = useState(false);
-  const [mode, setMode] = useState<"hour" | "minute">("hour");
-  const [draftHour, setDraftHour] = useState(val.hour);
-  const [draftMinute, setDraftMinute] = useState(val.minute);
-  const [draftPeriod, setDraftPeriod] = useState<"AM" | "PM">(val.period);
+  const [hour, setHour] = useState(val.hour);
+  const [minute, setMinute] = useState(val.minute);
+  const [period, setPeriod] = useState<"AM" | "PM">(val.period);
 
-  const clockAbsPos = useRef({ x: 0, y: 0 });
-  const clockSize = useRef({ w: CLOCK_SIZE, h: CLOCK_SIZE });
+  useEffect(() => {
+    setHour(val.hour);
+    setMinute(val.minute);
+    setPeriod(val.period);
+  }, [val.hour, val.minute, val.period]);
 
-  const handRotation = useRef(new Animated.Value(0)).current;
-  const handAngleRef = useRef(0);
-  const animationFrameRef = useRef<number | null>(null);
-
-  const modeRef = useRef(mode);
-  const draftHourRef = useRef(draftHour);
-  const draftMinuteRef = useRef(draftMinute);
-
-  useEffect(() => { modeRef.current = mode; }, [mode]);
-  useEffect(() => { draftHourRef.current = draftHour; }, [draftHour]);
-  useEffect(() => { draftMinuteRef.current = draftMinute; }, [draftMinute]);
-
-  const open = () => {
-    setDraftHour(val.hour);
-    setDraftMinute(val.minute);
-    setDraftPeriod(val.period);
-    setMode("hour");
-    const initialAngle = valueToAngle(val.hour, HOURS);
-    handAngleRef.current = initialAngle;
-    handRotation.setValue(initialAngle);
-    setVisible(true);
+  const emit = (h: number, m: number, p: "AM" | "PM") => {
+    onChange({ hour: h, minute: m, period: p });
   };
-
-  const close = () => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-    setVisible(false);
-  };
-
-  const confirm = () => {
-    onChange({ hour: draftHour, minute: draftMinute, period: draftPeriod });
-    setVisible(false);
-  };
-
-  const onClockLayout = useCallback((e: LayoutChangeEvent) => {
-    const { x, y, width, height } = e.nativeEvent.layout;
-    clockAbsPos.current = { x, y };
-    clockSize.current = { w: width, h: height };
-  }, []);
-
-  const computeTouchFromGesture = useCallback(
-    (gestureState: PanResponderGestureState) => {
-      const cx = clockSize.current.w / 2;
-      const cy = clockSize.current.h / 2;
-      const relX = gestureState.moveX - clockAbsPos.current.x;
-      const relY = gestureState.moveY - clockAbsPos.current.y;
-      const dx = relX - cx;
-      const dy = relY - cy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 8) return null;
-
-      const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
-
-      if (modeRef.current === "hour") {
-        return { type: "hour" as const, value: angleToHour(angleDeg) };
-      } else {
-        return { type: "minute" as const, value: angleToMinute(angleDeg) };
-      }
-    },
-    [],
-  );
-
-  const animateToAngle = useCallback(
-    (targetAngle: number) => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-
-      let currentRot = handAngleRef.current;
-
-      const currentNorm = ((currentRot % 360) + 360) % 360;
-      const targetNorm = ((targetAngle % 360) + 360) % 360;
-      const cw = (targetNorm - currentNorm + 360) % 360;
-      const ccw = (currentNorm - targetNorm + 360) % 360;
-      const finalTarget =
-        cw <= ccw ? currentRot + cw : currentRot - ccw;
-
-      const step = () => {
-        const cur = handAngleRef.current;
-        const diff = finalTarget - cur;
-        if (Math.abs(diff) < 0.5) {
-          handAngleRef.current = finalTarget;
-          handRotation.setValue(finalTarget);
-          animationFrameRef.current = null;
-          return;
-        }
-        const next = cur + diff * 0.3;
-        handAngleRef.current = next;
-        handRotation.setValue(next);
-        animationFrameRef.current = requestAnimationFrame(step);
-      };
-      animationFrameRef.current = requestAnimationFrame(step);
-    },
-    [handRotation],
-  );
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gs) =>
-        Math.abs(gs.dx) > 2 || Math.abs(gs.dy) > 2,
-      onPanResponderGrant: (_, gs) => {
-        const result = computeTouchFromGesture(gs);
-        if (!result) return;
-        if (result.type === "hour") {
-          setDraftHour(result.value);
-          animateToAngle(valueToAngle(result.value, HOURS));
-        } else {
-          setDraftMinute(result.value);
-          animateToAngle(minuteToAngle(result.value));
-        }
-      },
-      onPanResponderMove: (_, gs) => {
-        const result = computeTouchFromGesture(gs);
-        if (!result) return;
-        if (result.type === "hour") {
-          setDraftHour(result.value);
-          animateToAngle(valueToAngle(result.value, HOURS));
-        } else {
-          setDraftMinute(result.value);
-          animateToAngle(minuteToAngle(result.value));
-        }
-      },
-      onPanResponderRelease: () => {},
-    }),
-  ).current;
-
-  const selectedAngle =
-    mode === "hour"
-      ? valueToAngle(draftHour, HOURS)
-      : minuteToAngle(draftMinute);
-
-  const handLength = INNER_NUMBER_RADIUS - 12;
-  const visualHandRotation = handRotation;
-
-  const currentFaceItems = mode === "hour" ? HOURS : MINUTES_FACE;
-  const currentValue = mode === "hour" ? draftHour : draftMinute;
 
   return (
-    <>
-      <Pressable style={s.trigger} onPress={open}>
-        <View style={s.triggerInner}>
-          <View style={s.triggerTimeBox}>
-            <Text style={s.triggerHour}>
-              {String(val.hour).padStart(2, "0")}
-            </Text>
-            <Text style={s.triggerColon}>:</Text>
-            <Text style={s.triggerMinute}>
-              {String(val.minute).padStart(2, "0")}
+    <View style={styles.container}>
+      {/* Hour column */}
+      <ScrollColumn
+        items={HOURS}
+        selectedValue={hour}
+        width={60}
+        onValueChange={(v) => {
+          setHour(v);
+          emit(v, minute, period);
+        }}
+        renderItem={(item, sel) => (
+          <View style={styles.item}>
+            <Text
+              style={[
+                styles.itemText,
+                sel && styles.itemTextSelected,
+                sel && { color: accentColor },
+              ]}
+            >
+              {item}
             </Text>
           </View>
-          <View style={[s.triggerPeriod, { backgroundColor: accentColor }]}>
-            <Text style={s.triggerPeriodText}>{val.period}</Text>
-          </View>
-        </View>
-      </Pressable>
+        )}
+      />
 
-      <Modal
-        visible={visible}
-        transparent
-        animationType="fade"
-        onRequestClose={close}
-      >
-        <View style={s.overlay}>
-          <View style={s.sheet}>
-            <Text style={s.sheetTitle}>
-              {mode === "hour" ? "Select Hour" : "Select Minutes"}
+      {/* Separator */}
+      <View style={styles.separator}>
+        <Text style={[styles.separatorText, { color: accentColor }]}>:</Text>
+      </View>
+
+      {/* Minute column */}
+      <ScrollColumn
+        items={MINUTES}
+        selectedValue={minute}
+        width={60}
+        onValueChange={(v) => {
+          setMinute(v);
+          emit(hour, v, period);
+        }}
+        renderItem={(item, sel) => (
+          <View style={styles.item}>
+            <Text
+              style={[
+                styles.itemText,
+                sel && styles.itemTextSelected,
+                sel && { color: accentColor },
+              ]}
+            >
+              {String(item).padStart(2, "0")}
             </Text>
-
-            <View style={s.clockWrapper}>
-              <View
-                style={s.clockFace}
-                onLayout={onClockLayout}
-                {...panResponder.panHandlers}
-              >
-                <Animated.View
-                  style={{
-                    position: "absolute",
-                    left: CENTER - 1.5,
-                    top: CENTER - handLength,
-                    width: 3,
-                    height: handLength,
-                    backgroundColor: accentColor,
-                    borderRadius: 1.5,
-                    transformOrigin: "center bottom",
-                    transform: [
-                      {
-                        rotate: visualHandRotation.interpolate({
-                          inputRange: [0, 360],
-                          outputRange: ["0deg", "360deg"],
-                        }),
-                      },
-                    ],
-                    opacity: 0.85,
-                  }}
-                />
-
-                <View
-                  style={[
-                    s.centerPin,
-                    {
-                      left: CENTER - 6,
-                      top: CENTER - 6,
-                      backgroundColor: accentColor,
-                    },
-                  ]}
-                />
-
-                <Animated.View
-                  style={[
-                    s.tipDot,
-                    {
-                      backgroundColor: accentColor,
-                    },
-                    {
-                      left: CENTER - 8,
-                      top: CENTER - 8,
-                      transform: [
-                        {
-                          rotate: visualHandRotation.interpolate({
-                            inputRange: [0, 360],
-                            outputRange: ["0deg", "360deg"],
-                          }),
-                        },
-                        { translateY: -handLength + 8 },
-                      ],
-                    },
-                  ]}
-                />
-
-                {currentFaceItems.map((item) => {
-                  const angle =
-                    mode === "hour"
-                      ? valueToAngle(item, HOURS)
-                      : valueToAngle(item, MINUTES_FACE);
-                  const rad = (angle * Math.PI) / 180;
-                  const numX = CENTER + Math.cos(rad) * INNER_NUMBER_RADIUS;
-                  const numY = CENTER + Math.sin(rad) * INNER_NUMBER_RADIUS;
-                  const isSelected = item === currentValue;
-                  return (
-                    <View
-                      key={item}
-                      style={[
-                        s.numberDot,
-                        {
-                          left: numX - 16,
-                          top: numY - 16,
-                          width: 32,
-                          height: 32,
-                          borderRadius: 16,
-                          backgroundColor: isSelected
-                            ? accentColor
-                            : "transparent",
-                          justifyContent: "center",
-                          alignItems: "center",
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          s.numberText,
-                          {
-                            color: isSelected ? "#FFFFFF" : "#4A4458",
-                          },
-                          isSelected && { fontWeight: "800" },
-                        ]}
-                      >
-                        {getItemLabel(item, mode)}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
-
-            <View style={s.modeTabs}>
-              <Pressable
-                onPress={() => setMode("hour")}
-                style={[
-                  s.modeTab,
-                  mode === "hour" && { backgroundColor: accentColor },
-                ]}
-              >
-                <Text
-                  style={[
-                    s.modeTabText,
-                    mode === "hour" && { color: "#FFFFFF", fontWeight: "700" },
-                  ]}
-                >
-                  Hour
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setMode("minute")}
-                style={[
-                  s.modeTab,
-                  mode === "minute" && { backgroundColor: accentColor },
-                ]}
-              >
-                <Text
-                  style={[
-                    s.modeTabText,
-                    mode === "minute" && {
-                      color: "#FFFFFF",
-                      fontWeight: "700",
-                    },
-                  ]}
-                >
-                  Minutes
-                </Text>
-              </Pressable>
-            </View>
-
-            <View style={s.previewRow}>
-              <Text style={s.previewTime}>
-                {String(draftHour).padStart(2, "0")}:
-                {String(draftMinute).padStart(2, "0")}
-              </Text>
-            </View>
-
-            <View style={s.periodRow}>
-              {(["AM", "PM"] as const).map((p) => (
-                <Pressable
-                  key={p}
-                  onPress={() => setDraftPeriod(p)}
-                  style={[
-                    s.periodBtn,
-                    draftPeriod === p && { backgroundColor: accentColor },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      s.periodBtnText,
-                      draftPeriod === p && {
-                        color: "#FFFFFF",
-                        fontWeight: "700",
-                      },
-                    ]}
-                  >
-                    {p}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <View style={s.actions}>
-              <Pressable onPress={close} style={s.cancelBtn}>
-                <Text style={s.cancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                onPress={confirm}
-                style={[s.confirmBtn, { backgroundColor: accentColor }]}
-              >
-                <Text style={s.confirmText}>Confirm</Text>
-              </Pressable>
-            </View>
           </View>
-        </View>
-      </Modal>
-    </>
+        )}
+      />
+
+      {/* Period column */}
+      <ScrollColumn
+        items={PERIODS}
+        selectedValue={period}
+        width={60}
+        onValueChange={(v) => {
+          setPeriod(v);
+          emit(hour, minute, v);
+        }}
+        renderItem={(item, sel) => (
+          <View style={styles.item}>
+            <Text
+              style={[
+                styles.periodText,
+                sel && styles.periodTextSelected,
+                sel && { color: accentColor },
+              ]}
+            >
+              {item}
+            </Text>
+          </View>
+        )}
+      />
+    </View>
   );
 }
 
-const s = StyleSheet.create({
-  trigger: {
-    borderRadius: 16,
-    overflow: "hidden",
-  },
-  triggerInner: {
+const styles = StyleSheet.create({
+  container: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "#FAF8FF",
     borderRadius: 16,
     borderWidth: 1,
     borderColor: "#E9D5FF",
     paddingVertical: 4,
-    paddingHorizontal: 4,
-    gap: 8,
+    paddingHorizontal: 8,
   },
-  triggerTimeBox: {
-    flexDirection: "row",
+  column: {
+    height: PICKER_HEIGHT,
+    overflow: "hidden",
+    position: "relative",
+  },
+  highlight: {
+    position: "absolute",
+    top: PICKER_HEIGHT / 2 - ITEM_HEIGHT / 2,
+    left: 2,
+    right: 2,
+    height: ITEM_HEIGHT,
+    backgroundColor: "rgba(138, 99, 210, 0.08)",
+    borderRadius: 10,
+    zIndex: 10,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
     alignItems: "center",
-    flex: 1,
-    paddingLeft: 14,
-    gap: 2,
   },
-  triggerHour: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#1E1B4B",
-    fontVariant: ["tabular-nums"],
-  },
-  triggerColon: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#1E1B4B",
-    marginHorizontal: 1,
-  },
-  triggerMinute: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#1E1B4B",
-    fontVariant: ["tabular-nums"],
-  },
-  triggerPeriod: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-  triggerPeriodText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(30, 27, 75, 0.45)",
+  item: {
+    height: ITEM_HEIGHT,
     justifyContent: "center",
     alignItems: "center",
-    padding: 24,
+    paddingHorizontal: 4,
   },
-  sheet: {
-    width: "100%",
-    maxWidth: 340,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 28,
-    paddingTop: 28,
-    paddingBottom: 20,
-    alignItems: "center",
-  },
-  sheetTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1E1B4B",
-    marginBottom: 20,
-  },
-
-  clockWrapper: {
-    width: CLOCK_SIZE,
-    height: CLOCK_SIZE,
-    marginBottom: 16,
-  },
-  clockFace: {
-    width: CLOCK_SIZE,
-    height: CLOCK_SIZE,
-    borderRadius: CLOCK_SIZE / 2,
-    backgroundColor: "#FAF8FF",
-    borderWidth: 2,
-    borderColor: "#E9D5FF",
-  },
-  numberDot: {
-    position: "absolute",
-  },
-  numberText: {
-    fontSize: 14,
+  itemText: {
+    fontSize: 20,
     fontWeight: "600",
-  },
-  centerPin: {
-    position: "absolute",
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    zIndex: 10,
-  },
-  tipDot: {
-    position: "absolute",
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    zIndex: 10,
-  },
-
-  modeTabs: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 14,
-  },
-  modeTab: {
-    paddingHorizontal: 22,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#F3EAFF",
-  },
-  modeTabText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#8A63D2",
-  },
-
-  previewRow: {
-    marginBottom: 14,
-  },
-  previewTime: {
-    fontSize: 36,
-    fontWeight: "800",
-    color: "#1E1B4B",
+    color: "#999",
     fontVariant: ["tabular-nums"],
-    letterSpacing: 2,
   },
-
-  periodRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 20,
+  itemTextSelected: {
+    fontSize: 24,
+    fontWeight: "800",
   },
-  periodBtn: {
-    paddingHorizontal: 28,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: "#F3EAFF",
-  },
-  periodBtnText: {
-    fontSize: 14,
+  periodText: {
+    fontSize: 16,
     fontWeight: "600",
-    color: "#8A63D2",
+    color: "#999",
   },
-
-  actions: {
-    flexDirection: "row",
-    gap: 12,
-    paddingHorizontal: 20,
-    width: "100%",
+  periodTextSelected: {
+    fontSize: 20,
+    fontWeight: "800",
   },
-  cancelBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 16,
-    backgroundColor: "#F3EAFF",
+  separator: {
+    width: 20,
     alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 2,
   },
-  cancelText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#8A63D2",
-  },
-  confirmBtn: {
-    flex: 1.5,
-    paddingVertical: 14,
-    borderRadius: 16,
-    alignItems: "center",
-  },
-  confirmText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#FFFFFF",
+  separatorText: {
+    fontSize: 26,
+    fontWeight: "800",
   },
 });

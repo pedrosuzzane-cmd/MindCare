@@ -6,6 +6,7 @@
 
 import React, { useRef, useState, useEffect } from "react";
 import {
+  Animated,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -42,6 +43,73 @@ export default function GeminiChat() {
   const [isOpen, setIsOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const insets = useSafeAreaInsets();
+
+  // ─── Greeting popup state ─────────────────────────────────────────────
+  const [showGreeting, setShowGreeting] = useState(false);
+  const greetingOpacity = useRef(new Animated.Value(0)).current;
+  const greetingScale = useRef(new Animated.Value(0.8)).current;
+
+  // ─── FAB glow animation ──────────────────────────────────────────────
+  const glowAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: false,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 1500,
+          useNativeDriver: false,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [glowAnim]);
+
+  // ─── Show greeting after 1.5s, hide after 3s ─────────────────────────
+  useEffect(() => {
+    const showTimer = setTimeout(() => {
+      setShowGreeting(true);
+      Animated.parallel([
+        Animated.spring(greetingOpacity, {
+          toValue: 1,
+          tension: 60,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.spring(greetingScale, {
+          toValue: 1,
+          tension: 60,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      const hideTimer = setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(greetingOpacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(greetingScale, {
+            toValue: 0.8,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => setShowGreeting(false));
+      }, 3000);
+
+      return () => clearTimeout(hideTimer);
+    }, 1500);
+
+    return () => clearTimeout(showTimer);
+  }, [greetingOpacity, greetingScale]);
 
   // ─── Draggable minimized box ─────────────────────────────────────────────
   const pan = useRef({ x: 0, y: 0 }).current;
@@ -115,6 +183,7 @@ export default function GeminiChat() {
   };
 
   const handleFABPress = () => {
+    setShowGreeting(false);
     if (minimized) {
       setMinimized(false);
     }
@@ -136,20 +205,66 @@ export default function GeminiChat() {
     <>
       {/* ─── FAB (visible when not open AND not minimized) ────────────── */}
       {!isOpen && !minimized && (
-        <Pressable
-          onPress={handleFABPress}
-          style={({ pressed }) => [
-            styles.fab,
-            { right: rightInset, bottom: bottomInset },
-            pressed && styles.fabPressed,
-          ]}
-        >
-          <Image
-            source={require("@/assets/images/mindyai.png")}
-            style={styles.fabImage}
+        <>
+          {/* Greeting popup */}
+          {showGreeting && (
+            <Animated.View
+              style={[
+                styles.greetingBubble,
+                {
+                  right: rightInset + FAB_SIZE + 12,
+                  bottom: bottomInset + 10,
+                  opacity: greetingOpacity,
+                  transform: [{ scale: greetingScale }],
+                },
+              ]}
+              pointerEvents="none"
+            >
+              <Text style={styles.greetingText}>
+                Hello! How can I help you today? 👋
+              </Text>
+              <View style={styles.greetingArrow} />
+            </Animated.View>
+          )}
+
+          {/* Glowing FAB */}
+          <Animated.View
+            style={[
+              styles.fabGlow,
+              {
+                right: rightInset - 6,
+                bottom: bottomInset - 6,
+                opacity: glowAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.3, 0.7],
+                }),
+                transform: [
+                  {
+                    scale: glowAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.15],
+                    }),
+                  },
+                ],
+              },
+            ]}
+            pointerEvents="none"
           />
-          {!isConnected && <View style={styles.offlineDot} />}
-        </Pressable>
+          <Pressable
+            onPress={handleFABPress}
+            style={({ pressed }) => [
+              styles.fab,
+              { right: rightInset, bottom: bottomInset },
+              pressed && styles.fabPressed,
+            ]}
+          >
+            <Image
+              source={require("@/assets/images/mindyai.png")}
+              style={styles.fabImage}
+            />
+            {!isConnected && <View style={styles.offlineDot} />}
+          </Pressable>
+        </>
       )}
 
       {/* ─── Minimized Draggable Box ─────────────────────────────────── */}
@@ -303,12 +418,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#8A63D2",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: "#8A63D2",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 8,
-    zIndex: 1001,
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 10,
+    zIndex: 1002,
+  },
+  fabGlow: {
+    position: "absolute",
+    width: FAB_SIZE + 12,
+    height: FAB_SIZE + 12,
+    borderRadius: (FAB_SIZE + 12) / 2,
+    backgroundColor: "#8A63D2",
+    zIndex: 1000,
   },
   fabPressed: {
     opacity: 0.85,
@@ -318,6 +441,43 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
+  },
+  /* Greeting popup */
+  greetingBubble: {
+    position: "absolute",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderBottomRightRadius: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    maxWidth: 220,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 1003,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.15)",
+  },
+  greetingText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1E1B4B",
+    lineHeight: 20,
+  },
+  greetingArrow: {
+    position: "absolute",
+    bottom: 8,
+    right: -6,
+    width: 0,
+    height: 0,
+    borderTopColor: "transparent",
+    borderTopWidth: 6,
+    borderBottomColor: "transparent",
+    borderBottomWidth: 6,
+    borderLeftColor: "#FFFFFF",
+    borderLeftWidth: 6,
   },
   offlineDot: {
     position: "absolute",

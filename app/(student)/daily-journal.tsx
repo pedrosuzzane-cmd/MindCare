@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -42,6 +43,14 @@ export default function DailyJournalScreen() {
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate();
 
+  const isFutureDate = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime() > today.getTime();
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -57,6 +66,13 @@ export default function DailyJournalScreen() {
   };
 
   const handleDayPress = (date: Date) => {
+    if (isFutureDate(date)) {
+      Alert.alert(
+        "Future Date",
+        "You cannot create journal entries for future dates.",
+      );
+      return;
+    }
     const entry = getEntryForDate(date);
     if (entry) {
       router.push({ pathname: "/journal-detail", params: { id: entry.id } });

@@ -11,22 +11,33 @@ import {
 } from "@/services/notificationService";
 import { Platform } from "react-native";
 
-const REMINDER_CONTENT = {
+const REMINDER_CONTENT: Record<
+  string,
+  { title: string; body: string; color: string; channelId: "reminders" | "tasks" | "hydration" }
+> = {
   hydration: {
     title: "💧 Hydration Reminder",
     body: "Time to hydrate! Take a moment to drink a glass of water.",
+    color: "#4CAF50",
+    channelId: "hydration",
   },
   sleep: {
     title: "🌙 It's Almost Bedtime",
     body: "Getting enough sleep helps improve your focus and emotional well-being.",
+    color: "#7B2CBF",
+    channelId: "reminders",
   },
   breakTime: {
     title: "🌿 Take a Break",
     body: "You've been working hard. Take a 10–15 minute break to relax and recharge.",
+    color: "#FF9800",
+    channelId: "reminders",
   },
   task: {
     title: "📚 Assignment Reminder",
     body: "Don't forget to complete your pending tasks.",
+    color: "#2196F3",
+    channelId: "tasks",
   },
 };
 
@@ -67,9 +78,11 @@ async function scheduleStandard(id: "sleep" | "breakTime", r: StandardState) {
     await scheduleNotification({
       identifier: `${id}-${day}`,
       content: {
-        ...REMINDER_CONTENT[id],
+        title: REMINDER_CONTENT[id].title,
+        body: REMINDER_CONTENT[id].body,
         data: { type: id },
-        channelId: "reminders",
+        channelId: REMINDER_CONTENT[id].channelId,
+        color: REMINDER_CONTENT[id].color,
       },
       trigger: {
         weekday: day,
@@ -98,6 +111,7 @@ async function scheduleTask(r: StandardState) {
         body,
         data: { type: "task" },
         channelId: "tasks",
+        color: REMINDER_CONTENT.task.color,
       },
       trigger: {
         weekday: day,
@@ -144,6 +158,7 @@ async function scheduleHydration(r: HydrationState) {
           title,
           body,
           channelId: "hydration",
+          color: "#4CAF50",
           data: {
             type: "hydration",
             hydrationConfig: {

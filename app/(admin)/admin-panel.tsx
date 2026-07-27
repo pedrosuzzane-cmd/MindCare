@@ -66,6 +66,7 @@ interface StudentSummary {
   moodCounts: Record<string, number>;
   isLSN?: boolean;
   specialNeedsType?: string;
+  profileImage?: string;
   lsnDocument?: {
     fileName?: string;
     secureUrl?: string;
@@ -2430,11 +2431,12 @@ const styles = StyleSheet.create({
   deptKpiGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 10,
   },
   deptKpiCard: {
-    width: "48%",
-    minWidth: 150,
+    flexGrow: 1,
+    flexBasis: "45%",
+    minWidth: 0,
     backgroundColor: "#FFFFFF",
     borderRadius: 14,
     padding: 14,
@@ -2453,8 +2455,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   deptKpiMetric: {
-    width: "48%",
-    minWidth: 70,
+    flexGrow: 1,
+    flexBasis: "45%",
+    minWidth: 0,
   },
   deptKpiMetricLabel: {
     fontSize: 10,

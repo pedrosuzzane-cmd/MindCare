@@ -341,6 +341,45 @@ app.post(
   },
 );
 
+// ── Profile Avatar Upload (Cloudinary) ──
+app.post(
+  "/api/users/upload-avatar",
+  upload.single("file"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded." });
+      }
+
+      if (!cloudinary) {
+        throw new Error("Cloudinary not configured on backend.");
+      }
+
+      const b64 = Buffer.from(req.file.buffer).toString("base64");
+      let dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+
+      const result = await cloudinary.uploader.upload(dataURI, {
+        resource_type: "image",
+        folder: "mindcare-avatars",
+        transformation: [
+          { width: 300, height: 300, crop: "fill", gravity: "face" },
+        ],
+      });
+
+      return res.json({
+        success: true,
+        secureUrl: result.secure_url,
+        publicId: result.public_id,
+      });
+    } catch (error) {
+      console.error("Avatar upload error:", error.message);
+      return res
+        .status(500)
+        .json({ error: `Avatar upload failed: ${error.message}` });
+    }
+  },
+);
+
 // ── Delete Student Account (Firebase Auth + Firestore) ──
 app.post("/api/delete-student", async (req, res) => {
   const { uid } = req.body;

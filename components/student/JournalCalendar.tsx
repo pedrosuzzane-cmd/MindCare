@@ -18,6 +18,14 @@ const sameDay = (a: Date, b: Date) =>
   a.getMonth() === b.getMonth() &&
   a.getDate() === b.getDate();
 
+const isFutureDate = (date: Date) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime() > today.getTime();
+};
+
 const getCalendarDays = (monthDate: Date) => {
   const firstOfMonth = new Date(
     monthDate.getFullYear(),
@@ -188,6 +196,7 @@ export function JournalCalendar({
             {calendarDays.map((day) => {
               const isSelected = sameDay(day.date, selectedDate);
               const isToday = sameDay(day.date, new Date());
+              const isFuture = isFutureDate(day.date);
               const entry = day.isCurrentMonth
                 ? getEntryForDate(day.date)
                 : undefined;
@@ -198,9 +207,11 @@ export function JournalCalendar({
                   style={[
                     styles.dayButton,
                     !day.isCurrentMonth && styles.dayButtonFaded,
-                    isSelected && styles.dayButtonSelected,
+                    isFuture && styles.dayButtonDisabled,
+                    isSelected && !isFuture && styles.dayButtonSelected,
                   ]}
                   onPress={() => onDayPress(day.date)}
+                  disabled={isFuture}
                 >
                   <Text
                     style={[
@@ -223,13 +234,19 @@ export function JournalCalendar({
           {compactDays.map((date) => {
             const isSelected = sameDay(date, selectedDate);
             const isToday = sameDay(date, new Date());
+            const isFuture = isFutureDate(date);
             const entry = getEntryForDate(date);
             const moodEmoji = entry ? getMoodEmoji(entry.mood) : null;
             return (
               <Pressable
                 key={date.toISOString()}
-                style={[styles.compactDay, isSelected && styles.compactDaySelected]}
+                style={[
+                  styles.compactDay,
+                  isFuture && styles.compactDayDisabled,
+                  isSelected && !isFuture && styles.compactDaySelected,
+                ]}
                 onPress={() => onDayPress(date)}
+                disabled={isFuture}
               >
                 <Text style={[styles.compactWeekday, isSelected && styles.compactTextSelected]}>
                   {getWeekdayShort(date)}
@@ -313,6 +330,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   dayButtonFaded: { opacity: 0.35 },
+  dayButtonDisabled: { opacity: 0.3 },
   dayButtonSelected: { backgroundColor: "#7C3AED" },
   dayLabel: { fontSize: 14, color: "#4C1D95", fontWeight: "700" },
   dayLabelFaded: { color: "#999" },
@@ -331,6 +349,7 @@ const styles = StyleSheet.create({
   },
   compactDaysRow: { flexDirection: "row", justifyContent: "space-between", gap: 5 },
   compactDay: { flex: 1, minWidth: 0, alignItems: "center", paddingVertical: 10, borderRadius: 15, backgroundColor: "#FAF5FF" },
+  compactDayDisabled: { opacity: 0.3 },
   compactDaySelected: { backgroundColor: "#7C3AED" },
   compactWeekday: { color: "#8B5CF6", fontSize: 10, fontWeight: "800" },
   compactDayNumber: { color: "#4C1D95", fontSize: 16, fontWeight: "900", marginTop: 4 },

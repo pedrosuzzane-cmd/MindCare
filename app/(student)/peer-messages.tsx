@@ -13,6 +13,7 @@ import {
   Alert,
   Clipboard,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -546,7 +547,11 @@ export default function PeerMessagesScreen() {
   const renderStudent = ({ item }: { item: StudentSearchResult }) => (
     <Pressable style={styles.convRow} onPress={() => startConversation(item)}>
       <View style={styles.convAvatar}>
-        <Ionicons name="person" size={22} color="#8A63D2" />
+        {item.profileImage ? (
+          <Image source={{ uri: item.profileImage }} style={{ width: 44, height: 44, borderRadius: 22 }} />
+        ) : (
+          <Ionicons name="person" size={22} color="#8A63D2" />
+        )}
       </View>
       <View style={styles.convInfo}>
         <Text style={styles.convName}>{item.fullName}</Text>

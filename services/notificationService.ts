@@ -11,12 +11,22 @@ export interface NotificationSchedule {
     body: string;
     data?: Record<string, any>;
     channelId?: "reminders" | "tasks" | "hydration";
+    color?: string;
+    icon?: string;
+    largeIcon?: string;
   };
   trigger: Notifications.NotificationTriggerInput;
 }
 
+const CHANNEL_COLORS: Record<string, string> = {
+  reminders: "#8A63D2",
+  tasks: "#2196F3",
+  hydration: "#4CAF50",
+};
+
 /**
  * Sets up notification channels for Android. This is required for Android 8.0+.
+ * Each channel gets a distinct color, vibration, and light for visual identity.
  */
 export async function setupNotificationChannels() {
   if (Platform.OS === "android") {
@@ -24,19 +34,25 @@ export async function setupNotificationChannels() {
       name: "Daily Reminders",
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: "#4CAF50",
+      lightColor: "#8A63D2",
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      sound: "default",
     });
     await Notifications.setNotificationChannelAsync("tasks", {
       name: "Task Reminders",
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: "#2196F3",
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      sound: "default",
     });
     await Notifications.setNotificationChannelAsync("hydration", {
       name: "Hydration Reminders",
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: "#2196F3",
+      lightColor: "#4CAF50",
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      sound: "default",
     });
   }
 }
@@ -86,6 +102,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 
 /**
  * Schedules a single notification based on a schedule object.
+ * Includes accent color, Android priority, and channel routing for rich visuals.
  */
 export async function scheduleNotification(
   schedule: NotificationSchedule,
@@ -106,6 +123,12 @@ export async function scheduleNotification(
         return null;
       }
     }
+
+    const accentColor =
+      schedule.content.color ||
+      CHANNEL_COLORS[schedule.content.channelId || "reminders"] ||
+      "#8A63D2";
+
     await Notifications.scheduleNotificationAsync({
       identifier: schedule.identifier,
       content: {
@@ -113,6 +136,13 @@ export async function scheduleNotification(
         body: schedule.content.body,
         data: schedule.content.data,
         sound: true,
+        color: accentColor,
+        ...(Platform.OS === "android"
+          ? {
+              icon: schedule.content.icon || "icon",
+              channelId: schedule.content.channelId || "reminders",
+            }
+          : {}),
       },
       trigger: schedule.trigger,
     });

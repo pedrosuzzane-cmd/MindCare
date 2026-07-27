@@ -486,6 +486,7 @@ export async function fetchAllUsers(
         fullName: data.fullName || data.displayName || (collectionName === "admins" ? "Admin" : "Student"),
         department: data.department || data.position || undefined,
         yearLevel: data.yearLevel || undefined,
+        profileImage: data.profileImage || undefined,
       });
     }
     return results.sort((a, b) => a.fullName.localeCompare(b.fullName));

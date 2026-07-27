@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
+  Image,
   Linking,
   Pressable,
   SafeAreaView,
@@ -281,9 +282,13 @@ export default function StudentDetailScreen() {
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <View style={styles.avatarCircle}>
-                  <Text style={styles.avatarText}>
-                    {(profile.fullName || "?").charAt(0).toUpperCase()}
-                  </Text>
+                  {profile.profileImage ? (
+                    <Image source={{ uri: profile.profileImage }} style={{ width: 56, height: 56, borderRadius: 28 }} />
+                  ) : (
+                    <Text style={styles.avatarText}>
+                      {(profile.fullName || "?").charAt(0).toUpperCase()}
+                    </Text>
+                  )}
                 </View>
                 <View style={styles.nameBlock}>
                   <Text style={styles.studentName}>{profile.fullName}</Text>

@@ -52,10 +52,26 @@ export default function NewJournalEntryScreen() {
   const [thoughts, setThoughts] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
+  const isFutureDate = (date: Date): boolean => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const compare = new Date(date);
+    compare.setHours(0, 0, 0, 0);
+    return compare.getTime() > today.getTime();
+  };
+
   useEffect(() => {
     if (params.date) {
       const parsed = new Date(params.date);
       if (!Number.isNaN(parsed.getTime())) {
+        if (isFutureDate(parsed)) {
+          Alert.alert(
+            "Future Date",
+            "You cannot create journal entries for future dates.",
+          );
+          router.back();
+          return;
+        }
         setEntryDate(parsed);
       }
     }
@@ -84,6 +100,14 @@ export default function NewJournalEntryScreen() {
     });
 
   const handleSaveEntry = async () => {
+    if (isFutureDate(entryDate)) {
+      Alert.alert(
+        "Future Date",
+        "You cannot create journal entries for future dates.",
+      );
+      return;
+    }
+
     if (!entryTitle.trim()) {
       Alert.alert(
         "Missing Title",

@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
 import {
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -19,6 +20,7 @@ interface StudentSummary {
   latestRiskLevel?: "low" | "normal" | "high";
   latestTotalScore?: number;
   assessmentsCount: number;
+  profileImage?: string;
 }
 
 interface StudentListModalProps {
@@ -94,20 +96,34 @@ export function StudentListModal({
                         });
                       }}
                     >
-                      <View style={styles.studentHeader}>
-                        <View style={styles.studentIdentityBlock}>
-                          <Text style={styles.studentName}>{student.name}</Text>
-                          <Text style={styles.studentMeta}>
-                            {student.yearLevel}
-                          </Text>
+                      <View style={styles.studentCardRow}>
+                        <View style={styles.studentAvatarCircle}>
+                          {student.profileImage ? (
+                            <Image
+                              source={{ uri: student.profileImage }}
+                              style={{ width: 40, height: 40, borderRadius: 20 }}
+                            />
+                          ) : (
+                            <Text style={styles.studentAvatarText}>
+                              {student.name.charAt(0).toUpperCase()}
+                            </Text>
+                          )}
                         </View>
-                        <View style={styles.studentInfoBlock}>
-                          <Text style={styles.studentId}>
-                            {student.schoolId}
-                          </Text>
-                          <Text style={styles.studentCourse}>
-                            {student.department}
-                          </Text>
+                        <View style={styles.studentHeader}>
+                          <View style={styles.studentIdentityBlock}>
+                            <Text style={styles.studentName}>{student.name}</Text>
+                            <Text style={styles.studentMeta}>
+                              {student.yearLevel}
+                            </Text>
+                          </View>
+                          <View style={styles.studentInfoBlock}>
+                            <Text style={styles.studentId}>
+                              {student.schoolId}
+                            </Text>
+                            <Text style={styles.studentCourse}>
+                              {student.department}
+                            </Text>
+                          </View>
                         </View>
                       </View>
 
@@ -218,6 +234,24 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 18,
     marginBottom: 14,
+  },
+  studentCardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  studentAvatarCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#8A63D2",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  studentAvatarText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "700",
   },
   studentHeader: {
     flexDirection: "row",

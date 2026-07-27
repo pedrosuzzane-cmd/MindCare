@@ -44,4 +44,5 @@ export interface StudentSearchResult {
   fullName: string;
   department?: string;
   yearLevel?: string;
+  profileImage?: string;
 }
