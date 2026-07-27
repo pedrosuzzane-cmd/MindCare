@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -98,7 +99,11 @@ export default function LoginScreen() {
           <View style={styles.orbSmall} />
           <View style={styles.brandRow}>
             <View style={styles.brandIcon}>
-              <Ionicons name="heart" size={21} color={isDark ? "#2E1065" : "#6D28D9"} />
+              <Image
+                source={require("@/assets/images/logoicon.png")}
+                style={styles.brandLogoImage}
+                resizeMode="contain"
+              />
             </View>
             <Text style={styles.brandName}>MindCare</Text>
           </View>
@@ -284,6 +289,11 @@ const createStyles = (isDark: boolean) => {
       justifyContent: "center",
       alignItems: "center",
       backgroundColor: "#FFFFFF",
+      overflow: "hidden",
+    },
+    brandLogoImage: {
+      width: 28,
+      height: 28,
     },
     brandName: { color: colors.heroText, fontSize: 19, fontWeight: "800" },
     heroCopy: { marginTop: 28, maxWidth: 260, alignSelf: "center", alignItems: "center" },
@@ -314,6 +324,7 @@ const createStyles = (isDark: boolean) => {
       borderTopLeftRadius: 30,
       borderTopRightRadius: 30,
       backgroundColor: colors.card,
+      // @ts-ignore - web only
       boxShadow: isDark ? "0px -8px 30px rgba(0,0,0,0.28)" : "0px -8px 28px rgba(76,29,149,0.10)",
       elevation: 8,
     },
@@ -355,6 +366,7 @@ const createStyles = (isDark: boolean) => {
       borderColor: isDark ? "#7C3AED" : "#6D28D9",
     },
     rememberText: { color: colors.muted, fontSize: 13, fontWeight: "600" },
+    // @ts-ignore - web only
     loginButton: { borderRadius: 16, overflow: "hidden", marginTop: 7, boxShadow: "0px 10px 20px rgba(109,40,217,0.25)", elevation: 5 },
     loginButtonDisabled: { opacity: 0.7 },
     gradientButton: { height: 57, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9 },

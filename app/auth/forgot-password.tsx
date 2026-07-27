@@ -1,5 +1,5 @@
-import { Ionicons } from "@expo/vector-icons";
 import { API_URL } from "@/backend/config";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -100,7 +100,7 @@ export default function ForgotPasswordScreen() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: emailClean }),
-        }
+        },
       );
       const data = await response.json();
 
@@ -111,10 +111,7 @@ export default function ForgotPasswordScreen() {
 
       setCurrentStep("code");
       startCooldown();
-      Alert.alert(
-        "Code Sent",
-        "Check your email for a 6-digit reset code."
-      );
+      Alert.alert("Code Sent", "Check your email for a 6-digit reset code.");
     } catch (err: any) {
       console.error("Request OTP error:", err);
       setError("Network error. Please check your connection and try again.");
@@ -135,7 +132,7 @@ export default function ForgotPasswordScreen() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: emailClean }),
-        }
+        },
       );
       const data = await response.json();
       if (!response.ok) {
@@ -183,7 +180,7 @@ export default function ForgotPasswordScreen() {
 
     if (!validatePassword(newPassword)) {
       setError(
-        "Password must be at least 8 characters and include letters and numbers."
+        "Password must be at least 8 characters and include letters and numbers.",
       );
       return;
     }
@@ -205,7 +202,7 @@ export default function ForgotPasswordScreen() {
             otp: otpCode.trim(),
             newPassword,
           }),
-        }
+        },
       );
       const data = await response.json();
 
@@ -278,7 +275,10 @@ export default function ForgotPasswordScreen() {
           colors={["#E8E0F5", "#F4F2F8", "#E8E0F5"]}
           style={styles.gradient}
         >
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <TouchableWithoutFeedback
+            onPress={Keyboard.dismiss}
+            accessible={false}
+          >
             <ScrollView
               contentContainerStyle={{ flexGrow: 1 }}
               keyboardShouldPersistTaps="handled"
@@ -459,7 +459,9 @@ export default function ForgotPasswordScreen() {
                         >
                           <Ionicons
                             name={
-                              showNewPassword ? "eye-outline" : "eye-off-outline"
+                              showNewPassword
+                                ? "eye-outline"
+                                : "eye-off-outline"
                             }
                             size={20}
                             color="#666"
@@ -550,9 +552,7 @@ export default function ForgotPasswordScreen() {
                               : "close-circle"
                           }
                           size={16}
-                          color={
-                            /[0-9]/.test(newPassword) ? "#8A63D2" : "#999"
-                          }
+                          color={/[0-9]/.test(newPassword) ? "#8A63D2" : "#999"}
                         />
                         <Text style={styles.requirementText}>
                           Contains numbers (0-9)
@@ -670,6 +670,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
+    // @ts-ignore - web only
     boxShadow: "0px 2px 4px rgba(0,0,0,0.1)",
     elevation: 3,
   },
@@ -763,6 +764,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     fontSize: 16,
     color: "#333",
+    // @ts-ignore - web only
     boxShadow: "0px 1px 2px rgba(0,0,0,0.1)",
     elevation: 2,
   },
@@ -777,6 +779,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "white",
     borderRadius: 12,
+    // @ts-ignore - web only
     boxShadow: "0px 1px 2px rgba(0,0,0,0.1)",
     elevation: 2,
   },
@@ -798,6 +801,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginBottom: 24,
+    // @ts-ignore - web only
     boxShadow: "0px 1px 2px rgba(0,0,0,0.1)",
     elevation: 2,
   },

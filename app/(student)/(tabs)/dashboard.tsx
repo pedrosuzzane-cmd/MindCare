@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Image,
   Linking,
   Modal,
   Platform,
@@ -204,7 +205,11 @@ export default function DashboardScreen() {
           <View style={styles.header}>
             <View style={styles.logoContainer}>
               <View style={styles.logoIcon}>
-                <Text style={styles.heartIcon}>♥</Text>
+                <Image
+                  source={require("@/assets/images/logoicon.png")}
+                  style={styles.logoIconImage}
+                  resizeMode="contain"
+                />
               </View>
               <Text style={styles.logoText}>MindCare</Text>
             </View>
@@ -449,11 +454,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: 8,
+    overflow: "hidden",
   },
-  heartIcon: {
-    fontSize: 16,
-    color: "#8A63D2",
-    fontWeight: "bold",
+  logoIconImage: {
+    width: 22,
+    height: 22,
   },
   logoText: {
     fontSize: 18,
