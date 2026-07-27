@@ -20,6 +20,7 @@ module.exports = ({ config }) => {
       },
       android: {
         ...(config.expo?.android || {}),
+        package: config.expo?.android?.package || "com.nervachan.MindCareV2",
         intentFilters: [
           {
             action: "VIEW",
@@ -34,6 +35,9 @@ module.exports = ({ config }) => {
       extra: {
         ...(config.expo?.extra || {}),
         aiBackendUrl: process.env.AI_BACKEND_URL || "http://localhost:3000",
+        eas: {
+          projectId: "ca3225f1-2645-409c-8c8c-6394926367cc",
+        },
       },
     },
   };
