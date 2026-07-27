@@ -12,6 +12,19 @@ module.exports = ({ config }) => {
       ...config.expo,
       plugins: [
         ...(config.expo?.plugins || []),
+        "expo-font",
+        [
+          "expo-build-properties",
+          {
+            android: {
+              compileSdkVersion: 34,
+              targetSdkVersion: 34,
+              buildToolsVersion: "34.0.0",
+              minSdkVersion: 23,
+              kotlinVersion: "1.9.24",
+            },
+          },
+        ],
       ],
       scheme: config.expo?.scheme || "mindcarev2",
       ios: {
