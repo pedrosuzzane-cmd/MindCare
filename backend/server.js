@@ -222,6 +222,114 @@ Please provide a compassionate AI reflection following the JSON schema.`;
   }
 });
 
+// ── Journal AI Insight (Gemini-based wellness reflection) ──
+const JOURNAL_INSIGHT_SYSTEM_PROMPT = `You are a compassionate mental health assistant for university students. Your role is to provide a brief, constructive, and uplifting wellness reflection based on a student's journal entry.
+
+CRITICAL: Respond ONLY with valid JSON. No markdown, no code fences, no extra text.
+
+Respond with this exact JSON schema:
+{
+  "aiInsight": "A 2-4 sentence supportive, empathetic wellness reflection. Acknowledge their feelings, highlight any strengths you observe, and offer a gentle, actionable suggestion for well-being. Keep the tone warm and non-judgmental."
+}
+
+Guidelines:
+- Keep the tone warm, supportive, and non-judgmental
+- Use simple, clear language appropriate for students
+- If the entry mentions self-harm or crisis, include a gentle crisis resource reminder
+- Always validate their feelings first
+- Do NOT diagnose or claim to be a licensed professional
+- Do NOT prescribe medication`;
+
+app.post("/api/journal/analyze", async (req, res) => {
+  const { journalText } = req.body;
+
+  if (!journalText || typeof journalText !== "string") {
+    return res.status(400).json({ error: "Missing journalText." });
+  }
+
+  if (!GEMINI_API_KEY) {
+    return res
+      .status(500)
+      .json({ error: "Gemini API key is not configured on the server." });
+  }
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { text: `System instruction: ${JOURNAL_INSIGHT_SYSTEM_PROMPT}` },
+              ],
+            },
+            {
+              role: "model",
+              parts: [
+                {
+                  text: "Understood. I will provide supportive wellness reflections in the specified JSON format.",
+                },
+              ],
+            },
+            {
+              role: "user",
+              parts: [
+                {
+                  text: `Please provide a wellness reflection for this journal entry:\n\n"${journalText.substring(0, 3000)}"`,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 512,
+          },
+        }),
+      },
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error(
+        "Gemini journal analyze error:",
+        data.error?.message || response.status,
+      );
+      return res
+        .status(500)
+        .json({ error: data.error?.message || "Gemini request failed." });
+    }
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) {
+      return res.status(500).json({ error: "Invalid Gemini response." });
+    }
+
+    // Parse JSON from response (strip markdown fences if present)
+    let cleaned = text.trim();
+    if (cleaned.startsWith("```")) {
+      cleaned = cleaned.replace(/```(?:json)?\n?/g, "").trim();
+    }
+
+    const parsed = JSON.parse(cleaned);
+
+    if (!parsed.aiInsight || typeof parsed.aiInsight !== "string") {
+      return res.status(500).json({ error: "Invalid insight format." });
+    }
+
+    return res.json({ aiInsight: parsed.aiInsight });
+  } catch (err) {
+    console.error("Journal analyze route error:", err.message || err);
+    return res
+      .status(500)
+      .json({ error: "Journal analysis failed. Please try again." });
+  }
+});
+
 // ── Unified Document Upload & Groq Vision Verification Route ──
 app.post(
   "/api/upload-pwd-document",

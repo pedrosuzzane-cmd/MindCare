@@ -6,7 +6,6 @@ import React, { useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Animated,
-    Dimensions,
     Pressable,
     SafeAreaView,
     ScrollView,
@@ -14,16 +13,6 @@ import {
     Text,
     View,
 } from "react-native";
-
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-
-interface ReflectionData {
-  summary: string;
-  positiveMoment: string;
-  stressors: string[];
-  recommendations: string[];
-  encouragement: string;
-}
 
 export default function AIReflectionCardScreen() {
   const params = useLocalSearchParams<{
@@ -33,20 +22,21 @@ export default function AIReflectionCardScreen() {
     category?: string;
   }>();
 
-  const [reflection, setReflection] = useState<ReflectionData | null>(null);
+  const [aiInsight, setAiInsight] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
 
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
-    generateReflection();
+    generateInsight();
   }, []);
 
   useEffect(() => {
-    if (reflection) {
+    if (aiInsight) {
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -60,22 +50,20 @@ export default function AIReflectionCardScreen() {
         }),
       ]).start();
     }
-  }, [reflection]);
+  }, [aiInsight]);
 
-  const generateReflection = async () => {
+  const generateInsight = async () => {
     setLoading(true);
     setError(null);
+    setIsOffline(false);
 
     try {
-      const response = await fetch(`${API_URL}/api/ai-reflection`, {
+      const journalText = `Title: ${params.title || "Untitled"}\nMood: ${params.mood || ""}\nCategory: ${params.category || ""}\nThoughts: ${params.thoughts || ""}`;
+
+      const response = await fetch(`${API_URL}/api/journal/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: params.title || "",
-          thoughts: params.thoughts || "",
-          mood: params.mood || "",
-          category: params.category || "",
-        }),
+        body: JSON.stringify({ journalText }),
       });
 
       if (!response.ok) {
@@ -84,27 +72,21 @@ export default function AIReflectionCardScreen() {
       }
 
       const data = await response.json();
-      setReflection(data);
+      setAiInsight(data.aiInsight || null);
     } catch (err: any) {
-      console.error("Reflection error:", err);
-      setError(
-        err?.message || "Unable to generate reflection. Please try again.",
-      );
-      // Provide a fallback reflection
-      setReflection({
-        summary:
-          "Thank you for sharing your thoughts today. Every journal entry is a step toward greater self-awareness and emotional well-being.",
-        positiveMoment:
-          "💚 The fact that you took time to write down your thoughts shows self-awareness and a commitment to your mental health.",
-        stressors: ["Reflection unavailable"],
-        recommendations: [
-          "Take a few deep breaths and check in with how you're feeling right now.",
-          "Consider talking to a friend, family member, or counselor about your thoughts.",
-          "Practice self-compassion — be kind to yourself today.",
-        ],
-        encouragement:
-          "🌸 You are doing the best you can, and that is enough. Keep showing up for yourself, one day at a time.",
-      });
+      console.error("Journal insight error:", err);
+      // Check if it's a network error (likely offline)
+      if (
+        err?.message?.includes("Network") ||
+        err?.message?.includes("fetch") ||
+        err?.message?.includes("Failed to fetch")
+      ) {
+        setIsOffline(true);
+      } else {
+        setError(
+          err?.message || "Unable to generate insight. Please try again.",
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -115,7 +97,7 @@ export default function AIReflectionCardScreen() {
   };
 
   const handleRetry = () => {
-    generateReflection();
+    generateInsight();
   };
 
   if (loading) {
@@ -130,7 +112,7 @@ export default function AIReflectionCardScreen() {
             <Text style={styles.loadingTitle}>🌱 Creating Your Reflection</Text>
             <Text style={styles.loadingSubtitle}>
               Mindy is reading your journal entry and preparing a thoughtful
-              reflection...
+              wellness insight...
             </Text>
             <View style={styles.loadingDots}>
               {[0, 1, 2].map((i) => (
@@ -179,104 +161,34 @@ export default function AIReflectionCardScreen() {
             </View>
           )}
 
-          {reflection && (
+          {isOffline && (
+            <View style={styles.offlineContainer}>
+              <Ionicons name="cloud-offline-outline" size={20} color="#B45309" />
+              <Text style={styles.offlineText}>
+                You&apos;re offline. AI wellness insight will generate when back
+                online.
+              </Text>
+            </View>
+          )}
+
+          {aiInsight && (
             <Animated.View
               style={[
-                styles.reflectionContainer,
+                styles.insightContainer,
                 { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
               ]}
             >
-              {/* Summary Card */}
-              <View style={styles.card}>
-                <View style={styles.cardHeader}>
+              {/* Wellness Insight Card */}
+              <View style={styles.insightCard}>
+                <View style={styles.insightHeader}>
                   <View
-                    style={[styles.iconCircle, { backgroundColor: "#E8F5E9" }]}
-                  >
-                    <Ionicons name="document-text" size={22} color="#8A63D2" />
-                  </View>
-                  <Text style={styles.cardTitle}>Summary</Text>
-                </View>
-                <Text style={styles.cardBody}>{reflection.summary}</Text>
-              </View>
-
-              {/* Positive Moment Card */}
-              <View style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <View
-                    style={[styles.iconCircle, { backgroundColor: "#FFF3E0" }]}
+                    style={[styles.iconCircle, { backgroundColor: "#F3EAFF" }]}
                   >
                     <Text style={styles.emojiIcon}>💚</Text>
                   </View>
-                  <Text style={styles.cardTitle}>Positive Moment</Text>
+                  <Text style={styles.insightTitle}>Wellness Insight</Text>
                 </View>
-                <Text style={styles.cardBody}>{reflection.positiveMoment}</Text>
-              </View>
-
-              {/* Stressors Card */}
-              {reflection.stressors && reflection.stressors.length > 0 && (
-                <View style={styles.card}>
-                  <View style={styles.cardHeader}>
-                    <View
-                      style={[
-                        styles.iconCircle,
-                        { backgroundColor: "#FFEBEE" },
-                      ]}
-                    >
-                      <Ionicons
-                        name="heart-dislike"
-                        size={22}
-                        color="#E53935"
-                      />
-                    </View>
-                    <Text style={styles.cardTitle}>Identified Themes</Text>
-                  </View>
-                  <View style={styles.tagsContainer}>
-                    {reflection.stressors.map((stressor, idx) => (
-                      <View key={idx} style={styles.tag}>
-                        <Text style={styles.tagText}>{stressor}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              {/* Recommendations Card */}
-              {reflection.recommendations &&
-                reflection.recommendations.length > 0 && (
-                  <View style={styles.card}>
-                    <View style={styles.cardHeader}>
-                      <View
-                        style={[
-                          styles.iconCircle,
-                          { backgroundColor: "#E3F2FD" },
-                        ]}
-                      >
-                        <Ionicons name="bulb" size={22} color="#9C7EEB" />
-                      </View>
-                      <Text style={styles.cardTitle}>Suggestions</Text>
-                    </View>
-                    {reflection.recommendations.map((rec, idx) => (
-                      <View key={idx} style={styles.recommendationRow}>
-                        <Text style={styles.recommendationBullet}>📚</Text>
-                        <Text style={styles.recommendationText}>{rec}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-              {/* Encouragement Card */}
-              <View style={[styles.card, styles.encouragementCard]}>
-                <View style={styles.cardHeader}>
-                  <View
-                    style={[styles.iconCircle, { backgroundColor: "#FCE4EC" }]}
-                  >
-                    <Text style={styles.emojiIcon}>🌸</Text>
-                  </View>
-                  <Text style={styles.cardTitle}>Encouragement</Text>
-                </View>
-                <Text style={styles.encouragementText}>
-                  {reflection.encouragement}
-                </Text>
+                <Text style={styles.insightBody}>{aiInsight}</Text>
               </View>
 
               {/* Action Buttons */}
@@ -304,6 +216,29 @@ export default function AIReflectionCardScreen() {
                 </Pressable>
               </View>
             </Animated.View>
+          )}
+
+          {/* Fallback: no insight and no error — show encouragement */}
+          {!aiInsight && !error && !isOffline && (
+            <View style={styles.fallbackContainer}>
+              <Text style={styles.fallbackEmoji}>🌸</Text>
+              <Text style={styles.fallbackTitle}>Entry Saved</Text>
+              <Text style={styles.fallbackText}>
+                Your journal entry has been saved. AI insight will be available
+                shortly.
+              </Text>
+              <Pressable style={styles.primaryButton} onPress={handleBackToJournal}>
+                <LinearGradient
+                  colors={["#9C7EEB", "#8A63D2"]}
+                  style={styles.buttonGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <Ionicons name="journal" size={20} color="white" />
+                  <Text style={styles.primaryButtonText}>Back to Journal</Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
           )}
         </ScrollView>
       </LinearGradient>
@@ -392,100 +327,70 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     flex: 1,
   },
-  // Reflection Cards
-  reflectionContainer: {
+  // Offline
+  offlineContainer: {
+    flexDirection: "row",
+    backgroundColor: "#FEF3C7",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  offlineText: {
+    fontSize: 14,
+    color: "#92400E",
+    marginLeft: 8,
+    flex: 1,
+    lineHeight: 20,
+  },
+  // Insight Card
+  insightContainer: {
     gap: 16,
   },
-  card: {
+  insightCard: {
     backgroundColor: "white",
     borderRadius: 20,
-    padding: 20,
+    padding: 24,
     shadowColor: "#8A63D2",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
   },
-  cardHeader: {
+  insightHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 16,
   },
   iconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
   },
   emojiIcon: {
-    fontSize: 20,
+    fontSize: 22,
   },
-  cardTitle: {
-    fontSize: 16,
+  insightTitle: {
+    fontSize: 17,
     fontWeight: "700",
-    color: "#333",
+    color: "#1E1B4B",
   },
-  cardBody: {
-    fontSize: 15,
-    color: "#555",
-    lineHeight: 24,
-    letterSpacing: 0.2,
-  },
-  // Tags
-  tagsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  tag: {
-    backgroundColor: "#F5F5F5",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-  },
-  tagText: {
-    fontSize: 13,
-    color: "#666",
-    fontWeight: "500",
-  },
-  // Recommendations
-  recommendationRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 12,
-  },
-  recommendationBullet: {
+  insightBody: {
     fontSize: 16,
-    marginRight: 10,
-    marginTop: 2,
-  },
-  recommendationText: {
-    fontSize: 15,
-    color: "#555",
-    lineHeight: 22,
-    flex: 1,
-  },
-  // Encouragement
-  encouragementCard: {
-    backgroundColor: "#F3EAFF",
-    borderWidth: 1,
-    borderColor: "#E0D0FF",
-  },
-  encouragementText: {
-    fontSize: 16,
-    color: "#3B2F6B",
+    color: "#4B4453",
     lineHeight: 26,
-    fontStyle: "italic",
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
   },
   // Actions
   actionsContainer: {
     marginTop: 8,
-    marginBottom: 20,
     gap: 12,
   },
   primaryButton: {
@@ -519,5 +424,26 @@ const styles = StyleSheet.create({
     color: "#8A63D2",
     fontSize: 15,
     fontWeight: "600",
+  },
+  // Fallback
+  fallbackContainer: {
+    alignItems: "center",
+    paddingTop: 40,
+    gap: 12,
+  },
+  fallbackEmoji: {
+    fontSize: 48,
+  },
+  fallbackTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1E1B4B",
+  },
+  fallbackText: {
+    fontSize: 15,
+    color: "#888",
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 8,
   },
 });

@@ -45,6 +45,9 @@ service cloud.firestore {
       match /settings/{docId} {
         allow read, write: if isOwner(userId);
       }
+      match /presence/{docId} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // ==========================

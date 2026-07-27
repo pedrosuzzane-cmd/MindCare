@@ -1,6 +1,7 @@
 import { auth } from "@/constants/firebase";
 import { useAuth } from "@/hooks/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -14,10 +15,13 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
 } from "react-native";
+
+const REMEMBER_EMAIL_KEY = "@MindCare:remembered_email";
 
 export default function LoginScreen() {
   const colorScheme = useColorScheme();
@@ -26,8 +30,15 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const { user, role, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    AsyncStorage.getItem(REMEMBER_EMAIL_KEY).then((saved) => {
+      if (saved) setEmail(saved);
+    });
+  }, []);
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -55,6 +66,11 @@ export default function LoginScreen() {
     setSubmitting(true);
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password);
+      if (rememberMe) {
+        await AsyncStorage.setItem(REMEMBER_EMAIL_KEY, email.trim());
+      } else {
+        await AsyncStorage.removeItem(REMEMBER_EMAIL_KEY);
+      }
     } catch (error: any) {
       Alert.alert("Login failed", error.message || "Invalid credentials.");
     } finally {
@@ -154,6 +170,20 @@ export default function LoginScreen() {
                 size={20}
                 color={styles.icon.color}
               />
+            </Pressable>
+          </View>
+
+          <View style={styles.rememberRow}>
+            <Pressable
+              style={styles.rememberToggle}
+              onPress={() => setRememberMe((v) => !v)}
+              accessibilityRole="togglebutton"
+              accessibilityState={{ checked: rememberMe }}
+            >
+              <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+                {rememberMe && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+              </View>
+              <Text style={styles.rememberText}>Remember my email</Text>
             </Pressable>
           </View>
 
@@ -309,6 +339,22 @@ const createStyles = (isDark: boolean) => {
     placeholder: { color: colors.placeholder },
     eyeIcon: { padding: 4 },
     forgotText: { color: isDark ? "#C4B5FD" : "#6D28D9", fontSize: 12, fontWeight: "800", marginBottom: 8 },
+    rememberRow: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
+    rememberToggle: { flexDirection: "row", alignItems: "center", gap: 10 },
+    checkbox: {
+      width: 22,
+      height: 22,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: isDark ? "#6B5B8A" : "#C4B5D9",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    checkboxChecked: {
+      backgroundColor: isDark ? "#7C3AED" : "#6D28D9",
+      borderColor: isDark ? "#7C3AED" : "#6D28D9",
+    },
+    rememberText: { color: colors.muted, fontSize: 13, fontWeight: "600" },
     loginButton: { borderRadius: 16, overflow: "hidden", marginTop: 7, boxShadow: "0px 10px 20px rgba(109,40,217,0.25)", elevation: 5 },
     loginButtonDisabled: { opacity: 0.7 },
     gradientButton: { height: 57, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9 },

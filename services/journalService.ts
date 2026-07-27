@@ -22,6 +22,8 @@ export interface JournalEntry {
   aiEncouragement?: string;
   aiSuggestions?: string[];
   aiGeneratedAt?: string; // ISO 8601 string
+  // Gemini backend insight (supportive wellness reflection)
+  aiInsight?: string;
 }
 
 const getJournalEntries = async (userId: string): Promise<JournalEntry[]> => {

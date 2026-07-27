@@ -1,8 +1,11 @@
 /**
  * Gemini AI service for analyzing journal entries and generating wellness suggestions.
- * Uses the @google/generative-ai SDK.
+ * Uses the @google/generative-ai SDK for direct calls, and the Render backend
+ * for server-side Gemini analysis (keeps API keys secure).
  */
 
+import NetInfo from "@react-native-community/netinfo";
+import { API_URL } from "@/backend/config";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getGeminiApiKey } from "@/backend/config";
 
@@ -166,4 +169,43 @@ IMPORTANT: Respond ONLY with valid JSON, no other text.`;
   return {
     suggestions: parsed.suggestions.slice(0, 6),
   };
+}
+
+/**
+ * Sends the journal text to the Render backend for Gemini-based wellness analysis.
+ * Checks network connectivity first — skips entirely if offline.
+ * Returns the aiInsight string on success, or null if offline / on failure.
+ * Never throws.
+ */
+export async function analyzeJournalViaBackend(
+  journalText: string,
+): Promise<string | null> {
+  try {
+    const netState = await NetInfo.fetch();
+    if (!netState.isConnected) {
+      if (__DEV__) console.log("[JournalAI] Offline — skipping AI insight.");
+      return null;
+    }
+
+    const response = await fetch(`${API_URL}/api/journal/analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ journalText }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      console.warn(
+        "[JournalAI] Backend error:",
+        data?.error || response.status,
+      );
+      return null;
+    }
+
+    const data = await response.json();
+    return typeof data.aiInsight === "string" ? data.aiInsight : null;
+  } catch (err) {
+    if (__DEV__) console.warn("[JournalAI] Backend call failed:", err);
+    return null;
+  }
 }

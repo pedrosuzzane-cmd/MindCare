@@ -20,7 +20,6 @@ export default function RootLayout() {
       <AuthProvider>
         <NetworkProvider>
           <Stack>
-            <Stack.Screen name="welcome" options={{ headerShown: false }} />
             <Stack.Screen
               name="initial-profile-survey"
               options={{ headerShown: false }}

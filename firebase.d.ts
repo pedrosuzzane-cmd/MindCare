@@ -7,6 +7,15 @@ declare module "firebase/app" {
 
 declare module "firebase/auth" {
   export * from "@firebase/auth";
+
+  export function initializeAuth(
+    app: import("@firebase/app").FirebaseApp,
+    deps?: { persistence?: any },
+  ): import("@firebase/auth").Auth;
+
+  export function getReactNativePersistence(
+    storage: any,
+  ): import("@firebase/auth").Persistence;
 }
 
 declare module "firebase/firestore" {

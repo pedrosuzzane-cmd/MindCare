@@ -1,6 +1,11 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import {
+  getAuth,
+  initializeAuth,
+  getReactNativePersistence,
+} from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBGsUOr7tdhyUYcHR1Mi4f9dMDZpdva16I",
@@ -14,7 +19,22 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-export const auth = getAuth(app);
+// initializeAuth throws auth/already-initialized during HMR re-renders.
+// Fall back to getAuth if the app was already initialized.
+let auth;
+try {
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(ReactNativeAsyncStorage),
+  });
+} catch (e: any) {
+  if (e?.code === "auth/already-initialized") {
+    auth = getAuth(app);
+  } else {
+    throw e;
+  }
+}
+
+export { auth };
 export const db = getFirestore(app);
 
 export default app;

@@ -1,5 +1,6 @@
 import { useJournal } from "@/hooks/useJournal";
-import { analyzeJournal } from "@/services/geminiService";
+import { useNetwork } from "@/contexts/NetworkContext";
+import { analyzeJournalViaBackend } from "@/services/geminiService";
 import { journalService } from "@/services/journalService";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -28,6 +29,7 @@ interface Category {
 export default function NewJournalEntryScreen() {
   const params = useLocalSearchParams<{ date?: string }>();
   const { addJournalEntry } = useJournal();
+  const { isConnected } = useNetwork();
   const [entryDate, setEntryDate] = useState<Date>(new Date());
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [entryTitle, setEntryTitle] = useState<string>("");
@@ -168,38 +170,35 @@ export default function NewJournalEntryScreen() {
   };
 
   /**
-   * Calls Gemini to analyze the journal entry and stores results locally.
-   * Runs asynchronously in the background - never blocks or throws.
+   * Calls the Render backend for Gemini-based wellness analysis and stores
+   * the resulting aiInsight on the journal entry.
+   * Runs asynchronously in the background — never blocks or throws.
+   * If the device is offline, the call is skipped entirely.
    */
   const analyzeJournalInBackground = async (
     entry: import("@/services/journalService").JournalEntry,
   ) => {
     try {
       const journalText = `Title: ${entry.title}\nMood: ${entry.mood}\nCategory: ${entry.category}\nThoughts: ${entry.thoughts}`;
-      const analysis = await analyzeJournal(journalText);
+      const aiInsight = await analyzeJournalViaBackend(journalText);
 
-      if (!analysis) {
-        // Gemini failed silently - journal is already saved, no harm done
+      if (!aiInsight) {
+        // Offline or backend failed — journal is already saved, no harm done
         return;
       }
 
-      // Update the stored entry with AI analysis fields
+      // Update the stored entry with the backend AI insight
       const updatedEntry: import("@/services/journalService").JournalEntry = {
         ...entry,
-        aiEmotion: analysis.emotion,
-        aiSummary: analysis.summary,
-        aiEncouragement: analysis.encouragement,
-        aiSuggestions: analysis.suggestions,
-        aiGeneratedAt: new Date().toISOString(),
+        aiInsight,
       };
 
-      // Use journalService.updateJournalEntry instead of useJournal to avoid triggering re-renders
       const userId = updatedEntry.userId;
       await journalService.updateJournalEntry(userId, updatedEntry);
-      console.log("AI analysis saved for journal:", entry.id);
+      console.log("AI insight saved for journal:", entry.id);
     } catch (err) {
-      // Silently ignore - journal was already saved successfully
-      console.warn("Background AI analysis failed:", err);
+      // Silently ignore — journal was already saved successfully
+      console.warn("Background AI insight failed:", err);
     }
   };
 
@@ -240,6 +239,15 @@ export default function NewJournalEntryScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {isConnected === false && (
+          <View style={styles.offlineBanner}>
+            <Ionicons name="cloud-offline-outline" size={18} color="#B45309" />
+            <Text style={styles.offlineBannerText}>
+              You're offline — entry will sync when connected
+            </Text>
+          </View>
+        )}
+
         {/* Category Selection */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Select a Category</Text>
@@ -417,6 +425,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 40,
+  },
+  offlineBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#FEF3C7",
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 20,
+  },
+  offlineBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#92400E",
   },
   sectionContainer: {
     marginBottom: 24,
