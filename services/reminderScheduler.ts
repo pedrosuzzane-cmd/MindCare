@@ -115,32 +115,56 @@ async function scheduleHydration(r: HydrationState) {
 
   const days = getDaysOfWeek(r.repeat, r.customDays);
   const title = r.hydrationName || REMINDER_CONTENT.hydration.title;
+  const startH = to24h(r.startTime);
+  const endH = to24h(r.endTime);
 
   for (const day of days) {
-    await scheduleNotification({
-      identifier: `hydration-${day}-start`,
-      content: {
-        title,
-        body: HYDRATION_MESSAGES[0],
-        channelId: "hydration",
-        data: {
-          type: "hydration",
-          isChained: true,
-          hydrationConfig: {
-            name: r.hydrationName,
-            startTime: r.startTime,
-            endTime: r.endTime,
-            intervalMinutes: r.intervalMinutes,
+    // Calculate all interval offsets (in minutes) from startTime
+    const startMinutes = startH * 60 + r.startTime.minute;
+    const endMinutes = endH * 60 + r.endTime.minute;
+
+    // If endTime <= startTime, skip (invalid range)
+    if (endMinutes <= startMinutes) continue;
+
+    let offset = 0;
+    let index = 0;
+    while (offset <= endMinutes - startMinutes) {
+      const absMinutes = startMinutes + offset;
+      const h = Math.floor(absMinutes / 60);
+      const m = absMinutes % 60;
+
+      const body =
+        index === 0
+          ? HYDRATION_MESSAGES[0]
+          : HYDRATION_MESSAGES[index % HYDRATION_MESSAGES.length];
+
+      await scheduleNotification({
+        identifier: `hydration-${day}-${index}`,
+        content: {
+          title,
+          body,
+          channelId: "hydration",
+          data: {
+            type: "hydration",
+            hydrationConfig: {
+              name: r.hydrationName,
+              startTime: r.startTime,
+              endTime: r.endTime,
+              intervalMinutes: r.intervalMinutes,
+            },
           },
         },
-      },
-      trigger: {
-        weekday: day,
-        hour: to24h(r.startTime),
-        minute: r.startTime.minute,
-        repeats: true,
-      },
-    });
+        trigger: {
+          weekday: day,
+          hour: h,
+          minute: m,
+          repeats: true,
+        },
+      });
+
+      offset += r.intervalMinutes;
+      index++;
+    }
   }
 }
 

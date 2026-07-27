@@ -1,7 +1,8 @@
 /**
- * Admin messages inbox — list of student conversations + chat view.
- * Features: optimistic send, failed message retry, long-press delete (own + any),
- * delete conversation from inbox.
+ * Admin messaging screen — tabbed user directory (Students / Admins) + chat room.
+ * Tapping any user initializes or opens a conversation via messagingService.
+ * Chat view features: friendly reminder banner, phone-style bubbles,
+ * optimistic send, failed message retry, long-press delete/copy, emoji picker.
  */
 
 import { Ionicons } from "@expo/vector-icons";
@@ -30,13 +31,10 @@ import { useAuth } from "@/hooks/AuthContext";
 import {
   deleteConversation,
   deleteMessage,
+  fetchAllUsers,
   getOrCreateConversation,
-  getPeerName,
-  listenForAllPeerConversations,
-  listenForConversations,
   listenForMessages,
   markAsRead,
-  searchUsers,
   sendMessage as sendMsg,
 } from "@/services/messagingService";
 import type {
@@ -46,151 +44,138 @@ import type {
   StudentSearchResult,
 } from "@/types/messaging";
 
-type ViewMode = "inbox" | "chat" | "search";
+type ViewMode = "directory" | "chat";
+type DirectoryTab = "students" | "admins";
+
+const REMINDER_BANNER =
+  "Friendly Reminder: Please keep conversations respectful, supportive, and kind.";
 
 export default function AdminMessagesScreen() {
   const { user } = useAuth();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>("inbox");
+
+  // ── View state ──
+  const [viewMode, setViewMode] = useState<ViewMode>("directory");
+  const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("students");
+
+  // ── Directory state ──
+  const [students, setStudents] = useState<StudentSearchResult[]>([]);
+  const [admins, setAdmins] = useState<StudentSearchResult[]>([]);
+  const [directoryLoading, setDirectoryLoading] = useState(true);
+  const [directoryFilter, setDirectoryFilter] = useState("");
+
+  // ── Chat state ──
   const [activeConversation, setActiveConversation] =
     useState<Conversation | null>(null);
+  const [chatPartnerName, setChatPartnerName] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [optimistic, setOptimistic] = useState<OptimisticMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [sending, setSending] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [chatLoading, setChatLoading] = useState(true);
   const flatListRef = useRef<FlatList>(null);
 
-  // Context menus
-  const [msgCtxVisible, setMsgCtxVisible] = useState(false);
-  const [msgCtxMsg, setMsgCtxMsg] = useState<Message | null>(null);
-  const [convCtxVisible, setConvCtxVisible] = useState(false);
-  const [convCtxConv, setConvCtxConv] = useState<Conversation | null>(null);
+  const scrollToBottom = useCallback((animated = true) => {
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated });
+    }, 50);
+  }, []);
+
+  // ── Context menu state ──
+  const [contextVisible, setContextVisible] = useState(false);
+  const [contextMsg, setContextMsg] = useState<Message | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
 
-  // Peer conversations for admin moderation view
-  const [peerConversations, setPeerConversations] = useState<Conversation[]>(
-    [],
-  );
-  const [filterTab, setFilterTab] = useState<"student" | "peer">("student");
-
-  // Inbox-level search
-  const [inboxSearchQuery, setInboxSearchQuery] = useState("");
-
-  // Student search state
-  const [students, setStudents] = useState<StudentSearchResult[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchLoading, setSearchLoading] = useState(false);
-
-  // Filtered conversation lists for inbox search
-  const filteredConversations = inboxSearchQuery.trim()
-    ? conversations.filter((c) =>
-        c.studentName.toLowerCase().includes(inboxSearchQuery.toLowerCase()),
-      )
-    : conversations;
-
-  const filteredPeerConversations = inboxSearchQuery.trim()
-    ? peerConversations.filter((c) => {
-        const name = getPeerName(c, user!.uid).toLowerCase();
-        return name.includes(inboxSearchQuery.toLowerCase());
-      })
-    : peerConversations;
-
-  // Merge Firestore messages with optimistic ones
+  // ── Merge Firestore messages with optimistic ones ──
   const allMessages: OptimisticMessage[] = [
     ...messages,
     ...optimistic.filter((o) => !messages.some((m) => m.id === o.id)),
   ];
 
-  // Listen for all admin conversations
-  useEffect(() => {
-    if (!user?.uid) return;
-    const unsub = listenForConversations(user.uid, "admin", (convs) => {
-      setConversations(convs);
-      setLoading(false);
-    });
-    return () => unsub();
-  }, [user?.uid]);
+  // ── Filtered directory lists ──
+  const filteredStudents = directoryFilter.trim()
+    ? students.filter(
+        (s) =>
+          s.fullName.toLowerCase().includes(directoryFilter.toLowerCase()) ||
+          (s.department || "").toLowerCase().includes(directoryFilter.toLowerCase()),
+      )
+    : students;
 
-  // Listen for ALL peer conversations (admin moderation view)
-  useEffect(() => {
-    if (!user?.uid) return;
-    const unsub = listenForAllPeerConversations((convs) => {
-      setPeerConversations(convs);
-    });
-    return () => unsub();
-  }, [user?.uid]);
+  const filteredAdmins = directoryFilter.trim()
+    ? admins.filter(
+        (a) =>
+          a.fullName.toLowerCase().includes(directoryFilter.toLowerCase()) ||
+          (a.department || "").toLowerCase().includes(directoryFilter.toLowerCase()),
+      )
+    : admins;
 
-  // Listen for messages when in chat view
+  // ── Fetch users for directory ──
+  useEffect(() => {
+    if (viewMode !== "directory" || !user?.uid) return;
+
+    let cancelled = false;
+
+    async function load() {
+      setDirectoryLoading(true);
+      const [studentList, adminList] = await Promise.all([
+        fetchAllUsers(user!.uid, "users"),
+        fetchAllUsers(user!.uid, "admins"),
+      ]);
+      if (!cancelled) {
+        setStudents(studentList);
+        setAdmins(adminList);
+        setDirectoryLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [viewMode, user?.uid]);
+
+  // ── Listen for messages when in chat view ──
   useEffect(() => {
     if (!activeConversation?.id) return;
 
     const unsub = listenForMessages(activeConversation.id, (msgs) => {
       setMessages(msgs);
+      setChatLoading(false);
       markAsRead(activeConversation.id, user!.uid);
       setOptimistic((prev) =>
         prev.filter((o) => !msgs.some((m) => m.id === o.id)),
       );
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: false });
-      }, 100);
+      scrollToBottom(false);
     });
 
     return () => unsub();
   }, [activeConversation?.id, user?.uid]);
 
-  const openChat = (conversation: Conversation) => {
-    setActiveConversation(conversation);
-    setViewMode("chat");
-  };
-
-  // Debounced search query for admins
-  useEffect(() => {
-    if (viewMode !== "search") return;
-
-    const handler = setTimeout(async () => {
-      setSearchLoading(true);
-      const results = await searchUsers(user!.uid, "admin", searchQuery);
-      setStudents(results);
-      setSearchLoading(false);
-    }, 300); // Debounce for 300ms
-
-    return () => clearTimeout(handler);
-  }, [searchQuery, viewMode, user]);
-
-  // ─── Student Search ──────────────────────────────────────────────────────
-  const openSearch = async () => {
-    setViewMode("search");
-  };
-
-  const startConversation = async (student: StudentSearchResult) => {
+  // ── Open a chat from directory card tap ──
+  const startChat = async (item: StudentSearchResult) => {
     try {
       const adminName = user?.displayName || "Guidance Counselor";
       const convId = await getOrCreateConversation(
-        student.uid,
+        item.uid,
         user!.uid,
-        student.fullName,
+        item.fullName,
         adminName,
       );
 
-      // Find or create the conversation object
-      const existing = conversations.find((c) => c.id === convId);
-      if (existing) {
-        openChat(existing);
-      } else {
-        const tempConv: Conversation = {
-          id: convId,
-          studentId: student.uid,
-          adminId: user!.uid,
-          studentName: student.fullName,
-          adminName,
-          lastMessage: "",
-          lastMessageAt: Date.now(),
-          unreadBy: [],
-        };
-        setActiveConversation(tempConv);
-        setViewMode("chat");
-      }
+      setActiveConversation({
+        id: convId,
+        studentId: item.uid,
+        adminId: user!.uid,
+        studentName: item.fullName,
+        adminName,
+        lastMessage: "",
+        lastMessageAt: Date.now(),
+        unreadBy: [],
+      });
+      setChatPartnerName(item.fullName);
+      setMessages([]);
+      setOptimistic([]);
+      setChatLoading(true);
+      setViewMode("chat");
     } catch (err) {
       console.error("Failed to start conversation:", err);
     }
@@ -231,7 +216,7 @@ export default function AdminMessagesScreen() {
     }
   }, [inputText, activeConversation, user?.uid, sending]);
 
-  // ─── Retry failed message ────────────────────────────────────────────────
+  // ─── Retry a failed message ──────────────────────────────────────────────
   const handleRetry = useCallback(
     async (msg: OptimisticMessage) => {
       if (!activeConversation || !user?.uid) return;
@@ -259,48 +244,23 @@ export default function AdminMessagesScreen() {
     [activeConversation, user?.uid],
   );
 
-  // ─── Message context menu ────────────────────────────────────────────────
-  const handleCopyMsg = () => {
-    if (msgCtxMsg) {
-      Clipboard.setString(msgCtxMsg.deleted ? "" : msgCtxMsg.text);
+  // ─── Context menu actions ────────────────────────────────────────────────
+  const handleCopy = () => {
+    if (contextMsg) {
+      Clipboard.setString(contextMsg.deleted ? "" : contextMsg.text);
     }
-    setMsgCtxVisible(false);
+    setContextVisible(false);
   };
 
-  const handleDeleteMsg = async () => {
-    if (!msgCtxMsg || !activeConversation) return;
-    setMsgCtxVisible(false);
+  const handleDelete = async () => {
+    if (!contextMsg || !activeConversation) return;
+    setContextVisible(false);
 
     try {
-      await deleteMessage(activeConversation.id, msgCtxMsg.id);
+      await deleteMessage(activeConversation.id, contextMsg.id);
     } catch (err) {
-      console.error("Failed to delete message:", err);
+      console.error("Failed to delete:", err);
     }
-  };
-
-  // ─── Conversation context menu (delete entire conversation) ──────────────
-  const handleDeleteConv = async () => {
-    if (!convCtxConv) return;
-    setConvCtxVisible(false);
-
-    Alert.alert(
-      "Delete Conversation",
-      `Are you sure you want to delete your conversation with ${convCtxConv.studentName}? This cannot be undone.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteConversation(convCtxConv.id);
-            } catch (err) {
-              console.error("Failed to delete conversation:", err);
-            }
-          },
-        },
-      ],
-    );
   };
 
   const formatTime = (timestamp: number) => {
@@ -317,80 +277,46 @@ export default function AdminMessagesScreen() {
     return date.toLocaleDateString([], { month: "short", day: "numeric" });
   };
 
-  // ─── Inbox: Conversation row ─────────────────────────────────────────────
-  const renderConversation = ({ item }: { item: Conversation }) => {
-    const hasUnread = item.unreadBy?.includes(user?.uid || "");
-    const isPeer = item.type === "peer";
-    const displayName = isPeer
-      ? getPeerName(item, user!.uid)
-      : item.studentName;
-
-    return (
-      <Pressable
-        style={styles.convRow}
-        onPress={() => openChat(item)}
-        onLongPress={() => {
-          setConvCtxConv(item);
-          setConvCtxVisible(true);
-        }}
-        delayLongPress={400}
-      >
-        <View style={styles.convAvatar}>
-          <Ionicons
-            name={isPeer ? "people" : "person"}
-            size={22}
-            color="#8A63D2"
-          />
-        </View>
-        <View style={styles.convInfo}>
-          <View style={styles.convTop}>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 6,
-                flex: 1,
-              }}
-            >
-              <Text
-                style={[styles.convName, hasUnread && styles.convNameBold]}
-                numberOfLines={1}
-              >
-                {displayName}
-              </Text>
-              {isPeer && (
-                <View style={styles.peerBadge}>
-                  <Text style={styles.peerBadgeText}>Peer</Text>
-                </View>
-              )}
-            </View>
-            <Text style={styles.convTime}>
-              {item.lastMessageAt ? formatTime(item.lastMessageAt) : ""}
-            </Text>
-          </View>
-          <Text
-            style={[styles.convLastMsg, hasUnread && styles.convLastMsgBold]}
-            numberOfLines={1}
-          >
-            {item.lastMessage || "No messages yet"}
-          </Text>
-        </View>
-        {hasUnread && <View style={styles.unreadDot} />}
-      </Pressable>
-    );
+  // ─── Back handler ────────────────────────────────────────────────────────
+  const handleBack = () => {
+    if (viewMode === "chat") {
+      setViewMode("directory");
+      setActiveConversation(null);
+      setMessages([]);
+      setOptimistic([]);
+    } else {
+      router.back();
+    }
   };
 
-  // ─── Search: Student row ─────────────────────────────────────────────────
-  const renderStudent = ({ item }: { item: StudentSearchResult }) => (
-    <Pressable style={styles.convRow} onPress={() => startConversation(item)}>
-      <View style={styles.convAvatar}>
-        <Ionicons name="person" size={22} color="#8A63D2" />
+  // ─── Directory: User card row ────────────────────────────────────────────
+  const renderUserCard = ({
+    item,
+    isStudent,
+  }: {
+    item: StudentSearchResult;
+    isStudent: boolean;
+  }) => (
+    <Pressable style={styles.userCard} onPress={() => startChat(item)}>
+      <View
+        style={[
+          styles.userAvatar,
+          isStudent ? styles.userAvatarStudent : styles.userAvatarAdmin,
+        ]}
+      >
+        <Ionicons
+          name={isStudent ? "person" : "shield-checkmark"}
+          size={22}
+          color={isStudent ? "#8A63D2" : "#6D5BBF"}
+        />
       </View>
-      <View style={styles.convInfo}>
-        <Text style={styles.convName}>{item.fullName}</Text>
-        <Text style={styles.convLastMsg} numberOfLines={1}>
-          {[item.department, item.yearLevel].filter(Boolean).join(" · ") ||
-            "Student"}
+      <View style={styles.userInfo}>
+        <Text style={styles.userName} numberOfLines={1}>
+          {item.fullName}
+        </Text>
+        <Text style={styles.userRole} numberOfLines={1}>
+          {item.department || (isStudent ? "Student" : "Counselor")}
+          {item.yearLevel ? ` \u00B7 ${item.yearLevel}` : ""}
         </Text>
       </View>
       <Ionicons name="chatbubble-outline" size={18} color="#8A63D2" />
@@ -407,8 +333,8 @@ export default function AdminMessagesScreen() {
       <Pressable
         onLongPress={() => {
           if (!isDeleted) {
-            setMsgCtxMsg(item);
-            setMsgCtxVisible(true);
+            setContextMsg(item);
+            setContextVisible(true);
           }
         }}
         delayLongPress={400}
@@ -432,19 +358,26 @@ export default function AdminMessagesScreen() {
                 color={isMine ? "rgba(255,255,255,0.5)" : "#94A3B8"}
               />
               <Text
-                style={[styles.deletedText, isMine && styles.deletedTextMine]}
+                style={[
+                  styles.deletedText,
+                  isMine && styles.deletedTextMine,
+                ]}
               >
                 This message was deleted
               </Text>
             </View>
           ) : (
-            <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>
+            <Text
+              style={[styles.bubbleText, isMine && styles.bubbleTextMine]}
+            >
               {item.text}
             </Text>
           )}
 
           <View style={styles.bubbleFooter}>
-            <Text style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}>
+            <Text
+              style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}
+            >
               {formatTime(item.createdAt)}
             </Text>
             {isFailed && (
@@ -462,6 +395,10 @@ export default function AdminMessagesScreen() {
     );
   };
 
+  // ─── Directory tabs ──────────────────────────────────────────────────────
+  const currentList =
+    directoryTab === "students" ? filteredStudents : filteredAdmins;
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -476,250 +413,165 @@ export default function AdminMessagesScreen() {
           end={{ x: 1, y: 1 }}
         >
           <View style={styles.header}>
-            <Pressable
-              style={styles.backBtn}
-              onPress={() => {
-                if (viewMode === "chat") {
-                  setViewMode("inbox");
-                  setActiveConversation(null);
-                  setMessages([]);
-                  setOptimistic([]);
-                } else if (viewMode === "search") {
-                  setViewMode("inbox");
-                  setSearchQuery("");
-                } else if (inboxSearchQuery) {
-                  setInboxSearchQuery("");
-                } else {
-                  router.back();
-                }
-              }}
-            >
+            <Pressable style={styles.backBtn} onPress={handleBack}>
               <Ionicons name="arrow-back" size={22} color="white" />
             </Pressable>
-            <Text style={styles.headerTitle}>
-              {viewMode === "chat"
-                ? activeConversation?.type === "peer"
-                  ? getPeerName(activeConversation, user!.uid)
-                  : activeConversation?.studentName || "Chat"
-                : "Messages"}
-            </Text>
-            {viewMode === "chat" && (
-              <View style={styles.headerBadge}>
-                <Ionicons
-                  name={
-                    activeConversation?.type === "peer"
-                      ? "people"
-                      : "shield-checkmark"
-                  }
-                  size={10}
-                  color="white"
-                />
-                <Text style={styles.headerBadgeText}>
-                  {activeConversation?.type === "peer" ? "Peer" : "Student"}
-                </Text>
-              </View>
-            )}
-            {viewMode !== "chat" && <View style={{ width: 40 }} />}
+            <View style={styles.headerCenter}>
+              <Text style={styles.headerTitle}>
+                {viewMode === "chat"
+                  ? chatPartnerName || "Chat"
+                  : "Messages"}
+              </Text>
+              {viewMode === "chat" && (
+                <View style={styles.headerBadge}>
+                  <Ionicons name="chatbubble" size={10} color="white" />
+                  <Text style={styles.headerBadgeText}>Chat</Text>
+                </View>
+              )}
+            </View>
+            <View style={{ width: 40 }} />
           </View>
         </LinearGradient>
 
         {/* Content */}
-        {viewMode === "inbox" ? (
-          loading ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="chatbubbles-outline" size={48} color="#D1D5DB" />
-              <Text style={styles.emptyText}>Loading conversations...</Text>
-            </View>
-          ) : (
-            <>
-              {/* Inbox search bar */}
-              <View style={styles.searchBar}>
-                <Ionicons name="search" size={18} color="#94A3B8" />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Search conversations..."
-                  placeholderTextColor="#94A3B8"
-                  value={inboxSearchQuery}
-                  onChangeText={setInboxSearchQuery}
-                />
-                {inboxSearchQuery.length > 0 && (
-                  <Pressable onPress={() => setInboxSearchQuery("")}>
-                    <Ionicons name="close-circle" size={18} color="#94A3B8" />
-                  </Pressable>
-                )}
-              </View>
-
-              {/* Filter tabs */}
-              <View style={styles.filterTabs}>
-                <Pressable
-                  style={[
-                    styles.filterTab,
-                    filterTab === "student" && styles.filterTabActive,
-                  ]}
-                  onPress={() => setFilterTab("student")}
-                >
-                  <Ionicons
-                    name="person"
-                    size={16}
-                    color={filterTab === "student" ? "#8A63D2" : "#94A3B8"}
-                  />
-                  <Text
-                    style={[
-                      styles.filterTabText,
-                      filterTab === "student" && styles.filterTabTextActive,
-                    ]}
-                  >
-                    Students ({filteredConversations.length})
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.filterTab,
-                    filterTab === "peer" && styles.filterTabActive,
-                  ]}
-                  onPress={() => setFilterTab("peer")}
-                >
-                  <Ionicons
-                    name="people"
-                    size={16}
-                    color={filterTab === "peer" ? "#8A63D2" : "#94A3B8"}
-                  />
-                  <Text
-                    style={[
-                      styles.filterTabText,
-                      filterTab === "peer" && styles.filterTabTextActive,
-                    ]}
-                  >
-                    Peer Chats ({filteredPeerConversations.length})
-                  </Text>
-                </Pressable>
-                {/* Search button */}
-                <Pressable
-                  style={[styles.filterTab, { marginLeft: "auto" }]}
-                  onPress={openSearch}
-                >
-                  <Ionicons name="search" size={16} color="#8A63D2" />
-                  <Text
-                    style={[
-                      styles.filterTabText,
-                      { color: "#8A63D2", fontWeight: "600" },
-                    ]}
-                  >
-                    Find
-                  </Text>
-                </Pressable>
-              </View>
-
-              {filterTab === "student" ? (
-                conversations.length === 0 ? (
-                  <View style={styles.emptyState}>
-                    <Ionicons
-                      name="chatbubbles-outline"
-                      size={48}
-                      color="#D1D5DB"
-                    />
-                    <Text style={styles.emptyTitle}>No conversations yet</Text>
-                    <Text style={styles.emptyText}>
-                      When students message you, their conversations will appear
-                      here. Tap "Find" to search for a student to message.
-                    </Text>
-                  </View>
-                ) : filteredConversations.length === 0 ? (
-                  <View style={styles.emptyState}>
-                    <Ionicons name="search-outline" size={48} color="#D1D5DB" />
-                    <Text style={styles.emptyTitle}>No matches</Text>
-                    <Text style={styles.emptyText}>
-                      No conversations match "{inboxSearchQuery}".
-                    </Text>
-                  </View>
-                ) : (
-                  <FlatList
-                    data={filteredConversations}
-                    keyExtractor={(item) => item.id}
-                    renderItem={renderConversation}
-                    contentContainerStyle={styles.convList}
-                    showsVerticalScrollIndicator={false}
-                  />
-                )
-              ) : peerConversations.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Ionicons name="people-outline" size={48} color="#D1D5DB" />
-                  <Text style={styles.emptyTitle}>No peer chats yet</Text>
-                  <Text style={styles.emptyText}>
-                    Student-to-student conversations will appear here for
-                    moderation.
-                  </Text>
-                </View>
-              ) : filteredPeerConversations.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Ionicons name="search-outline" size={48} color="#D1D5DB" />
-                  <Text style={styles.emptyTitle}>No matches</Text>
-                  <Text style={styles.emptyText}>
-                    No peer chats match "{inboxSearchQuery}".
-                  </Text>
-                </View>
-              ) : (
-                <FlatList
-                  data={filteredPeerConversations}
-                  keyExtractor={(item) => item.id}
-                  renderItem={renderConversation}
-                  contentContainerStyle={styles.convList}
-                  showsVerticalScrollIndicator={false}
-                />
-              )}
-            </>
-          )
-        ) : viewMode === "search" ? (
+        {viewMode === "directory" ? (
           <>
+            {/* Directory filter */}
             <View style={styles.searchBar}>
               <Ionicons name="search" size={18} color="#94A3B8" />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search by name or department..."
                 placeholderTextColor="#94A3B8"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoFocus
+                value={directoryFilter}
+                onChangeText={setDirectoryFilter}
               />
-              {searchQuery.length > 0 && (
-                <Pressable onPress={() => setSearchQuery("")}>
+              {directoryFilter.length > 0 && (
+                <Pressable onPress={() => setDirectoryFilter("")}>
                   <Ionicons name="close-circle" size={18} color="#94A3B8" />
                 </Pressable>
               )}
             </View>
-            {searchLoading ? (
+
+            {/* Tab switch */}
+            <View style={styles.tabBar}>
+              <Pressable
+                style={[
+                  styles.tab,
+                  directoryTab === "students" && styles.tabActive,
+                ]}
+                onPress={() => {
+                  setDirectoryTab("students");
+                  setDirectoryFilter("");
+                }}
+              >
+                <Ionicons
+                  name="people"
+                  size={16}
+                  color={directoryTab === "students" ? "#8A63D2" : "#94A3B8"}
+                />
+                <Text
+                  style={[
+                    styles.tabText,
+                    directoryTab === "students" && styles.tabTextActive,
+                  ]}
+                >
+                  Students
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.tab,
+                  directoryTab === "admins" && styles.tabActive,
+                ]}
+                onPress={() => {
+                  setDirectoryTab("admins");
+                  setDirectoryFilter("");
+                }}
+              >
+                <Ionicons
+                  name="shield-checkmark"
+                  size={16}
+                  color={directoryTab === "admins" ? "#8A63D2" : "#94A3B8"}
+                />
+                <Text
+                  style={[
+                    styles.tabText,
+                    directoryTab === "admins" && styles.tabTextActive,
+                  ]}
+                >
+                  Admins
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* User list */}
+            {directoryLoading ? (
               <View style={styles.emptyState}>
                 <ActivityIndicator size="large" color="#8A63D2" />
-                <Text style={styles.emptyText}>Loading students...</Text>
+                <Text style={styles.emptyText}>Loading users...</Text>
               </View>
-            ) : students.length === 0 ? (
+            ) : currentList.length === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons name="search-outline" size={48} color="#D1D5DB" />
-                <Text style={styles.emptyTitle}>{searchQuery ? "No users found" : "Find a User"}</Text>
+                <Ionicons
+                  name={
+                    directoryTab === "students"
+                      ? "people-outline"
+                      : "shield-checkmark-outline"
+                  }
+                  size={48}
+                  color="#D1D5DB"
+                />
+                <Text style={styles.emptyTitle}>
+                  {directoryFilter
+                    ? "No users found"
+                    : directoryTab === "students"
+                      ? "No students yet"
+                      : "No other admins yet"}
+                </Text>
                 <Text style={styles.emptyText}>
-                  {searchQuery
+                  {directoryFilter
                     ? "Try a different search term."
-                    : "Start typing to search for students or other admins."}
+                    : directoryTab === "students"
+                      ? "Students will appear here once they register."
+                      : "Other counselors will appear here once they join."}
                 </Text>
               </View>
             ) : (
               <FlatList
-                data={students}
+                data={currentList}
                 keyExtractor={(item) => item.uid}
-                renderItem={renderStudent}
-                contentContainerStyle={styles.convList}
+                renderItem={({ item }) => (
+                  <RenderUserCardRow
+                    item={item}
+                    isStudent={directoryTab === "students"}
+                  />
+                )}
+                contentContainerStyle={styles.userList}
                 showsVerticalScrollIndicator={false}
               />
             )}
           </>
         ) : (
+          /* ── Chat View ── */
           <>
-            {allMessages.length === 0 ? (
+            {/* Friendly reminder banner */}
+            <View style={styles.reminderBanner}>
+              <Ionicons name="heart-outline" size={14} color="#6D5BBF" />
+              <Text style={styles.reminderText}>{REMINDER_BANNER}</Text>
+            </View>
+
+            {chatLoading ? (
+              <View style={styles.emptyState}>
+                <ActivityIndicator size="large" color="#8A63D2" />
+                <Text style={styles.emptyText}>Loading conversation...</Text>
+              </View>
+            ) : allMessages.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="chatbubble-outline" size={48} color="#D1D5DB" />
                 <Text style={styles.emptyTitle}>Start the conversation</Text>
                 <Text style={styles.emptyText}>
-                  Send a message to {activeConversation?.studentName}.
+                  Send a message to {chatPartnerName}.
                 </Text>
               </View>
             ) : (
@@ -730,6 +582,7 @@ export default function AdminMessagesScreen() {
                 renderItem={renderMessage}
                 contentContainerStyle={styles.messagesList}
                 showsVerticalScrollIndicator={false}
+                onContentSizeChange={() => scrollToBottom(false)}
               />
             )}
 
@@ -762,7 +615,10 @@ export default function AdminMessagesScreen() {
                 onChangeText={setInputText}
                 multiline
                 maxLength={1000}
-                onFocus={() => setShowEmoji(false)}
+                onFocus={() => {
+                  setShowEmoji(false);
+                  scrollToBottom(true);
+                }}
               />
               <Pressable
                 style={[
@@ -783,25 +639,25 @@ export default function AdminMessagesScreen() {
         )}
       </KeyboardAvoidingView>
 
-      {/* ─── Message Context Menu ───────────────────────────────────── */}
+      {/* ─── Context Menu Modal ─────────────────────────────────────── */}
       <Modal
-        visible={msgCtxVisible}
+        visible={contextVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setMsgCtxVisible(false)}
+        onRequestClose={() => setContextVisible(false)}
       >
         <Pressable
           style={styles.ctxOverlay}
-          onPress={() => setMsgCtxVisible(false)}
+          onPress={() => setContextVisible(false)}
         >
           <View style={styles.ctxMenu}>
             <Text style={styles.ctxTitle}>Message Options</Text>
-            <Pressable style={styles.ctxRow} onPress={handleCopyMsg}>
+            <Pressable style={styles.ctxRow} onPress={handleCopy}>
               <Ionicons name="copy-outline" size={20} color="#8A63D2" />
               <Text style={styles.ctxLabel}>Copy</Text>
             </Pressable>
             <View style={styles.ctxDivider} />
-            <Pressable style={styles.ctxRow} onPress={handleDeleteMsg}>
+            <Pressable style={styles.ctxRow} onPress={handleDelete}>
               <Ionicons name="trash-outline" size={20} color="#EF4444" />
               <Text style={[styles.ctxLabel, { color: "#EF4444" }]}>
                 Delete
@@ -810,31 +666,19 @@ export default function AdminMessagesScreen() {
           </View>
         </Pressable>
       </Modal>
-
-      {/* ─── Conversation Context Menu ──────────────────────────────── */}
-      <Modal
-        visible={convCtxVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setConvCtxVisible(false)}
-      >
-        <Pressable
-          style={styles.ctxOverlay}
-          onPress={() => setConvCtxVisible(false)}
-        >
-          <View style={styles.ctxMenu}>
-            <Text style={styles.ctxTitle}>Conversation Options</Text>
-            <Pressable style={styles.ctxRow} onPress={handleDeleteConv}>
-              <Ionicons name="trash-outline" size={20} color="#EF4444" />
-              <Text style={[styles.ctxLabel, { color: "#EF4444" }]}>
-                Delete Conversation
-              </Text>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Modal>
     </SafeAreaView>
   );
+
+  // Separate component to pass isStudent prop to renderItem
+  function RenderUserCardRow({
+    item,
+    isStudent,
+  }: {
+    item: StudentSearchResult;
+    isStudent: boolean;
+  }) {
+    return renderUserCard({ item, isStudent });
+  }
 }
 
 const styles = StyleSheet.create({
@@ -862,6 +706,10 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "center",
   },
+  headerCenter: {
+    flex: 1,
+    alignItems: "center",
+  },
   headerBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -870,8 +718,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
-    position: "absolute",
-    bottom: 10,
+    marginTop: 3,
     alignSelf: "center",
   },
   headerBadgeText: {
@@ -895,46 +742,112 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Conversation list
-  convList: { paddingVertical: 8 },
-  convRow: {
+  // Search bar
+  searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    gap: 12,
     backgroundColor: "white",
-    marginHorizontal: 16,
-    marginBottom: 2,
+    margin: 16,
+    marginBottom: 8,
     borderRadius: 14,
-    marginTop: 4,
+    paddingHorizontal: 14,
+    height: 46,
+    gap: 8,
     // @ts-ignore
     boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
   },
-  convAvatar: {
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: "#1E1B4B",
+    paddingVertical: 0,
+  },
+
+  // Tabs
+  tabBar: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    gap: 8,
+    marginBottom: 8,
+  },
+  tab: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: "white",
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.1)",
+  },
+  tabActive: {
+    backgroundColor: "#F3EEFF",
+    borderColor: "#8A63D2",
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#94A3B8",
+  },
+  tabTextActive: {
+    color: "#8A63D2",
+    fontWeight: "600",
+  },
+
+  // User list
+  userList: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+  },
+  userCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 8,
+    // @ts-ignore
+    boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
+    gap: 12,
+  },
+  userAvatar: {
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: "#F3EAFF",
     justifyContent: "center",
     alignItems: "center",
   },
-  convInfo: { flex: 1, gap: 2 },
-  convTop: {
+  userAvatarStudent: { backgroundColor: "#F3EEFF" },
+  userAvatarAdmin: { backgroundColor: "#EDE9FE" },
+  userInfo: { flex: 1 },
+  userName: { fontSize: 15, fontWeight: "600", color: "#1E1B4B" },
+  userRole: { fontSize: 13, color: "#64748B", marginTop: 2 },
+
+  // Reminder banner
+  reminderBanner: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: 8,
+    backgroundColor: "#F3EEFF",
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(138, 99, 210, 0.12)",
   },
-  convName: { fontSize: 15, fontWeight: "500", color: "#1E1B4B" },
-  convNameBold: { fontWeight: "700" },
-  convTime: { fontSize: 11, color: "#94A3B8" },
-  convLastMsg: { fontSize: 13, color: "#64748B" },
-  convLastMsgBold: { color: "#1E1B4B", fontWeight: "600" },
-  unreadDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#8A63D2",
+  reminderText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#6D5BBF",
+    lineHeight: 17,
   },
 
   // Messages
@@ -969,7 +882,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(148, 163, 184, 0.2)",
   },
-  bubbleText: { fontSize: 15, color: "#1E1B4B", lineHeight: 20 },
+  bubbleText: {
+    fontSize: 15,
+    color: "#1E1B4B",
+    lineHeight: 20,
+  },
   bubbleTextMine: { color: "white" },
   bubbleFooter: {
     flexDirection: "row",
@@ -979,17 +896,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   bubbleTime: { fontSize: 10, color: "#94A3B8" },
-  bubbleTimeMine: { color: "rgba(255,255,255,0.6)" },
-  deletedRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  deletedText: {
-    fontSize: 13,
-    color: "#94A3B8",
-    fontStyle: "italic",
-  },
+  bubbleTimeMine: { color: "rgba(255,255,255,0.5)" },
+  deletedRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  deletedText: { fontSize: 13, color: "#94A3B8", fontStyle: "italic" },
   deletedTextMine: { color: "rgba(255,255,255,0.5)" },
   retryBtn: {
     flexDirection: "row",
@@ -1050,7 +959,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 18,
     padding: 6,
-    width: 220,
+    width: 200,
     // @ts-ignore
     boxShadow: "0px 8px 24px rgba(0,0,0,0.15)",
   },
@@ -1075,74 +984,5 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: "#F1F5F9",
     marginHorizontal: 14,
-  },
-
-  // Search
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "white",
-    margin: 16,
-    marginBottom: 8,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    height: 46,
-    gap: 8,
-    // @ts-ignore
-    boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: "#1E1B4B",
-    paddingVertical: 0,
-  },
-
-  // Filter tabs
-  filterTabs: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 4,
-    gap: 8,
-  },
-  filterTab: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "white",
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.1)",
-  },
-  filterTabActive: {
-    backgroundColor: "#F3EEFF",
-    borderColor: "#8A63D2",
-  },
-  filterTabText: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#94A3B8",
-  },
-  filterTabTextActive: {
-    color: "#8A63D2",
-    fontWeight: "600",
-  },
-
-  // Peer badge
-  peerBadge: {
-    backgroundColor: "#E9D5FF",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  peerBadgeText: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#8A63D2",
   },
 });

@@ -10,6 +10,7 @@ import "react-native-reanimated";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { AuthProvider } from "@/hooks/AuthContext";
 import { NetworkProvider } from "@/contexts/NetworkContext";
+import "@/hooks/useReminderNotifications";
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();

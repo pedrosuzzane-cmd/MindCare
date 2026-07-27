@@ -64,6 +64,12 @@ export default function PeerMessagesScreen() {
   const [loading, setLoading] = useState(true);
   const flatListRef = useRef<FlatList>(null);
 
+  const scrollToBottom = useCallback((animated = true) => {
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated });
+    }, 50);
+  }, []);
+
   // Context menus
   const [msgCtxVisible, setMsgCtxVisible] = useState(false);
   const [msgCtxMsg, setMsgCtxMsg] = useState<Message | null>(null);
@@ -119,9 +125,7 @@ export default function PeerMessagesScreen() {
       setOptimistic((prev) =>
         prev.filter((o) => !msgs.some((m) => m.id === o.id)),
       );
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: false });
-      }, 100);
+      scrollToBottom(false);
     });
 
     return () => unsub();
@@ -750,6 +754,7 @@ export default function PeerMessagesScreen() {
                 renderItem={renderMessage}
                 contentContainerStyle={styles.messagesList}
                 showsVerticalScrollIndicator={false}
+                onContentSizeChange={() => scrollToBottom(false)}
               />
             )}
 
@@ -790,7 +795,10 @@ export default function PeerMessagesScreen() {
                 onChangeText={setInputText}
                 multiline
                 maxLength={1000}
-                onFocus={() => setShowEmoji(false)}
+                onFocus={() => {
+                  setShowEmoji(false);
+                  scrollToBottom(true);
+                }}
               />
               <Pressable
                 style={[

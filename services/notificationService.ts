@@ -1,22 +1,8 @@
-import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
-// ── Notification Handler (must be set early) ──
-// In Expo Go, some notification features are unavailable.
-if (
-  Platform.OS !== "android" ||
-  !Constants.isDevice ||
-  !Constants.expoConfig?.hostUri
-) {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true, // Required: Show the notification alert
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    }),
-  });
-}
+// Notification handler is set globally in hooks/useReminderNotifications.ts
+// and imported at app root layout. No duplicate handler needed here.
 
 export interface NotificationSchedule {
   identifier: string;

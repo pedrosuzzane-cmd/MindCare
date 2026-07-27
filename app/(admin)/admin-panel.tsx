@@ -3,6 +3,12 @@ import { StudentListModal } from "@/components/admin/StudentListModal";
 import { db } from "@/constants/firebase";
 import { useAuth } from "@/hooks/AuthContext";
 import { listenForAdminDashboardData } from "@/services/adminFirestoreService";
+import {
+  listenForAnnouncements,
+  createAnnouncement,
+  deleteAnnouncement as deleteAnnouncementService,
+} from "@/services/announcementService";
+import type { Announcement, AnnouncementLink } from "@/types/announcement";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -10,6 +16,7 @@ import {
     collection,
     deleteDoc,
     doc,
+    getDoc,
     getDocs,
     setDoc,
     writeBatch,
@@ -152,7 +159,7 @@ export default function AdminPanelScreen() {
     [],
   );
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState<"students" | "analytics">(
+  const [activeTab, setActiveTab] = useState<"students" | "analytics" | "announcements">(
     "students",
   );
   const [removingStudent, setRemovingStudent] = useState<string | null>(null);
@@ -173,6 +180,16 @@ export default function AdminPanelScreen() {
   const [isSignOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
+
+  // Announcements
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [announcementTitle, setAnnouncementTitle] = useState("");
+  const [announcementDescription, setAnnouncementDescription] = useState("");
+  const [announcementLinks, setAnnouncementLinks] = useState<AnnouncementLink[]>([]);
+  const [creatingAnnouncement, setCreatingAnnouncement] = useState(false);
+  const [announcementError, setAnnouncementError] = useState<string | null>(null);
+  const [deleteAnnounceId, setDeleteAnnounceId] = useState<string | null>(null);
+
   useEffect(() => {
     // Secure route: Redirect to login if user is null (not logged in)
     if (!user) {
@@ -197,7 +214,13 @@ export default function AdminPanelScreen() {
     return () => {
       unsubData();
     };
-  }, [user]); // Re-run effect if user state changes
+  }, [user]);
+
+  useEffect(() => {
+    const unsub = listenForAnnouncements((data) => setAnnouncements(data));
+    return () => unsub();
+  }, []);
+
   const [creatingAdmin, setCreatingAdmin] = useState(false);
   const [createAdminError, setCreateAdminError] = useState<string | null>(null);
 
@@ -1259,6 +1282,24 @@ export default function AdminPanelScreen() {
                 Department Analytics
               </Text>
             </Pressable>
+            <Pressable
+              style={
+                activeTab === "announcements"
+                  ? [styles.tabButton, styles.tabButtonActive]
+                  : styles.tabButton
+              }
+              onPress={() => setActiveTab("announcements")}
+            >
+              <Text
+                style={
+                  activeTab === "announcements"
+                    ? [styles.tabLabel, styles.tabLabelActive]
+                    : styles.tabLabel
+                }
+              >
+                Announcements
+              </Text>
+            </Pressable>
           </View>
 
           {loading ? (
@@ -1481,6 +1522,160 @@ export default function AdminPanelScreen() {
                         />
                       </Pressable>
                     </View>
+                  )}
+                </>
+              ) : activeTab === "announcements" ? (
+                <>
+                  <View style={styles.lookupCard}>
+                    <View style={styles.lookupHeader}>
+                      <Text style={styles.sectionTitle}>Create Announcement</Text>
+                    </View>
+                    <View style={styles.formGroup}>
+                      <Text style={styles.formLabel}>Title</Text>
+                      <TextInput
+                        style={styles.formInput}
+                        placeholder="Announcement title"
+                        placeholderTextColor="#94A3B8"
+                        value={announcementTitle}
+                        onChangeText={setAnnouncementTitle}
+                      />
+                    </View>
+                    <View style={styles.formGroup}>
+                      <Text style={styles.formLabel}>Description</Text>
+                      <TextInput
+                        style={[styles.formInput, { minHeight: 80, textAlignVertical: "top" as const }]}
+                        placeholder="Write your announcement here..."
+                        placeholderTextColor="#94A3B8"
+                        value={announcementDescription}
+                        onChangeText={setAnnouncementDescription}
+                        multiline
+                        numberOfLines={4}
+                      />
+                    </View>
+                    <View style={styles.formGroup}>
+                      <Text style={styles.formLabel}>Links (optional)</Text>
+                      {announcementLinks.map((link, idx) => (
+                        <View key={idx} style={styles.linkRow}>
+                          <TextInput
+                            style={[styles.formInput, { flex: 1 }]}
+                            placeholder="Link title"
+                            placeholderTextColor="#94A3B8"
+                            value={link.title}
+                            onChangeText={(v) => {
+                              const updated = [...announcementLinks];
+                              updated[idx] = { ...updated[idx], title: v };
+                              setAnnouncementLinks(updated);
+                            }}
+                          />
+                          <TextInput
+                            style={[styles.formInput, { flex: 1 }]}
+                            placeholder="https://..."
+                            placeholderTextColor="#94A3B8"
+                            value={link.url}
+                            onChangeText={(v) => {
+                              const updated = [...announcementLinks];
+                              updated[idx] = { ...updated[idx], url: v };
+                              setAnnouncementLinks(updated);
+                            }}
+                            keyboardType="url"
+                            autoCapitalize="none"
+                          />
+                          <Pressable
+                            style={styles.deleteLinkBtn}
+                            onPress={() => setAnnouncementLinks(announcementLinks.filter((_, i) => i !== idx))}
+                          >
+                            <Ionicons name="close-circle" size={22} color="#EF4444" />
+                          </Pressable>
+                        </View>
+                      ))}
+                      <Pressable
+                        style={styles.addLinkBtn}
+                        onPress={() => setAnnouncementLinks([...announcementLinks, { title: "", url: "" }])}
+                      >
+                        <Ionicons name="add-circle-outline" size={18} color="#8A63D2" />
+                        <Text style={styles.addLinkText}>Add Link</Text>
+                      </Pressable>
+                    </View>
+                    {announcementError && (
+                      <Text style={styles.errorText}>{announcementError}</Text>
+                    )}
+                    <Pressable
+                      style={[styles.postButton, creatingAnnouncement && { opacity: 0.7 }]}
+                      onPress={async () => {
+                        if (!announcementTitle.trim() || !announcementDescription.trim()) {
+                          setAnnouncementError("Title and description are required.");
+                          return;
+                        }
+                        const validLinks = announcementLinks.filter(l => l.title.trim() && l.url.trim());
+                        setCreatingAnnouncement(true);
+                        setAnnouncementError(null);
+                        try {
+                          const adminDoc = await getDoc(doc(db, "admins", user!.uid));
+                          const adminData = adminDoc.data();
+                          await createAnnouncement({
+                            title: announcementTitle.trim(),
+                            description: announcementDescription.trim(),
+                            links: validLinks,
+                            authorName: user!.displayName || adminData?.displayName || "Admin",
+                            adminId: user!.uid,
+                            authorPosition: adminData?.position || undefined,
+                          });
+                          setAnnouncementTitle("");
+                          setAnnouncementDescription("");
+                          setAnnouncementLinks([]);
+                          Alert.alert("Success", "Announcement posted.");
+                        } catch (err) {
+                          setAnnouncementError(err instanceof Error ? err.message : "Failed to post.");
+                        } finally {
+                          setCreatingAnnouncement(false);
+                        }
+                      }}
+                      disabled={creatingAnnouncement}
+                    >
+                      {creatingAnnouncement ? (
+                        <ActivityIndicator color="white" />
+                      ) : (
+                        <Text style={styles.postButtonText}>Post Announcement</Text>
+                      )}
+                    </Pressable>
+                  </View>
+
+                  <Text style={styles.sectionHeader}>All Announcements</Text>
+                  {announcements.length === 0 ? (
+                    <View style={styles.stateCard}>
+                      <Ionicons name="megaphone-outline" size={40} color="#D1D5DB" />
+                      <Text style={styles.stateText}>No announcements yet.</Text>
+                    </View>
+                  ) : (
+                    announcements.map((a) => (
+                      <View key={a.id} style={styles.announcementCard}>
+                        <View style={styles.announcementCardHeader}>
+                          <Ionicons name="megaphone" size={18} color="#8A63D2" />
+                          <Text style={styles.announcementCardTitle}>{a.title}</Text>
+                        </View>
+                        <Text style={styles.announcementCardBody}>{a.description}</Text>
+                        {a.links.length > 0 && (
+                          <View style={styles.announcementLinksWrap}>
+                            {a.links.map((link, idx) => (
+                              <Text key={idx} style={styles.announcementLinkItem}>
+                                {link.title}: {link.url}
+                              </Text>
+                            ))}
+                          </View>
+                        )}
+                        <View style={styles.announcementCardFooter}>
+                          <Text style={styles.announcementCardMeta}>
+                            {a.authorName}{a.authorPosition ? `, ${a.authorPosition}` : ""} · {a.createdAt.toLocaleDateString()}
+                          </Text>
+                          <Pressable
+                            style={styles.deleteAnnouncementBtn}
+                            onPress={() => setDeleteAnnounceId(a.id)}
+                          >
+                            <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                          </Pressable>
+                        </View>
+                      </View>
+                    ))
                   )}
                 </>
               ) : (
@@ -1916,6 +2111,46 @@ export default function AdminPanelScreen() {
             </View>
           </View>
         </Modal>
+
+        {/* Delete Announcement Confirmation Modal */}
+        <Modal
+          visible={deleteAnnounceId !== null}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setDeleteAnnounceId(null)}
+        >
+          <View style={styles.confirmOverlay}>
+            <View style={styles.confirmContainer}>
+              <Ionicons name="warning-outline" size={48} color="#EF4444" />
+              <Text style={styles.confirmTitle}>Delete Announcement</Text>
+              <Text style={styles.confirmText}>
+                Are you sure you want to delete this announcement? This action cannot be undone.
+              </Text>
+              <View style={styles.confirmActions}>
+                <Pressable
+                  style={styles.confirmCancelButton}
+                  onPress={() => setDeleteAnnounceId(null)}
+                >
+                  <Text style={styles.confirmCancelText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.confirmDeleteButton}
+                  onPress={async () => {
+                    if (!deleteAnnounceId) return;
+                    try {
+                      await deleteAnnouncementService(deleteAnnounceId);
+                      setDeleteAnnounceId(null);
+                    } catch {
+                      Alert.alert("Error", "Failed to delete announcement.");
+                    }
+                  }}
+                >
+                  <Text style={styles.confirmDeleteText}>Delete</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -1957,6 +2192,7 @@ const styles = StyleSheet.create({
     padding: 22,
     marginBottom: 24,
     overflow: "hidden",
+    // @ts-ignore - web only
     boxShadow: "0px 12px 28px rgba(91, 33, 182, 0.28)",
     elevation: 8,
   },
@@ -2858,4 +3094,56 @@ const styles = StyleSheet.create({
     minWidth: 100,
     textAlign: "center",
   },
+  linkRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8,
+    alignItems: "center",
+  },
+  deleteLinkBtn: { padding: 4 },
+  addLinkBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  addLinkText: { color: "#8A63D2", fontWeight: "600", fontSize: 13 },
+  postButton: {
+    backgroundColor: "#8A63D2",
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 12,
+  },
+  postButtonText: { color: "white", fontWeight: "700", fontSize: 15 },
+  announcementCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#F3EAFF",
+    // @ts-ignore - web only
+    boxShadow: "0px 6px 20px rgba(138, 99, 210, 0.08)",
+  },
+  announcementCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  announcementCardTitle: { fontSize: 16, fontWeight: "800", color: "#0F172A", flex: 1 },
+  announcementCardBody: { fontSize: 14, color: "#475569", lineHeight: 22, marginBottom: 12 },
+  announcementLinksWrap: { gap: 4, marginBottom: 12 },
+  announcementLinkItem: { fontSize: 12, color: "#8A63D2", fontWeight: "600" },
+  announcementCardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: "#F3EAFF",
+    paddingTop: 12,
+  },
+  announcementCardMeta: { fontSize: 12, color: "#94A3B8", fontWeight: "600", flex: 1 },
+  deleteAnnouncementBtn: { padding: 8, borderRadius: 10, backgroundColor: "#FEF2F2" },
 });

@@ -403,10 +403,11 @@ export async function refreshPeerConversationNames(
 }
 
 /**
- * Searches for users (students and/or admins) to start a conversation with.
- * Uses a 'keywords' field for prefix search.
+ * Searches for users (students and/or admins) by name or department.
+ * Fetches all documents from the relevant collection(s) and filters
+ * client-side with case-insensitive substring matching.
  * @param searchIn - "all" searches both collections, "users" only students, "admins" only admins.
- * Returns an empty array on failure.
+ * Returns an empty array if the query is empty or on failure.
  */
 export async function searchUsers(
   currentUserId: string,
@@ -414,56 +415,81 @@ export async function searchUsers(
   queryText: string,
   searchIn: "all" | "users" | "admins" = "all",
 ): Promise<StudentSearchResult[]> {
-  const results: StudentSearchResult[] = [];
   const searchText = queryText.toLowerCase().trim();
-
   if (!searchText) {
     return [];
   }
 
   try {
-    if (searchIn === "all" || searchIn === "users") {
-      const usersRef = collection(db, "users");
-      const userQuery = query(
-        usersRef,
-        where("keywords", "array-contains", searchText),
-      );
-      const userDocs = await getDocs(userQuery);
+    const results: StudentSearchResult[] = [];
 
-      userDocs.docs.forEach((doc) => {
-        if (doc.id === currentUserId) return;
-        const data = doc.data();
-        results.push({
-          uid: doc.id,
-          fullName: data.fullName || data.displayName || "Student",
-          department: data.department || undefined,
-          yearLevel: data.yearLevel || undefined,
-        });
-      });
+    if (searchIn === "all" || searchIn === "users") {
+      const userDocs = await getDocs(collection(db, "users"));
+      for (const d of userDocs.docs) {
+        if (d.id === currentUserId) continue;
+        const data = d.data();
+        const name = (data.fullName || data.displayName || "").toLowerCase();
+        const dept = (data.department || "").toLowerCase();
+        if (name.includes(searchText) || dept.includes(searchText)) {
+          results.push({
+            uid: d.id,
+            fullName: data.fullName || data.displayName || "Student",
+            department: data.department || undefined,
+            yearLevel: data.yearLevel || undefined,
+          });
+        }
+      }
     }
 
     if (searchIn === "all" || searchIn === "admins") {
-      const adminsRef = collection(db, "admins");
-      const adminQuery = query(
-        adminsRef,
-        where("keywords", "array-contains", searchText),
-      );
-      const adminDocs = await getDocs(adminQuery);
-
-      adminDocs.forEach((doc) => {
-        if (doc.id === currentUserId) return;
-        const data = doc.data();
-        results.push({
-          uid: doc.id,
-          fullName: data.fullName || data.displayName || "Admin",
-          department: data.position || "Administrator",
-        });
-      });
+      const adminDocs = await getDocs(collection(db, "admins"));
+      for (const d of adminDocs.docs) {
+        if (d.id === currentUserId) continue;
+        const data = d.data();
+        const name = (data.fullName || data.displayName || "").toLowerCase();
+        const dept = (data.position || data.department || "").toLowerCase();
+        if (name.includes(searchText) || dept.includes(searchText)) {
+          results.push({
+            uid: d.id,
+            fullName: data.fullName || data.displayName || "Admin",
+            department: data.position || data.department || "Administrator",
+          });
+        }
+      }
     }
 
     return results.sort((a, b) => a.fullName.localeCompare(b.fullName));
   } catch (error) {
     console.error("searchUsers error:", error);
+    return [];
+  }
+}
+
+/**
+ * Fetches all users from a Firestore collection (users or admins).
+ * Used by the tabbed directory to render the full user list without requiring a search query.
+ * Filters out the currently logged-in user.
+ */
+export async function fetchAllUsers(
+  currentUserId: string,
+  collectionName: "users" | "admins",
+): Promise<StudentSearchResult[]> {
+  try {
+    const snapshot = await getDocs(collection(db, collectionName));
+    const results: StudentSearchResult[] = [];
+    for (const d of snapshot.docs) {
+      if (d.id === currentUserId) continue;
+      const data = d.data();
+      results.push({
+        uid: d.id,
+        fullName: data.fullName || data.displayName || (collectionName === "admins" ? "Admin" : "Student"),
+        department: data.department || data.position || undefined,
+        yearLevel: data.yearLevel || undefined,
+      });
+    }
+    return results.sort((a, b) => a.fullName.localeCompare(b.fullName));
+  } catch (error) {
+    console.error("fetchAllUsers error:", error);
     return [];
   }
 }

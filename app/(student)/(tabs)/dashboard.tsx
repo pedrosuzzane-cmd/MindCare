@@ -2,10 +2,12 @@ import { useAuth } from "@/hooks/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Href, Redirect, router } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -17,6 +19,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { handleSignOut } from "@/services/authService";
 import GeminiChat from "@/components/GeminiChat";
+import {
+  listenForAnnouncements,
+  markAnnouncementAsRead,
+  getUnreadCount,
+} from "@/services/announcementService";
+import type { Announcement } from "@/types/announcement";
 
 const FEATURES = [
   {
@@ -63,10 +71,48 @@ const FEATURES = [
   },
 ] as const;
 
+const formatAnnouncementDate = (date: Date) => {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHrs = Math.floor(diffMins / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  const diffDays = Math.floor(diffHrs / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+};
+
 export default function DashboardScreen() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const { user, role } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
+
+  // Announcements state
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [announcementModalVisible, setAnnouncementModalVisible] = useState(false);
+
+  // Announcements listener
+  useEffect(() => {
+    if (!user) return;
+    const unsub = listenForAnnouncements((data) => {
+      setAnnouncements(data);
+      getUnreadCount(user.uid, data).then(setUnreadCount);
+    });
+    return () => unsub();
+  }, [user]);
+
+  // Mark all as read when modal opens
+  useEffect(() => {
+    if (announcementModalVisible && user) {
+      announcements.forEach((a) => {
+        markAnnouncementAsRead(a.id, user.uid);
+      });
+      setUnreadCount(0);
+    }
+  }, [announcementModalVisible]);
 
   // Automatically adjust columns based on screen width
   const { width } = useWindowDimensions();
@@ -162,20 +208,25 @@ export default function DashboardScreen() {
             <View style={styles.rightButtons}>
               <Pressable
                 style={styles.profileButton}
-                onPress={() => router.push("/(student)/peer-messages")}
+                onPress={() => setAnnouncementModalVisible(true)}
               >
-                <Ionicons
-                  name="people-outline"
-                  size={24}
-                  color="white"
-                />
+                <View>
+                  <Ionicons name="megaphone-outline" size={24} color="white" />
+                  {unreadCount > 0 && (
+                    <View style={styles.badgeContainer}>
+                      <Text style={styles.badgeText}>
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </Pressable>
               <Pressable
                 style={styles.profileButton}
                 onPress={() => router.push("/(student)/messages")}
               >
                 <Ionicons
-                  name="shield-outline"
+                  name="chatbubble-ellipses-outline"
                   size={24}
                   color="white"
                 />
@@ -274,6 +325,75 @@ export default function DashboardScreen() {
 
         {/* Floating AI Chat Bubble */}
         <GeminiChat />
+
+        {/* Announcement Modal */}
+        <Modal
+          visible={announcementModalVisible}
+          animationType="slide"
+          onRequestClose={() => setAnnouncementModalVisible(false)}
+        >
+          <SafeAreaView style={styles.announcementModalRoot}>
+            <LinearGradient
+              colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <View style={styles.announcementModalHeader}>
+                <Pressable onPress={() => setAnnouncementModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="white" />
+                </Pressable>
+                <Text style={styles.announcementModalTitle}>Announcements</Text>
+                <View style={{ width: 24 }} />
+              </View>
+            </LinearGradient>
+
+            <ScrollView
+              contentContainerStyle={styles.announcementList}
+              showsVerticalScrollIndicator={false}
+            >
+              {announcements.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="megaphone-outline" size={48} color="#D1D5DB" />
+                  <Text style={styles.emptyStateText}>No announcements yet</Text>
+                </View>
+              ) : (
+                announcements.map((announcement) => (
+                  <View key={announcement.id} style={styles.announcementCard}>
+                    <Text style={styles.announcementCardTitle}>
+                      {announcement.title}
+                    </Text>
+                    <Text style={styles.announcementCardBody}>
+                      {announcement.description}
+                    </Text>
+                    {announcement.links.length > 0 && (
+                      <View style={styles.announcementLinksContainer}>
+                        {announcement.links.map((link, idx) => (
+                          <Pressable
+                            key={idx}
+                            onPress={() => Linking.openURL(link.url)}
+                          >
+                            <Text style={styles.announcementLinkText}>
+                              {link.title}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    )}
+                    <Text style={styles.announcementCardMeta}>
+                      Posted by {announcement.authorName}
+                      {announcement.authorPosition
+                        ? `, ${announcement.authorPosition}`
+                        : ""}
+                    </Text>
+                    <Text style={styles.announcementCardDate}>
+                      {formatAnnouncementDate(announcement.createdAt)}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
       </LinearGradient>
     </SafeAreaView>
   );
@@ -470,4 +590,96 @@ const styles = StyleSheet.create({
   logoutButton: { backgroundColor: "#EF4444", borderRadius: 14 },
   cancelText: { color: "#4B5563", fontWeight: "600" },
   logoutText: { color: "white", fontWeight: "600" },
+  // ─── Badge ─────────────────────────────────────────────────────────
+  badgeContainer: {
+    position: "absolute",
+    top: -4,
+    right: -8,
+    backgroundColor: "#EF4444",
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  // ─── Announcement Modal ────────────────────────────────────────────
+  announcementModalRoot: {
+    flex: 1,
+    backgroundColor: "#F4F2F8",
+  },
+  announcementModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 14,
+  },
+  announcementModalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "white",
+  },
+  announcementList: {
+    padding: 20,
+    gap: 16,
+  },
+  announcementCard: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 18,
+    // @ts-ignore — web-only shadow property
+    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.10)",
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.08)",
+  },
+  announcementCardTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1E1B4B",
+    marginBottom: 8,
+  },
+  announcementCardBody: {
+    fontSize: 14,
+    color: "#4B5563",
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  announcementLinksContainer: {
+    gap: 6,
+    marginBottom: 12,
+  },
+  announcementLinkText: {
+    fontSize: 13,
+    color: "#8A63D2",
+    fontWeight: "600",
+    textDecorationLine: "underline",
+  },
+  announcementCardMeta: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    marginBottom: 2,
+  },
+  announcementCardDate: {
+    fontSize: 11,
+    color: "#D1D5DB",
+  },
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+    gap: 12,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: "#9CA3AF",
+    fontWeight: "500",
+  },
 });
