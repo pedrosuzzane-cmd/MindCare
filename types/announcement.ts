@@ -9,6 +9,7 @@ export interface Announcement {
   description: string;
   links: AnnouncementLink[];
   createdAt: Date;
+  expiresAt: Date;
   authorName: string;
   adminId: string;
   authorPosition?: string;

@@ -23,7 +23,10 @@ import {
   listenForAnnouncements,
   markAnnouncementAsRead,
   getUnreadCount,
+  formatAnnouncementDateTime,
+  getDaysRemaining,
 } from "@/services/announcementService";
+import { listenForConversations } from "@/services/messagingService";
 import type { Announcement } from "@/types/announcement";
 
 const FEATURES = [
@@ -69,20 +72,7 @@ const FEATURES = [
     color: "#E91E63",
     route: "/support-hotlines",
   },
-] as const;
-
-const formatAnnouncementDate = (date: Date) => {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHrs = Math.floor(diffMins / 60);
-  if (diffHrs < 24) return `${diffHrs}h ago`;
-  const diffDays = Math.floor(diffHrs / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
-};
+ ] as const;
 
 export default function DashboardScreen() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -94,6 +84,9 @@ export default function DashboardScreen() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [announcementModalVisible, setAnnouncementModalVisible] = useState(false);
 
+  // Unread message count
+  const [unreadMessages, setUnreadMessages] = useState(0);
+
   // Announcements listener
   useEffect(() => {
     if (!user) return;
@@ -103,6 +96,16 @@ export default function DashboardScreen() {
     });
     return () => unsub();
   }, [user]);
+
+  // Unread messages listener
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsub = listenForConversations(user.uid, "student", (convs) => {
+      const unread = convs.filter((c) => c.unreadBy?.includes(user.uid)).length;
+      setUnreadMessages(unread);
+    });
+    return () => unsub();
+  }, [user?.uid]);
 
   // Mark all as read when modal opens
   useEffect(() => {
@@ -225,11 +228,20 @@ export default function DashboardScreen() {
                 style={styles.profileButton}
                 onPress={() => router.push("/(student)/messages")}
               >
-                <Ionicons
-                  name="chatbubble-ellipses-outline"
-                  size={24}
-                  color="white"
-                />
+                <View>
+                  <Ionicons
+                    name="chatbubble-ellipses-outline"
+                    size={24}
+                    color="white"
+                  />
+                  {unreadMessages > 0 && (
+                    <View style={styles.badgeContainer}>
+                      <Text style={styles.badgeText}>
+                        {unreadMessages > 9 ? "9+" : unreadMessages}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </Pressable>
               <Pressable
                 style={styles.profileButton}
@@ -386,8 +398,13 @@ export default function DashboardScreen() {
                         : ""}
                     </Text>
                     <Text style={styles.announcementCardDate}>
-                      {formatAnnouncementDate(announcement.createdAt)}
+                      {formatAnnouncementDateTime(announcement.createdAt)}
                     </Text>
+                    <View style={styles.announcementExpiry}>
+                      <Text style={styles.announcementExpiryText}>
+                        Expires in {getDaysRemaining(announcement.expiresAt)} days
+                      </Text>
+                    </View>
                   </View>
                 ))
               )}
@@ -670,6 +687,19 @@ const styles = StyleSheet.create({
   announcementCardDate: {
     fontSize: 11,
     color: "#D1D5DB",
+  },
+  announcementExpiry: {
+    marginTop: 6,
+    alignSelf: "flex-start",
+    backgroundColor: "#F3EEFF",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  announcementExpiryText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#8A63D2",
   },
   emptyState: {
     alignItems: "center",

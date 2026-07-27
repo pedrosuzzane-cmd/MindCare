@@ -7,6 +7,9 @@ import {
   listenForAnnouncements,
   createAnnouncement,
   deleteAnnouncement as deleteAnnouncementService,
+  cleanupExpiredAnnouncements,
+  formatAnnouncementDateTime,
+  getDaysRemaining,
 } from "@/services/announcementService";
 import type { Announcement, AnnouncementLink } from "@/types/announcement";
 import { Ionicons } from "@expo/vector-icons";
@@ -218,6 +221,10 @@ export default function AdminPanelScreen() {
 
   useEffect(() => {
     const unsub = listenForAnnouncements((data) => setAnnouncements(data));
+    // Clean up expired announcements in the background
+    cleanupExpiredAnnouncements().then((count) => {
+      if (count > 0) console.log(`Cleaned up ${count} expired announcements`);
+    });
     return () => unsub();
   }, []);
 
@@ -1664,9 +1671,20 @@ export default function AdminPanelScreen() {
                           </View>
                         )}
                         <View style={styles.announcementCardFooter}>
-                          <Text style={styles.announcementCardMeta}>
-                            {a.authorName}{a.authorPosition ? `, ${a.authorPosition}` : ""} · {a.createdAt.toLocaleDateString()}
-                          </Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.announcementCardMeta}>
+                              {a.authorName}{a.authorPosition ? `, ${a.authorPosition}` : ""}
+                            </Text>
+                            <Text style={styles.announcementCardDate}>
+                              {formatAnnouncementDateTime(a.createdAt)}
+                            </Text>
+                          </View>
+                          <View style={styles.expiryBadge}>
+                            <Ionicons name="time-outline" size={12} color="#8A63D2" />
+                            <Text style={styles.expiryText}>
+                              {getDaysRemaining(a.expiresAt)}d left
+                            </Text>
+                          </View>
                           <Pressable
                             style={styles.deleteAnnouncementBtn}
                             onPress={() => setDeleteAnnounceId(a.id)}
@@ -3145,5 +3163,17 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   announcementCardMeta: { fontSize: 12, color: "#94A3B8", fontWeight: "600", flex: 1 },
+  announcementCardDate: { fontSize: 11, color: "#CBD5E1", marginTop: 2 },
+  expiryBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#F3EEFF",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  expiryText: { fontSize: 11, fontWeight: "600", color: "#8A63D2" },
   deleteAnnouncementBtn: { padding: 8, borderRadius: 10, backgroundColor: "#FEF2F2" },
 });

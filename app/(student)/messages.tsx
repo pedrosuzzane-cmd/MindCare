@@ -11,8 +11,10 @@ import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Clipboard,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -23,6 +25,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import EmojiPicker from "@/components/chat/EmojiPicker";
 
@@ -35,7 +38,14 @@ import {
   listenForMessages,
   markAsRead,
   sendMessage as sendMsg,
+  startTyping,
+  listenForTyping,
 } from "@/services/messagingService";
+import {
+  setUserOnline,
+  setUserOffline,
+  listenForPresence,
+} from "@/services/presenceService";
 import type {
   Conversation,
   Message,
@@ -51,6 +61,7 @@ const REMINDER_BANNER =
 
 export default function StudentMessagesScreen() {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   // ── View state ──
   const [viewMode, setViewMode] = useState<ViewMode>("directory");
@@ -83,6 +94,12 @@ export default function StudentMessagesScreen() {
   const [contextVisible, setContextVisible] = useState(false);
   const [contextMsg, setContextMsg] = useState<Message | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
+
+  // ── Presence state ──
+  const [partnerOnline, setPartnerOnline] = useState(false);
+
+  // ── Typing state ──
+  const [partnerTyping, setPartnerTyping] = useState(false);
 
   // ── Merge Firestore messages with optimistic ones ──
   const allMessages: OptimisticMessage[] = [
@@ -149,6 +166,39 @@ export default function StudentMessagesScreen() {
     return () => unsub();
   }, [activeConversation?.id, user?.uid]);
 
+  // ── Set self as online on mount, offline on unmount ──
+  useEffect(() => {
+    if (!user?.uid) return;
+    setUserOnline(user.uid);
+    return () => {
+      setUserOffline(user.uid);
+    };
+  }, [user?.uid]);
+
+  // ── Listen for partner presence ──
+  useEffect(() => {
+    if (!activeConversation?.participants || !user?.uid) return;
+    const otherUid = activeConversation.participants.find(
+      (uid) => uid !== user.uid,
+    );
+    if (!otherUid) return;
+
+    const unsub = listenForPresence(otherUid, (online) => {
+      setPartnerOnline(online);
+    });
+    return () => unsub();
+  }, [activeConversation?.id, activeConversation?.participants, user?.uid]);
+
+  // ── Listen for partner typing ──
+  useEffect(() => {
+    if (!activeConversation?.id || !user?.uid) return;
+
+    const unsub = listenForTyping(activeConversation.id, user.uid, (typing) => {
+      setPartnerTyping(typing);
+    });
+    return () => unsub();
+  }, [activeConversation?.id, user?.uid]);
+
   // ── Open a chat from directory card tap ──
   const startChat = async (item: StudentSearchResult, isPeer: boolean) => {
     try {
@@ -201,6 +251,10 @@ export default function StudentMessagesScreen() {
       setViewMode("chat");
     } catch (err) {
       console.error("Failed to start conversation:", err);
+      Alert.alert(
+        "Could not start chat",
+        "Something went wrong opening this conversation. Please try again.",
+      );
     }
   };
 
@@ -575,6 +629,14 @@ export default function StudentMessagesScreen() {
         />
       )}
 
+      {/* Typing indicator */}
+      {partnerTyping && (
+        <View style={styles.typingIndicator}>
+          <Text style={styles.typingText}>{chatPartnerName} is typing</Text>
+          <ActivityIndicator size="small" color="#8A63D2" style={{ marginLeft: 6 }} />
+        </View>
+      )}
+
       {/* Emoji Picker */}
       {showEmoji && (
         <EmojiPicker
@@ -585,10 +647,13 @@ export default function StudentMessagesScreen() {
       )}
 
       {/* Input */}
-      <View style={styles.inputBar}>
+      <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
         <Pressable
           style={styles.emojiBtn}
-          onPress={() => setShowEmoji((v) => !v)}
+          onPress={() => {
+            Keyboard.dismiss();
+            setShowEmoji((v) => !v);
+          }}
         >
           <Ionicons
             name={showEmoji ? "keyboard" : ("happy-outline" as any)}
@@ -601,7 +666,14 @@ export default function StudentMessagesScreen() {
           placeholder="Type a message..."
           placeholderTextColor="#94A3B8"
           value={inputText}
-          onChangeText={setInputText}
+          onChangeText={(text) => {
+            setInputText(text);
+            if (activeConversation?.id && user?.uid) {
+              if (text.trim()) {
+                startTyping(activeConversation.id, user.uid);
+              }
+            }
+          }}
           multiline
           maxLength={1000}
           onFocus={() => {
@@ -631,7 +703,7 @@ export default function StudentMessagesScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
         {/* Header */}
@@ -651,9 +723,22 @@ export default function StudentMessagesScreen() {
                   : "Messages"}
               </Text>
               {viewMode === "chat" && (
-                <View style={styles.headerBadge}>
-                  <Ionicons name="chatbubble" size={10} color="white" />
-                  <Text style={styles.headerBadgeText}>Chat</Text>
+                <View style={styles.headerMeta}>
+                  <View style={styles.headerBadge}>
+                    <Ionicons name="chatbubble" size={10} color="white" />
+                    <Text style={styles.headerBadgeText}>Chat</Text>
+                  </View>
+                  <View style={styles.onlineIndicator}>
+                    <View
+                      style={[
+                        styles.onlineDot,
+                        partnerOnline ? styles.onlineDotActive : styles.onlineDotInactive,
+                      ]}
+                    />
+                    <Text style={styles.onlineText}>
+                      {partnerOnline ? "Online" : "Offline"}
+                    </Text>
+                  </View>
                 </View>
               )}
             </View>
@@ -738,13 +823,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
-    marginTop: 3,
     alignSelf: "center",
   },
   headerBadgeText: {
     fontSize: 10,
     fontWeight: "600",
     color: "white",
+  },
+  headerMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 3,
+    alignSelf: "center",
+  },
+  onlineIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  onlineDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  onlineDotActive: {
+    backgroundColor: "#4ADE80",
+  },
+  onlineDotInactive: {
+    backgroundColor: "rgba(255,255,255,0.4)",
+  },
+  onlineText: {
+    fontSize: 10,
+    fontWeight: "500",
+    color: "rgba(255,255,255,0.75)",
   },
 
   // Empty state
@@ -930,6 +1042,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryText: { fontSize: 11, color: "#EF4444", fontWeight: "600" },
+
+  // Typing indicator
+  typingIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 6,
+    backgroundColor: "#F8F5FF",
+  },
+  typingText: {
+    fontSize: 12,
+    color: "#8A63D2",
+    fontStyle: "italic",
+  },
 
   // Input
   inputBar: {

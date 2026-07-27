@@ -151,8 +151,8 @@ export default function EmojiPicker({ onSelect }: EmojiPickerProps) {
         data={category.emojis}
         keyExtractor={(item, idx) => `${item}_${idx}`}
         numColumns={8}
-        scrollEnabled={false}
         contentContainerStyle={styles.grid}
+        showsVerticalScrollIndicator={true}
         renderItem={({ item }) => (
           <Pressable
             style={styles.emojiCell}
@@ -171,6 +171,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderTopWidth: 1,
     borderTopColor: "rgba(156, 126, 235, 0.08)",
+    maxHeight: 280,
   },
   tabBar: {
     maxHeight: 44,

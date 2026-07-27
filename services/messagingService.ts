@@ -28,6 +28,7 @@ import {
   orderBy,
   query,
   runTransaction,
+  serverTimestamp,
   setDoc,
   where,
 } from "firebase/firestore";
@@ -537,4 +538,91 @@ export function getPeerName(
     return conversation.participantNames[otherUid];
   }
   return "Student";
+}
+
+// ── Typing Indicator ─────────────────────────────────────────────────────────
+
+/**
+ * Updates the typing status for a user in a conversation.
+ * Sets typingBy[uid] = timestamp when typing, removes when stopped.
+ */
+export async function setTyping(
+  conversationId: string,
+  uid: string,
+  isTyping: boolean,
+): Promise<void> {
+  try {
+    const conversationRef = doc(db, "conversations", conversationId);
+    if (isTyping) {
+      await setDoc(
+        conversationRef,
+        { [`typingBy.${uid}`]: Date.now() },
+        { merge: true },
+      );
+    } else {
+      // Remove the field by setting it to delete sentinel
+      // Firestore doesn't support field deletion via setDoc, so we use runTransaction
+      const snap = await getDoc(conversationRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        const typingBy = { ...(data.typingBy || {}) };
+        delete typingBy[uid];
+        await setDoc(conversationRef, { typingBy }, { merge: false });
+      }
+    }
+  } catch (err) {
+    console.error("setTyping error:", err);
+  }
+}
+
+/**
+ * Real-time listener for the other user's typing status in a conversation.
+ * Returns a cleanup function. Calls callback with true when the other person is typing.
+ */
+export function listenForTyping(
+  conversationId: string,
+  currentUid: string,
+  callback: (isOtherTyping: boolean) => void,
+): () => void {
+  const conversationRef = doc(db, "conversations", conversationId);
+  return onSnapshot(conversationRef, (snap) => {
+    if (!snap.exists()) {
+      callback(false);
+      return;
+    }
+    const data = snap.data();
+    const typingBy = data.typingBy || {};
+    const now = Date.now();
+    // Consider someone "typing" if their timestamp is within the last 5 seconds
+    const isOtherTyping = Object.entries(typingBy).some(
+      ([uid, timestamp]) => uid !== currentUid && now - (timestamp as number) < 5000,
+    );
+    callback(isOtherTyping);
+  });
+}
+
+/**
+ * Auto-clear typing status after inactivity.
+ * Call this with a debounced version of setTyping.
+ */
+let typingTimeout: ReturnType<typeof setTimeout> | null = null;
+
+export function startTyping(
+  conversationId: string,
+  uid: string,
+): void {
+  setTyping(conversationId, uid, true);
+
+  if (typingTimeout) clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(() => {
+    setTyping(conversationId, uid, false);
+  }, 3000);
+}
+
+export function stopTyping(
+  conversationId: string,
+  uid: string,
+): void {
+  if (typingTimeout) clearTimeout(typingTimeout);
+  setTyping(conversationId, uid, false);
 }
