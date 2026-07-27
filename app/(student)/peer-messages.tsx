@@ -4,6 +4,9 @@
  * optimistic send, failed message retry, long-press delete/copy, emoji picker.
  */
 
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -20,24 +23,23 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 
 import EmojiPicker from "@/components/chat/EmojiPicker";
-import { moderateMessage, quickModerationCheck } from "@/services/contentModeration";
+import {
+  moderateMessage,
+  quickModerationCheck,
+} from "@/services/contentModeration";
 
 import { useAuth } from "@/hooks/AuthContext";
 import {
   deleteMessage,
   getOrCreatePeerConversation,
   getPeerName,
-  getPeerNameAsync,
   listenForMessages,
   listenForPeerConversations,
   markAsRead,
   refreshPeerConversationNames,
-  searchStudents,
+  searchUsers,
   sendMessage as sendMsg,
 } from "@/services/messagingService";
 import type {
@@ -80,11 +82,22 @@ export default function PeerMessagesScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
 
+  // Inbox-level search
+  const [inboxSearchQuery, setInboxSearchQuery] = useState("");
+
   // Merge Firestore messages with optimistic ones
   const allMessages: OptimisticMessage[] = [
     ...messages,
     ...optimistic.filter((o) => !messages.some((m) => m.id === o.id)),
   ];
+
+  // Filtered conversations for inbox search
+  const filteredConversations = inboxSearchQuery.trim()
+    ? conversations.filter((c) => {
+        const name = getPeerName(c, user!.uid).toLowerCase();
+        return name.includes(inboxSearchQuery.toLowerCase());
+      })
+    : conversations;
 
   // Listen for peer conversations
   useEffect(() => {
@@ -122,7 +135,9 @@ export default function PeerMessagesScreen() {
     }
     const result = quickModerationCheck(inputText);
     if (result.status === "blocked") {
-      setModerationError(result.reason || "This message contains restricted content.");
+      setModerationError(
+        result.reason || "This message contains restricted content.",
+      );
     } else {
       setModerationError(null);
     }
@@ -149,9 +164,7 @@ export default function PeerMessagesScreen() {
           setHeaderName(freshNames[otherUid]);
           // Update the conversation object with fresh names
           setActiveConversation((prev) =>
-            prev
-              ? { ...prev, participantNames: freshNames }
-              : prev,
+            prev ? { ...prev, participantNames: freshNames } : prev,
           );
         }
       } catch {
@@ -161,26 +174,27 @@ export default function PeerMessagesScreen() {
     }
   };
 
+  // Debounced search query
+  useEffect(() => {
+    if (viewMode !== "search") return;
+
+    const handler = setTimeout(async () => {
+      setSearchLoading(true);
+      const results = await searchUsers(user!.uid, "student", searchQuery, "users");
+      setStudents(results);
+      setSearchLoading(false);
+    }, 300); // Debounce for 300ms
+
+    return () => clearTimeout(handler);
+  }, [searchQuery, viewMode, user]);
+
   const openSearch = async () => {
     setViewMode("search");
-    setSearchLoading(true);
-    try {
-      const allStudents = await searchStudents(user!.uid);
-      setStudents(allStudents);
-    } catch (err) {
-      console.error("Failed to search students:", err);
-    } finally {
-      setSearchLoading(false);
-    }
   };
 
   const startConversation = async (student: StudentSearchResult) => {
     try {
-      const myName =
-        user?.displayName ||
-        (await import("@/services/messagingService").then((m) =>
-          m.getUserDisplayName(user!.uid),
-        ));
+      const myName = user?.displayName || "Student";
       const convId = await getOrCreatePeerConversation(
         user!.uid,
         student.uid,
@@ -221,7 +235,8 @@ export default function PeerMessagesScreen() {
 
   // ─── Send with moderation + optimistic UI ──────────────────────────────────
   const handleSend = useCallback(async () => {
-    if (!inputText.trim() || !activeConversation || !user?.uid || sending) return;
+    if (!inputText.trim() || !activeConversation || !user?.uid || sending)
+      return;
 
     const text = inputText.trim();
     setModerationLoading(true);
@@ -372,9 +387,8 @@ export default function PeerMessagesScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              const { deleteConversation } = await import(
-                "@/services/messagingService"
-              );
+              const { deleteConversation } =
+                await import("@/services/messagingService");
               await deleteConversation(convCtxConv.id);
             } catch (err) {
               console.error("Failed to delete conversation:", err);
@@ -399,16 +413,6 @@ export default function PeerMessagesScreen() {
     return date.toLocaleDateString([], { month: "short", day: "numeric" });
   };
 
-  const filteredStudents = students.filter((s) => {
-    const name = s.fullName || "";
-    const department = s.department || "";
-    const queryText = searchQuery.toLowerCase();
-    return (
-      name.toLowerCase().includes(queryText) ||
-      department.toLowerCase().includes(queryText)
-    );
-  });
-
   // ─── Inbox: Conversation row ───────────────────────────────────────────────
   const renderConversation = ({ item }: { item: Conversation }) => {
     const hasUnread = item.unreadBy?.includes(user?.uid || "");
@@ -429,9 +433,7 @@ export default function PeerMessagesScreen() {
         </View>
         <View style={styles.convInfo}>
           <View style={styles.convTop}>
-            <Text
-              style={[styles.convName, hasUnread && styles.convNameBold]}
-            >
+            <Text style={[styles.convName, hasUnread && styles.convNameBold]}>
               {peerName}
             </Text>
             <Text style={styles.convTime}>
@@ -439,10 +441,7 @@ export default function PeerMessagesScreen() {
             </Text>
           </View>
           <Text
-            style={[
-              styles.convLastMsg,
-              hasUnread && styles.convLastMsgBold,
-            ]}
+            style={[styles.convLastMsg, hasUnread && styles.convLastMsgBold]}
             numberOfLines={1}
           >
             {item.lastMessage || "No messages yet"}
@@ -489,54 +488,51 @@ export default function PeerMessagesScreen() {
               isDeleted && styles.bubbleDeleted,
             ]}
           >
-          {isDeleted ? (
-            <View style={styles.deletedRow}>
-              <Ionicons
-                name="ban-outline"
-                size={14}
-                color={isMine ? "rgba(255,255,255,0.5)" : "#94A3B8"}
-              />
+            {isDeleted ? (
+              <View style={styles.deletedRow}>
+                <Ionicons
+                  name="ban-outline"
+                  size={14}
+                  color={isMine ? "rgba(255,255,255,0.5)" : "#94A3B8"}
+                />
+                <Text
+                  style={[styles.deletedText, isMine && styles.deletedTextMine]}
+                >
+                  This message was deleted
+                </Text>
+              </View>
+            ) : (
               <Text
-                style={[
-                  styles.deletedText,
-                  isMine && styles.deletedTextMine,
-                ]}
+                style={[styles.bubbleText, isMine && styles.bubbleTextMine]}
               >
-                This message was deleted
+                {item.text}
               </Text>
-            </View>
-          ) : (
-            <Text
-              style={[styles.bubbleText, isMine && styles.bubbleTextMine]}
-            >
-              {item.text}
-            </Text>
-          )}
+            )}
 
-          <View style={styles.bubbleFooter}>
-            <Text
-              style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}
-            >
-              {formatTime(item.createdAt)}
-            </Text>
-            {isFlagged && (
-              <Ionicons
-                name="warning"
-                size={12}
-                color={isMine ? "rgba(255,255,255,0.7)" : "#F59E0B"}
-              />
-            )}
-            {isFailed && (
-              <Pressable
-                style={styles.retryBtn}
-                onPress={() => handleRetry(item)}
+            <View style={styles.bubbleFooter}>
+              <Text
+                style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}
               >
-                <Ionicons name="refresh" size={12} color="#EF4444" />
-                <Text style={styles.retryText}>Retry</Text>
-              </Pressable>
-            )}
+                {formatTime(item.createdAt)}
+              </Text>
+              {isFlagged && (
+                <Ionicons
+                  name="warning"
+                  size={12}
+                  color={isMine ? "rgba(255,255,255,0.7)" : "#F59E0B"}
+                />
+              )}
+              {isFailed && (
+                <Pressable
+                  style={styles.retryBtn}
+                  onPress={() => handleRetry(item)}
+                >
+                  <Ionicons name="refresh" size={12} color="#EF4444" />
+                  <Text style={styles.retryText}>Retry</Text>
+                </Pressable>
+              )}
+            </View>
           </View>
-        </View>
         </View>
       </Pressable>
     );
@@ -544,10 +540,7 @@ export default function PeerMessagesScreen() {
 
   // ─── Search: Student row ───────────────────────────────────────────────────
   const renderStudent = ({ item }: { item: StudentSearchResult }) => (
-    <Pressable
-      style={styles.convRow}
-      onPress={() => startConversation(item)}
-    >
+    <Pressable style={styles.convRow} onPress={() => startConversation(item)}>
       <View style={styles.convAvatar}>
         <Ionicons name="person" size={22} color="#8A63D2" />
       </View>
@@ -602,6 +595,8 @@ export default function PeerMessagesScreen() {
                 } else if (viewMode === "search") {
                   setViewMode("inbox");
                   setSearchQuery("");
+                } else if (inboxSearchQuery) {
+                  setInboxSearchQuery("");
                 } else {
                   router.back();
                 }
@@ -635,20 +630,12 @@ export default function PeerMessagesScreen() {
         {viewMode === "inbox" ? (
           loading ? (
             <View style={styles.emptyState}>
-              <Ionicons
-                name="chatbubbles-outline"
-                size={48}
-                color="#D1D5DB"
-              />
+              <Ionicons name="chatbubbles-outline" size={48} color="#D1D5DB" />
               <Text style={styles.emptyText}>Loading conversations...</Text>
             </View>
           ) : conversations.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons
-                name="people-outline"
-                size={48}
-                color="#D1D5DB"
-              />
+              <Ionicons name="people-outline" size={48} color="#D1D5DB" />
               <Text style={styles.emptyTitle}>No conversations yet</Text>
               <Text style={styles.emptyText}>
                 Tap the + button to find students and start chatting.
@@ -660,13 +647,38 @@ export default function PeerMessagesScreen() {
             </View>
           ) : (
             <>
-              <FlatList
-                data={conversations}
-                keyExtractor={(item) => item.id}
-                renderItem={renderConversation}
-                contentContainerStyle={styles.convList}
-                showsVerticalScrollIndicator={false}
-              />
+              <View style={styles.searchBar}>
+                <Ionicons name="search" size={18} color="#94A3B8" />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search conversations..."
+                  placeholderTextColor="#94A3B8"
+                  value={inboxSearchQuery}
+                  onChangeText={setInboxSearchQuery}
+                />
+                {inboxSearchQuery.length > 0 && (
+                  <Pressable onPress={() => setInboxSearchQuery("")}>
+                    <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                  </Pressable>
+                )}
+              </View>
+              {filteredConversations.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="search-outline" size={48} color="#D1D5DB" />
+                  <Text style={styles.emptyTitle}>No matches</Text>
+                  <Text style={styles.emptyText}>
+                    No conversations match "{inboxSearchQuery}".
+                  </Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={filteredConversations}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderConversation}
+                  contentContainerStyle={styles.convList}
+                  showsVerticalScrollIndicator={false}
+                />
+              )}
               <Pressable style={styles.fab} onPress={openSearch}>
                 <Ionicons name="add" size={28} color="white" />
               </Pressable>
@@ -694,20 +706,21 @@ export default function PeerMessagesScreen() {
               <View style={styles.emptyState}>
                 <ActivityIndicator size="large" color="#8A63D2" />
                 <Text style={styles.emptyText}>Loading students...</Text>
-              </View>
-            ) : filteredStudents.length === 0 ? (
+              </View>            ) : students.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="search-outline" size={48} color="#D1D5DB" />
-                <Text style={styles.emptyTitle}>No students found</Text>
+                <Text style={styles.emptyTitle}>
+                  {searchQuery ? "No students found" : "Find a Student"}
+                </Text>
                 <Text style={styles.emptyText}>
                   {searchQuery
                     ? "Try a different search term."
-                    : "No other students are registered yet."}
+                    : "Start typing a name or department to find someone to chat with."}
                 </Text>
               </View>
             ) : (
               <FlatList
-                data={filteredStudents}
+                data={students}
                 keyExtractor={(item) => item.uid}
                 renderItem={renderStudent}
                 contentContainerStyle={styles.convList}
@@ -719,11 +732,7 @@ export default function PeerMessagesScreen() {
           <>
             {allMessages.length === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons
-                  name="chatbubble-outline"
-                  size={48}
-                  color="#D1D5DB"
-                />
+                <Ionicons name="chatbubble-outline" size={48} color="#D1D5DB" />
                 <Text style={styles.emptyTitle}>Start the conversation</Text>
                 <Text style={styles.emptyText}>
                   Send a message to{" "}
@@ -768,7 +777,7 @@ export default function PeerMessagesScreen() {
                 onPress={() => setShowEmoji((v) => !v)}
               >
                 <Ionicons
-                  name={showEmoji ? "keyboard" : "happy-outline" as any}
+                  name={showEmoji ? "keyboard" : ("happy-outline" as any)}
                   size={24}
                   color={showEmoji ? "#8A63D2" : "#94A3B8"}
                 />
@@ -786,11 +795,19 @@ export default function PeerMessagesScreen() {
               <Pressable
                 style={[
                   styles.sendBtn,
-                  (!inputText.trim() || sending || moderationLoading || !!moderationError) &&
+                  (!inputText.trim() ||
+                    sending ||
+                    moderationLoading ||
+                    !!moderationError) &&
                     styles.sendBtnDisabled,
                 ]}
                 onPress={handleSend}
-                disabled={!inputText.trim() || sending || moderationLoading || !!moderationError}
+                disabled={
+                  !inputText.trim() ||
+                  sending ||
+                  moderationLoading ||
+                  !!moderationError
+                }
               >
                 {moderationLoading ? (
                   <ActivityIndicator size={24} color="#8A63D2" />
@@ -799,7 +816,9 @@ export default function PeerMessagesScreen() {
                     name="arrow-up-circle"
                     size={32}
                     color={
-                      inputText.trim() && !moderationError ? "#8A63D2" : "#D1D5DB"
+                      inputText.trim() && !moderationError
+                        ? "#8A63D2"
+                        : "#D1D5DB"
                     }
                   />
                 )}

@@ -4,6 +4,9 @@
  * delete conversation from inbox.
  */
 
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -20,9 +23,6 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 
 import EmojiPicker from "@/components/chat/EmojiPicker";
 
@@ -36,10 +36,15 @@ import {
   listenForConversations,
   listenForMessages,
   markAsRead,
-  searchStudents,
+  searchUsers,
   sendMessage as sendMsg,
 } from "@/services/messagingService";
-import type { Conversation, Message, OptimisticMessage, StudentSearchResult } from "@/types/messaging";
+import type {
+  Conversation,
+  Message,
+  OptimisticMessage,
+  StudentSearchResult,
+} from "@/types/messaging";
 
 type ViewMode = "inbox" | "chat" | "search";
 
@@ -64,14 +69,32 @@ export default function AdminMessagesScreen() {
   const [showEmoji, setShowEmoji] = useState(false);
 
   // Peer conversations for admin moderation view
-  const [peerConversations, setPeerConversations] = useState<Conversation[]>([]);
+  const [peerConversations, setPeerConversations] = useState<Conversation[]>(
+    [],
+  );
   const [filterTab, setFilterTab] = useState<"student" | "peer">("student");
+
+  // Inbox-level search
+  const [inboxSearchQuery, setInboxSearchQuery] = useState("");
 
   // Student search state
   const [students, setStudents] = useState<StudentSearchResult[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
-  const [searchInitLoading, setSearchInitLoading] = useState(false);
+
+  // Filtered conversation lists for inbox search
+  const filteredConversations = inboxSearchQuery.trim()
+    ? conversations.filter((c) =>
+        c.studentName.toLowerCase().includes(inboxSearchQuery.toLowerCase()),
+      )
+    : conversations;
+
+  const filteredPeerConversations = inboxSearchQuery.trim()
+    ? peerConversations.filter((c) => {
+        const name = getPeerName(c, user!.uid).toLowerCase();
+        return name.includes(inboxSearchQuery.toLowerCase());
+      })
+    : peerConversations;
 
   // Merge Firestore messages with optimistic ones
   const allMessages: OptimisticMessage[] = [
@@ -121,19 +144,23 @@ export default function AdminMessagesScreen() {
     setViewMode("chat");
   };
 
+  // Debounced search query for admins
+  useEffect(() => {
+    if (viewMode !== "search") return;
+
+    const handler = setTimeout(async () => {
+      setSearchLoading(true);
+      const results = await searchUsers(user!.uid, "admin", searchQuery);
+      setStudents(results);
+      setSearchLoading(false);
+    }, 300); // Debounce for 300ms
+
+    return () => clearTimeout(handler);
+  }, [searchQuery, viewMode, user]);
+
   // ─── Student Search ──────────────────────────────────────────────────────
   const openSearch = async () => {
     setViewMode("search");
-    setSearchInitLoading(true);
-    setSearchQuery("");
-    try {
-      const allStudents = await searchStudents(user!.uid);
-      setStudents(allStudents);
-    } catch (err) {
-      console.error("Failed to search students:", err);
-    } finally {
-      setSearchInitLoading(false);
-    }
   };
 
   const startConversation = async (student: StudentSearchResult) => {
@@ -169,24 +196,9 @@ export default function AdminMessagesScreen() {
     }
   };
 
-  const filteredStudents = students.filter((s) => {
-    const name = s.fullName || "";
-    const department = s.department || "";
-    const queryText = searchQuery.toLowerCase();
-    return (
-      name.toLowerCase().includes(queryText) ||
-      department.toLowerCase().includes(queryText)
-    );
-  });
-
   // ─── Send with optimistic UI ─────────────────────────────────────────────
   const handleSend = useCallback(async () => {
-    if (
-      !inputText.trim() ||
-      !activeConversation ||
-      !user?.uid ||
-      sending
-    )
+    if (!inputText.trim() || !activeConversation || !user?.uid || sending)
       return;
 
     const text = inputText.trim();
@@ -205,12 +217,7 @@ export default function AdminMessagesScreen() {
     setSending(true);
 
     try {
-      const realId = await sendMsg(
-        activeConversation.id,
-        text,
-        user.uid,
-        true,
-      );
+      const realId = await sendMsg(activeConversation.id, text, user.uid, true);
       setOptimistic((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, id: realId } : m)),
       );
@@ -329,11 +336,22 @@ export default function AdminMessagesScreen() {
         delayLongPress={400}
       >
         <View style={styles.convAvatar}>
-          <Ionicons name={isPeer ? "people" : "person"} size={22} color="#8A63D2" />
+          <Ionicons
+            name={isPeer ? "people" : "person"}
+            size={22}
+            color="#8A63D2"
+          />
         </View>
         <View style={styles.convInfo}>
           <View style={styles.convTop}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
+                flex: 1,
+              }}
+            >
               <Text
                 style={[styles.convName, hasUnread && styles.convNameBold]}
                 numberOfLines={1}
@@ -351,10 +369,7 @@ export default function AdminMessagesScreen() {
             </Text>
           </View>
           <Text
-            style={[
-              styles.convLastMsg,
-              hasUnread && styles.convLastMsgBold,
-            ]}
+            style={[styles.convLastMsg, hasUnread && styles.convLastMsgBold]}
             numberOfLines={1}
           >
             {item.lastMessage || "No messages yet"}
@@ -367,10 +382,7 @@ export default function AdminMessagesScreen() {
 
   // ─── Search: Student row ─────────────────────────────────────────────────
   const renderStudent = ({ item }: { item: StudentSearchResult }) => (
-    <Pressable
-      style={styles.convRow}
-      onPress={() => startConversation(item)}
-    >
+    <Pressable style={styles.convRow} onPress={() => startConversation(item)}>
       <View style={styles.convAvatar}>
         <Ionicons name="person" size={22} color="#8A63D2" />
       </View>
@@ -420,26 +432,19 @@ export default function AdminMessagesScreen() {
                 color={isMine ? "rgba(255,255,255,0.5)" : "#94A3B8"}
               />
               <Text
-                style={[
-                  styles.deletedText,
-                  isMine && styles.deletedTextMine,
-                ]}
+                style={[styles.deletedText, isMine && styles.deletedTextMine]}
               >
                 This message was deleted
               </Text>
             </View>
           ) : (
-            <Text
-              style={[styles.bubbleText, isMine && styles.bubbleTextMine]}
-            >
+            <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>
               {item.text}
             </Text>
           )}
 
           <View style={styles.bubbleFooter}>
-            <Text
-              style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}
-            >
+            <Text style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}>
               {formatTime(item.createdAt)}
             </Text>
             {isFailed && (
@@ -482,6 +487,8 @@ export default function AdminMessagesScreen() {
                 } else if (viewMode === "search") {
                   setViewMode("inbox");
                   setSearchQuery("");
+                } else if (inboxSearchQuery) {
+                  setInboxSearchQuery("");
                 } else {
                   router.back();
                 }
@@ -499,7 +506,11 @@ export default function AdminMessagesScreen() {
             {viewMode === "chat" && (
               <View style={styles.headerBadge}>
                 <Ionicons
-                  name={activeConversation?.type === "peer" ? "people" : "shield-checkmark"}
+                  name={
+                    activeConversation?.type === "peer"
+                      ? "people"
+                      : "shield-checkmark"
+                  }
                   size={10}
                   color="white"
                 />
@@ -516,15 +527,28 @@ export default function AdminMessagesScreen() {
         {viewMode === "inbox" ? (
           loading ? (
             <View style={styles.emptyState}>
-              <Ionicons
-                name="chatbubbles-outline"
-                size={48}
-                color="#D1D5DB"
-              />
+              <Ionicons name="chatbubbles-outline" size={48} color="#D1D5DB" />
               <Text style={styles.emptyText}>Loading conversations...</Text>
             </View>
           ) : (
             <>
+              {/* Inbox search bar */}
+              <View style={styles.searchBar}>
+                <Ionicons name="search" size={18} color="#94A3B8" />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search conversations..."
+                  placeholderTextColor="#94A3B8"
+                  value={inboxSearchQuery}
+                  onChangeText={setInboxSearchQuery}
+                />
+                {inboxSearchQuery.length > 0 && (
+                  <Pressable onPress={() => setInboxSearchQuery("")}>
+                    <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                  </Pressable>
+                )}
+              </View>
+
               {/* Filter tabs */}
               <View style={styles.filterTabs}>
                 <Pressable
@@ -545,7 +569,7 @@ export default function AdminMessagesScreen() {
                       filterTab === "student" && styles.filterTabTextActive,
                     ]}
                   >
-                    Students ({conversations.length})
+                    Students ({filteredConversations.length})
                   </Text>
                 </Pressable>
                 <Pressable
@@ -566,7 +590,7 @@ export default function AdminMessagesScreen() {
                       filterTab === "peer" && styles.filterTabTextActive,
                     ]}
                   >
-                    Peer Chats ({peerConversations.length})
+                    Peer Chats ({filteredPeerConversations.length})
                   </Text>
                 </Pressable>
                 {/* Search button */}
@@ -575,7 +599,12 @@ export default function AdminMessagesScreen() {
                   onPress={openSearch}
                 >
                   <Ionicons name="search" size={16} color="#8A63D2" />
-                  <Text style={[styles.filterTabText, { color: "#8A63D2", fontWeight: "600" }]}>
+                  <Text
+                    style={[
+                      styles.filterTabText,
+                      { color: "#8A63D2", fontWeight: "600" },
+                    ]}
+                  >
                     Find
                   </Text>
                 </Pressable>
@@ -595,9 +624,17 @@ export default function AdminMessagesScreen() {
                       here. Tap "Find" to search for a student to message.
                     </Text>
                   </View>
+                ) : filteredConversations.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Ionicons name="search-outline" size={48} color="#D1D5DB" />
+                    <Text style={styles.emptyTitle}>No matches</Text>
+                    <Text style={styles.emptyText}>
+                      No conversations match "{inboxSearchQuery}".
+                    </Text>
+                  </View>
                 ) : (
                   <FlatList
-                    data={conversations}
+                    data={filteredConversations}
                     keyExtractor={(item) => item.id}
                     renderItem={renderConversation}
                     contentContainerStyle={styles.convList}
@@ -606,20 +643,24 @@ export default function AdminMessagesScreen() {
                 )
               ) : peerConversations.length === 0 ? (
                 <View style={styles.emptyState}>
-                  <Ionicons
-                    name="people-outline"
-                    size={48}
-                    color="#D1D5DB"
-                  />
+                  <Ionicons name="people-outline" size={48} color="#D1D5DB" />
                   <Text style={styles.emptyTitle}>No peer chats yet</Text>
                   <Text style={styles.emptyText}>
                     Student-to-student conversations will appear here for
                     moderation.
                   </Text>
                 </View>
+              ) : filteredPeerConversations.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="search-outline" size={48} color="#D1D5DB" />
+                  <Text style={styles.emptyTitle}>No matches</Text>
+                  <Text style={styles.emptyText}>
+                    No peer chats match "{inboxSearchQuery}".
+                  </Text>
+                </View>
               ) : (
                 <FlatList
-                  data={peerConversations}
+                  data={filteredPeerConversations}
                   keyExtractor={(item) => item.id}
                   renderItem={renderConversation}
                   contentContainerStyle={styles.convList}
@@ -646,24 +687,24 @@ export default function AdminMessagesScreen() {
                 </Pressable>
               )}
             </View>
-            {searchInitLoading ? (
+            {searchLoading ? (
               <View style={styles.emptyState}>
                 <ActivityIndicator size="large" color="#8A63D2" />
                 <Text style={styles.emptyText}>Loading students...</Text>
               </View>
-            ) : filteredStudents.length === 0 ? (
+            ) : students.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="search-outline" size={48} color="#D1D5DB" />
-                <Text style={styles.emptyTitle}>No students found</Text>
+                <Text style={styles.emptyTitle}>{searchQuery ? "No users found" : "Find a User"}</Text>
                 <Text style={styles.emptyText}>
                   {searchQuery
                     ? "Try a different search term."
-                    : "No students are registered yet."}
+                    : "Start typing to search for students or other admins."}
                 </Text>
               </View>
             ) : (
               <FlatList
-                data={filteredStudents}
+                data={students}
                 keyExtractor={(item) => item.uid}
                 renderItem={renderStudent}
                 contentContainerStyle={styles.convList}
@@ -675,14 +716,8 @@ export default function AdminMessagesScreen() {
           <>
             {allMessages.length === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons
-                  name="chatbubble-outline"
-                  size={48}
-                  color="#D1D5DB"
-                />
-                <Text style={styles.emptyTitle}>
-                  Start the conversation
-                </Text>
+                <Ionicons name="chatbubble-outline" size={48} color="#D1D5DB" />
+                <Text style={styles.emptyTitle}>Start the conversation</Text>
                 <Text style={styles.emptyText}>
                   Send a message to {activeConversation?.studentName}.
                 </Text>
@@ -714,7 +749,7 @@ export default function AdminMessagesScreen() {
                 onPress={() => setShowEmoji((v) => !v)}
               >
                 <Ionicons
-                  name={showEmoji ? "keyboard" : "happy-outline" as any}
+                  name={showEmoji ? "keyboard" : ("happy-outline" as any)}
                   size={24}
                   color={showEmoji ? "#8A63D2" : "#94A3B8"}
                 />
@@ -732,8 +767,7 @@ export default function AdminMessagesScreen() {
               <Pressable
                 style={[
                   styles.sendBtn,
-                  (!inputText.trim() || sending) &&
-                    styles.sendBtnDisabled,
+                  (!inputText.trim() || sending) && styles.sendBtnDisabled,
                 ]}
                 onPress={handleSend}
                 disabled={!inputText.trim() || sending}

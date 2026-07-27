@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "MindCareV2",
-    "slug": "MindCareV2",
+    "name": "MindCare",
+    "slug": "mindcare",
+    "owner": "zane97",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -45,8 +46,9 @@
     },
     "extra": {
       "router": {},
+      "aiBackendUrl": "http://localhost:3000",
       "eas": {
-        "projectId": "54def36b-e207-4778-986b-434e202ad4b2"
+        "projectId": "ca3225f1-2645-409c-8c8c-6394926367cc"
       }
     }
   }

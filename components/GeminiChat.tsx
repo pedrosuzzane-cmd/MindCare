@@ -8,6 +8,7 @@ import React, { useRef, useState, useEffect } from "react";
 import {
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
   PanResponder,
   Platform,
@@ -187,6 +188,11 @@ export default function GeminiChat() {
         onRequestClose={handleBack}
       >
         <SafeAreaView style={styles.modalRoot}>
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+          >
           {/* Header */}
           <LinearGradient
             colors={["#8A63D2", "#B794F6"]}
@@ -280,6 +286,7 @@ export default function GeminiChat() {
 
           {/* Input */}
           <ChatInput onSend={handleSend} disabled={isTyping} />
+          </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
     </>

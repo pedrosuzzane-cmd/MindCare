@@ -13,6 +13,11 @@
  */
 
 import { db } from "@/constants/firebase";
+import type {
+  Conversation,
+  Message,
+  StudentSearchResult,
+} from "@/types/messaging";
 import {
   collection,
   deleteDoc,
@@ -26,7 +31,6 @@ import {
   setDoc,
   where,
 } from "firebase/firestore";
-import type { Conversation, Message, StudentSearchResult } from "@/types/messaging";
 
 /**
  * Builds a deterministic conversation ID from two UIDs.
@@ -54,10 +58,18 @@ export async function getOrCreateConversation(
       adminId: adminUid,
       studentName,
       adminName,
+      participants: [studentUid, adminUid],
       lastMessage: "",
       lastMessageAt: Date.now(),
       unreadBy: [],
     });
+  } else if (!snap.data().participants) {
+    // Migrate old conversations that lack the participants field
+    await setDoc(
+      conversationRef,
+      { participants: [studentUid, adminUid] },
+      { merge: true },
+    );
   }
 
   return conversationId;
@@ -74,7 +86,12 @@ export async function sendMessage(
   isAdmin: boolean,
   moderationStatus?: "safe" | "flagged" | "blocked",
 ): Promise<string> {
-  const messagesRef = collection(db, "conversations", conversationId, "messages");
+  const messagesRef = collection(
+    db,
+    "conversations",
+    conversationId,
+    "messages",
+  );
   const conversationRef = doc(db, "conversations", conversationId);
 
   const messageId = `${senderUid}_${Date.now()}`;
@@ -108,7 +125,13 @@ export async function deleteMessage(
   conversationId: string,
   messageId: string,
 ): Promise<void> {
-  const messageRef = doc(db, "conversations", conversationId, "messages", messageId);
+  const messageRef = doc(
+    db,
+    "conversations",
+    conversationId,
+    "messages",
+    messageId,
+  );
 
   await setDoc(messageRef, { deleted: true }, { merge: true });
 
@@ -119,10 +142,13 @@ export async function deleteMessage(
 /**
  * Recalculates a conversation's lastMessage from its most recent visible message.
  */
-export async function updateLastMessage(
-  conversationId: string,
-): Promise<void> {
-  const messagesRef = collection(db, "conversations", conversationId, "messages");
+export async function updateLastMessage(conversationId: string): Promise<void> {
+  const messagesRef = collection(
+    db,
+    "conversations",
+    conversationId,
+    "messages",
+  );
   const q = query(messagesRef, orderBy("createdAt", "asc"));
   const snapshot = await getDocs(q);
 
@@ -154,7 +180,13 @@ export async function permanentlyDeleteMessage(
   conversationId: string,
   messageId: string,
 ): Promise<void> {
-  const messageRef = doc(db, "conversations", conversationId, "messages", messageId);
+  const messageRef = doc(
+    db,
+    "conversations",
+    conversationId,
+    "messages",
+    messageId,
+  );
   await deleteDoc(messageRef);
   await updateLastMessage(conversationId);
 }
@@ -167,7 +199,12 @@ export async function deleteConversation(
   conversationId: string,
 ): Promise<void> {
   // Delete all messages in the subcollection
-  const messagesRef = collection(db, "conversations", conversationId, "messages");
+  const messagesRef = collection(
+    db,
+    "conversations",
+    conversationId,
+    "messages",
+  );
   const snapshot = await getDocs(messagesRef);
   const batchDeletes = snapshot.docs.map((d) => deleteDoc(d.ref));
   await Promise.all(batchDeletes);
@@ -188,7 +225,9 @@ export async function markAsRead(
   const snap = await getDoc(conversationRef);
   if (snap.exists()) {
     const data = snap.data();
-    const unread = (data.unreadBy || []).filter((uid: string) => uid !== readerUid);
+    const unread = (data.unreadBy || []).filter(
+      (uid: string) => uid !== readerUid,
+    );
     await setDoc(conversationRef, { unreadBy: unread }, { merge: true });
   }
 }
@@ -201,7 +240,12 @@ export function listenForMessages(
   conversationId: string,
   callback: (messages: Message[]) => void,
 ): () => void {
-  const messagesRef = collection(db, "conversations", conversationId, "messages");
+  const messagesRef = collection(
+    db,
+    "conversations",
+    conversationId,
+    "messages",
+  );
   const q = query(messagesRef, orderBy("createdAt", "asc"));
 
   return onSnapshot(q, (snapshot) => {
@@ -359,33 +403,67 @@ export async function refreshPeerConversationNames(
 }
 
 /**
- * Searches for students to start a peer conversation with.
- * Returns all students from the "users" collection except the current user.
- * Includes try/catch with fallback and returns empty array on failure.
+ * Searches for users (students and/or admins) to start a conversation with.
+ * Uses a 'keywords' field for prefix search.
+ * @param searchIn - "all" searches both collections, "users" only students, "admins" only admins.
+ * Returns an empty array on failure.
  */
-export async function searchStudents(
+export async function searchUsers(
   currentUserId: string,
+  role: "student" | "admin",
+  queryText: string,
+  searchIn: "all" | "users" | "admins" = "all",
 ): Promise<StudentSearchResult[]> {
-  try {
-    const usersRef = collection(db, "users");
-    const snapshot = await getDocs(usersRef);
+  const results: StudentSearchResult[] = [];
+  const searchText = queryText.toLowerCase().trim();
 
-    const students: StudentSearchResult[] = [];
-    for (const d of snapshot.docs) {
-      if (d.id === currentUserId) continue;
-      const data = d.data();
-      students.push({
-        uid: d.id,
-        fullName: data.fullName || data.displayName || "Student",
-        department: data.department || undefined,
-        yearLevel: data.yearLevel || undefined,
+  if (!searchText) {
+    return [];
+  }
+
+  try {
+    if (searchIn === "all" || searchIn === "users") {
+      const usersRef = collection(db, "users");
+      const userQuery = query(
+        usersRef,
+        where("keywords", "array-contains", searchText),
+      );
+      const userDocs = await getDocs(userQuery);
+
+      userDocs.docs.forEach((doc) => {
+        if (doc.id === currentUserId) return;
+        const data = doc.data();
+        results.push({
+          uid: doc.id,
+          fullName: data.fullName || data.displayName || "Student",
+          department: data.department || undefined,
+          yearLevel: data.yearLevel || undefined,
+        });
       });
     }
 
-    return students.sort((a, b) => a.fullName.localeCompare(b.fullName));
+    if (searchIn === "all" || searchIn === "admins") {
+      const adminsRef = collection(db, "admins");
+      const adminQuery = query(
+        adminsRef,
+        where("keywords", "array-contains", searchText),
+      );
+      const adminDocs = await getDocs(adminQuery);
+
+      adminDocs.forEach((doc) => {
+        if (doc.id === currentUserId) return;
+        const data = doc.data();
+        results.push({
+          uid: doc.id,
+          fullName: data.fullName || data.displayName || "Admin",
+          department: data.position || "Administrator",
+        });
+      });
+    }
+
+    return results.sort((a, b) => a.fullName.localeCompare(b.fullName));
   } catch (error) {
-    console.error("searchStudents error:", error);
-    // Return empty array instead of crashing — the UI will show "No students found"
+    console.error("searchUsers error:", error);
     return [];
   }
 }
@@ -401,7 +479,9 @@ export async function getPeerNameAsync(
   if (!conversation.participants) {
     return conversation.studentName || "Student";
   }
-  const otherUid = conversation.participants.find((uid) => uid !== currentUserId);
+  const otherUid = conversation.participants.find(
+    (uid) => uid !== currentUserId,
+  );
   if (!otherUid) return "Student";
 
   // Check cached names first
@@ -424,7 +504,9 @@ export function getPeerName(
   if (!conversation.participantNames || !conversation.participants) {
     return conversation.studentName || "Student";
   }
-  const otherUid = conversation.participants.find((uid) => uid !== currentUserId);
+  const otherUid = conversation.participants.find(
+    (uid) => uid !== currentUserId,
+  );
   if (otherUid && conversation.participantNames[otherUid]) {
     return conversation.participantNames[otherUid];
   }

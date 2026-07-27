@@ -94,6 +94,24 @@ const CITIZENSHIP_OPTIONS = [
   "Foreign National",
 ];
 
+/**
+ * Generates an array of keywords from a string for Firestore searching.
+ * Creates prefixes of each word. e.g., "John Doe" -> ["j", "jo", "joh", "john", "d", "do", "doe"]
+ */
+function generateKeywords(text: string): string[] {
+  const keywords = new Set<string>();
+  const words = text.toLowerCase().split(" ").filter(Boolean);
+
+  for (const word of words) {
+    for (let i = 1; i <= word.length; i++) {
+      keywords.add(word.substring(0, i));
+    }
+  }
+
+  return Array.from(keywords);
+}
+
+
 export default function RegisterScreen() {
   const [activeTab, setActiveTab] = useState<1 | 2 | 3>(1);
 
@@ -431,6 +449,11 @@ export default function RegisterScreen() {
         };
       }
 
+      // Generate keywords for searching
+      const nameKeywords = generateKeywords(sanitize(formData.fullName, 200));
+      const emailKeywords = generateKeywords(emailClean.split("@")[0]);
+      const keywords = Array.from(new Set([...nameKeywords, ...emailKeywords]));
+
       const profileData = {
         fullName: sanitize(formData.fullName, 200),
         email: emailClean,
@@ -454,6 +477,7 @@ export default function RegisterScreen() {
           lsnStatus !== "no" ? sanitize(specialNeedsType, 150) : "",
         lsnDocument: lsnDocumentData,
         role: "student",
+        keywords,
       } as Record<string, any>;
 
       await createUserDocument(user.uid, profileData);

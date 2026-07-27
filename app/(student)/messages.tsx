@@ -1,11 +1,15 @@
 /**
- * Student messaging screen — real-time chat with the guidance admin.
- * Features: optimistic send, failed message retry, long-press delete, copy.
+ * Student messaging screen — inbox of admin conversations + chat view.
+ * Features: inbox search, find admins, optimistic send, failed message retry,
+ * long-press delete, copy, emoji picker.
  */
 
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
+  ActivityIndicator,
   Clipboard,
   FlatList,
   KeyboardAvoidingView,
@@ -18,36 +22,37 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 
 import EmojiPicker from "@/components/chat/EmojiPicker";
 
-import { db } from "@/constants/firebase";
 import { useAuth } from "@/hooks/AuthContext";
 import {
   deleteMessage,
   getOrCreateConversation,
+  listenForConversations,
   listenForMessages,
   markAsRead,
+  searchUsers,
   sendMessage as sendMsg,
 } from "@/services/messagingService";
-import {
-  collection,
-  doc,
-  getDocs,
-  query,
-  where,
-} from "firebase/firestore";
-import type { Message, OptimisticMessage } from "@/types/messaging";
+import type {
+  Conversation,
+  Message,
+  OptimisticMessage,
+  StudentSearchResult,
+} from "@/types/messaging";
+
+type ViewMode = "inbox" | "chat" | "search";
 
 export default function StudentMessagesScreen() {
   const { user } = useAuth();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>("inbox");
+  const [activeConversation, setActiveConversation] =
+    useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [optimistic, setOptimistic] = useState<OptimisticMessage[]>([]);
   const [inputText, setInputText] = useState("");
-  const [conversationId, setConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const flatListRef = useRef<FlatList>(null);
@@ -57,6 +62,21 @@ export default function StudentMessagesScreen() {
   const [contextMsg, setContextMsg] = useState<Message | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
 
+  // Inbox search
+  const [inboxSearchQuery, setInboxSearchQuery] = useState("");
+
+  // Admin search
+  const [admins, setAdmins] = useState<StudentSearchResult[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  // Filtered conversations for inbox search
+  const filteredConversations = inboxSearchQuery.trim()
+    ? conversations.filter((c) =>
+        c.adminName.toLowerCase().includes(inboxSearchQuery.toLowerCase()),
+      )
+    : conversations;
+
   // Merge Firestore messages with optimistic ones
   const allMessages: OptimisticMessage[] = [
     ...messages,
@@ -65,76 +85,99 @@ export default function StudentMessagesScreen() {
     ),
   ];
 
-  // Find the first admin, get/create conversation, listen for messages
+  // Listen for admin conversations
   useEffect(() => {
     if (!user?.uid) return;
-    let unsubMessages: (() => void) | null = null;
-
-    const init = async () => {
-      try {
-        const adminsSnap = await getDocs(query(collection(db, "admins")));
-        if (adminsSnap.empty) {
-          setLoading(false);
-          return;
-        }
-
-        const firstAdmin = adminsSnap.docs[0];
-        const adminId = firstAdmin.id;
-
-        const studentData = (
-          await getDocs(
-            query(collection(db, "users"), where("__name__", "==", user!.uid)),
-          )
-        ).docs[0]?.data();
-
-        const studentName =
-          user!.displayName || studentData?.fullName || "Student";
-        const adminName =
-          firstAdmin.data().displayName ||
-          firstAdmin.data().fullName ||
-          "Guidance Counselor";
-
-        const convId = await getOrCreateConversation(
-          user!.uid,
-          adminId,
-          studentName,
-          adminName,
-        );
-        setConversationId(convId);
-
-        unsubMessages = listenForMessages(convId, (msgs) => {
-          setMessages(msgs);
-          setLoading(false);
-          markAsRead(convId, user!.uid);
-          // Clear optimistic messages that are now confirmed by Firestore
-          setOptimistic((prev) =>
-            prev.filter((o) => !msgs.some((m) => m.id === o.id)),
-          );
-          setTimeout(() => {
-            flatListRef.current?.scrollToEnd({ animated: false });
-          }, 100);
-        });
-      } catch (err) {
-        console.error("Failed to init student chat:", err);
-        setLoading(false);
-      }
-    };
-
-    init();
-    return () => {
-      unsubMessages?.();
-    };
+    const unsub = listenForConversations(user.uid, "student", (convs) => {
+      setConversations(convs);
+      setLoading(false);
+    });
+    return () => unsub();
   }, [user?.uid]);
+
+  // Listen for messages when in chat view
+  useEffect(() => {
+    if (!activeConversation?.id) return;
+
+    const unsub = listenForMessages(activeConversation.id, (msgs) => {
+      setMessages(msgs);
+      setLoading(false);
+      markAsRead(activeConversation.id, user!.uid);
+      setOptimistic((prev) =>
+        prev.filter((o) => !msgs.some((m) => m.id === o.id)),
+      );
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 100);
+    });
+
+    return () => unsub();
+  }, [activeConversation?.id, user?.uid]);
+
+  // Debounced search for admins
+  useEffect(() => {
+    if (viewMode !== "search") return;
+
+    const handler = setTimeout(async () => {
+      setSearchLoading(true);
+      const results = await searchUsers(user!.uid, "student", searchQuery, "admins");
+      setAdmins(results);
+      setSearchLoading(false);
+    }, 300);
+
+    return () => clearTimeout(handler);
+  }, [searchQuery, viewMode, user]);
+
+  const openChat = (conversation: Conversation) => {
+    setActiveConversation(conversation);
+    setViewMode("chat");
+  };
+
+  const openSearch = () => {
+    setViewMode("search");
+  };
+
+  const startConversation = async (admin: StudentSearchResult) => {
+    try {
+      const studentName = user?.displayName || "Student";
+      const convId = await getOrCreateConversation(
+        user!.uid,
+        admin.uid,
+        studentName,
+        admin.fullName,
+      );
+
+      const existing = conversations.find((c) => c.id === convId);
+      if (existing) {
+        openChat(existing);
+      } else {
+        const tempConv: Conversation = {
+          id: convId,
+          studentId: user!.uid,
+          adminId: admin.uid,
+          studentName,
+          adminName: admin.fullName,
+          lastMessage: "",
+          lastMessageAt: Date.now(),
+          unreadBy: [],
+        };
+        setActiveConversation(tempConv);
+        setViewMode("chat");
+      }
+    } catch (err) {
+      console.error("Failed to start conversation:", err);
+    }
+  };
 
   // ─── Send with optimistic UI ─────────────────────────────────────────────
   const handleSend = useCallback(async () => {
-    if (!inputText.trim() || !conversationId || !user?.uid || sending) return;
+    if (!inputText.trim() || !activeConversation || !user?.uid || sending)
+      return;
 
     const text = inputText.trim();
     const tempId = `temp_${Date.now()}`;
     setInputText("");
 
-    // Optimistic: show message immediately
     const optMsg: OptimisticMessage = {
       id: tempId,
       senderId: user.uid,
@@ -147,26 +190,24 @@ export default function StudentMessagesScreen() {
     setSending(true);
 
     try {
-      const realId = await sendMsg(conversationId, text, user.uid, false);
-      // Replace temp with real ID (will be filtered out once Firestore listener fires)
+      const realId = await sendMsg(activeConversation.id, text, user.uid, false);
       setOptimistic((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, id: realId } : m)),
       );
     } catch (err) {
       console.error("Failed to send:", err);
-      // Mark as failed — shows retry button
       setOptimistic((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, failed: true } : m)),
       );
     } finally {
       setSending(false);
     }
-  }, [inputText, conversationId, user?.uid, sending]);
+  }, [inputText, activeConversation, user?.uid, sending]);
 
   // ─── Retry a failed message ──────────────────────────────────────────────
   const handleRetry = useCallback(
     async (msg: OptimisticMessage) => {
-      if (!conversationId || !user?.uid) return;
+      if (!activeConversation || !user?.uid) return;
 
       setOptimistic((prev) =>
         prev.map((m) => (m.id === msg.id ? { ...m, failed: false } : m)),
@@ -174,7 +215,7 @@ export default function StudentMessagesScreen() {
 
       try {
         const realId = await sendMsg(
-          conversationId,
+          activeConversation.id,
           msg.text,
           user.uid,
           false,
@@ -188,7 +229,7 @@ export default function StudentMessagesScreen() {
         );
       }
     },
-    [conversationId, user?.uid],
+    [activeConversation, user?.uid],
   );
 
   // ─── Context menu actions ────────────────────────────────────────────────
@@ -200,25 +241,83 @@ export default function StudentMessagesScreen() {
   };
 
   const handleDelete = async () => {
-    if (!contextMsg || !conversationId) return;
+    if (!contextMsg || !activeConversation) return;
     setContextVisible(false);
 
     try {
-      await deleteMessage(conversationId, contextMsg.id);
+      await deleteMessage(activeConversation.id, contextMsg.id);
     } catch (err) {
       console.error("Failed to delete:", err);
     }
   };
 
   const formatTime = (timestamp: number) => {
+    const now = Date.now();
+    const diff = now - timestamp;
     const date = new Date(timestamp);
-    return date.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+
+    if (diff < 86400000) {
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+    return date.toLocaleDateString([], { month: "short", day: "numeric" });
   };
 
-  // ─── Message bubble ──────────────────────────────────────────────────────
+  // ─── Inbox: Conversation row ─────────────────────────────────────────────
+  const renderConversation = ({ item }: { item: Conversation }) => {
+    const hasUnread = item.unreadBy?.includes(user?.uid || "");
+
+    return (
+      <Pressable
+        style={styles.convRow}
+        onPress={() => openChat(item)}
+      >
+        <View style={styles.convAvatar}>
+          <Ionicons name="shield-checkmark" size={22} color="#8A63D2" />
+        </View>
+        <View style={styles.convInfo}>
+          <View style={styles.convTop}>
+            <Text
+              style={[styles.convName, hasUnread && styles.convNameBold]}
+              numberOfLines={1}
+            >
+              {item.adminName || "Guidance Counselor"}
+            </Text>
+            <Text style={styles.convTime}>
+              {item.lastMessageAt ? formatTime(item.lastMessageAt) : ""}
+            </Text>
+          </View>
+          <Text
+            style={[styles.convLastMsg, hasUnread && styles.convLastMsgBold]}
+            numberOfLines={1}
+          >
+            {item.lastMessage || "No messages yet"}
+          </Text>
+        </View>
+        {hasUnread && <View style={styles.unreadDot} />}
+      </Pressable>
+    );
+  };
+
+  // ─── Search: Admin row ───────────────────────────────────────────────────
+  const renderAdmin = ({ item }: { item: StudentSearchResult }) => (
+    <Pressable style={styles.convRow} onPress={() => startConversation(item)}>
+      <View style={styles.convAvatar}>
+        <Ionicons name="shield-checkmark" size={22} color="#8A63D2" />
+      </View>
+      <View style={styles.convInfo}>
+        <Text style={styles.convName}>{item.fullName}</Text>
+        <Text style={styles.convLastMsg} numberOfLines={1}>
+          {item.department || "Guidance Counselor"}
+        </Text>
+      </View>
+      <Ionicons name="chatbubble-outline" size={18} color="#8A63D2" />
+    </Pressable>
+  );
+
+  // ─── Chat: Message bubble ────────────────────────────────────────────────
   const renderMessage = ({ item }: { item: OptimisticMessage }) => {
     const isMine = item.senderId === user?.uid;
     const isDeleted = item.deleted;
@@ -304,96 +403,229 @@ export default function StudentMessagesScreen() {
           end={{ x: 1, y: 1 }}
         >
           <View style={styles.header}>
-            <Pressable style={styles.backBtn} onPress={() => router.back()}>
+            <Pressable
+              style={styles.backBtn}
+              onPress={() => {
+                if (viewMode === "chat") {
+                  setViewMode("inbox");
+                  setActiveConversation(null);
+                  setMessages([]);
+                  setOptimistic([]);
+                } else if (viewMode === "search") {
+                  setViewMode("inbox");
+                  setSearchQuery("");
+                } else if (inboxSearchQuery) {
+                  setInboxSearchQuery("");
+                } else {
+                  router.back();
+                }
+              }}
+            >
               <Ionicons name="arrow-back" size={22} color="white" />
             </Pressable>
-            <View style={styles.headerCenter}>
-              <View style={styles.headerAvatar}>
-                <Ionicons name="shield-checkmark" size={18} color="#8A63D2" />
+            <Text style={styles.headerTitle}>
+              {viewMode === "chat"
+                ? activeConversation?.adminName || "Chat"
+                : viewMode === "search"
+                  ? "Find Counselors"
+                  : "Messages"}
+            </Text>
+            {viewMode === "chat" && (
+              <View style={styles.headerBadge}>
+                <Ionicons name="shield-checkmark" size={10} color="white" />
+                <Text style={styles.headerBadgeText}>Admin</Text>
               </View>
-              <View>
-                <Text style={styles.headerTitle}>Guidance Counselor</Text>
-                <View style={styles.headerBadge}>
-                  <Ionicons name="shield-checkmark" size={10} color="white" />
-                  <Text style={styles.headerBadgeText}>Admin</Text>
-                </View>
-              </View>
-            </View>
-            <View style={{ width: 40 }} />
+            )}
+            {viewMode !== "chat" && <View style={{ width: 40 }} />}
           </View>
         </LinearGradient>
 
-        {/* Messages */}
-        {loading ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="chatbubbles-outline" size={48} color="#D1D5DB" />
-            <Text style={styles.emptyText}>Loading conversation...</Text>
-          </View>
-        ) : allMessages.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="chatbubbles-outline" size={48} color="#D1D5DB" />
-            <Text style={styles.emptyTitle}>Start a conversation</Text>
-            <Text style={styles.emptyText}>
-              Send a message to your guidance counselor.
-            </Text>
-          </View>
+        {/* Content */}
+        {viewMode === "inbox" ? (
+          loading ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="chatbubbles-outline" size={48} color="#D1D5DB" />
+              <Text style={styles.emptyText}>Loading conversations...</Text>
+            </View>
+          ) : conversations.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="chatbubbles-outline" size={48} color="#D1D5DB" />
+              <Text style={styles.emptyTitle}>No conversations yet</Text>
+              <Text style={styles.emptyText}>
+                Tap "Find" to search for a counselor and start a conversation.
+              </Text>
+              <Pressable style={styles.findBtn} onPress={openSearch}>
+                <Ionicons name="search" size={18} color="white" />
+                <Text style={styles.findBtnText}>Find Counselors</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              {/* Inbox search bar */}
+              <View style={styles.searchBar}>
+                <Ionicons name="search" size={18} color="#94A3B8" />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search conversations..."
+                  placeholderTextColor="#94A3B8"
+                  value={inboxSearchQuery}
+                  onChangeText={setInboxSearchQuery}
+                />
+                {inboxSearchQuery.length > 0 && (
+                  <Pressable onPress={() => setInboxSearchQuery("")}>
+                    <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                  </Pressable>
+                )}
+              </View>
+
+              {/* Find button */}
+              <View style={styles.filterTabs}>
+                <Pressable style={styles.filterTab} onPress={openSearch}>
+                  <Ionicons name="search" size={16} color="#8A63D2" />
+                  <Text
+                    style={[
+                      styles.filterTabText,
+                      { color: "#8A63D2", fontWeight: "600" },
+                    ]}
+                  >
+                    Find
+                  </Text>
+                </Pressable>
+              </View>
+
+              {filteredConversations.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Ionicons name="search-outline" size={48} color="#D1D5DB" />
+                  <Text style={styles.emptyTitle}>No matches</Text>
+                  <Text style={styles.emptyText}>
+                    No conversations match "{inboxSearchQuery}".
+                  </Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={filteredConversations}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderConversation}
+                  contentContainerStyle={styles.convList}
+                  showsVerticalScrollIndicator={false}
+                />
+              )}
+            </>
+          )
+        ) : viewMode === "search" ? (
+          <>
+            <View style={styles.searchBar}>
+              <Ionicons name="search" size={18} color="#94A3B8" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search by name..."
+                placeholderTextColor="#94A3B8"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoFocus
+              />
+              {searchQuery.length > 0 && (
+                <Pressable onPress={() => setSearchQuery("")}>
+                  <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                </Pressable>
+              )}
+            </View>
+            {searchLoading ? (
+              <View style={styles.emptyState}>
+                <ActivityIndicator size="large" color="#8A63D2" />
+                <Text style={styles.emptyText}>Searching...</Text>
+              </View>
+            ) : admins.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="search-outline" size={48} color="#D1D5DB" />
+                <Text style={styles.emptyTitle}>
+                  {searchQuery ? "No counselors found" : "Find a Counselor"}
+                </Text>
+                <Text style={styles.emptyText}>
+                  {searchQuery
+                    ? "Try a different search term."
+                    : "Start typing a name to find your guidance counselor."}
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={admins}
+                keyExtractor={(item) => item.uid}
+                renderItem={renderAdmin}
+                contentContainerStyle={styles.convList}
+                showsVerticalScrollIndicator={false}
+              />
+            )}
+          </>
         ) : (
-          <FlatList
-            ref={flatListRef}
-            data={allMessages}
-            keyExtractor={(item) => item.id}
-            renderItem={renderMessage}
-            contentContainerStyle={styles.messagesList}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
+          <>
+            {allMessages.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="chatbubble-outline" size={48} color="#D1D5DB" />
+                <Text style={styles.emptyTitle}>Start the conversation</Text>
+                <Text style={styles.emptyText}>
+                  Send a message to {activeConversation?.adminName}.
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                ref={flatListRef}
+                data={allMessages}
+                keyExtractor={(item) => item.id}
+                renderItem={renderMessage}
+                contentContainerStyle={styles.messagesList}
+                showsVerticalScrollIndicator={false}
+              />
+            )}
 
-        {/* Emoji Picker */}
-        {showEmoji && (
-          <EmojiPicker
-            onSelect={(emoji) => {
-              setInputText((prev) => prev + emoji);
-            }}
-          />
-        )}
+            {/* Emoji Picker */}
+            {showEmoji && (
+              <EmojiPicker
+                onSelect={(emoji) => {
+                  setInputText((prev) => prev + emoji);
+                }}
+              />
+            )}
 
-        {/* Input */}
-        <View style={styles.inputBar}>
-          <Pressable
-            style={styles.emojiBtn}
-            onPress={() => setShowEmoji((v) => !v)}
-          >
-            <Ionicons
-              name={showEmoji ? "keyboard" : "happy-outline" as any}
-              size={24}
-              color={showEmoji ? "#8A63D2" : "#94A3B8"}
-            />
-          </Pressable>
-          <TextInput
-            style={styles.textInput}
-            placeholder="Type a message..."
-            placeholderTextColor="#94A3B8"
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-            maxLength={1000}
-            onFocus={() => setShowEmoji(false)}
-          />
-          <Pressable
-            style={[
-              styles.sendBtn,
-              (!inputText.trim() || sending) && styles.sendBtnDisabled,
-            ]}
-            onPress={handleSend}
-            disabled={!inputText.trim() || sending}
-          >
-            <Ionicons
-              name="arrow-up-circle"
-              size={32}
-              color={inputText.trim() ? "#8A63D2" : "#D1D5DB"}
-            />
-          </Pressable>
-        </View>
+            {/* Input */}
+            <View style={styles.inputBar}>
+              <Pressable
+                style={styles.emojiBtn}
+                onPress={() => setShowEmoji((v) => !v)}
+              >
+                <Ionicons
+                  name={showEmoji ? "keyboard" : ("happy-outline" as any)}
+                  size={24}
+                  color={showEmoji ? "#8A63D2" : "#94A3B8"}
+                />
+              </Pressable>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Type a message..."
+                placeholderTextColor="#94A3B8"
+                value={inputText}
+                onChangeText={setInputText}
+                multiline
+                maxLength={1000}
+                onFocus={() => setShowEmoji(false)}
+              />
+              <Pressable
+                style={[
+                  styles.sendBtn,
+                  (!inputText.trim() || sending) && styles.sendBtnDisabled,
+                ]}
+                onPress={handleSend}
+                disabled={!inputText.trim() || sending}
+              >
+                <Ionicons
+                  name="arrow-up-circle"
+                  size={32}
+                  color={inputText.trim() ? "#8A63D2" : "#D1D5DB"}
+                />
+              </Pressable>
+            </View>
+          </>
+        )}
       </KeyboardAvoidingView>
 
       {/* ─── Context Menu Modal ─────────────────────────────────────── */}
@@ -445,21 +677,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  headerCenter: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+  headerTitle: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "700",
     flex: 1,
+    textAlign: "center",
   },
-  headerAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "white",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: { fontSize: 16, fontWeight: "700", color: "white" },
   headerBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -468,8 +692,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
-    marginTop: 3,
-    alignSelf: "flex-start",
+    position: "absolute",
+    bottom: 10,
+    alignSelf: "center",
   },
   headerBadgeText: {
     fontSize: 10,
@@ -490,6 +715,59 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#64748B",
     textAlign: "center",
+  },
+  findBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#8A63D2",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginTop: 8,
+  },
+  findBtnText: { color: "white", fontSize: 15, fontWeight: "600" },
+
+  // Conversation list
+  convList: { paddingVertical: 8 },
+  convRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    gap: 12,
+    backgroundColor: "white",
+    marginHorizontal: 16,
+    marginBottom: 2,
+    borderRadius: 14,
+    marginTop: 4,
+    // @ts-ignore
+    boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.06)",
+  },
+  convAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: "#F3EAFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  convInfo: { flex: 1, gap: 2 },
+  convTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  convName: { fontSize: 15, fontWeight: "500", color: "#1E1B4B" },
+  convNameBold: { fontWeight: "700" },
+  convTime: { fontSize: 11, color: "#94A3B8" },
+  convLastMsg: { fontSize: 13, color: "#64748B" },
+  convLastMsgBold: { color: "#1E1B4B", fontWeight: "600" },
+  unreadDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#8A63D2",
   },
 
   // Messages
@@ -538,7 +816,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   bubbleTime: { fontSize: 10, color: "#94A3B8" },
-  bubbleTimeMine: { color: "rgba(255,255,255,0.6)" },
+  bubbleTimeMine: { color: "rgba(255,255,255,0.5)" },
   deletedRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   deletedText: { fontSize: 13, color: "#94A3B8", fontStyle: "italic" },
   deletedTextMine: { color: "rgba(255,255,255,0.5)" },
@@ -589,6 +867,54 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   sendBtnDisabled: { opacity: 0.5 },
+
+  // Search
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
+    margin: 16,
+    marginBottom: 8,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 46,
+    gap: 8,
+    // @ts-ignore
+    boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: "#1E1B4B",
+    paddingVertical: 0,
+  },
+
+  // Filter tabs
+  filterTabs: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 4,
+    gap: 8,
+  },
+  filterTab: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "white",
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.1)",
+  },
+  filterTabText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#94A3B8",
+  },
 
   // Context menu
   ctxOverlay: {

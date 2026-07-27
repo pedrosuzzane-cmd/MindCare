@@ -10,6 +10,7 @@ import { router } from "expo-router";
 import React, { useCallback, useEffect, useRef } from "react";
 import {
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -66,8 +67,18 @@ export default function AiChatScreen() {
             <Ionicons name="arrow-back" size={24} color="white" />
           </Pressable>
           <View style={styles.headerCenter}>
-            <Text style={styles.headerTitle}>Mindy</Text>
-            <Text style={styles.headerSubtitle}>AI Wellness Companion</Text>
+            <View style={styles.headerIconWrap}>
+              <Image
+                source={require("@/assets/images/mindyai.png")}
+                style={styles.headerIconImage}
+              />
+            </View>
+            <View>
+              <Text style={styles.headerTitle}>Mindy</Text>
+              <Text style={styles.headerSubtitle}>
+                {isConnected ? "AI Wellness Companion" : "Offline"}
+              </Text>
+            </View>
           </View>
           <Pressable style={styles.clearButton} onPress={clearChat}>
             <Ionicons name="refresh-outline" size={22} color="white" />
@@ -80,6 +91,16 @@ export default function AiChatScreen() {
         <View style={styles.errorBanner}>
           <Ionicons name="alert-circle" size={18} color="#D32F2F" />
           <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
+      {/* Offline Banner */}
+      {!isConnected && !error && (
+        <View style={styles.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={14} color="#F59E0B" />
+          <Text style={styles.offlineBannerText}>
+            No internet. Messages won&apos;t send.
+          </Text>
         </View>
       )}
 
@@ -138,7 +159,23 @@ const styles = StyleSheet.create({
   },
   headerCenter: {
     flex: 1,
+    flexDirection: "row",
     alignItems: "center",
+    gap: 10,
+  },
+  headerIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  headerIconImage: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
   },
   headerTitle: {
     fontSize: 17,
@@ -167,6 +204,19 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 13,
     color: "#D32F2F",
+    flex: 1,
+  },
+  offlineBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFBEB",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 6,
+  },
+  offlineBannerText: {
+    fontSize: 12,
+    color: "#92400E",
     flex: 1,
   },
   chatContainer: {
