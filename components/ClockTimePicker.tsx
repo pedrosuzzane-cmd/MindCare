@@ -1,8 +1,8 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Animated,
   LayoutChangeEvent,
   Modal,
-  NativeSyntheticEvent,
   PanResponder,
   PanResponderGestureState,
   Pressable,
@@ -17,14 +17,21 @@ const CENTER = CLOCK_SIZE / 2;
 const INNER_NUMBER_RADIUS = CLOCK_RADIUS - 18;
 
 const HOURS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-const MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+const MINUTES_FACE = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
-function angleToValue(angleDeg: number, items: number[]): number {
-  const sector = 360 / items.length;
+function angleToHour(angleDeg: number): number {
   const offset = -90;
   const normalized = ((angleDeg - offset) % 360 + 360) % 360;
-  const index = Math.round(normalized / sector) % items.length;
-  return items[index];
+  const sector = 360 / 12;
+  const index = Math.round(normalized / sector) % 12;
+  return HOURS[index];
+}
+
+function angleToMinute(angleDeg: number): number {
+  const offset = -90;
+  const normalized = ((angleDeg - offset) % 360 + 360) % 360;
+  const minute = Math.round((normalized / 360) * 60) % 60;
+  return minute;
 }
 
 function valueToAngle(value: number, items: number[]): number {
@@ -32,6 +39,10 @@ function valueToAngle(value: number, items: number[]): number {
   const index = items.indexOf(value);
   if (index === -1) return 0;
   return index * sector - 90;
+}
+
+function minuteToAngle(minute: number): number {
+  return (minute / 60) * 360 - 90;
 }
 
 function getItemLabel(item: number, mode: "hour" | "minute"): string {
@@ -56,19 +67,39 @@ export default function ClockTimePicker({
   const [draftMinute, setDraftMinute] = useState(val.minute);
   const [draftPeriod, setDraftPeriod] = useState<"AM" | "PM">(val.period);
 
-  // Absolute position of the clock face on screen
   const clockAbsPos = useRef({ x: 0, y: 0 });
   const clockSize = useRef({ w: CLOCK_SIZE, h: CLOCK_SIZE });
+
+  const handRotation = useRef(new Animated.Value(0)).current;
+  const handAngleRef = useRef(0);
+  const animationFrameRef = useRef<number | null>(null);
+
+  const modeRef = useRef(mode);
+  const draftHourRef = useRef(draftHour);
+  const draftMinuteRef = useRef(draftMinute);
+
+  useEffect(() => { modeRef.current = mode; }, [mode]);
+  useEffect(() => { draftHourRef.current = draftHour; }, [draftHour]);
+  useEffect(() => { draftMinuteRef.current = draftMinute; }, [draftMinute]);
 
   const open = () => {
     setDraftHour(val.hour);
     setDraftMinute(val.minute);
     setDraftPeriod(val.period);
     setMode("hour");
+    const initialAngle = valueToAngle(val.hour, HOURS);
+    handAngleRef.current = initialAngle;
+    handRotation.setValue(initialAngle);
     setVisible(true);
   };
 
-  const close = () => setVisible(false);
+  const close = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    setVisible(false);
+  };
 
   const confirm = () => {
     onChange({ hour: draftHour, minute: draftMinute, period: draftPeriod });
@@ -81,48 +112,62 @@ export default function ClockTimePicker({
     clockSize.current = { w: width, h: height };
   }, []);
 
-  const currentItems = mode === "hour" ? HOURS : MINUTES;
-  const currentValue = mode === "hour" ? draftHour : draftMinute;
-
-  // Use pageX/pageY to compute touch position relative to clock center.
-  // This works reliably on both iOS and Android.
   const computeTouchFromGesture = useCallback(
     (gestureState: PanResponderGestureState) => {
       const cx = clockSize.current.w / 2;
       const cy = clockSize.current.h / 2;
-      // pageX/pageY are absolute screen coords; subtract the clock's absolute position
       const relX = gestureState.moveX - clockAbsPos.current.x;
       const relY = gestureState.moveY - clockAbsPos.current.y;
       const dx = relX - cx;
       const dy = relY - cy;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 10) return null;
+      if (dist < 8) return null;
 
       const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
-      return angleToValue(angleDeg, currentItems);
+
+      if (modeRef.current === "hour") {
+        return { type: "hour" as const, value: angleToHour(angleDeg) };
+      } else {
+        return { type: "minute" as const, value: angleToMinute(angleDeg) };
+      }
     },
-    [currentItems],
+    [],
   );
 
-  // Use refs so the PanResponder always reads the latest values
-  // without needing to be recreated.
-  const modeRef = useRef(mode);
-  const draftHourRef = useRef(draftHour);
-  const draftMinuteRef = useRef(draftMinute);
+  const animateToAngle = useCallback(
+    (targetAngle: number) => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
 
-  // Keep refs synced
-  modeRef.current = mode;
-  draftHourRef.current = draftHour;
-  draftMinuteRef.current = draftMinute;
+      let currentRot = handAngleRef.current;
 
-  const applyValue = useCallback((snapped: number | null) => {
-    if (snapped === null) return;
-    if (modeRef.current === "hour") {
-      setDraftHour(snapped);
-    } else {
-      setDraftMinute(snapped);
-    }
-  }, []);
+      const currentNorm = ((currentRot % 360) + 360) % 360;
+      const targetNorm = ((targetAngle % 360) + 360) % 360;
+      const cw = (targetNorm - currentNorm + 360) % 360;
+      const ccw = (currentNorm - targetNorm + 360) % 360;
+      const finalTarget =
+        cw <= ccw ? currentRot + cw : currentRot - ccw;
+
+      const step = () => {
+        const cur = handAngleRef.current;
+        const diff = finalTarget - cur;
+        if (Math.abs(diff) < 0.5) {
+          handAngleRef.current = finalTarget;
+          handRotation.setValue(finalTarget);
+          animationFrameRef.current = null;
+          return;
+        }
+        const next = cur + diff * 0.3;
+        handAngleRef.current = next;
+        handRotation.setValue(next);
+        animationFrameRef.current = requestAnimationFrame(step);
+      };
+      animationFrameRef.current = requestAnimationFrame(step);
+    },
+    [handRotation],
+  );
 
   const panResponder = useRef(
     PanResponder.create({
@@ -130,33 +175,41 @@ export default function ClockTimePicker({
       onMoveShouldSetPanResponder: (_, gs) =>
         Math.abs(gs.dx) > 2 || Math.abs(gs.dy) > 2,
       onPanResponderGrant: (_, gs) => {
-        const snapped = computeTouchFromGesture(gs);
-        applyValue(snapped);
+        const result = computeTouchFromGesture(gs);
+        if (!result) return;
+        if (result.type === "hour") {
+          setDraftHour(result.value);
+          animateToAngle(valueToAngle(result.value, HOURS));
+        } else {
+          setDraftMinute(result.value);
+          animateToAngle(minuteToAngle(result.value));
+        }
       },
       onPanResponderMove: (_, gs) => {
-        const snapped = computeTouchFromGesture(gs);
-        applyValue(snapped);
+        const result = computeTouchFromGesture(gs);
+        if (!result) return;
+        if (result.type === "hour") {
+          setDraftHour(result.value);
+          animateToAngle(valueToAngle(result.value, HOURS));
+        } else {
+          setDraftMinute(result.value);
+          animateToAngle(minuteToAngle(result.value));
+        }
       },
       onPanResponderRelease: () => {},
     }),
   ).current;
 
-  // Recreate panResponder when computeTouchFromGesture changes
-  // (i.e. when currentItems changes due to mode switch)
-  const prevModeRef = useRef(mode);
-  if (prevModeRef.current !== mode) {
-    prevModeRef.current = mode;
-    // We can't recreate the panResponder in render cleanly,
-    // so we force the handlers to use latest refs via applyValue/modeRef.
-  }
-
   const selectedAngle =
     mode === "hour"
       ? valueToAngle(draftHour, HOURS)
-      : valueToAngle(draftMinute, MINUTES);
+      : minuteToAngle(draftMinute);
 
   const handLength = INNER_NUMBER_RADIUS - 12;
-  const handRotation = selectedAngle + 90;
+  const visualHandRotation = handRotation;
+
+  const currentFaceItems = mode === "hour" ? HOURS : MINUTES_FACE;
+  const currentValue = mode === "hour" ? draftHour : draftMinute;
 
   return (
     <>
@@ -195,8 +248,7 @@ export default function ClockTimePicker({
                 onLayout={onClockLayout}
                 {...panResponder.panHandlers}
               >
-                {/* Clock hand line */}
-                <View
+                <Animated.View
                   style={{
                     position: "absolute",
                     left: CENTER - 1.5,
@@ -206,12 +258,18 @@ export default function ClockTimePicker({
                     backgroundColor: accentColor,
                     borderRadius: 1.5,
                     transformOrigin: "center bottom",
-                    transform: [{ rotate: `${handRotation}deg` }],
+                    transform: [
+                      {
+                        rotate: visualHandRotation.interpolate({
+                          inputRange: [0, 360],
+                          outputRange: ["0deg", "360deg"],
+                        }),
+                      },
+                    ],
                     opacity: 0.85,
                   }}
                 />
 
-                {/* Center pin */}
                 <View
                   style={[
                     s.centerPin,
@@ -223,30 +281,33 @@ export default function ClockTimePicker({
                   ]}
                 />
 
-                {/* Selected tip dot */}
-                <View
+                <Animated.View
                   style={[
                     s.tipDot,
                     {
-                      left:
-                        CENTER +
-                        Math.cos((selectedAngle * Math.PI) / 180) * handLength -
-                        8,
-                      top:
-                        CENTER +
-                        Math.sin((selectedAngle * Math.PI) / 180) * handLength -
-                        8,
                       backgroundColor: accentColor,
+                    },
+                    {
+                      left: CENTER - 8,
+                      top: CENTER - 8,
+                      transform: [
+                        {
+                          rotate: visualHandRotation.interpolate({
+                            inputRange: [0, 360],
+                            outputRange: ["0deg", "360deg"],
+                          }),
+                        },
+                        { translateY: -handLength + 8 },
+                      ],
                     },
                   ]}
                 />
 
-                {/* Number labels */}
-                {currentItems.map((item) => {
+                {currentFaceItems.map((item) => {
                   const angle =
                     mode === "hour"
                       ? valueToAngle(item, HOURS)
-                      : valueToAngle(item, MINUTES);
+                      : valueToAngle(item, MINUTES_FACE);
                   const rad = (angle * Math.PI) / 180;
                   const numX = CENTER + Math.cos(rad) * INNER_NUMBER_RADIUS;
                   const numY = CENTER + Math.sin(rad) * INNER_NUMBER_RADIUS;
@@ -287,7 +348,6 @@ export default function ClockTimePicker({
               </View>
             </View>
 
-            {/* Mode tabs */}
             <View style={s.modeTabs}>
               <Pressable
                 onPress={() => setMode("hour")}
@@ -326,7 +386,6 @@ export default function ClockTimePicker({
               </Pressable>
             </View>
 
-            {/* Digital preview */}
             <View style={s.previewRow}>
               <Text style={s.previewTime}>
                 {String(draftHour).padStart(2, "0")}:
@@ -334,7 +393,6 @@ export default function ClockTimePicker({
               </Text>
             </View>
 
-            {/* AM / PM toggle */}
             <View style={s.periodRow}>
               {(["AM", "PM"] as const).map((p) => (
                 <Pressable
@@ -360,7 +418,6 @@ export default function ClockTimePicker({
               ))}
             </View>
 
-            {/* Action buttons */}
             <View style={s.actions}>
               <Pressable onPress={close} style={s.cancelBtn}>
                 <Text style={s.cancelText}>Cancel</Text>

@@ -6,7 +6,11 @@ declare module "firebase/app" {
 }
 
 declare module "firebase/auth" {
+  import { Persistence } from "@firebase/auth";
   export * from "@firebase/auth";
+  export function getReactNativePersistence(
+    storage: any,
+  ): Persistence;
 }
 
 declare module "firebase/firestore" {
