@@ -20,8 +20,8 @@ service cloud.firestore {
     match /users/{userId} {
       // Only the owner or an admin can read a specific user document
       allow get: if isOwner(userId) || isAdmin();
-      // Only admins can list all users (prevents mass PII scraping)
-      allow list: if isAdmin();
+      // Signed-in users can list users for the messaging directory
+      allow list: if signedIn();
       // Owner can write their own doc; role cannot be escalated
       allow create: if isOwner(userId)
         && request.resource.data.keys().hasAll(['fullName', 'email']);

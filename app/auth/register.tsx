@@ -616,29 +616,32 @@ export default function RegisterScreen() {
       const user = userCredential.user;
 
       let lsnDocumentData = null;
+      let lsnUploadAttempted = false;
       if (lsnStatus === "yes-with-id" && lsnDocument && !lsnDocument.canceled) {
-        // Check network connectivity before attempting upload
-        const netState = await NetInfo.fetch();
-        if (!netState.isConnected) {
-          throw new Error(
-            "No internet connection detected. Please check your network and try again.",
-          );
+        lsnUploadAttempted = true;
+        try {
+          const netState = await NetInfo.fetch();
+          if (!netState.isConnected) {
+            console.warn("No internet for LSN file upload, saving profile without document");
+          } else {
+            const asset = lsnDocument.assets[0];
+            const { secureUrl, publicId } = await uploadToCloudinary(
+              asset,
+              setUploadProgress,
+            );
+
+            lsnDocumentData = {
+              fileName: asset.name,
+              fileType: asset.mimeType,
+              fileSize: asset.size,
+              uploadedAt: new Date().toISOString(),
+              publicId: publicId,
+              secureUrl: secureUrl,
+            };
+          }
+        } catch (uploadErr) {
+          console.error("LSN file upload failed, saving profile without document:", uploadErr);
         }
-
-        const asset = lsnDocument.assets[0];
-        const { secureUrl, publicId } = await uploadToCloudinary(
-          asset,
-          setUploadProgress,
-        );
-
-        lsnDocumentData = {
-          fileName: asset.name,
-          fileType: asset.mimeType,
-          fileSize: asset.size,
-          uploadedAt: new Date().toISOString(),
-          publicId: publicId,
-          secureUrl: secureUrl,
-        };
       }
 
       // Generate keywords for searching
@@ -674,6 +677,14 @@ export default function RegisterScreen() {
       } as Record<string, any>;
 
       await createUserDocument(user.uid, profileData);
+
+      if (lsnUploadAttempted && lsnDocumentData === null) {
+        Alert.alert(
+          "Account Created",
+          "Your account was created, but your LSN document could not be uploaded. You can submit it later through your profile or contact your guidance office.",
+        );
+      }
+
       router.replace("/(student)/(tabs)/dashboard");
     } catch (err: any) {
       setShowConfirmModal(false);

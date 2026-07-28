@@ -4,7 +4,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Href, Redirect, router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Animated,
   Image,
   Platform,
@@ -16,7 +15,6 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { handleSignOut } from "@/services/authService";
 import { useSidePanel } from "@/contexts/SidePanelContext";
 import GeminiChat from "@/components/GeminiChat";
 
@@ -66,10 +64,8 @@ const FEATURES = [
  ] as const;
 
 export default function DashboardScreen() {
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const { user, role } = useAuth();
   const { toggle: toggleSidePanel } = useSidePanel();
-  const [signingOut, setSigningOut] = useState(false);
 
   // Automatically adjust columns based on screen width
   const { width } = useWindowDimensions();
@@ -90,21 +86,6 @@ export default function DashboardScreen() {
     if (hour < 12) return "Good Morning";
     if (hour < 17) return "Good Afternoon";
     return "Good Evening";
-  };
-
-  const doSignOut = async () => {
-    setSigningOut(true);
-    try {
-      await handleSignOut(router);
-      console.log("Sign out successful");
-    } catch (err) {
-      console.error("Logout error", err);
-      setSigningOut(false);
-    }
-  };
-
-  const handleLogoutPress = () => {
-    setShowLogoutConfirm(true);
   };
 
   function FeatureCard({ feature }: { feature: (typeof FEATURES)[number] }) {
@@ -173,19 +154,6 @@ export default function DashboardScreen() {
               >
                 <Ionicons name="menu" size={26} color="white" />
               </Pressable>
-              <Pressable
-                style={styles.profileButton}
-                onPress={() => router.push("/profile")}
-              >
-                <Ionicons
-                  name="person-circle-outline"
-                  size={26}
-                  color="white"
-                />
-              </Pressable>
-              <Pressable style={styles.chatButton} onPress={handleLogoutPress}>
-                <Ionicons name="log-out-outline" size={24} color="white" />
-              </Pressable>
             </View>
           </View>
 
@@ -226,43 +194,6 @@ export default function DashboardScreen() {
               essential. Your self-care is a necessity.&quot;
             </Text>
           </View>
-
-          {signingOut && (
-            <View style={styles.signOutOverlay} pointerEvents="auto">
-              <View style={styles.signOutBox}>
-                <ActivityIndicator size="large" color="#ffffff" />
-                <Text style={styles.signOutText}>Signing out...</Text>
-              </View>
-            </View>
-          )}
-
-          {showLogoutConfirm && (
-            <View style={styles.confirmOverlay} pointerEvents="auto">
-              <View style={styles.confirmBox}>
-                <Text style={styles.confirmTitle}>Confirm Logout</Text>
-                <Text style={styles.confirmMessage}>
-                  Are you sure you want to logout?
-                </Text>
-                <View style={styles.confirmButtons}>
-                  <Pressable
-                    style={[styles.confirmButton, styles.cancelButton]}
-                    onPress={() => setShowLogoutConfirm(false)}
-                  >
-                    <Text style={styles.cancelText}>Cancel</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.confirmButton, styles.logoutButton]}
-                    onPress={() => {
-                      setShowLogoutConfirm(false);
-                      doSignOut();
-                    }}
-                  >
-                    <Text style={styles.logoutText}>Logout</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-          )}
         </ScrollView>
 
         {/* Floating AI Chat Bubble */}
@@ -315,13 +246,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     color: "white",
-  },
-  chatButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
   },
   rightButtons: {
     flexDirection: "row",
@@ -402,65 +326,11 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     lineHeight: 24,
   },
-  signOutOverlay: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.4)",
-  },
-  signOutBox: {
-    padding: 20,
-    borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    alignItems: "center",
-    gap: 12,
-  },
-  signOutText: {
-    color: "white",
-    marginTop: 8,
-    fontSize: 16,
-  },
-  confirmOverlay: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.4)",
-  },
-  confirmBox: {
-    width: "86%",
-    padding: 24,
+  chatButton: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    backgroundColor: "white",
+    justifyContent: "center",
     alignItems: "center",
-    gap: 14,
-    // @ts-ignore — web-only shadow property
-    boxShadow: "0px 12px 40px rgba(0,0,0,0.12)",
   },
-  confirmTitle: { fontSize: 18, fontWeight: "700", color: "#2D1B69" },
-  confirmMessage: { fontSize: 14, color: "#6B7280", textAlign: "center", lineHeight: 20 },
-  confirmButtons: {
-    flexDirection: "row",
-    width: "100%",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-  confirmButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    marginHorizontal: 6,
-  },
-  cancelButton: { backgroundColor: "#F3F0FF", borderRadius: 14 },
-  logoutButton: { backgroundColor: "#EF4444", borderRadius: 14 },
-  cancelText: { color: "#4B5563", fontWeight: "600" },
-  logoutText: { color: "white", fontWeight: "600" },
 });

@@ -83,6 +83,55 @@ const ALL_ACHIEVEMENTS: Achievement[] = [
     description: "You set and pursued a wellness goal",
     requirement: "Set a wellness goal in your profile survey",
   },
+  {
+    id: "first-step-forward",
+    emoji: "🌱",
+    title: "First Step Forward",
+    description: "You wrote your very first daily journal entry",
+    requirement: "Complete your first daily journal entry",
+  },
+  {
+    id: "consistent-reflector",
+    emoji: "🌿",
+    title: "Consistent Reflector",
+    description: "You completed journal entries for 3 consecutive days",
+    requirement: "Journal for 3 consecutive days",
+  },
+  {
+    id: "mindfulness-master",
+    emoji: "🌳",
+    title: "Mindfulness Master",
+    description: "You maintained a 7-day journaling streak",
+    requirement: "Maintain a 7-day journaling streak",
+  },
+  {
+    id: "emotional-explorer",
+    emoji: "🧭",
+    title: "Emotional Explorer",
+    description: "You logged entries covering 5 different moods",
+    requirement: "Log entries with 5 different moods",
+  },
+  {
+    id: "guardian-of-wellness",
+    emoji: "🛡️",
+    title: "Self-Care Champion",
+    description: "You completed both a journal entry and a self-assessment on the same day",
+    requirement: "Complete a journal entry and self-assessment on the same day",
+  },
+  {
+    id: "night-owl-reflector",
+    emoji: "🌙",
+    title: "Night Owl Reflector",
+    description: "You submitted a journal entry past 9:00 PM to unwind before sleep",
+    requirement: "Submit a journal entry after 9:00 PM",
+  },
+  {
+    id: "early-bird-growth",
+    emoji: "☀️",
+    title: "Early Bird Growth",
+    description: "You submitted a morning journal entry before 8:00 AM",
+    requirement: "Submit a journal entry before 8:00 AM",
+  },
 ];
 
 const POSITIVE_MOODS = ["happy", "calm", "relaxed", "good"];
@@ -127,11 +176,21 @@ export function useAchievements() {
 
       // Check if user completed a self-assessment (with fallback)
       let assessmentCount = 0;
+      const assessmentDates = new Set<string>();
       try {
         const assessmentsSnap = await getDocs(
           collection(db, "users", uid, "selfAssessments"),
         );
         assessmentCount = assessmentsSnap.size;
+        assessmentsSnap.forEach((d) => {
+          const data = d.data();
+          const ts = data.createdAt || data.date;
+          if (ts && typeof ts.toDate === "function") {
+            assessmentDates.add(ts.toDate().toISOString().slice(0, 10));
+          } else if (ts) {
+            assessmentDates.add(new Date(ts).toISOString().slice(0, 10));
+          }
+        });
       } catch (readErr) {
         console.warn("Could not read selfAssessments for achievements:", readErr);
       }
@@ -157,6 +216,9 @@ export function useAchievements() {
       const daysWithPositiveMood = new Set<string>();
       const daysWithEntries = new Set<string>();
       const datesSorted: Date[] = [];
+      const distinctMoods = new Set<string>();
+      let nightEntryCount = 0;
+      let morningEntryCount = 0;
 
       entries.forEach((e: any) => {
         let date: Date;
@@ -172,6 +234,12 @@ export function useAchievements() {
         const dateKey = date.toISOString().slice(0, 10);
         daysWithEntries.add(dateKey);
         datesSorted.push(date);
+
+        if (e.mood) distinctMoods.add(e.mood);
+
+        const hours = date.getHours();
+        if (hours >= 21) nightEntryCount++;
+        if (hours < 8) morningEntryCount++;
 
         if (POSITIVE_MOODS.includes(e.mood)) {
           daysWithPositiveMood.add(dateKey);
@@ -204,6 +272,13 @@ export function useAchievements() {
 
       const uniqueDayCount = daysWithEntries.size;
       const positiveDayCount = daysWithPositiveMood.size;
+      const distinctMoodCount = distinctMoods.size;
+
+      // Count days with both a journal entry and a self-assessment
+      let sameDayJournalAndAssessment = 0;
+      for (const dayKey of daysWithEntries) {
+        if (assessmentDates.has(dayKey)) sameDayJournalAndAssessment++;
+      }
 
       // Has wellness goal from profile survey
       const hasWellnessGoal = Boolean(
@@ -254,6 +329,41 @@ export function useAchievements() {
           case "wellness-goal-achieved":
             unlocked = hasWellnessGoal;
             progress = hasWellnessGoal ? 100 : 0;
+            break;
+
+          case "first-step-forward":
+            progress = Math.min(100, totalEntries * 100);
+            unlocked = totalEntries >= 1;
+            break;
+
+          case "consistent-reflector":
+            progress = Math.min(100, (longestStreak / 3) * 100);
+            unlocked = longestStreak >= 3;
+            break;
+
+          case "mindfulness-master":
+            progress = Math.min(100, (longestStreak / 7) * 100);
+            unlocked = longestStreak >= 7;
+            break;
+
+          case "emotional-explorer":
+            progress = Math.min(100, (distinctMoodCount / 5) * 100);
+            unlocked = distinctMoodCount >= 5;
+            break;
+
+          case "guardian-of-wellness":
+            progress = Math.min(100, sameDayJournalAndAssessment * 100);
+            unlocked = sameDayJournalAndAssessment >= 1;
+            break;
+
+          case "night-owl-reflector":
+            progress = Math.min(100, nightEntryCount * 100);
+            unlocked = nightEntryCount >= 1;
+            break;
+
+          case "early-bird-growth":
+            progress = Math.min(100, morningEntryCount * 100);
+            unlocked = morningEntryCount >= 1;
             break;
 
           default:

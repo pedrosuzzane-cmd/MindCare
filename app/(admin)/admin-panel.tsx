@@ -24,7 +24,7 @@ import {
     setDoc,
     writeBatch,
 } from "firebase/firestore";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -271,8 +271,16 @@ export default function AdminPanelScreen() {
   const [currentPage, setCurrentPage] = useState(1);
   const STUDENTS_PER_PAGE = 10;
 
+  const scrollRef = useRef<ScrollView>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const scrollYRef = useRef(0);
+
   // Consolidated state for student list modals
   const [studentListModal, setStudentListModal] = useState<{
+    visible: boolean;
+    title: string;
+  } | null>(null);
+  const [journalModal, setJournalModal] = useState<{
     visible: boolean;
     title: string;
   } | null>(null);
@@ -800,9 +808,13 @@ export default function AdminPanelScreen() {
           isWide && styles.summaryKpiCardWide,
           pressed && { transform: [{ scale: 0.98 }], opacity: 0.95 },
         ]}
-        onPress={() =>
-          setStudentListModal({ visible: true, title: kpi.label })
-        }
+        onPress={() => {
+          if (kpi.label === "Journal Entries") {
+            setJournalModal({ visible: true, title: kpi.label });
+          } else {
+            setStudentListModal({ visible: true, title: kpi.label });
+          }
+        }}
       >
         <View style={styles.summaryKpiTopRow}>
           <View
@@ -1258,8 +1270,16 @@ export default function AdminPanelScreen() {
         </View>
 
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[styles.content, isWide && { padding: responsivePadding, paddingBottom: 40 }]}
           showsVerticalScrollIndicator={false}
+          onScroll={(e) => {
+            const offsetY = e.nativeEvent.contentOffset.y;
+            scrollYRef.current = offsetY;
+            console.log("Scroll Y:", offsetY);
+            setShowScrollTop(offsetY > 300);
+          }}
+          scrollEventThrottle={50}
         >
           <View style={styles.tabBar}>
             <Pressable
@@ -1882,12 +1902,31 @@ export default function AdminPanelScreen() {
           )}
         </ScrollView>
 
+        <Pressable
+          style={[styles.scrollToTopBtn, { opacity: showScrollTop ? 1 : 0, pointerEvents: showScrollTop ? "auto" : "none" }]}
+          onPress={() => {
+            scrollRef.current?.scrollTo({ y: 0, animated: true });
+            setShowScrollTop(false);
+          }}
+        >
+          <Ionicons name="arrow-up" size={22} color="white" />
+        </Pressable>
+
         {studentListModal && (
           <StudentListModal
             visible={studentListModal.visible}
             title={studentListModal.title}
             students={modalStudents}
             onClose={() => setStudentListModal(null)}
+          />
+        )}
+        {journalModal?.visible && (
+          <StudentListModal
+            visible={journalModal.visible}
+            title={journalModal.title}
+            students={studentSummaries.filter((s) => s.journalCount > 0)}
+            onClose={() => setJournalModal(null)}
+            journalMode
           />
         )}
 
@@ -2231,7 +2270,7 @@ export default function AdminPanelScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F4F2F8" },
-  mainLayout: { flex: 1, backgroundColor: "#F4F2F8" },
+  mainLayout: { flex: 1, backgroundColor: "#F4F2F8", position: "relative" },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -3301,5 +3340,23 @@ const styles = StyleSheet.create({
   bottomWidgetWide: {
     width: "32%",
     minWidth: 280,
+  },
+  scrollToTopBtn: {
+    position: "absolute",
+    bottom: 24,
+    right: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#8A63D2",
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 10,
+    zIndex: 999,
+    overflow: "visible",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
 });

@@ -28,6 +28,7 @@ interface StudentListModalProps {
   title: string;
   students: StudentSummary[];
   onClose: () => void;
+  journalMode?: boolean;
 }
 
 export function StudentListModal({
@@ -35,6 +36,7 @@ export function StudentListModal({
   title,
   students,
   onClose,
+  journalMode,
 }: StudentListModalProps) {
   const sortedStudents = [...students].sort((a, b) => {
     if (title.toLowerCase() === "survey assessment status") {
@@ -89,11 +91,19 @@ export function StudentListModal({
                       key={student.uid}
                       style={styles.studentCard}
                       onPress={() => {
-                        onClose();
-                        router.push({
-                          pathname: "./student-detail",
-                          params: { uid: student.uid },
-                        });
+                        if (journalMode) {
+                          onClose();
+                          router.navigate({
+                            pathname: "/(admin)/student-journals",
+                            params: { studentId: student.uid, studentName: student.name },
+                          });
+                        } else {
+                          onClose();
+                          router.push({
+                            pathname: "./student-detail",
+                            params: { uid: student.uid },
+                          });
+                        }
                       }}
                     >
                       <View style={styles.studentCardRow}>

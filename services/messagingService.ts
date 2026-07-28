@@ -269,8 +269,7 @@ export function listenForConversations(
   onError?: (error: Error) => void,
 ): () => void {
   const conversationsRef = collection(db, "conversations");
-  const field = role === "student" ? "studentId" : "adminId";
-  const q = query(conversationsRef, where(field, "==", userId));
+  const q = query(conversationsRef, where("participants", "array-contains", userId));
 
   return onSnapshot(q, (snapshot) => {
     const conversations: Conversation[] = snapshot.docs.map((d) => ({

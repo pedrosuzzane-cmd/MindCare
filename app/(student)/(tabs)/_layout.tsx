@@ -42,7 +42,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="messages"
         options={{
-          title: "Messages",
+          title: "Inbox",
           tabBarButton: HapticTab,
           tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles" size={size} color={color} />,
         }}

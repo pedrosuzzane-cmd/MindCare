@@ -6,6 +6,7 @@ export default function AdminLayout() {
       <Stack.Screen name="admin-panel" />
       <Stack.Screen name="messages" />
       <Stack.Screen name="student-detail" />
+      <Stack.Screen name="student-journals" />
     </Stack>
   );
 }

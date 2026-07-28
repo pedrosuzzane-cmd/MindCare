@@ -12,6 +12,7 @@ import {
     Alert,
     Image,
     KeyboardAvoidingView,
+    Linking,
     Modal,
     Platform,
     Pressable,
@@ -35,8 +36,6 @@ export default function ProfileScreen() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
-  const [legalModalVisible, setLegalModalVisible] = useState(false);
-  const [legalModalType, setLegalModalType] = useState<"terms" | "about" | "privacy">("terms");
   const [uploadingImage, setUploadingImage] = useState(false);
 
   const [fullName, setFullName] = useState("");
@@ -254,17 +253,14 @@ export default function ProfileScreen() {
 
           {/* Quick action buttons */}
           <View style={s.quickActions}>
-            <Pressable style={s.quickActionBtn}>
+            <Pressable style={s.quickActionBtn} onPress={() => Linking.openURL("mailto:support@mindcare.app")}>
               <Ionicons name="mail" size={20} color="#7B2CBF" />
             </Pressable>
-            <Pressable style={s.quickActionBtn}>
+            <Pressable style={s.quickActionBtn} onPress={() => Linking.openURL("tel:911")}>
               <Ionicons name="call" size={20} color="#7B2CBF" />
             </Pressable>
-            <Pressable style={s.quickActionBtn}>
+            <Pressable style={s.quickActionBtn} onPress={() => router.push("/(student)/(tabs)/messages")}>
               <Ionicons name="chatbubble" size={20} color="#7B2CBF" />
-            </Pressable>
-            <Pressable style={s.quickActionBtn}>
-              <Ionicons name="heart-outline" size={20} color="#7B2CBF" />
             </Pressable>
           </View>
         </LinearGradient>
@@ -480,54 +476,7 @@ export default function ProfileScreen() {
             </View>
           )}
 
-          {/* ─── Legal & Support (students only) ─── */}
-          {!isAdmin && (
-            <View style={s.sectionCard}>
-              <View style={s.sectionHeader}>
-                <View style={[s.sectionIcon, { backgroundColor: "#FCE7F3" }]}>
-                  <Ionicons name="shield-checkmark-outline" size={18} color="#DB2777" />
-                </View>
-                <Text style={s.sectionTitle}>Legal & Support</Text>
-              </View>
 
-              <Pressable
-                style={s.legalRow}
-                onPress={() => { setLegalModalType("terms"); setLegalModalVisible(true); }}
-              >
-                <View style={[s.legalIconCircle, { backgroundColor: "#EDE9FE" }]}>
-                  <Ionicons name="document-text-outline" size={18} color="#8A63D2" />
-                </View>
-                <Text style={s.legalLabel}>Terms of Service</Text>
-                <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
-              </Pressable>
-
-              <View style={s.legalDivider} />
-
-              <Pressable
-                style={s.legalRow}
-                onPress={() => { setLegalModalType("about"); setLegalModalVisible(true); }}
-              >
-                <View style={[s.legalIconCircle, { backgroundColor: "#E0F2FE" }]}>
-                  <Ionicons name="information-circle-outline" size={18} color="#0EA5E9" />
-                </View>
-                <Text style={s.legalLabel}>About MindCare</Text>
-                <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
-              </Pressable>
-
-              <View style={s.legalDivider} />
-
-              <Pressable
-                style={s.legalRow}
-                onPress={() => { setLegalModalType("privacy"); setLegalModalVisible(true); }}
-              >
-                <View style={[s.legalIconCircle, { backgroundColor: "#F0FDF4" }]}>
-                  <Ionicons name="lock-closed-outline" size={18} color="#22C55E" />
-                </View>
-                <Text style={s.legalLabel}>Privacy Policy</Text>
-                <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
-              </Pressable>
-            </View>
-          )}
 
           <View style={{ height: 100 }} />
         </ScrollView>
@@ -605,137 +554,6 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* ─── Legal Content Modals ────────────────────────────────────── */}
-      <Modal
-        visible={legalModalVisible}
-        animationType="slide"
-        onRequestClose={() => setLegalModalVisible(false)}
-      >
-        <SafeAreaView style={s.legalFullScreen}>
-          <LinearGradient
-            colors={["#8A63D2", "#B794F6"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <View style={s.legalHeader}>
-              <Pressable
-                style={s.legalBackBtn}
-                onPress={() => setLegalModalVisible(false)}
-              >
-                <Ionicons name="arrow-back" size={22} color="white" />
-              </Pressable>
-              <Text style={s.legalHeaderTitle}>
-                {legalModalType === "terms"
-                  ? "Terms of Service"
-                  : legalModalType === "about"
-                    ? "About MindCare"
-                    : "Privacy Policy"}
-              </Text>
-              <View style={{ width: 40 }} />
-            </View>
-          </LinearGradient>
-
-          <ScrollView style={s.legalBody} contentContainerStyle={{ paddingBottom: 40 }}>
-            {legalModalType === "terms" && (
-              <>
-                <Text style={s.legalBodyTitle}>Terms of Service</Text>
-                <Text style={s.legalBodyDate}>Effective Date: July 2026</Text>
-                <Text style={s.legalBodyText}>
-                  Welcome to MindCare. By using this application, you agree to comply with and be bound by the following terms and conditions. Please review them carefully.
-                </Text>
-                <Text style={s.legalBodySubheading}>1. Acceptance of Terms</Text>
-                <Text style={s.legalBodyText}>
-                  By accessing or using MindCare, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service. If you do not agree, please do not use the application.
-                </Text>
-                <Text style={s.legalBodySubheading}>2. Use of the Application</Text>
-                <Text style={s.legalBodyText}>
-                  MindCare is designed to support student mental wellness through journaling, mood tracking, and AI-assisted reflections. You agree to use the application only for its intended purpose and in compliance with all applicable laws and regulations.
-                </Text>
-                <Text style={s.legalBodySubheading}>3. User Accounts</Text>
-                <Text style={s.legalBodyText}>
-                  You are responsible for maintaining the confidentiality of your account credentials. You must notify us immediately of any unauthorized use of your account. We are not liable for any loss arising from unauthorized access to your account.
-                </Text>
-                <Text style={s.legalBodySubheading}>4. Content and Privacy</Text>
-                <Text style={s.legalBodyText}>
-                  Your journal entries and personal data are treated with strict confidentiality. AI-generated reflections are processed securely and are not shared with third parties. Please refer to our Privacy Policy for detailed information.
-                </Text>
-                <Text style={s.legalBodySubheading}>5. Limitation of Liability</Text>
-                <Text style={s.legalBodyText}>
-                  MindCare is not a substitute for professional mental health services. In case of emergencies, please contact local authorities or a licensed mental health professional. The application is provided "as is" without warranties of any kind.
-                </Text>
-                <Text style={s.legalBodySubheading}>6. Changes to Terms</Text>
-                <Text style={s.legalBodyText}>
-                  We reserve the right to modify these terms at any time. Continued use of the application after changes constitutes acceptance of the revised terms.
-                </Text>
-              </>
-            )}
-
-            {legalModalType === "about" && (
-              <>
-                <Text style={s.legalBodyTitle}>About MindCare</Text>
-                <Text style={s.legalBodyDate}>Student Mental Wellness Platform</Text>
-                <Text style={s.legalBodyText}>
-                  MindCare is a mental health and wellness application designed specifically for students. Our mission is to provide a safe, private, and supportive digital space where students can track their emotional well-being, reflect on their experiences, and receive timely support.
-                </Text>
-                <Text style={s.legalBodySubheading}>Our Vision</Text>
-                <Text style={s.legalBodyText}>
-                  We believe that mental health is just as important as physical health. MindCare aims to break the stigma surrounding mental wellness in academic environments by making self-care accessible, approachable, and data-driven.
-                </Text>
-                <Text style={s.legalBodySubheading}>What We Offer</Text>
-                <Text style={s.legalBodyText}>
-                  {"\u2022"} Daily mood tracking and journaling with rich prompts{"\n"}{"\u2022"} AI-powered reflections and personalized suggestions{"\n"}{"\u2022"} Confidential peer support chat through Mindy, our AI chatbot{"\n"}{"\u2022"} Wellness assessments and progress visualization{"\n"}{"\u2022"} Administrative dashboards for guidance counselors to monitor student well-being trends
-                </Text>
-                <Text style={s.legalBodySubheading}>Our Commitment</Text>
-                <Text style={s.legalBodyText}>
-                  We are committed to safeguarding your privacy and data. All information shared within the application is encrypted and handled in accordance with our Privacy Policy and applicable data protection laws.
-                </Text>
-                <Text style={s.legalBodySubheading}>Contact Us</Text>
-                <Text style={s.legalBodyText}>
-                  For questions, feedback, or support, please reach out through the application or contact your school's guidance office.
-                </Text>
-              </>
-            )}
-
-            {legalModalType === "privacy" && (
-              <>
-                <Text style={s.legalBodyTitle}>Privacy Policy</Text>
-                <Text style={s.legalBodyDate}>Effective Date: July 2026</Text>
-                <Text style={s.legalBodyText}>
-                  Your privacy is important to us. This Privacy Policy explains how MindCare collects, uses, and protects your personal information when you use our application.
-                </Text>
-                <Text style={s.legalBodySubheading}>1. Information We Collect</Text>
-                <Text style={s.legalBodyText}>
-                  {"\u2022"} Account information: name, email, school ID, and academic details{"\n"}{"\u2022"} Wellness data: journal entries, mood logs, and assessment responses{"\n"}{"\u2022"} Technical data: device type, operating system, and usage analytics
-                </Text>
-                <Text style={s.legalBodySubheading}>2. How We Use Your Information</Text>
-                <Text style={s.legalBodyText}>
-                  Your data is used solely to provide and improve the MindCare experience. Specifically:{"\n"}{"\u2022"} Journal entries are used to generate AI-powered reflections and suggestions{"\n"}{"\u2022"} Mood data is used to visualize your wellness trends over time{"\n"}{"\u2022"} Aggregate (anonymized) data may be used by school administrators to monitor overall student well-being
-                </Text>
-                <Text style={s.legalBodySubheading}>3. Data Security</Text>
-                <Text style={s.legalBodyText}>
-                  All data is stored securely using industry-standard encryption. We implement strict access controls to ensure that only authorized personnel can access your information. Your journal entries are private and are never shared with other students.
-                </Text>
-                <Text style={s.legalBodySubheading}>4. Data Sharing</Text>
-                <Text style={s.legalBodyText}>
-                  We do not sell, trade, or rent your personal information to third parties. Anonymized and aggregated wellness data may be shared with school guidance counselors for the purpose of identifying students who may need additional support.
-                </Text>
-                <Text style={s.legalBodySubheading}>5. Your Rights</Text>
-                <Text style={s.legalBodyText}>
-                  You have the right to access, update, or delete your personal data at any time through the application's profile settings. If you wish to request a full data export or deletion, please contact your school's guidance office.
-                </Text>
-                <Text style={s.legalBodySubheading}>6. Children's Privacy</Text>
-                <Text style={s.legalBodyText}>
-                  MindCare is intended for use by students in academic institutions. We comply with all applicable laws regarding the protection of minors' personal data.
-                </Text>
-                <Text style={s.legalBodySubheading}>7. Changes to This Policy</Text>
-                <Text style={s.legalBodyText}>
-                  We may update this Privacy Policy from time to time. Any changes will be reflected in the application and communicated through appropriate channels.
-                </Text>
-              </>
-            )}
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -998,32 +816,6 @@ const s = StyleSheet.create({
     color: "white",
   },
 
-  /* ── Legal Section ───────────────────────────────────────────────── */
-  legalRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    gap: 12,
-  },
-  legalIconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  legalLabel: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1E1B4B",
-  },
-  legalDivider: {
-    height: 1,
-    backgroundColor: "rgba(156, 126, 235, 0.06)",
-    marginLeft: 46,
-  },
-
   /* ── Confirmation Modal ─────────────────────────────────────────── */
   modalOverlay: {
     flex: 1,
@@ -1096,59 +888,4 @@ const s = StyleSheet.create({
     color: "#FFFFFF",
   },
 
-  /* ── Legal Content Modal ────────────────────────────────────────── */
-  legalFullScreen: {
-    flex: 1,
-    backgroundColor: "#F4F2F8",
-  },
-  legalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 14,
-  },
-  legalBackBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  legalHeaderTitle: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "700",
-    flex: 1,
-    textAlign: "center",
-  },
-  legalBody: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 24,
-  },
-  legalBodyTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#1E1B4B",
-    marginBottom: 4,
-  },
-  legalBodyDate: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#8A63D2",
-    marginBottom: 16,
-  },
-  legalBodySubheading: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#1E1B4B",
-    marginTop: 18,
-    marginBottom: 6,
-  },
-  legalBodyText: {
-    fontSize: 14,
-    color: "#475569",
-    lineHeight: 21,
-  },
 });

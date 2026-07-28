@@ -1,5 +1,5 @@
 import { db } from "@/constants/firebase";
-import { collection, getDocs, onSnapshot } from "firebase/firestore";
+import { collection, getDocs, onSnapshot, query, orderBy } from "firebase/firestore";
 
 // --- TYPE DEFINITIONS ---
 type RiskLevel = "low" | "normal" | "high";
@@ -264,4 +264,42 @@ function processAnalytics(
     gender: Array.from(analyticsBuckets.gender.values()),
     yearLevel: Array.from(analyticsBuckets.yearLevel.values()),
   };
+}
+
+/**
+ * Fetches all journal entries for a specific student, ordered by createdAt descending.
+ * Used by the admin journal detail screen.
+ *
+ * @param studentId - The Firestore UID of the student
+ * @returns An array of journal entry documents with ids
+ */
+export async function fetchStudentJournals(studentId: string): Promise<JournalEntryDoc[]> {
+  try {
+    const entriesRef = collection(db, "users", studentId, "journalEntries");
+    const q = query(entriesRef, orderBy("createdAt", "desc"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => ({
+      id: d.id,
+      ...d.data(),
+    })) as JournalEntryDoc[];
+  } catch (error) {
+    console.error("fetchStudentJournals error:", error);
+    throw error;
+  }
+}
+
+export interface JournalEntryDoc {
+  id: string;
+  title?: string;
+  thoughts?: string;
+  mood?: string;
+  category?: string;
+  createdAt?: { toDate: () => Date } | string | number;
+  entryDate?: string;
+  aiInsight?: string;
+  aiEmotion?: string;
+  aiSummary?: string;
+  aiEncouragement?: string;
+  aiSuggestions?: string[];
+  syncStatus?: string;
 }
