@@ -80,13 +80,13 @@ export default function GeminiChat() {
           toValue: 1,
           tension: 60,
           friction: 8,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
         }),
         Animated.spring(greetingScale, {
           toValue: 1,
           tension: 60,
           friction: 8,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
         }),
       ]).start();
 
@@ -95,12 +95,12 @@ export default function GeminiChat() {
           Animated.timing(greetingOpacity, {
             toValue: 0,
             duration: 300,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== "web",
           }),
           Animated.timing(greetingScale, {
             toValue: 0.8,
             duration: 300,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== "web",
           }),
         ]).start(() => setShowGreeting(false));
       }, 3000);

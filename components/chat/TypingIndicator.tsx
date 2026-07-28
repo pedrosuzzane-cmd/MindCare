@@ -3,7 +3,7 @@
  */
 
 import React, { useEffect, useRef } from "react";
-import { Animated, Image, StyleSheet, Text, View } from "react-native";
+import { Animated, Image, Platform, StyleSheet, View } from "react-native";
 
 export default function TypingIndicator() {
   const dot1 = useRef(new Animated.Value(0)).current;
@@ -18,12 +18,12 @@ export default function TypingIndicator() {
           Animated.timing(dot, {
             toValue: 1,
             duration: 400,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== "web",
           }),
           Animated.timing(dot, {
             toValue: 0,
             duration: 400,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== "web",
           }),
         ]),
       );

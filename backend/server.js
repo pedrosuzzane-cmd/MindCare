@@ -34,7 +34,7 @@ const upload = multer({ storage });
 
 const app = express();
 
-// <--- 2. Enable CORS so your frontend (localhost:8081) can talk to ngrok/backend
+// <--- 2. Enable CORS so your frontend can talk to the backend
 app.use(cors());
 const port = process.env.PORT || 3000;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;

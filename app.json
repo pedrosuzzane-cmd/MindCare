@@ -51,6 +51,27 @@
             "kotlinVersion": "1.9.24"
           }
         }
+      ],
+      [
+        "expo-document-picker",
+        {
+          "androidPermissions": [
+            "READ_EXTERNAL_STORAGE",
+            "READ_MEDIA_IMAGES",
+            "READ_MEDIA_VIDEO",
+            "READ_MEDIA_AUDIO"
+          ]
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "androidPermissions": [
+            "android.permission.CAMERA",
+            "android.permission.READ_EXTERNAL_STORAGE",
+            "android.permission.READ_MEDIA_IMAGES"
+          ]
+        }
       ]
     ],
     "experiments": {
