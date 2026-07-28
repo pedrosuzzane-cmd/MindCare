@@ -1,11 +1,13 @@
 {
   "expo": {
     "name": "MindCare",
+    "displayName": "MindCare",
     "slug": "mindcare",
     "owner": "zane97",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logoicon.png",
+    "primaryColor": "#8A63D2",
     "scheme": "mindcarev2",
     "userInterfaceStyle": "automatic",
     "ios": {

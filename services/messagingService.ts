@@ -28,9 +28,8 @@ import {
   orderBy,
   query,
   runTransaction,
-  serverTimestamp,
   setDoc,
-  where,
+  where
 } from "firebase/firestore";
 
 /**
@@ -250,13 +249,17 @@ export function listenForMessages(
   );
   const q = query(messagesRef, orderBy("createdAt", "asc"));
 
-  return onSnapshot(q, (snapshot) => {
-    const messages: Message[] = snapshot.docs.map((d) => ({
-      id: d.id,
-      ...(d.data() as Omit<Message, "id">),
-    }));
-    callback(messages);
-  }, onError || ((err) => console.warn("Snapshot error:", err)));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const messages: Message[] = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<Message, "id">),
+      }));
+      callback(messages);
+    },
+    onError || ((err) => console.warn("Snapshot error:", err)),
+  );
 }
 
 /**
@@ -269,16 +272,23 @@ export function listenForConversations(
   onError?: (error: Error) => void,
 ): () => void {
   const conversationsRef = collection(db, "conversations");
-  const q = query(conversationsRef, where("participants", "array-contains", userId));
+  const q = query(
+    conversationsRef,
+    where("participants", "array-contains", userId),
+  );
 
-  return onSnapshot(q, (snapshot) => {
-    const conversations: Conversation[] = snapshot.docs.map((d) => ({
-      id: d.id,
-      ...(d.data() as Omit<Conversation, "id">),
-    }));
-    conversations.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
-    callback(conversations);
-  }, onError || ((err) => console.warn("Snapshot error:", err)));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const conversations: Conversation[] = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<Conversation, "id">),
+      }));
+      conversations.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+      callback(conversations);
+    },
+    onError || ((err) => console.warn("Snapshot error:", err)),
+  );
 }
 
 /**
@@ -341,14 +351,18 @@ export function listenForPeerConversations(
     where("participants", "array-contains", userId),
   );
 
-  return onSnapshot(q, (snapshot) => {
-    const conversations: Conversation[] = snapshot.docs.map((d) => ({
-      id: d.id,
-      ...(d.data() as Omit<Conversation, "id">),
-    }));
-    conversations.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
-    callback(conversations);
-  }, onError || ((err) => console.warn("Snapshot error:", err)));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const conversations: Conversation[] = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<Conversation, "id">),
+      }));
+      conversations.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+      callback(conversations);
+    },
+    onError || ((err) => console.warn("Snapshot error:", err)),
+  );
 }
 
 /**
@@ -362,14 +376,18 @@ export function listenForAllPeerConversations(
   const conversationsRef = collection(db, "conversations");
   const q = query(conversationsRef, where("type", "==", "peer"));
 
-  return onSnapshot(q, (snapshot) => {
-    const conversations: Conversation[] = snapshot.docs.map((d) => ({
-      id: d.id,
-      ...(d.data() as Omit<Conversation, "id">),
-    }));
-    conversations.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
-    callback(conversations);
-  }, onError || ((err) => console.warn("Snapshot error:", err)));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const conversations: Conversation[] = snapshot.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<Conversation, "id">),
+      }));
+      conversations.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+      callback(conversations);
+    },
+    onError || ((err) => console.warn("Snapshot error:", err)),
+  );
 }
 
 /**
@@ -488,7 +506,10 @@ export async function fetchAllUsers(
       const data = d.data();
       results.push({
         uid: d.id,
-        fullName: data.fullName || data.displayName || (collectionName === "admins" ? "Admin" : "Student"),
+        fullName:
+          data.fullName ||
+          data.displayName ||
+          (collectionName === "admins" ? "Admin" : "Student"),
         department: data.department || data.position || undefined,
         yearLevel: data.yearLevel || undefined,
         profileImage: data.profileImage || undefined,
@@ -592,20 +613,25 @@ export function listenForTyping(
   onError?: (error: Error) => void,
 ): () => void {
   const conversationRef = doc(db, "conversations", conversationId);
-  return onSnapshot(conversationRef, (snap) => {
-    if (!snap.exists()) {
-      callback(false);
-      return;
-    }
-    const data = snap.data();
-    const typingBy = data.typingBy || {};
-    const now = Date.now();
-    // Consider someone "typing" if their timestamp is within the last 5 seconds
-    const isOtherTyping = Object.entries(typingBy).some(
-      ([uid, timestamp]) => uid !== currentUid && now - (timestamp as number) < 5000,
-    );
-    callback(isOtherTyping);
-  }, onError || ((err) => console.warn("Snapshot error:", err)));
+  return onSnapshot(
+    conversationRef,
+    (snap) => {
+      if (!snap.exists()) {
+        callback(false);
+        return;
+      }
+      const data = snap.data();
+      const typingBy = data.typingBy || {};
+      const now = Date.now();
+      // Consider someone "typing" if their timestamp is within the last 5 seconds
+      const isOtherTyping = Object.entries(typingBy).some(
+        ([uid, timestamp]) =>
+          uid !== currentUid && now - (timestamp as number) < 5000,
+      );
+      callback(isOtherTyping);
+    },
+    onError || ((err) => console.warn("Snapshot error:", err)),
+  );
 }
 
 /**
@@ -614,10 +640,7 @@ export function listenForTyping(
  */
 let typingTimeout: ReturnType<typeof setTimeout> | null = null;
 
-export function startTyping(
-  conversationId: string,
-  uid: string,
-): void {
+export function startTyping(conversationId: string, uid: string): void {
   setTyping(conversationId, uid, true);
 
   if (typingTimeout) clearTimeout(typingTimeout);
@@ -626,10 +649,7 @@ export function startTyping(
   }, 3000);
 }
 
-export function stopTyping(
-  conversationId: string,
-  uid: string,
-): void {
+export function stopTyping(conversationId: string, uid: string): void {
   if (typingTimeout) clearTimeout(typingTimeout);
   setTyping(conversationId, uid, false);
 }
