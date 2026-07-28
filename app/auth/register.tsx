@@ -208,6 +208,52 @@ const COLLEGE_DEPARTMENTS: Record<string, Record<string, string[]>> = {
       "Bachelor of Technology and Livelihood Education (BTLEd)",
     ],
   },
+  "University of the Cordilleras (UC)": {
+    "College of Information Technology and Computer Science (CITCS)": [
+      "Bachelor of Science in Information Technology (BSIT)",
+      "Bachelor of Science in Computer Science (BSCS)",
+      "Associate in Computer Technology (ACT)",
+    ],
+    "College of Accountancy (COA)": [
+      "Bachelor of Science in Accountancy (BSA)",
+      "Bachelor of Science in Management Accounting (BSMA)",
+    ],
+    "College of Business Administration (CBA)": [
+      "Bachelor of Science in Business Administration (BSBA)",
+      "Bachelor of Science in Entrepreneurship (BS Entrep)",
+    ],
+    "College of Criminal Justice Education (CCJE)": [
+      "Bachelor of Science in Criminology (BSCrim)",
+      "Bachelor of Science in Industrial Security Management (BSISM)",
+    ],
+    "College of Engineering and Architecture (CEA)": [
+      "Bachelor of Science in Architecture (BS Arch)",
+      "Bachelor of Science in Civil Engineering (BSCE)",
+      "Bachelor of Science in Computer Engineering (BSCpE)",
+      "Bachelor of Science in Electrical Engineering (BSEE)",
+      "Bachelor of Science in Electronics Engineering (BSECE)",
+      "Bachelor of Science in Mechanical Engineering (BSME)",
+    ],
+    "College of Arts and Sciences (CAS)": [
+      "Bachelor of Arts in Communication (AB Comm)",
+      "Bachelor of Arts in Political Science (AB PolSci)",
+      "Bachelor of Science in Psychology (BS Psych)",
+      "Bachelor of Science in Biology (BS Bio)",
+      "Bachelor of Library and Information Science (BLIS)",
+    ],
+    "College of Teacher Education (CTE)": [
+      "Bachelor of Early Childhood Education (BECEd)",
+      "Bachelor of Elementary Education (BEEd)",
+      "Bachelor of Secondary Education (BSEd)",
+    ],
+    "College of Hospitality and Tourism Management (CHTM)": [
+      "Bachelor of Science in Hospitality Management (BSHM)",
+      "Bachelor of Science in Tourism Management (BSTM)",
+    ],
+    "College of Nursing (CON)": [
+      "Bachelor of Science in Nursing (BSN)",
+    ],
+  },
 };
 
 const GENDERS = [
@@ -285,6 +331,7 @@ export default function RegisterScreen() {
     useState<DocumentPicker.DocumentPickerResult | null>(null);
   const [departmentSearch, setDepartmentSearch] = useState("");
   const [collegeSearch, setCollegeSearch] = useState("");
+  const [programSearch, setProgramSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -1017,53 +1064,86 @@ export default function RegisterScreen() {
                     <Ionicons name="school-outline" size={18} color="#64748B" />
                     <Text style={styles.inputLabel}>Department *</Text>
                   </View>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      validationErrors.includes("department") &&
-                        styles.inputError,
-                    ]}
-                    placeholder="Search department..."
-                    placeholderTextColor="#94A3B8"
-                    value={
-                      formData.department
-                        ? formData.department
-                        : departmentSearch
+                  {(() => {
+                    const hasDepts = formData.college && COLLEGE_DEPARTMENTS[formData.college];
+                    if (hasDepts) {
+                      return (
+                        <>
+                          <TextInput
+                            style={[
+                              styles.input,
+                              validationErrors.includes("department") &&
+                                styles.inputError,
+                            ]}
+                            placeholder="Search department..."
+                            placeholderTextColor="#94A3B8"
+                            value={
+                              formData.department
+                                ? formData.department
+                                : departmentSearch
+                            }
+                            editable={!formData.department}
+                            onChangeText={(text) => setDepartmentSearch(text)}
+                          />
+                          {!formData.department && !!departmentSearch && (
+                            <View style={styles.dropdownContainer}>
+                              {Object.keys(COLLEGE_DEPARTMENTS[formData.college] || {})
+                                .filter((d) =>
+                                  d
+                                    .toLowerCase()
+                                    .includes(departmentSearch.toLowerCase()),
+                                )
+                                .slice(0, 5)
+                                .map((dept) => (
+                                  <Pressable
+                                    key={dept}
+                                    style={styles.dropdownOption}
+                                    onPress={() => {
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        department: dept,
+                                        academicProgram: "",
+                                      }));
+                                      setDepartmentSearch("");
+                                      if (validationErrors.includes("department"))
+                                        setValidationErrors((p) =>
+                                          p.filter((k) => k !== "department"),
+                                        );
+                                    }}
+                                  >
+                                    <Text style={styles.dropdownText}>{dept}</Text>
+                                  </Pressable>
+                                ))}
+                            </View>
+                          )}
+                        </>
+                      );
                     }
-                    editable={!formData.department}
-                    onChangeText={(text) => setDepartmentSearch(text)}
-                  />
-                  {!formData.department && !!departmentSearch && (
-                    <View style={styles.dropdownContainer}>
-                      {Object.keys(COLLEGE_DEPARTMENTS[formData.college] || {})
-                        .filter((d) =>
-                          d
-                            .toLowerCase()
-                            .includes(departmentSearch.toLowerCase()),
-                        )
-                        .slice(0, 5)
-                        .map((dept) => (
-                          <Pressable
-                            key={dept}
-                            style={styles.dropdownOption}
-                            onPress={() => {
-                              setFormData((prev) => ({
-                                ...prev,
-                                department: dept,
-                                academicProgram: "",
-                              }));
-                              setDepartmentSearch("");
-                              if (validationErrors.includes("department"))
-                                setValidationErrors((p) =>
-                                  p.filter((k) => k !== "department"),
-                                );
-                            }}
-                          >
-                            <Text style={styles.dropdownText}>{dept}</Text>
-                          </Pressable>
-                        ))}
-                    </View>
-                  )}
+                    return (
+                      <TextInput
+                        style={[
+                          styles.input,
+                          validationErrors.includes("department") &&
+                            styles.inputError,
+                        ]}
+                        placeholder="Type your department..."
+                        placeholderTextColor="#94A3B8"
+                        value={
+                          formData.department
+                            ? formData.department
+                            : departmentSearch
+                        }
+                        onChangeText={(text) => {
+                          setDepartmentSearch(text);
+                          setFormData((prev) => ({
+                            ...prev,
+                            department: text,
+                            academicProgram: "",
+                          }));
+                        }}
+                      />
+                    );
+                  })()}
                   {formData.department && (
                     <View style={styles.selectedTag}>
                       <Text style={styles.selectedTagText}>
@@ -1092,7 +1172,7 @@ export default function RegisterScreen() {
                       Academic Program / Course *
                     </Text>
                   </View>
-                  {!formData.department && !formData.college ? (
+                  {!formData.college ? (
                     <Text style={styles.helpText}>
                       Please select a college first
                     </Text>
@@ -1100,40 +1180,134 @@ export default function RegisterScreen() {
                     <Text style={styles.helpText}>
                       Please search and select a department
                     </Text>
-                  ) : (
-                    <View style={styles.optionsWrap}>
-                      {getDepartmentPrograms(formData.college, formData.department)?.map((course) => (
-                        <Pressable
-                          key={course}
+                  ) : (() => {
+                    const hasPrograms = getDepartmentPrograms(formData.college, formData.department)?.length > 0;
+                    if (hasPrograms) {
+                      return (
+                        <>
+                          <TextInput
+                            style={[
+                              styles.input,
+                              validationErrors.includes("academicProgram") &&
+                                styles.inputError,
+                            ]}
+                            placeholder="Search program..."
+                            placeholderTextColor="#94A3B8"
+                            value={
+                              formData.academicProgram
+                                ? formData.academicProgram
+                                : programSearch
+                            }
+                            editable={!formData.academicProgram}
+                            onChangeText={(text) => setProgramSearch(text)}
+                          />
+                          {!formData.academicProgram && !!programSearch && (
+                            <View style={styles.dropdownContainer}>
+                              {getDepartmentPrograms(formData.college, formData.department)
+                                ?.filter((p) =>
+                                  p
+                                    .toLowerCase()
+                                    .includes(programSearch.toLowerCase()),
+                                )
+                                .slice(0, 8)
+                                .map((program) => (
+                                  <Pressable
+                                    key={program}
+                                    style={styles.dropdownOption}
+                                    onPress={() => {
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        academicProgram: program,
+                                      }));
+                                      setProgramSearch("");
+                                      if (
+                                        validationErrors.includes("academicProgram")
+                                      )
+                                        setValidationErrors((p) =>
+                                          p.filter(
+                                            (k) => k !== "academicProgram",
+                                          ),
+                                        );
+                                    }}
+                                  >
+                                    <Text style={styles.dropdownText}>
+                                      {program}
+                                    </Text>
+                                  </Pressable>
+                                ))}
+                            </View>
+                          )}
+                          {formData.academicProgram && (
+                            <View style={styles.selectedTag}>
+                              <Text style={styles.selectedTagText}>
+                                {formData.academicProgram}
+                              </Text>
+                              <Pressable
+                                onPress={() =>
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    academicProgram: "",
+                                  }))
+                                }
+                              >
+                                <Ionicons
+                                  name="close-circle"
+                                  size={18}
+                                  color="white"
+                                />
+                              </Pressable>
+                            </View>
+                          )}
+                        </>
+                      );
+                    }
+                    return (
+                      <>
+                        <TextInput
                           style={[
-                            styles.listOption,
-                            formData.academicProgram === course &&
-                              styles.listOptionSelected,
+                            styles.input,
+                            validationErrors.includes("academicProgram") &&
+                              styles.inputError,
                           ]}
-                          onPress={() => {
+                          placeholder="Type your program..."
+                          placeholderTextColor="#94A3B8"
+                          value={
+                            formData.academicProgram
+                              ? formData.academicProgram
+                              : programSearch
+                          }
+                          onChangeText={(text) => {
+                            setProgramSearch(text);
                             setFormData((prev) => ({
                               ...prev,
-                              academicProgram: course,
+                              academicProgram: text,
                             }));
-                            if (validationErrors.includes("academicProgram"))
-                              setValidationErrors((p) =>
-                                p.filter((k) => k !== "academicProgram"),
-                              );
                           }}
-                        >
-                          <Text
-                            style={[
-                              styles.listOptionText,
-                              formData.academicProgram === course &&
-                                styles.listOptionSelectedText,
-                            ]}
-                          >
-                            {course}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  )}
+                        />
+                        {formData.academicProgram && (
+                          <View style={styles.selectedTag}>
+                            <Text style={styles.selectedTagText}>
+                              {formData.academicProgram}
+                            </Text>
+                            <Pressable
+                              onPress={() =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  academicProgram: "",
+                                }))
+                              }
+                            >
+                              <Ionicons
+                                name="close-circle"
+                                size={18}
+                                color="white"
+                              />
+                            </Pressable>
+                          </View>
+                        )}
+                      </>
+                    );
+                  })()}
                   {validationErrors.includes("academicProgram") ? <Text style={styles.fieldError}>Please select a program</Text> : null}
                 </View>
 

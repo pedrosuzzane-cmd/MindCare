@@ -47,6 +47,7 @@ export default function ProfileScreen() {
 
   const [position, setPosition] = useState("");
   const [schoolId, setSchoolId] = useState("");
+  const [college, setCollege] = useState("");
   const [academicProgram, setAcademicProgram] = useState("");
   const [yearLevel, setYearLevel] = useState("");
 
@@ -73,6 +74,7 @@ export default function ProfileScreen() {
           setAddress(data.provincialAddress || data.address || "");
           setPosition(data.position || "");
           setSchoolId(data.schoolId || "");
+          setCollege(data.college || "");
           setAcademicProgram(data.academicProgram || "");
           setYearLevel(data.yearLevel || "");
         } else {
@@ -118,6 +120,7 @@ export default function ProfileScreen() {
       setAddress(profile.provincialAddress || profile.address || "");
       setPosition(profile.position || "");
       setSchoolId(profile.schoolId || "");
+      setCollege(profile.college || "");
       setAcademicProgram(profile.academicProgram || "");
       setYearLevel(profile.yearLevel || "");
     }
@@ -155,6 +158,7 @@ export default function ProfileScreen() {
       if (isAdmin) {
         data.schoolId = sanitize(schoolId.replace(/-/g, ""), 20);
         data.position = sanitize(position, 100);
+        data.college = sanitize(college, 150);
         data.address = sanitize(address, 500);
       } else {
         data.schoolId = sanitize(schoolId, 50);
@@ -184,7 +188,7 @@ export default function ProfileScreen() {
 
   const roleLabel = isAdmin ? "Administrator" : "Student";
   const deptLabel = isAdmin
-    ? profile?.position || "MindCare Staff"
+    ? profile?.college || profile?.position || "MindCare Staff"
     : profile?.academicProgram || "MindCare Student";
 
   if (loading) {
@@ -419,6 +423,21 @@ export default function ProfileScreen() {
                   <Text style={s.fieldValue}>
                     {formatSchoolId(profile?.schoolId || "") || "-"}
                   </Text>
+                </View>
+              )}
+
+              <Text style={s.fieldLabel}>College / University</Text>
+              {editing ? (
+                <TextInput
+                  style={s.input}
+                  value={college}
+                  onChangeText={setCollege}
+                  placeholder="e.g. University of the Cordilleras (UC)"
+                  placeholderTextColor="#94A3B8"
+                />
+              ) : (
+                <View style={s.fieldRow}>
+                  <Text style={s.fieldValue}>{profile?.college || "-"}</Text>
                 </View>
               )}
 

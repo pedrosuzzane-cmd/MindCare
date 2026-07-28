@@ -38,6 +38,30 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context"; // This was already correct
 
+const COLLEGES = [
+  "Saint Louis University (SLU)",
+  "University of the Philippines Baguio (UPB)",
+  "University of Baguio (UB)",
+  "University of the Cordilleras (UC)",
+  "Baguio Central University (BCU)",
+  "Pines City Colleges (PCC)",
+  "Baguio College of Technology (BCT)",
+  "Philippine Military Academy (PMA)",
+  "Easter College (EC)",
+  "BSBT College",
+  "Asia Pacific Theological Seminary (APTS)",
+  "Data Center College of the Philippines (DCCP)",
+  "STI College Baguio",
+  "Benguet State University (BSU)",
+  "Cordillera Career Development College (CCDC)",
+  "King's College of the Philippines (KCP)",
+  "Philippine Nazarene College (PNC)",
+  "Philippine College of Ministry (PCM)",
+  "BVS Colleges",
+  "Concordia College of Benguet",
+  "Star Colleges",
+];
+
 type RiskLevel = "low" | "normal" | "high";
 
 interface AnalyticsSummary {
@@ -181,6 +205,9 @@ export default function AdminPanelScreen() {
   const [newAdminGender, setNewAdminGender] = useState("");
   const [newAdminNationality, setNewAdminNationality] = useState("");
   const [newAdminAddress, setNewAdminAddress] = useState("");
+  const [newAdminCollege, setNewAdminCollege] = useState("");
+  const [newAdminCollegeSearch, setNewAdminCollegeSearch] = useState("");
+  const [adminCollege, setAdminCollege] = useState("");
   const [isSignOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
@@ -214,6 +241,13 @@ export default function AdminPanelScreen() {
         setLoading(false);
       },
     );
+
+    getDoc(doc(db, "admins", user.uid)).then((snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.college) setAdminCollege(data.college);
+      }
+    }).catch(() => {});
 
     return () => {
       unsubData();
@@ -647,6 +681,7 @@ export default function AdminPanelScreen() {
           nationality: newAdminNationality.trim() || null,
           address: newAdminAddress.trim() || null,
           schoolId: newAdminIdNo.replace(/-/g, "").trim() || null,
+          college: newAdminCollege || null,
         }),
       });
 
@@ -684,6 +719,9 @@ export default function AdminPanelScreen() {
             ...(newAdminAddress.trim()
               ? { address: newAdminAddress.trim() }
               : {}),
+            ...(newAdminCollege
+              ? { college: newAdminCollege }
+              : {}),
           },
           { merge: true },
         );
@@ -703,6 +741,8 @@ export default function AdminPanelScreen() {
       setNewAdminGender("");
       setNewAdminNationality("");
       setNewAdminAddress("");
+      setNewAdminCollege("");
+      setNewAdminCollegeSearch("");
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "An unknown error occurred.";
@@ -1215,7 +1255,7 @@ export default function AdminPanelScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.mainLayout}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Analytics Overview</Text>
+          <Text style={styles.headerTitle}>{adminCollege ? `${adminCollege} Analytics Overview` : "Analytics Overview"}</Text>
           <View style={styles.headerActions}>
             <Pressable
               style={styles.profileButton}
@@ -1948,6 +1988,46 @@ export default function AdminPanelScreen() {
                     }}
                     keyboardType="number-pad"
                   />
+                </View>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>College / University</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    placeholder="Search college..."
+                    value={newAdminCollege ? newAdminCollege : newAdminCollegeSearch}
+                    editable={!newAdminCollege}
+                    onChangeText={(text) => setNewAdminCollegeSearch(text)}
+                    autoCapitalize="words"
+                  />
+                  {!newAdminCollege && !!newAdminCollegeSearch && (
+                    <View style={styles.dropdownContainer}>
+                      {COLLEGES.filter((c) =>
+                        c.toLowerCase().includes(newAdminCollegeSearch.toLowerCase()),
+                      )
+                        .slice(0, 8)
+                        .map((college) => (
+                          <Pressable
+                            key={college}
+                            style={styles.dropdownOption}
+                            onPress={() => {
+                              setNewAdminCollege(college);
+                              setNewAdminCollegeSearch("");
+                            }}
+                          >
+                            <Text style={styles.dropdownText}>{college}</Text>
+                          </Pressable>
+                        ))}
+                    </View>
+                  )}
+                  {newAdminCollege && (
+                    <View style={styles.selectedTag}>
+                      <Text style={styles.selectedTagText}>{newAdminCollege}</Text>
+                      <Pressable onPress={() => setNewAdminCollege("")}>
+                        <Ionicons name="close-circle" size={18} color="white" />
+                      </Pressable>
+                    </View>
+                  )}
                 </View>
 
                 <View style={styles.formGroup}>
@@ -3179,4 +3259,35 @@ const styles = StyleSheet.create({
   },
   expiryText: { fontSize: 11, fontWeight: "600", color: "#8A63D2" },
   deleteAnnouncementBtn: { padding: 8, borderRadius: 10, backgroundColor: "#FEF2F2" },
+  dropdownContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    maxHeight: 240,
+    marginTop: 4,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  dropdownOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  dropdownText: { fontSize: 14, color: "#1E293B" },
+  selectedTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#8A63D2",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 8,
+    gap: 8,
+  },
+  selectedTagText: { color: "#FFFFFF", fontSize: 14, fontWeight: "600", flex: 1 },
 });
