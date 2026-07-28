@@ -9,7 +9,6 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -33,6 +32,9 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const { user, role, loading: authLoading } = useAuth();
 
   useEffect(() => {
@@ -59,10 +61,20 @@ export default function LoginScreen() {
   }
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert("Missing details", "Enter both your email and password.");
-      return;
+    setEmailError("");
+    setPasswordError("");
+    setError("");
+
+    let hasError = false;
+    if (!email.trim()) {
+      setEmailError("Email is required.");
+      hasError = true;
     }
+    if (!password.trim()) {
+      setPasswordError("Password is required.");
+      hasError = true;
+    }
+    if (hasError) return;
 
     setSubmitting(true);
     try {
@@ -72,8 +84,23 @@ export default function LoginScreen() {
       } else {
         await AsyncStorage.removeItem(REMEMBER_EMAIL_KEY);
       }
-    } catch (error: any) {
-      Alert.alert("Login failed", error.message || "Invalid credentials.");
+    } catch (err: any) {
+      const code = err?.code || "";
+      let message = "Login failed. Please try again.";
+      if (
+        code === "auth/invalid-credential" ||
+        code === "auth/user-not-found" ||
+        code === "auth/wrong-password"
+      ) {
+        message = "Invalid email or password. Please check your credentials and try again.";
+      } else if (code === "auth/user-disabled") {
+        message = "This account has been disabled. Please contact support.";
+      } else if (code === "auth/too-many-requests") {
+        message = "Too many failed attempts. Please try again later.";
+      } else if (code === "auth/network-request-failed") {
+        message = "Network error. Please check your connection.";
+      }
+      setError(message);
     } finally {
       setSubmitting(false);
     }
@@ -134,19 +161,20 @@ export default function LoginScreen() {
           </Text>
 
           <Text style={styles.fieldLabel}>Email address</Text>
-          <View style={styles.inputContainer}>
+          <View style={[styles.inputContainer, emailError ? styles.inputContainerError : null]}>
             <Ionicons name="mail-outline" size={20} color={styles.icon.color} />
             <TextInput
               style={styles.input}
               placeholder="you@example.com"
               placeholderTextColor={styles.placeholder.color}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(text) => { setEmail(text); if (emailError) setEmailError(""); if (error) setError(""); }}
               autoCapitalize="none"
               keyboardType="email-address"
               autoComplete="email"
             />
           </View>
+          {emailError ? <Text style={styles.fieldError}>{emailError}</Text> : null}
 
           <View style={styles.labelRow}>
             <Text style={styles.fieldLabel}>Password</Text>
@@ -154,14 +182,14 @@ export default function LoginScreen() {
               <Text style={styles.forgotText}>Forgot password?</Text>
             </Pressable>
           </View>
-          <View style={styles.inputContainer}>
+          <View style={[styles.inputContainer, passwordError ? styles.inputContainerError : null]}>
             <Ionicons name="lock-closed-outline" size={20} color={styles.icon.color} />
             <TextInput
               style={styles.input}
               placeholder="Enter your password"
               placeholderTextColor={styles.placeholder.color}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(text) => { setPassword(text); if (passwordError) setPasswordError(""); if (error) setError(""); }}
               secureTextEntry={!showPassword}
               autoComplete="password"
             />
@@ -177,6 +205,7 @@ export default function LoginScreen() {
               />
             </Pressable>
           </View>
+          {passwordError ? <Text style={styles.fieldError}>{passwordError}</Text> : null}
 
           <View style={styles.rememberRow}>
             <Pressable
@@ -192,10 +221,13 @@ export default function LoginScreen() {
             </Pressable>
           </View>
 
+          {error ? <Text style={styles.fieldError}>{error}</Text> : null}
+
           <Pressable
             style={[styles.loginButton, submitting && styles.loginButtonDisabled]}
             onPress={handleLogin}
             disabled={submitting}
+            android_ripple={{ borderless: false, color: "rgba(255,255,255,0.2)" }}
           >
             <LinearGradient
               colors={isDark ? ["#A78BFA", "#7C3AED"] : ["#7C3AED", "#5B21B6"]}
@@ -216,7 +248,7 @@ export default function LoginScreen() {
 
           <View style={styles.footerContainer}>
             <Text style={styles.footerText}>New to MindCare? </Text>
-            <Pressable onPress={() => router.push("/auth/register")}>
+            <Pressable onPress={() => router.push("/auth/register")} android_ripple={{ borderless: false, color: "rgba(124,58,237,0.1)" }}>
               <Text style={styles.signupText}>Create an account</Text>
             </Pressable>
           </View>
@@ -349,6 +381,16 @@ const createStyles = (isDark: boolean) => {
     icon: { color: colors.icon },
     placeholder: { color: colors.placeholder },
     eyeIcon: { padding: 4 },
+    inputContainerError: {
+      borderColor: "#EF4444",
+    },
+    fieldError: {
+      color: "#EF4444",
+      fontSize: 12,
+      marginTop: -14,
+      marginBottom: 14,
+      fontWeight: "600",
+    },
     forgotText: { color: isDark ? "#C4B5FD" : "#6D28D9", fontSize: 12, fontWeight: "800", marginBottom: 8 },
     rememberRow: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
     rememberToggle: { flexDirection: "row", alignItems: "center", gap: 10 },

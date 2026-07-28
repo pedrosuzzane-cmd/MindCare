@@ -98,6 +98,7 @@ export default function StudentMessagesScreen() {
 
   // ── Presence state ──
   const [partnerOnline, setPartnerOnline] = useState(false);
+  const [presenceMap, setPresenceMap] = useState<Record<string, boolean>>({});
 
   // ── Typing state ──
   const [partnerTyping, setPartnerTyping] = useState(false);
@@ -149,6 +150,20 @@ export default function StudentMessagesScreen() {
       cancelled = true;
     };
   }, [viewMode, user?.uid]);
+
+  // ── Listen for presence of all directory users ──
+  useEffect(() => {
+    const allUsers = [...peers, ...admins];
+    if (allUsers.length === 0) return;
+
+    const unsubs = allUsers.map((u) =>
+      listenForPresence(u.uid, (online) => {
+        setPresenceMap((prev) => ({ ...prev, [u.uid]: online }));
+      }),
+    );
+
+    return () => unsubs.forEach((unsub) => unsub());
+  }, [peers, admins]);
 
   // ── Listen for messages when in chat view ──
   useEffect(() => {
@@ -389,7 +404,15 @@ export default function StudentMessagesScreen() {
           {item.yearLevel ? ` \u00B7 ${item.yearLevel}` : ""}
         </Text>
       </View>
-      <Ionicons name="chatbubble-outline" size={18} color="#8A63D2" />
+      <View style={styles.userCardRight}>
+        <View
+          style={[
+            styles.presenceDot,
+            presenceMap[item.uid] ? styles.presenceDotOnline : styles.presenceDotOffline,
+          ]}
+        />
+        <Ionicons name="chatbubble-outline" size={18} color="#8A63D2" />
+      </View>
     </Pressable>
   );
 
@@ -964,6 +987,21 @@ const styles = StyleSheet.create({
   userInfo: { flex: 1 },
   userName: { fontSize: 15, fontWeight: "600", color: "#1E1B4B" },
   userRole: { fontSize: 13, color: "#64748B", marginTop: 2 },
+  userCardRight: {
+    alignItems: "center",
+    gap: 8,
+  },
+  presenceDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  presenceDotOnline: {
+    backgroundColor: "#22C55E",
+  },
+  presenceDotOffline: {
+    backgroundColor: "#D1D5DB",
+  },
 
   // Reminder banner
   reminderBanner: {

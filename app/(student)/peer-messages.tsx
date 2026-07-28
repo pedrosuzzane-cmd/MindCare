@@ -49,6 +49,11 @@ import type {
   OptimisticMessage,
   StudentSearchResult,
 } from "@/types/messaging";
+import {
+  setUserOnline,
+  setUserOffline,
+  listenForPresence,
+} from "@/services/presenceService";
 
 type ViewMode = "inbox" | "chat" | "search";
 
@@ -92,6 +97,9 @@ export default function PeerMessagesScreen() {
   // Inbox-level search
   const [inboxSearchQuery, setInboxSearchQuery] = useState("");
 
+  // Presence
+  const [presenceMap, setPresenceMap] = useState<Record<string, boolean>>({});
+
   // Merge Firestore messages with optimistic ones
   const allMessages: OptimisticMessage[] = [
     ...messages,
@@ -115,6 +123,30 @@ export default function PeerMessagesScreen() {
     });
     return () => unsub();
   }, [user?.uid]);
+
+  // Set self as online on mount, offline on unmount
+  useEffect(() => {
+    if (!user?.uid) return;
+    setUserOnline(user.uid);
+    return () => {
+      setUserOffline(user.uid);
+    };
+  }, [user?.uid]);
+
+  // Listen for presence of conversation partners
+  useEffect(() => {
+    if (conversations.length === 0 || !user?.uid) return;
+
+    const unsubs = conversations.map((conv) => {
+      const peerUid = conv.participants?.find((p) => p !== user.uid);
+      if (!peerUid) return () => {};
+      return listenForPresence(peerUid, (online) => {
+        setPresenceMap((prev) => ({ ...prev, [peerUid]: online }));
+      });
+    });
+
+    return () => unsubs.forEach((unsub) => unsub());
+  }, [conversations, user?.uid]);
 
   // Listen for messages when in chat view
   useEffect(() => {
@@ -433,8 +465,22 @@ export default function PeerMessagesScreen() {
         }}
         delayLongPress={400}
       >
-        <View style={styles.convAvatar}>
-          <Ionicons name="person" size={22} color="#8A63D2" />
+        <View style={styles.convAvatarWrapper}>
+          <View style={styles.convAvatar}>
+            <Ionicons name="person" size={22} color="#8A63D2" />
+          </View>
+          {(() => {
+            const peerUid = item.participants?.find((p) => p !== user?.uid);
+            const isOnline = peerUid ? presenceMap[peerUid] : false;
+            return (
+              <View
+                style={[
+                  styles.convPresenceDot,
+                  isOnline ? styles.convPresenceDotOnline : styles.convPresenceDotOffline,
+                ]}
+              />
+            );
+          })()}
         </View>
         <View style={styles.convInfo}>
           <View style={styles.convTop}>
@@ -1066,6 +1112,25 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
     backgroundColor: "#8A63D2",
+  },
+  convAvatarWrapper: {
+    position: "relative",
+  },
+  convPresenceDot: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: "white",
+  },
+  convPresenceDotOnline: {
+    backgroundColor: "#22C55E",
+  },
+  convPresenceDotOffline: {
+    backgroundColor: "#D1D5DB",
   },
 
   // Search

@@ -43,8 +43,9 @@ service cloud.firestore {
         allow read, write: if isOwner(userId);
       }
        match /presence/{docId} {
-    	allow read, write: if isOwner(userId);
-  		}
+        allow read: if signedIn();
+        allow write: if isOwner(userId);
+      }
     }
 
     match /admins/{adminId} {

@@ -661,6 +661,7 @@ export default function RegisterScreen() {
                     }}
                     autoCapitalize="words"
                   />
+                  {validationErrors.includes("fullName") ? <Text style={styles.fieldError}>Full name is required</Text> : null}
                 </View>
 
                 <View style={styles.inputContainer}>
@@ -686,6 +687,7 @@ export default function RegisterScreen() {
                     keyboardType="email-address"
                     autoCapitalize="none"
                   />
+                  {validationErrors.includes("email") ? <Text style={styles.fieldError}>Valid email is required</Text> : null}
                 </View>
 
                 <View style={styles.inputContainer}>
@@ -716,6 +718,7 @@ export default function RegisterScreen() {
                     keyboardType="number-pad"
                     maxLength={10}
                   />
+                  {validationErrors.includes("dateOfBirth") ? <Text style={styles.fieldError}>Date of birth is required</Text> : null}
                 </View>
 
                 <View style={styles.inputContainer}>
@@ -746,11 +749,13 @@ export default function RegisterScreen() {
                     }}
                     keyboardType="phone-pad"
                   />
+                  {validationErrors.includes("contactNo") ? <Text style={styles.fieldError}>Phone number is required</Text> : null}
                 </View>
 
                 <Pressable
                   style={styles.nextStepButton}
                   onPress={handleNextTab}
+                  android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
                 >
                   <Text style={styles.nextStepButtonText}>
                     Next Step: School Info
@@ -795,6 +800,7 @@ export default function RegisterScreen() {
                     keyboardType="numeric"
                     maxLength={11}
                   />
+                  {validationErrors.includes("schoolId") ? <Text style={styles.fieldError}>School ID is required</Text> : null}
                 </View>
 
                 <View style={styles.inputContainer}>
@@ -867,6 +873,7 @@ export default function RegisterScreen() {
                       </Pressable>
                     </View>
                   )}
+                  {validationErrors.includes("department") ? <Text style={styles.fieldError}>Department is required</Text> : null}
                 </View>
 
                 <View style={styles.inputContainer}>
@@ -914,6 +921,7 @@ export default function RegisterScreen() {
                       ))}
                     </View>
                   )}
+                  {validationErrors.includes("academicProgram") ? <Text style={styles.fieldError}>Please select a program</Text> : null}
                 </View>
 
                 <View style={styles.inputContainer}>
@@ -954,12 +962,14 @@ export default function RegisterScreen() {
                       </Pressable>
                     ))}
                   </View>
+                  {validationErrors.includes("yearLevel") ? <Text style={styles.fieldError}>Please select a year level</Text> : null}
                 </View>
 
                 <View style={styles.stepButtonRow}>
                   <Pressable
                     style={styles.prevStepButton}
                     onPress={() => setActiveTab(1)}
+                    android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
                   >
                     <Ionicons name="arrow-back" size={18} color="#334155" />
                     <Text style={styles.prevStepButtonText}>Back</Text>
@@ -967,6 +977,7 @@ export default function RegisterScreen() {
                   <Pressable
                     style={styles.nextStepButton}
                     onPress={handleNextTab}
+                    android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
                   >
                     <Text style={styles.nextStepButtonText}>
                       Next: Personal Info
@@ -1010,6 +1021,7 @@ export default function RegisterScreen() {
                     }}
                     autoCapitalize="words"
                   />
+                  {validationErrors.includes("nationality") ? <Text style={styles.fieldError}>Nationality is required</Text> : null}
                 </View>
 
                 <View style={styles.inputContainer}>
@@ -1053,6 +1065,7 @@ export default function RegisterScreen() {
                       </Pressable>
                     ))}
                   </View>
+                  {validationErrors.includes("citizenship") ? <Text style={styles.fieldError}>Citizenship is required</Text> : null}
                 </View>
 
                 <View style={styles.inputContainer}>
@@ -1098,6 +1111,7 @@ export default function RegisterScreen() {
                       </Pressable>
                     ))}
                   </View>
+                  {validationErrors.includes("civilStatus") ? <Text style={styles.fieldError}>Civil status is required</Text> : null}
                 </View>
 
                 <View style={styles.inputContainer}>
@@ -1141,6 +1155,7 @@ export default function RegisterScreen() {
                       </Pressable>
                     ))}
                   </View>
+                  {validationErrors.includes("genderIdentity") ? <Text style={styles.fieldError}>Gender identity is required</Text> : null}
                 </View>
 
                 <View style={styles.inputContainer}>
@@ -1216,6 +1231,7 @@ export default function RegisterScreen() {
                     multiline={true}
                     numberOfLines={2}
                   />
+                  {validationErrors.includes("provincialAddress") ? <Text style={styles.fieldError}>Address is required</Text> : null}
                 </View>
 
                 <View style={styles.inputContainer}>
@@ -1386,6 +1402,7 @@ export default function RegisterScreen() {
                           <Pressable
                             style={styles.uploadButton}
                             onPress={handlePickDocument}
+                            android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
                           >
                             <Text style={styles.uploadButtonText}>
                               Select File (PDF, JPG, PNG)
@@ -1440,6 +1457,7 @@ export default function RegisterScreen() {
                   <Pressable
                     style={styles.prevStepButton}
                     onPress={() => setActiveTab(2)}
+                    android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
                   >
                     <Ionicons name="arrow-back" size={18} color="#334155" />
                     <Text style={styles.prevStepButtonText}>Back</Text>
@@ -1451,6 +1469,7 @@ export default function RegisterScreen() {
                     ]}
                     onPress={handleOpenConfirmation}
                     disabled={loading}
+                    android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
                   >
                     {loading ? (
                       <ActivityIndicator color="white" />
@@ -1547,6 +1566,7 @@ export default function RegisterScreen() {
                     setConfirmPassword("");
                   }}
                   disabled={finalizing}
+                  android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
                 >
                   <Text style={styles.modalCancelText}>Cancel</Text>
                 </Pressable>
@@ -1558,6 +1578,7 @@ export default function RegisterScreen() {
                   ]}
                   onPress={handleFinalizeAccountCreation}
                   disabled={finalizing}
+                  android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
                 >
                   {finalizing ? (
                     <ActivityIndicator color="white" />
@@ -1717,6 +1738,13 @@ const styles = StyleSheet.create({
   inputError: {
     borderColor: "#EF4444",
     borderWidth: 1.5,
+  },
+  fieldError: {
+    color: "#EF4444",
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 4,
+    fontWeight: "600",
   },
   passwordInputContainer: {
     flexDirection: "row",
