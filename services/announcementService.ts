@@ -62,6 +62,7 @@ export async function createAnnouncement(
 
 export function listenForAnnouncements(
   callback: (announcements: Announcement[]) => void,
+  onError?: (error: Error) => void,
 ): () => void {
   const q = query(collection(db, "announcements"), orderBy("createdAt", "desc"));
   return onSnapshot(q, (snapshot) => {
@@ -87,7 +88,7 @@ export function listenForAnnouncements(
       })
       .filter((a) => a.expiresAt.getTime() > now);
     callback(items);
-  });
+  }, onError);
 }
 
 export async function deleteAnnouncement(announcementId: string): Promise<void> {

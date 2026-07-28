@@ -158,6 +158,9 @@ export default function MoodCalendarScreen() {
         });
         setJournalEntries(entries);
         setLoading(false);
+      }, (snapshotErr) => {
+        console.warn("Journal entries listener error:", snapshotErr);
+        setLoading(false);
       });
 
       return () => {

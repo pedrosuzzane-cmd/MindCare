@@ -51,6 +51,7 @@ export async function setUserOffline(uid: string): Promise<void> {
 export function listenForPresence(
   uid: string,
   callback: (online: boolean, lastSeen: number) => void,
+  onError?: (error: Error) => void,
 ): () => void {
   const presenceRef = doc(db, "users", uid, "presence", "status");
   return onSnapshot(presenceRef, (snap) => {
@@ -60,7 +61,7 @@ export function listenForPresence(
     } else {
       callback(false, 0);
     }
-  });
+  }, onError);
 }
 
 /**

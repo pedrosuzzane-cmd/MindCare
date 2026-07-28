@@ -10,7 +10,6 @@ export default function TabLayout() {
         headerShown: false,
       }}
     >
-      {/* Keep only the screens that actually remain inside app/(tabs)/ */}
       <Tabs.Screen
         name="dashboard"
         options={{
@@ -19,15 +18,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: "Explore",
-          tabBarButton: HapticTab,
-          tabBarIcon: ({ color, size }) => <Ionicons name="compass" size={size} color={color} />,
-        }}
-      />
-      {/* Ensure daily-journal is REMOVED from here since it's now a root screen */}
     </Tabs>
   );
 }

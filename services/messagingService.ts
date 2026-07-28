@@ -240,6 +240,7 @@ export async function markAsRead(
 export function listenForMessages(
   conversationId: string,
   callback: (messages: Message[]) => void,
+  onError?: (error: Error) => void,
 ): () => void {
   const messagesRef = collection(
     db,
@@ -255,7 +256,7 @@ export function listenForMessages(
       ...(d.data() as Omit<Message, "id">),
     }));
     callback(messages);
-  });
+  }, onError);
 }
 
 /**
@@ -265,6 +266,7 @@ export function listenForConversations(
   userId: string,
   role: "student" | "admin",
   callback: (conversations: Conversation[]) => void,
+  onError?: (error: Error) => void,
 ): () => void {
   const conversationsRef = collection(db, "conversations");
   const field = role === "student" ? "studentId" : "adminId";
@@ -277,7 +279,7 @@ export function listenForConversations(
     }));
     conversations.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
     callback(conversations);
-  });
+  }, onError);
 }
 
 /**
@@ -331,20 +333,23 @@ export async function getOrCreatePeerConversation(
 export function listenForPeerConversations(
   userId: string,
   callback: (conversations: Conversation[]) => void,
+  onError?: (error: Error) => void,
 ): () => void {
   const conversationsRef = collection(db, "conversations");
-  const q = query(conversationsRef, where("type", "==", "peer"));
+  const q = query(
+    conversationsRef,
+    where("type", "==", "peer"),
+    where("participants", "array-contains", userId),
+  );
 
   return onSnapshot(q, (snapshot) => {
-    const conversations: Conversation[] = snapshot.docs
-      .map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<Conversation, "id">),
-      }))
-      .filter((conv) => conv.participants?.includes(userId) || false);
+    const conversations: Conversation[] = snapshot.docs.map((d) => ({
+      id: d.id,
+      ...(d.data() as Omit<Conversation, "id">),
+    }));
     conversations.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
     callback(conversations);
-  });
+  }, onError);
 }
 
 /**
@@ -353,6 +358,7 @@ export function listenForPeerConversations(
  */
 export function listenForAllPeerConversations(
   callback: (conversations: Conversation[]) => void,
+  onError?: (error: Error) => void,
 ): () => void {
   const conversationsRef = collection(db, "conversations");
   const q = query(conversationsRef, where("type", "==", "peer"));
@@ -364,7 +370,7 @@ export function listenForAllPeerConversations(
     }));
     conversations.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
     callback(conversations);
-  });
+  }, onError);
 }
 
 /**
@@ -584,6 +590,7 @@ export function listenForTyping(
   conversationId: string,
   currentUid: string,
   callback: (isOtherTyping: boolean) => void,
+  onError?: (error: Error) => void,
 ): () => void {
   const conversationRef = doc(db, "conversations", conversationId);
   return onSnapshot(conversationRef, (snap) => {
@@ -599,7 +606,7 @@ export function listenForTyping(
       ([uid, timestamp]) => uid !== currentUid && now - (timestamp as number) < 5000,
     );
     callback(isOtherTyping);
-  });
+  }, onError);
 }
 
 /**
