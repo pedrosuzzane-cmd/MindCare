@@ -24,57 +24,190 @@ import { auth } from "@/constants/firebase";
 import { createUserDocument } from "@/firestore/profileFirestore";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 
-const DEPARTMENTS: Record<string, string[]> = {
-  "College of Information Technology and Computer Science (CITCS)": [
-    "Bachelor of Science in Information Technology (BSIT)",
-    "Bachelor of Science in Computer Science (BSCS)",
-    "Bachelor of Science in Data Analytics (BSDA)",
-    "Bachelor of Library and Information Science (BLIS)",
-    "Bachelor of Multimedia Arts (BMA)",
-    "Associate in Computer Technology (ACT)",
-  ],
-  "College of Criminal Justice Education (CCJE)": [
-    "Bachelor of Science in Criminology (BSC)",
-    "Bachelor of Forensic Science (BFS)",
-    "Bachelor of Science in Industrial Security Management (BSISM)",
-  ],
-  "College of Accountancy (COA)": [
-    "Bachelor of Science in Accountancy (BSA)",
-    "Bachelor of Science in Management Accounting (BSMA)",
-    "Bachelor of Science in Accounting Information System (BSAIS)",
-    "Bachelor of Science in Forensic Accounting (BSFA)",
-  ],
-  "College of Business Administration (CBA)": [
-    "Bachelor of Science in Business Administration (BSBA)",
-    "Bachelor of Science in Entrepreneurship (BSE)",
-  ],
-  "College of Engineering and Architecture (CEA)": [
-    "Bachelor of Science in Architecture (BSA)",
-    "Bachelor of Science in Civil Engineering (BSCE)",
-    "Bachelor of Science in Computer Engineering (BSCpE)",
-    "Bachelor of Science in Electronics Engineering (BSCEE)",
-    "Bachelor of Fine Arts (BFA)",
-  ],
-  "College of Arts and Sciences (CAS)": [
-    "Bachelor of Arts in Communication (BACom)",
-    "Bachelor of Arts in English Language Studies (BAELS)",
-    "Bachelor of Arts in Political Science (BAPS)",
-    "Bachelor of Arts in Behavioral Science (BABS)",
-    "Bachelor of Science in Psychology (BSPsy)",
-    "Bachelor of Science in Social Work (BSSW)",
-  ],
-  "College of Teacher Education (CTE)": [
-    "Bachelor of Early Childhood Education (BECEd)",
-    "Bachelor of Elementary Education (BEEd)",
-    "Bachelor of Special Needs Education (BSNEd)",
-    "Bachelor of Physical Education (BPed)",
-    "Bachelor of Secondary Education (BSEd)",
-  ],
-  "College of Hospitality and Tourism Management (CHTM)": [
-    "Bachelor of Science in Hospitality Management (BSHM)",
-    "Bachelor of Science in Tourism Management (BSTM)",
-  ],
-  "College of Nursing (CN)": ["Bachelor of Science in Nursing (BSN)"],
+const COLLEGES = [
+  "Saint Louis University (SLU)",
+  "University of the Philippines Baguio (UPB)",
+  "University of Baguio (UB)",
+  "University of the Cordilleras (UC)",
+  "Baguio Central University (BCU)",
+  "Pines City Colleges (PCC)",
+  "Baguio College of Technology (BCT)",
+  "Philippine Military Academy (PMA)",
+  "Easter College (EC)",
+  "BSBT College",
+  "Asia Pacific Theological Seminary (APTS)",
+  "Data Center College of the Philippines (DCCP)",
+  "STI College Baguio",
+  "Benguet State University (BSU)",
+  "Cordillera Career Development College (CCDC)",
+  "King's College of the Philippines (KCP)",
+  "Philippine Nazarene College (PNC)",
+  "Philippine College of Ministry (PCM)",
+  "BVS Colleges",
+  "Concordia College of Benguet",
+  "Star Colleges",
+];
+
+const COLLEGE_DEPARTMENTS: Record<string, Record<string, string[]>> = {
+  "Saint Louis University (SLU)": {
+    "School of Accountancy, Management, Computing and Information Studies (SAMCIS)": [
+      "Bachelor of Science in Accountancy (BSA)",
+      "Bachelor of Science in Management Accounting (BSMA)",
+      "Bachelor of Science in Business Administration (BSBA)",
+      "Bachelor of Science in Entrepreneurship (BS Entrep)",
+      "Bachelor of Science in Tourism Management (BSTM)",
+      "Bachelor of Science in Hospitality Management (BSHM)",
+      "Bachelor of Science in Computer Science (BSCS)",
+      "Bachelor of Science in Information Technology (BSIT)",
+      "Bachelor of Multimedia Arts (BMA)",
+    ],
+    "School of Engineering and Architecture (SEA)": [
+      "Bachelor of Science in Architecture (BS Arch)",
+      "Bachelor of Science in Chemical Engineering (BSChE)",
+      "Bachelor of Science in Civil Engineering (BSCE)",
+      "Bachelor of Science in Electrical Engineering (BSEE)",
+      "Bachelor of Science in Electronics Engineering (BSECE)",
+      "Bachelor of Science in Geodetic Engineering (BSGE)",
+      "Bachelor of Science in Industrial Engineering (BSIE)",
+      "Bachelor of Science in Mechanical Engineering (BSME)",
+      "Bachelor of Science in Mechatronics Engineering (BS Mechatronics)",
+      "Bachelor of Science in Mining Engineering (BS Mining)",
+    ],
+    "School of Nursing, Allied Health, and Biological Sciences (SONAHBS)": [
+      "Bachelor of Science in Biology (BS Bio)",
+      "Bachelor of Science in Medical Laboratory Science (BSMLS)",
+      "Bachelor of Science in Nursing (BSN)",
+      "Bachelor of Science in Pharmacy (BS Pharm)",
+      "Bachelor of Science in Radiologic Technology (BS RadTech)",
+    ],
+    "School of Teacher Education and Liberal Arts (STELA)": [
+      "Bachelor of Arts in Communication (AB Comm)",
+      "Bachelor of Arts in Philosophy (AB Philo)",
+      "Bachelor of Arts in Political Science (AB PolSci)",
+      "Bachelor of Elementary Education (BEEd)",
+      "Bachelor of Physical Education (BPEd)",
+      "Bachelor of Science in Psychology (BS Psych)",
+      "Bachelor of Secondary Education (BSEd)",
+      "Bachelor of Special Needs Education (BSNEd)",
+      "Bachelor of Science in Social Work (BSSW)",
+    ],
+    "School of Law (SOL)": [
+      "Juris Doctor (JD)",
+    ],
+  },
+  "University of the Philippines Baguio (UPB)": {
+    "College of Arts and Communication (CAC)": [
+      "Bachelor of Arts in Communication (BA Comm)",
+      "Bachelor of Arts in Language and Literature (BA LangLit)",
+      "Bachelor of Arts in Fine Arts (BAFA)",
+    ],
+    "College of Science (CS)": [
+      "Bachelor of Science in Biology (BS Bio)",
+      "Bachelor of Science in Computer Science (BSCS)",
+      "Bachelor of Science in Mathematics (BS Math)",
+      "Bachelor of Science in Physics (BS Physics)",
+    ],
+    "College of Social Sciences (CSS)": [
+      "Bachelor of Arts in Anthropology (BA Anthro)",
+      "Bachelor of Arts in History (BA History)",
+      "Bachelor of Arts in Philosophy (BA Philo)",
+      "Bachelor of Science in Social Work (BSSW)",
+    ],
+  },
+  "University of Baguio (UB)": {
+    "School of Business Administration and Accountancy (SBAA)": [
+      "Bachelor of Science in Accountancy (BSA)",
+      "Bachelor of Science in Business Administration (BSBA)",
+    ],
+    "School of Criminal Justice and Public Safety (SCJPS)": [
+      "Bachelor of Science in Criminology (BSCrim)",
+      "Bachelor of Science in Industrial Security Management (BSISM)",
+    ],
+    "School of Dentistry (SOD)": [
+      "Doctor of Medicine in Dentistry (DMD)",
+    ],
+    "School of Engineering and Architecture (SEA)": [
+      "Bachelor of Science in Architecture (BS Arch)",
+      "Bachelor of Science in Civil Engineering (BSCE)",
+      "Bachelor of Science in Electrical Engineering (BSEE)",
+      "Bachelor of Science in Computer Engineering (BSCpE)",
+      "Bachelor of Science in Mechanical Engineering (BSME)",
+    ],
+    "School of Information Technology (SIT)": [
+      "Bachelor of Science in Information Technology (BSIT)",
+      "Bachelor of Science in Computer Science (BSCS)",
+    ],
+    "School of International Tourism and Hospitality Management (SIHTM)": [
+      "Bachelor of Science in International Tourism Management (BSITM)",
+      "Bachelor of Science in Hospitality Management (BSHM)",
+    ],
+    "School of Natural Sciences (SNS)": [
+      "Bachelor of Science in Medical Laboratory Science (BSMLS)",
+      "Bachelor of Science in Nursing (BSN)",
+      "Bachelor of Science in Pharmacy (BS Pharm)",
+      "Bachelor of Science in Biology (BS Bio)",
+    ],
+  },
+  "Benguet State University (BSU)": {
+    "College of Agriculture (CA)": [
+      "Bachelor of Science in Agriculture (BSA)",
+    ],
+    "College of Arts and Humanities (CAH)": [
+      "Bachelor of Arts in Communication (BA Comm)",
+      "Bachelor of Arts in English Language (BAEL)",
+      "Bachelor of Arts in Filipino Language (BAFL)",
+    ],
+    "College of Engineering (CoE)": [
+      "Bachelor of Science in Agricultural and Biosystems Engineering (BSABE)",
+      "Bachelor of Science in Civil Engineering (BSCE)",
+      "Bachelor of Science in Electrical Engineering (BSEE)",
+      "Bachelor of Science in Industrial Engineering (BSIE)",
+    ],
+    "College of Forestry (CF)": [
+      "Bachelor of Science in Forestry (BSF)",
+    ],
+    "College of Home Economics and Technology (CHET)": [
+      "Bachelor of Science in Hospitality Management (BSHM)",
+      "Bachelor of Science in Nutrition and Dietetics (BSND)",
+      "Bachelor of Science in Entrepreneurship (BS Entrep)",
+      "Bachelor of Science in Food Technology (BSFT)",
+      "Bachelor of Science in Tourism Management (BSTM)",
+    ],
+    "College of Human Kinetics (CHK)": [
+      "Bachelor of Science in Physical Education (BSPE)",
+      "Bachelor of Science in Exercise and Sports Sciences (BSESS)",
+    ],
+    "College of Information Sciences (CIS)": [
+      "Bachelor of Science in Development Communication (BSDC)",
+      "Bachelor of Science in Information Technology (BSIT)",
+      "Bachelor of Library and Information Science (BLIS)",
+    ],
+    "College of Natural Sciences (CNS)": [
+      "Bachelor of Science in Biology (BS Bio)",
+      "Bachelor of Science in Chemistry (BS Chem)",
+      "Bachelor of Science in Environmental Science (BSES)",
+    ],
+    "College of Numeracy and Applied Sciences (CNAS)": [
+      "Bachelor of Science in Statistics (BS Stat)",
+      "Bachelor of Science in Mathematics (BS Math)",
+    ],
+    "College of Nursing (CON)": [
+      "Bachelor of Science in Nursing (BSN)",
+    ],
+    "College of Public Administration and Governance (CPAG)": [
+      "Bachelor of Public Administration (BPA)",
+    ],
+    "College of Social Sciences (CSS)": [
+      "Bachelor of Science in Psychology (BS Psych)",
+      "Bachelor of Arts in History (BA History)",
+    ],
+    "College of Teacher Education (CTE)": [
+      "Bachelor of Early Childhood Education (BECEd)",
+      "Bachelor of Elementary Education (BEEd)",
+      "Bachelor of Secondary Education (BSEd)",
+      "Bachelor of Technology and Livelihood Education (BTLEd)",
+    ],
+  },
 };
 
 const GENDERS = [
@@ -111,6 +244,15 @@ function generateKeywords(text: string): string[] {
   return Array.from(keywords);
 }
 
+function getCollegeDepartments(college: string): string[] {
+  const depts = COLLEGE_DEPARTMENTS[college];
+  return depts ? Object.keys(depts) : [];
+}
+
+function getDepartmentPrograms(college: string, department: string): string[] {
+  const depts = COLLEGE_DEPARTMENTS[college];
+  return depts?.[department] || [];
+}
 
 export default function RegisterScreen() {
   const [activeTab, setActiveTab] = useState<1 | 2 | 3>(1);
@@ -119,6 +261,7 @@ export default function RegisterScreen() {
     fullName: "",
     email: "",
     schoolId: "",
+    college: "",
     department: "",
     academicProgram: "",
     yearLevel: "",
@@ -141,6 +284,7 @@ export default function RegisterScreen() {
   const [lsnDocument, setLsnDocument] =
     useState<DocumentPicker.DocumentPickerResult | null>(null);
   const [departmentSearch, setDepartmentSearch] = useState("");
+  const [collegeSearch, setCollegeSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -343,6 +487,7 @@ export default function RegisterScreen() {
     } else if (activeTab === 2) {
       const missing: string[] = [];
       if (!formData.schoolId.trim()) missing.push("schoolId");
+      if (!formData.college.trim()) missing.push("college");
       if (!formData.department.trim()) missing.push("department");
       if (!formData.academicProgram.trim()) missing.push("academicProgram");
       if (!formData.yearLevel.trim()) missing.push("yearLevel");
@@ -458,6 +603,7 @@ export default function RegisterScreen() {
         fullName: sanitize(formData.fullName, 200),
         email: emailClean,
         schoolId: sanitize(formData.schoolId.replace(/[^0-9-]/g, ""), 20),
+        college: sanitize(formData.college, 150),
         department: sanitize(formData.department, 150),
         academicProgram: sanitize(formData.academicProgram, 100),
         yearLevel: sanitize(formData.yearLevel, 50),
@@ -758,7 +904,7 @@ export default function RegisterScreen() {
                   android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
                 >
                   <Text style={styles.nextStepButtonText}>
-                    Next Step: School Info
+                    Next: School Info
                   </Text>
                   <Ionicons name="arrow-forward" size={18} color="white" />
                 </Pressable>
@@ -805,6 +951,69 @@ export default function RegisterScreen() {
 
                 <View style={styles.inputContainer}>
                   <View style={styles.inputHeader}>
+                    <Ionicons name="business-outline" size={18} color="#64748B" />
+                    <Text style={styles.inputLabel}>College / University *</Text>
+                  </View>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      validationErrors.includes("college") && styles.inputError,
+                    ]}
+                    placeholder="Search college..."
+                    placeholderTextColor="#94A3B8"
+                    value={formData.college ? formData.college : collegeSearch}
+                    editable={!formData.college}
+                    onChangeText={(text) => setCollegeSearch(text)}
+                  />
+                  {!formData.college && !!collegeSearch && (
+                    <View style={styles.dropdownContainer}>
+                      {COLLEGES.filter((c) =>
+                        c.toLowerCase().includes(collegeSearch.toLowerCase()),
+                      )
+                        .slice(0, 8)
+                        .map((college) => (
+                          <Pressable
+                            key={college}
+                            style={styles.dropdownOption}
+                            onPress={() => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                college,
+                                department: "",
+                                academicProgram: "",
+                              }));
+                              setCollegeSearch("");
+                              if (validationErrors.includes("college"))
+                                setValidationErrors((p) => p.filter((k) => k !== "college"));
+                            }}
+                          >
+                            <Text style={styles.dropdownText}>{college}</Text>
+                          </Pressable>
+                        ))}
+                    </View>
+                  )}
+                  {formData.college && (
+                    <View style={styles.selectedTag}>
+                      <Text style={styles.selectedTagText}>{formData.college}</Text>
+                      <Pressable
+                        onPress={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            college: "",
+                            department: "",
+                            academicProgram: "",
+                          }))
+                        }
+                      >
+                        <Ionicons name="close-circle" size={18} color="white" />
+                      </Pressable>
+                    </View>
+                  )}
+                  {validationErrors.includes("college") ? <Text style={styles.fieldError}>College is required</Text> : null}
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <View style={styles.inputHeader}>
                     <Ionicons name="school-outline" size={18} color="#64748B" />
                     <Text style={styles.inputLabel}>Department *</Text>
                   </View>
@@ -826,7 +1035,7 @@ export default function RegisterScreen() {
                   />
                   {!formData.department && !!departmentSearch && (
                     <View style={styles.dropdownContainer}>
-                      {Object.keys(DEPARTMENTS)
+                      {Object.keys(COLLEGE_DEPARTMENTS[formData.college] || {})
                         .filter((d) =>
                           d
                             .toLowerCase()
@@ -883,13 +1092,17 @@ export default function RegisterScreen() {
                       Academic Program / Course *
                     </Text>
                   </View>
-                  {!formData.department ? (
+                  {!formData.department && !formData.college ? (
                     <Text style={styles.helpText}>
-                      Please select a department first
+                      Please select a college first
+                    </Text>
+                  ) : !formData.department ? (
+                    <Text style={styles.helpText}>
+                      Please search and select a department
                     </Text>
                   ) : (
                     <View style={styles.optionsWrap}>
-                      {DEPARTMENTS[formData.department]?.map((course) => (
+                      {getDepartmentPrograms(formData.college, formData.department)?.map((course) => (
                         <Pressable
                           key={course}
                           style={[

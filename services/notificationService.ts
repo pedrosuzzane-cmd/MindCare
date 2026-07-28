@@ -1,5 +1,5 @@
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
+import { Platform, PermissionsAndroid } from "react-native";
 
 // Notification handler is set globally in hooks/useReminderNotifications.ts
 // and imported at app root layout. No duplicate handler needed here.
@@ -25,11 +25,34 @@ const CHANNEL_COLORS: Record<string, string> = {
 };
 
 /**
+ * Request exact alarm permission on Android 12+ (API 31+).
+ * This reduces the 1-minute latency window for scheduled notifications.
+ */
+export async function requestExactAlarmPermission(): Promise<boolean> {
+  if (Platform.OS !== "android") return true;
+  try {
+    // USE_EXACT_ALARM (API 33+) is auto-granted, no runtime prompt needed.
+    // SCHEDULE_EXACT_ALARM (API 31+) requires user to grant via Settings.
+    // We check and request only on API 31-32 where SCHEDULE_EXACT_ALARM is needed.
+    if (Platform.Version >= 31 && Platform.Version < 33) {
+      const granted = await PermissionsAndroid.request(
+        "android.permission.SCHEDULE_EXACT_ALARM" as any,
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Sets up notification channels for Android. This is required for Android 8.0+.
  * Each channel gets a distinct color, vibration, and light for visual identity.
  */
 export async function setupNotificationChannels() {
   if (Platform.OS === "android") {
+    await requestExactAlarmPermission();
     await Notifications.setNotificationChannelAsync("reminders", {
       name: "Daily Reminders",
       importance: Notifications.AndroidImportance.HIGH,
