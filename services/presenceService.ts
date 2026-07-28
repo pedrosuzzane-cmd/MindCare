@@ -61,7 +61,7 @@ export function listenForPresence(
     } else {
       callback(false, 0);
     }
-  }, onError);
+  }, onError || ((err) => console.warn("listenForPresence error:", err)));
 }
 
 /**

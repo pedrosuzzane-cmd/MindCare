@@ -170,12 +170,16 @@ export function StudentListModal({
                                 ? styles.riskLow
                                 : student.latestRiskLevel === "high"
                                   ? styles.riskHigh
-                                  : styles.riskNormal,
+                                  : styles.riskModerate,
                             ]}
                           >
-                            {student.latestRiskLevel
-                              ? student.latestRiskLevel.toUpperCase()
-                              : "N/A"}
+                            {student.latestRiskLevel === "low"
+                              ? "Low"
+                              : student.latestRiskLevel === "high"
+                                ? "High"
+                                : student.latestRiskLevel
+                                  ? "Moderate"
+                                  : "N/A"}
                           </Text>
                         </View>
                         <View style={styles.statItemWide}>
@@ -289,9 +293,9 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   statValueHighlight: { fontSize: 15, fontWeight: "800", color: "#0B3D91" },
-  riskLow: { color: "#16A34A" },
-  riskNormal: { color: "#0B3D91" },
-  riskHigh: { color: "#EF4444" },
+  riskLow: { color: "#16A34A", fontWeight: "800" },
+  riskModerate: { color: "#D97706", fontWeight: "800" },
+  riskHigh: { color: "#EF4444", fontWeight: "800" },
   stateCard: {
     backgroundColor: "white",
     borderRadius: 16,

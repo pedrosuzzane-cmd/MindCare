@@ -4,6 +4,7 @@ import {
   addDoc,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   setDoc,
   onSnapshot,
@@ -88,7 +89,7 @@ export function listenForAnnouncements(
       })
       .filter((a) => a.expiresAt.getTime() > now);
     callback(items);
-  }, onError);
+  }, onError || ((err) => console.warn("listenForAnnouncements error:", err)));
 }
 
 export async function deleteAnnouncement(announcementId: string): Promise<void> {
@@ -146,13 +147,10 @@ export async function getUnreadCount(
 ): Promise<number> {
   if (announcements.length === 0) return 0;
   const checks = announcements.map(async (a) => {
-    const readDoc = await getDocs(
-      collection(db, "announcements", a.id, "reads"),
+    const readDoc = await getDoc(
+      doc(db, "announcements", a.id, "reads", studentUid),
     );
-    const hasRead = readDoc.docs.some(
-      (d) => d.id === studentUid || d.data().uid === studentUid,
-    );
-    return hasRead ? 0 : 1;
+    return readDoc.exists() ? 0 : 1;
   });
   const results = await Promise.all(checks);
   return results.reduce<number>((sum, v) => sum + v, 0);

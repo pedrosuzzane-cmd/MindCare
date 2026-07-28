@@ -198,6 +198,9 @@ export default function StudentDetailScreen() {
     return () => unsubscribe();
   }, [uid]);
 
+  const latestAssessment =
+    assessments.length > 0 ? assessments[assessments.length - 1] : null;
+
   const maxCount = Math.max(...Object.values(moodCounts), 1);
   const screenWidth = Dimensions.get("window").width;
   const barMaxWidth = screenWidth * 0.45;
@@ -394,6 +397,57 @@ export default function StudentDetailScreen() {
               )}
             </View>
 
+            {/* Current Concern Level Card */}
+            {latestAssessment && (
+              <View style={styles.card}>
+                {(() => {
+                  const score = latestAssessment.totalScore;
+                  const levelLabel =
+                    score >= 51 ? "High"
+                      : score >= 21 ? "Moderate"
+                      : "Low";
+                  const levelColor =
+                    score >= 51 ? "#DC2626"
+                      : score >= 21 ? "#D97706"
+                      : "#16A34A";
+                  const bgColor =
+                    score >= 51 ? "#FEE2E2"
+                      : score >= 21 ? "#FEF3C7"
+                      : "#DCFCE7";
+                  return (
+                    <>
+                      <View style={styles.sectionHeaderRow}>
+                        <Ionicons name="pulse-outline" size={20} color={levelColor} />
+                        <Text style={styles.sectionTitle}>
+                          Current Concern Level
+                        </Text>
+                      </View>
+                      <View style={styles.divider} />
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 4 }}>
+                        <View
+                          style={{
+                            backgroundColor: bgColor,
+                            paddingHorizontal: 16,
+                            paddingVertical: 8,
+                            borderRadius: 20,
+                          }}
+                        >
+                          <Text style={{ color: levelColor, fontWeight: "700", fontSize: 16 }}>
+                            {levelLabel}
+                          </Text>
+                        </View>
+                        <Text style={{ color: "#475569", fontSize: 14 }}>
+                          Score: {score}/80
+                          {" \u00B7 "}
+                          Latest assessment
+                        </Text>
+                      </View>
+                    </>
+                  );
+                })()}
+              </View>
+            )}
+
             {/* Assessment 14-Day Trend Graph Card */}
             <View style={styles.card}>
               <View style={styles.sectionHeaderRow}>
@@ -473,6 +527,7 @@ export default function StudentDetailScreen() {
                           style={styles.assessmentScroll}
                         >
                           {buckets.map((bucket, idx) => {
+                            const isLatest = idx === buckets.length - 1;
                             const avgScore = Math.round(
                               bucket.scores.reduce((s, v) => s + v, 0) /
                                 bucket.scores.length,
@@ -489,7 +544,12 @@ export default function StudentDetailScreen() {
                                   : "#22C55E";
 
                             return (
-                              <View key={idx} style={styles.assessmentBarCol}>
+                              <View key={idx} style={[styles.assessmentBarCol, isLatest && { borderTopWidth: 2, borderTopColor: riskColor, paddingTop: 4 }]}>
+                                {isLatest && (
+                                  <Text style={{ fontSize: 9, color: riskColor, fontWeight: "700", marginBottom: 2, textAlign: "center" }}>
+                                    NOW
+                                  </Text>
+                                )}
                                 <View style={styles.assessmentBarTrack}>
                                   <View
                                     style={[
@@ -517,10 +577,10 @@ export default function StudentDetailScreen() {
                                   ]}
                                 >
                                   {avgScore >= 51
-                                    ? "HIGH"
+                                    ? "High"
                                     : avgScore >= 21
-                                      ? "MOD"
-                                      : "LOW"}
+                                      ? "Moderate"
+                                      : "Low"}
                                 </Text>
                               </View>
                             );

@@ -24,7 +24,7 @@ export interface JournalSuggestions {
   }[];
 }
 
-const MODEL_NAME = "gemini-flash-latest";
+const MODEL_NAME = "gemini-2.0-flash";
 
 let genAI: GoogleGenerativeAI | null = null;
 
@@ -174,7 +174,8 @@ IMPORTANT: Respond ONLY with valid JSON, no other text.`;
 /**
  * Sends the journal text to the Render backend for Gemini-based wellness analysis.
  * Checks network connectivity first — skips entirely if offline.
- * Returns the aiInsight string on success, or null if offline / on failure.
+ * Falls back to client-side Gemini SDK if the backend fails.
+ * Returns the aiInsight string on success, or null if all attempts fail.
  * Never throws.
  */
 export async function analyzeJournalViaBackend(
@@ -199,13 +200,26 @@ export async function analyzeJournalViaBackend(
         "[JournalAI] Backend error:",
         data?.error || response.status,
       );
-      return null;
+    } else {
+      const data = await response.json();
+      if (typeof data.aiInsight === "string" && data.aiInsight) {
+        return data.aiInsight;
+      }
     }
-
-    const data = await response.json();
-    return typeof data.aiInsight === "string" ? data.aiInsight : null;
   } catch (err) {
     if (__DEV__) console.warn("[JournalAI] Backend call failed:", err);
-    return null;
   }
+
+  // Fallback: try client-side Gemini SDK
+  if (__DEV__) console.log("[JournalAI] Falling back to client-side Gemini...");
+  const analysis = await analyzeJournal(journalText);
+  if (analysis) {
+    const insight = [
+      analysis.encouragement,
+      analysis.summary ? ` ${analysis.summary}` : "",
+    ].join("");
+    return insight || null;
+  }
+
+  return null;
 }

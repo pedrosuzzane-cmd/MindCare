@@ -1,4 +1,3 @@
-import { API_URL } from "@/backend/config";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -13,6 +12,11 @@ import {
     Text,
     View,
 } from "react-native";
+import {
+  analyzeJournalViaBackend,
+  analyzeJournal,
+} from "@/services/geminiService";
+import NetInfo from "@react-native-community/netinfo";
 
 export default function AIReflectionCardScreen() {
   const params = useLocalSearchParams<{
@@ -58,35 +62,34 @@ export default function AIReflectionCardScreen() {
     setIsOffline(false);
 
     try {
+      const netState = await NetInfo.fetch();
+      if (!netState.isConnected) {
+        setIsOffline(true);
+        setLoading(false);
+        return;
+      }
+
       const journalText = `Title: ${params.title || "Untitled"}\nMood: ${params.mood || ""}\nCategory: ${params.category || ""}\nThoughts: ${params.thoughts || ""}`;
 
-      const response = await fetch(`${API_URL}/api/journal/analyze`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ journalText }),
-      });
+      // Try backend first, falls back to client-side Gemini
+      const insight = await analyzeJournalViaBackend(journalText);
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => null);
-        throw new Error(data?.error || `API Error: ${response.status}`);
+      if (insight) {
+        setAiInsight(insight);
+      } else {
+        // Last-resort client-side fallback
+        const analysis = await analyzeJournal(journalText);
+        if (analysis) {
+          setAiInsight(
+            [analysis.encouragement, analysis.summary ? ` ${analysis.summary}` : ""].join(""),
+          );
+        } else {
+          setError("Unable to generate insight. Please try again.");
+        }
       }
-
-      const data = await response.json();
-      setAiInsight(data.aiInsight || null);
     } catch (err: any) {
       console.error("Journal insight error:", err);
-      // Check if it's a network error (likely offline)
-      if (
-        err?.message?.includes("Network") ||
-        err?.message?.includes("fetch") ||
-        err?.message?.includes("Failed to fetch")
-      ) {
-        setIsOffline(true);
-      } else {
-        setError(
-          err?.message || "Unable to generate insight. Please try again.",
-        );
-      }
+      setError(err?.message || "Unable to generate insight. Please try again.");
     } finally {
       setLoading(false);
     }

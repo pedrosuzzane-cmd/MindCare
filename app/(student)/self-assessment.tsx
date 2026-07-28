@@ -87,9 +87,9 @@ function classifyRisk(answers: Record<string, number>): AssessmentResult {
     return sum + adjusted;
   }, 0);
 
-  // 0–20  → Low Concern
-  // 21–50 → Moderate Concern
-  // 51–80 → High Concern
+  // 0–20  → low (Low Concern)    → "Low"
+  // 21–50 → normal (Moderate Concern) → "Moderate"
+  // 51–80 → high (High Concern)  → "High"
   let riskLevel: RiskLevel = "low";
   if (totalScore >= 51) {
     riskLevel = "high";

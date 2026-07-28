@@ -256,7 +256,7 @@ export function listenForMessages(
       ...(d.data() as Omit<Message, "id">),
     }));
     callback(messages);
-  }, onError);
+  }, onError || ((err) => console.warn("Snapshot error:", err)));
 }
 
 /**
@@ -279,7 +279,7 @@ export function listenForConversations(
     }));
     conversations.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
     callback(conversations);
-  }, onError);
+  }, onError || ((err) => console.warn("Snapshot error:", err)));
 }
 
 /**
@@ -349,7 +349,7 @@ export function listenForPeerConversations(
     }));
     conversations.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
     callback(conversations);
-  }, onError);
+  }, onError || ((err) => console.warn("Snapshot error:", err)));
 }
 
 /**
@@ -370,7 +370,7 @@ export function listenForAllPeerConversations(
     }));
     conversations.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
     callback(conversations);
-  }, onError);
+  }, onError || ((err) => console.warn("Snapshot error:", err)));
 }
 
 /**
@@ -606,7 +606,7 @@ export function listenForTyping(
       ([uid, timestamp]) => uid !== currentUid && now - (timestamp as number) < 5000,
     );
     callback(isOtherTyping);
-  }, onError);
+  }, onError || ((err) => console.warn("Snapshot error:", err)));
 }
 
 /**

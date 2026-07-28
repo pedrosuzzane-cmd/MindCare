@@ -14,7 +14,7 @@ import {
 import type { Announcement, AnnouncementLink } from "@/types/announcement";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
+import { Redirect, router } from "expo-router";
 import {
     collection,
     deleteDoc,
@@ -29,11 +29,13 @@ import {
     ActivityIndicator,
     Alert,
     Modal,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
+    useWindowDimensions,
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context"; // This was already correct
@@ -172,6 +174,9 @@ interface EngagementMetric {
 
 export default function AdminPanelScreen() {
   const { user, signOut } = useAuth();
+  const { width: screenWidth } = useWindowDimensions();
+  const isWide = screenWidth >= 900;
+  const responsivePadding = Math.min(Math.max(screenWidth * 0.03, 24), 64);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -222,11 +227,7 @@ export default function AdminPanelScreen() {
   const [deleteAnnounceId, setDeleteAnnounceId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Secure route: Redirect to login if user is null (not logged in)
-    if (!user) {
-      router.replace("/auth/login");
-      return; // Stop execution here
-    }
+    if (!user) return;
 
     const unsubData = listenForAdminDashboardData(
       (data) => {
@@ -322,17 +323,16 @@ export default function AdminPanelScreen() {
 
   // ─── Computed Risk Trend KPI Data ─────────────────────────────────────────
   const riskTrendKpiData = useMemo((): KpiCardData[] => {
-    const total = studentSummaries.length || 1;
     const atRisk = studentSummaries.filter(
-      (s) => s.latestRiskLevel === "normal" || s.latestRiskLevel === "high",
+      (s) => s.latestRiskLevel === "high",
+    ).length;
+    const moderate = studentSummaries.filter(
+      (s) => s.latestRiskLevel === "normal",
     ).length;
     const healthy = studentSummaries.filter(
       (s) => s.latestRiskLevel === "low",
     ).length;
     const totalLSN = studentSummaries.filter((s) => s.isLSN).length;
-    const pctAtRisk = Math.round(
-      (atRisk / (studentSummaries.length || 1)) * 100,
-    );
 
     const pctChange = (current: number, baseline: number) =>
       baseline > 0
@@ -342,12 +342,13 @@ export default function AdminPanelScreen() {
           : 0;
 
     const baselineAtRisk = Math.round(atRisk * 0.9) || 1;
+    const baselineModerate = Math.round(moderate * 0.9) || 1;
     const baselineHealthy = Math.round(healthy * 0.9) || 1;
     const baselineLSN = Math.round(totalLSN * 0.9) || 1;
 
     return [
       {
-        riskLabel: "At-Risk Students",
+        riskLabel: "At-Risk Students (HIGH)",
         count: atRisk,
         percentageChange: pctChange(atRisk, baselineAtRisk),
         baselineCount: baselineAtRisk,
@@ -356,27 +357,22 @@ export default function AdminPanelScreen() {
         icon: "warning",
       },
       {
-        riskLabel: "Healthy Students",
+        riskLabel: "Moderate Students",
+        count: moderate,
+        percentageChange: pctChange(moderate, baselineModerate),
+        baselineCount: baselineModerate,
+        color: "#D97706",
+        bgColor: "#FEF3C7",
+        icon: "alert-circle",
+      },
+      {
+        riskLabel: "Healthy Students (LOW)",
         count: healthy,
         percentageChange: pctChange(healthy, baselineHealthy),
         baselineCount: baselineHealthy,
         color: "#16A34A",
         bgColor: "#DCFCE7",
         icon: "shield-checkmark",
-      },
-      {
-        riskLabel: "% At Risk",
-        count: pctAtRisk,
-        percentageChange: 0,
-        baselineCount: 0,
-        color:
-          pctAtRisk < 30
-            ? "#16A34A"
-            : pctAtRisk <= 60
-              ? "#D97706"
-              : "#EF4444",
-        bgColor: "#F5F3FF",
-        icon: "analytics",
       },
       {
         riskLabel: "LSN Students",
@@ -759,22 +755,18 @@ export default function AdminPanelScreen() {
     const isUp = kpi.percentageChange >= 0;
     const arrowIcon = isUp ? "arrow-up" : "arrow-down";
     const arrowColor = isUp ? "#16A34A" : "#DC2626";
-    const title = `${kpi.riskLabel} Students`;
-    const isPercentCard = kpi.riskLabel === "% At Risk";
+    const title = kpi.riskLabel;
 
     return (
       <Pressable
         key={index}
         style={({ pressed }) => [
           styles.kpiCard,
+          isWide && styles.kpiCardWide,
           pressed && { transform: [{ scale: 0.98 }], opacity: 0.95 },
         ]}
         onPress={() => {
-          if (isPercentCard) {
-            setStudentListModal({ visible: true, title: "At-Risk Students" });
-          } else {
-            setStudentListModal({ visible: true, title });
-          }
+          setStudentListModal({ visible: true, title });
         }}
       >
         <View style={styles.kpiHeader}>
@@ -783,46 +775,18 @@ export default function AdminPanelScreen() {
           >
             <Ionicons name={kpi.icon} size={18} color={kpi.color} />
           </View>
-          {!isPercentCard && (
-            <View style={styles.kpiChangeBadge}>
-              <Ionicons name={arrowIcon} size={12} color={arrowColor} />
-              <Text style={[styles.kpiChangeText, { color: arrowColor }]}>
-                {Math.abs(kpi.percentageChange)}%
-              </Text>
-            </View>
-          )}
-          {isPercentCard && (
-            <View
-              style={[
-                styles.kpiChangeBadge,
-                { backgroundColor: `${kpi.color}18` },
-              ]}
-            >
-              <View
-                style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: 4,
-                  backgroundColor: kpi.color,
-                }}
-              />
-            </View>
-          )}
+          <View style={styles.kpiChangeBadge}>
+            <Ionicons name={arrowIcon} size={12} color={arrowColor} />
+            <Text style={[styles.kpiChangeText, { color: arrowColor }]}>
+              {Math.abs(kpi.percentageChange)}%
+            </Text>
+          </View>
         </View>
-        <Text style={styles.kpiCount}>
-          {isPercentCard ? `${kpi.count}` : kpi.count}
-        </Text>
+        <Text style={styles.kpiCount}>{kpi.count}</Text>
         <Text style={styles.kpiLabel}>{kpi.riskLabel}</Text>
-        {!isPercentCard && (
-          <Text style={styles.kpiBaseline}>
-            Baseline: ({kpi.baselineCount})
-          </Text>
-        )}
-        {isPercentCard && (
-          <Text style={[styles.kpiBaseline, { color: kpi.color }]}>
-            {kpi.count < 30 ? "Healthy" : kpi.count <= 60 ? "Moderate" : "Critical"}
-          </Text>
-        )}
+        <Text style={styles.kpiBaseline}>
+          Baseline: ({kpi.baselineCount})
+        </Text>
       </Pressable>
     );
   };
@@ -833,6 +797,7 @@ export default function AdminPanelScreen() {
         key={index}
         style={({ pressed }) => [
           styles.summaryKpiCard,
+          isWide && styles.summaryKpiCardWide,
           pressed && { transform: [{ scale: 0.98 }], opacity: 0.95 },
         ]}
         onPress={() =>
@@ -1020,7 +985,7 @@ export default function AdminPanelScreen() {
     });
 
     return (
-      <View style={styles.bottomWidget}>
+      <View style={[styles.bottomWidget, isWide && styles.bottomWidgetWide]}>
         <Text style={styles.bottomWidgetTitle}>
           Overall Concern Distribution
         </Text>
@@ -1077,7 +1042,7 @@ export default function AdminPanelScreen() {
 
     return (
       <Pressable
-        style={styles.bottomWidget}
+        style={[styles.bottomWidget, isWide && styles.bottomWidgetWide]}
         onPress={() =>
           setStudentListModal({
             visible: true,
@@ -1152,7 +1117,7 @@ export default function AdminPanelScreen() {
 
   const renderComparativeChart = (metrics: EngagementMetric[]) => {
     return (
-      <View style={styles.bottomWidget}>
+      <View style={[styles.bottomWidget, isWide && styles.bottomWidgetWide]}>
         <Text style={styles.bottomWidgetTitle}>Detailed Engagement Report</Text>
         <View style={styles.compChartContainer}>
           {metrics.map((metric) => {
@@ -1221,13 +1186,16 @@ export default function AdminPanelScreen() {
       return (s) => s.isLSN === true;
     }
     if (lowerTitle.includes("at-risk students")) {
-      return (s) => s.latestRiskLevel === "normal" || s.latestRiskLevel === "high";
+      return (s) => s.latestRiskLevel === "high";
+    }
+    if (lowerTitle.includes("moderate students")) {
+      return (s) => s.latestRiskLevel === "normal";
     }
     if (lowerTitle.includes("healthy students")) {
       return (s) => s.latestRiskLevel === "low";
     }
     if (lowerTitle.includes("% at risk")) {
-      return (s) => s.latestRiskLevel === "normal" || s.latestRiskLevel === "high";
+      return (s) => s.latestRiskLevel === "high";
     }
     if (lowerTitle.includes("students assessed")) {
       return (s) => s.assessmentsCount > 0;
@@ -1252,9 +1220,9 @@ export default function AdminPanelScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.mainLayout}>
-        <View style={styles.header}>
+    <SafeAreaView style={[styles.container, isWide && styles.containerWide]}>
+      <View style={[styles.mainLayout, isWide && styles.mainLayoutWide]}>
+        <View style={[styles.header, isWide && { paddingHorizontal: responsivePadding }]}>
           <Text style={styles.headerTitle}>{adminCollege ? `${adminCollege} Analytics Overview` : "Analytics Overview"}</Text>
           <View style={styles.headerActions}>
             <Pressable
@@ -1290,7 +1258,7 @@ export default function AdminPanelScreen() {
         </View>
 
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, isWide && { padding: responsivePadding, paddingBottom: 40 }]}
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.tabBar}>
@@ -1392,7 +1360,8 @@ export default function AdminPanelScreen() {
                       </Text>
                     </View>
                   ) : (
-                    paginatedStudents.map((student) => {
+                    <View style={isWide && styles.studentGrid}>
+                    {paginatedStudents.map((student) => {
                       const moods = Object.entries(student.moodCounts)
                         .sort(([, a], [, b]) => b - a)
                         .map(([mood, count]) => `${mood} (${count})`)
@@ -1402,7 +1371,7 @@ export default function AdminPanelScreen() {
                       return (
                         <Pressable
                           key={student.uid}
-                          style={styles.studentCard}
+                          style={[styles.studentCard, isWide && styles.studentCardWide]}
                           onPress={() =>
                             router.push({
                               pathname: "./student-detail",
@@ -1471,12 +1440,16 @@ export default function AdminPanelScreen() {
                                     ? styles.riskLow
                                     : student.latestRiskLevel === "high"
                                       ? styles.riskHigh
-                                      : styles.riskNormal,
+                                      : styles.riskModerate,
                                 ]}
                               >
-                                {student.latestRiskLevel
-                                  ? student.latestRiskLevel.toUpperCase()
-                                  : "N/A"}
+                                {student.latestRiskLevel === "low"
+                                  ? "Low"
+                                  : student.latestRiskLevel === "high"
+                                    ? "High"
+                                    : student.latestRiskLevel
+                                      ? "Moderate"
+                                      : "N/A"}
                               </Text>
                             </View>
                             <View style={styles.statItemWide}>
@@ -1527,7 +1500,8 @@ export default function AdminPanelScreen() {
                           </Pressable>
                         </Pressable>
                       );
-                    })
+                    })}
+                  </View>
                   )}
                   {totalPages > 1 && (
                     <View style={styles.paginationContainer}>
@@ -1787,7 +1761,7 @@ export default function AdminPanelScreen() {
 
                   {/* ─── SECTION 1: Overall Summary KPIs ──────────────────── */}
                   <Text style={styles.sectionHeader}>Overall Summary</Text>
-                  <View style={styles.kpiRow}>
+                  <View style={[styles.kpiRow, isWide && styles.kpiRowWide]}>
                     {summaryKpiData.map((kpi, i) =>
                       renderSummaryKpiCard(kpi, i),
                     )}
@@ -1797,7 +1771,7 @@ export default function AdminPanelScreen() {
                   <Text style={styles.sectionHeader}>
                     Risk Trend Indicators
                   </Text>
-                  <View style={styles.kpiRow}>
+                  <View style={[styles.kpiRow, isWide && styles.kpiRowWide]}>
                     {riskTrendKpiData.map((kpi, i) => renderKpiCard(kpi, i))}
                   </View>
 
@@ -1805,7 +1779,7 @@ export default function AdminPanelScreen() {
                   <Text style={styles.sectionHeader}>
                     Assessment Participation by Department
                   </Text>
-                  <View style={styles.barChartContainer}>
+                  <View style={[styles.barChartContainer, isWide && styles.barChartContainerWide]}>
                     {/* Legend */}
                     <View style={styles.barLegend}>
                       <View style={styles.barLegendItem}>
@@ -1897,7 +1871,7 @@ export default function AdminPanelScreen() {
 
                   {/* ─── SECTION 6: Visual Insights ──────────────────────── */}
                   <Text style={styles.sectionHeader}>Visual Insights</Text>
-                  <View style={styles.chartsRow}>
+                  <View style={[styles.chartsRow, isWide && styles.chartsRowWide]}>
                     {renderDonutChart(donutData)}
                     {renderRadialProgress(surveyCompletionPct)}
                     {renderComparativeChart(engagementData)}
@@ -3020,7 +2994,7 @@ const styles = StyleSheet.create({
   statValueHighlight: { fontSize: 15, fontWeight: "800", color: "#8A63D2" },
   moodSummary: { color: "#334155", fontSize: 13, marginTop: 6 },
   riskLow: { color: "#16A34A", fontWeight: "800" },
-  riskNormal: { color: "#D97706", fontWeight: "800" },
+  riskModerate: { color: "#D97706", fontWeight: "800" },
   riskHigh: { color: "#EF4444", fontWeight: "800" },
   modalOverlay: {
     flex: 1,
@@ -3290,4 +3264,42 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   selectedTagText: { color: "#FFFFFF", fontSize: 14, fontWeight: "600", flex: 1 },
+
+  // ─── Wide screen (desktop) overrides ──────────────────────────
+  containerWide: {
+    backgroundColor: "#E8E4F0",
+  },
+  mainLayoutWide: {
+    backgroundColor: "#F4F2F8",
+  },
+  kpiRowWide: { gap: 20 },
+  kpiCardWide: {
+    width: "23%",
+    minWidth: 200,
+  },
+  summaryKpiCardWide: {
+    width: "23%",
+    minWidth: 200,
+  },
+  studentGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+  },
+  studentCardWide: {
+    width: "48%",
+    minWidth: 300,
+  },
+  barChartContainerWide: {
+    paddingHorizontal: 32,
+  },
+  chartsRowWide: {
+    flexDirection: "row",
+    flexWrap: "nowrap",
+    gap: 24,
+  },
+  bottomWidgetWide: {
+    width: "32%",
+    minWidth: 280,
+  },
 });

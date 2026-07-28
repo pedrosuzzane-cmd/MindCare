@@ -16,9 +16,18 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
+    // ─── USERS ───────────────────────────────────────────────
     match /users/{userId} {
-      allow list, get: if signedIn();
-      allow write: if isOwner(userId);
+      // Only the owner or an admin can read a specific user document
+      allow get: if isOwner(userId) || isAdmin();
+      // Only admins can list all users (prevents mass PII scraping)
+      allow list: if isAdmin();
+      // Owner can write their own doc; role cannot be escalated
+      allow create: if isOwner(userId)
+        && request.resource.data.keys().hasAll(['fullName', 'email']);
+      allow update: if isOwner(userId)
+        && (!request.resource.data.keys().hasAny(['role'])
+            || request.resource.data.role == resource.data.role);
 
       match /selfAssessments/{assessmentId} {
         allow read: if isOwner(userId) || isAdmin();
@@ -42,12 +51,16 @@ service cloud.firestore {
       match /settings/{docId} {
         allow read, write: if isOwner(userId);
       }
-       match /presence/{docId} {
+      match /presence/{docId} {
         allow read: if signedIn();
         allow write: if isOwner(userId);
       }
     }
 
+    // ─── ADMINS ──────────────────────────────────────────────
+    // NOTE: `allow read: if signedIn()` is kept intentionally so students can
+    // browse admins/counselors in the messaging directory. Admin docs should
+    // avoid storing sensitive PII beyond what's needed for directory display.
     match /admins/{adminId} {
       allow read: if signedIn();
       allow create: if isAdmin();
@@ -55,13 +68,11 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ─── CONVERSATIONS ───────────────────────────────────────
     match /conversations/{conversationId} {
-
-      allow get: if signedIn() && (
-        resource == null
-        || request.auth.uid in resource.data.participants
-        || isAdmin()
-      );
+      allow get: if signedIn()
+        && request.auth.uid in resource.data.participants
+        || isAdmin();
 
       allow list: if (signedIn() && request.auth.uid in resource.data.participants) || isAdmin();
 
@@ -78,30 +89,28 @@ service cloud.firestore {
 
         allow read: if isParticipant() || isAdmin();
         allow create: if isParticipant() && request.auth.uid == request.resource.data.senderId;
-        allow update: if (request.auth.uid == resource.data.senderId) || isAdmin();
+        // Messages are immutable — no editing after sending
+        allow update: if false;
         allow delete: if false;
       }
     }
-		    // ==========================
-    // ANNOUNCEMENTS
-    // ==========================
+
+    // ─── ANNOUNCEMENTS ───────────────────────────────────────
     match /announcements/{announcementId} {
-      // Any signed-in user can read announcements
       allow read: if signedIn();
-      // Only admins can create/delete announcements
       allow create: if isAdmin();
       allow delete: if isAdmin();
-      // Only admins can update announcement metadata
       allow update: if isAdmin();
 
       // Reads subcollection — tracks which students have read each announcement
       match /reads/{readId} {
-          // Anyone signed-in can list reads (needed for getUnreadCount)
-  				// and can read/get their own read receipt
-  				allow read: if signedIn();
-        // Students can mark announcements as read (create/update their own doc)
-        allow create, update: if signedIn() && isOwner(readId);
-        allow delete: if false;
+        // Students can only read their own read receipt; admins can read all
+        allow read: if isOwner(readId) || isAdmin();
+        // Create/update must match the authenticated user AND the uid field
+        allow create, update: if signedIn()
+          && isOwner(readId)
+          && request.resource.data.uid == request.auth.uid;
+        allow delete: if isAdmin();
       }
     }
   }

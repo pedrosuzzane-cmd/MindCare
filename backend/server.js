@@ -254,8 +254,9 @@ app.post("/api/journal/analyze", async (req, res) => {
   }
 
   try {
+    const modelName = "gemini-2.0-flash";
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -324,6 +325,41 @@ app.post("/api/journal/analyze", async (req, res) => {
     return res.json({ aiInsight: parsed.aiInsight });
   } catch (err) {
     console.error("Journal analyze route error:", err.message || err);
+    // Try a simpler fallback prompt with a different model
+    try {
+      const fallbackModel = "gemini-1.5-flash";
+      const fallbackResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${fallbackModel}:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    text: `You are a supportive wellness companion. Respond with valid JSON only: {"aiInsight": "A 2-3 sentence compassionate reflection on this journal entry"}.\n\nJournal: "${journalText.substring(0, 1500)}"`,
+                  },
+                ],
+              },
+            ],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 300 },
+          }),
+        },
+      );
+      if (fallbackResponse.ok) {
+        const fallbackData = await fallbackResponse.json();
+        const fallbackText = fallbackData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        let cleaned = fallbackText.trim().replace(/^```(?:json)?\n?/g, "").replace(/```$/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+        if (parsed.aiInsight && typeof parsed.aiInsight === "string") {
+          return res.json({ aiInsight: parsed.aiInsight });
+        }
+      }
+    } catch (fallbackErr) {
+      console.error("Fallback analysis also failed:", fallbackErr.message || fallbackErr);
+    }
     return res
       .status(500)
       .json({ error: "Journal analysis failed. Please try again." });
@@ -484,6 +520,160 @@ app.post(
       return res
         .status(500)
         .json({ error: `Avatar upload failed: ${error.message}` });
+    }
+  },
+);
+
+// ── LSN Registration (Register with Special Needs Document) ──
+app.post(
+  "/api/register-lsn",
+  upload.single("file"),
+  async (req, res) => {
+    try {
+      // 1. Validate required fields
+      const { email, password, fullName, department, yearLevel, schoolId, contactNo, specialNeedsType } = req.body;
+
+      if (!req.file) {
+        return res.status(400).json({ error: "No verification document uploaded." });
+      }
+      if (!email || !password || !fullName) {
+        return res.status(400).json({ error: "Missing required fields: email, password, fullName." });
+      }
+      if (!cloudinary) {
+        throw new Error("Cloudinary not configured on backend.");
+      }
+      if (!admin) {
+        throw new Error("Firebase Admin not configured on backend.");
+      }
+
+      // 2. Upload document to Cloudinary
+      const b64 = Buffer.from(req.file.buffer).toString("base64");
+      let dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+
+      const uploadResult = await cloudinary.uploader.upload(dataURI, {
+        resource_type: "auto",
+        folder: "mindcare-lsn-documents",
+      });
+
+      const secureUrl = uploadResult.secure_url;
+      const publicId = uploadResult.public_id;
+      console.log("LSN Document uploaded to Cloudinary:", secureUrl);
+
+      // 3. Verify document using Groq Vision AI
+      console.log("Starting Groq LSN document verification...");
+
+      const groqSystemPrompt = `
+        You are an AI assistant tasked with verifying LSN (Learner with Special Needs) verification documents for a student support app.
+        You will be given an image or document (via a URL).
+        Your goal is to determine if this document is a valid medical certificate, clinical diagnosis, psychological evaluation,
+        or official government-issued ID that confirms a learner has special needs or disabilities.
+
+        CRITICAL: Respond ONLY with valid JSON. No markdown, no code fences.
+
+        Respond with this exact JSON schema:
+        {
+          "is_valid": true,
+          "confidence": "high" | "medium" | "low",
+          "reasoning": "A brief sentence explaining why it is valid or invalid"
+        }
+      `;
+
+      const chatCompletion = await groq.chat.completions.create({
+        messages: [
+          { role: "system", content: groqSystemPrompt },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Verify this LSN document." },
+              {
+                type: "image_url",
+                image_url: { url: secureUrl },
+              },
+            ],
+          },
+        ],
+        model: "llama-3.2-11b-vision-preview",
+        temperature: 0,
+      });
+
+      const groqResponseText = chatCompletion.choices[0]?.message?.content;
+      console.log("Groq Raw Response:", groqResponseText);
+
+      let verificationResult;
+      try {
+        const cleanJson = groqResponseText.match(/\{[\s\S]*\}/);
+        verificationResult = cleanJson
+          ? JSON.parse(cleanJson[0])
+          : { is_valid: false };
+      } catch (parseError) {
+        console.error("Error parsing Groq JSON:", parseError);
+        // Cleanup Cloudinary on parse failure
+        await cloudinary.uploader.destroy(publicId);
+        throw new Error("Failed to parse AI verification result.");
+      }
+
+      // 4. Conditional Branching
+      if (!verificationResult.is_valid) {
+        // Delete invalid document from Cloudinary
+        try {
+          await cloudinary.uploader.destroy(publicId);
+          console.log("Deleted invalid LSN document from Cloudinary:", publicId);
+        } catch (delErr) {
+          console.error("Error deleting invalid image from Cloudinary:", delErr);
+        }
+
+        return res.status(400).json({
+          error: "Document Verification Failed",
+          details:
+            verificationResult.reasoning ||
+            "Document does not appear to be a valid LSN verification document.",
+        });
+      }
+
+      // 5. Document is valid — create Firebase Auth user and Firestore document
+      console.log("LSN document verified by Groq. Creating user...");
+
+      const userRecord = await admin.auth().createUser({
+        email,
+        password,
+        displayName: fullName,
+        emailVerified: false,
+      });
+
+      const lsnData = {
+        fullName,
+        email,
+        schoolId: schoolId || "",
+        department: department || "",
+        yearLevel: yearLevel || "",
+        contactNo: contactNo || "",
+        isLSN: true,
+        specialNeedsType: specialNeedsType || "Not specified",
+        lsnDocument: {
+          fileName: req.file.originalname,
+          secureUrl,
+          publicId,
+        },
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        role: "student",
+      };
+
+      await admin.firestore().collection("users").doc(userRecord.uid).set(lsnData);
+
+      console.log("LSN user created successfully:", userRecord.uid);
+
+      return res.status(201).json({
+        success: true,
+        message: "LSN registration successful.",
+        uid: userRecord.uid,
+        email: userRecord.email,
+      });
+
+    } catch (error) {
+      console.error("LSN Registration error:", error.message);
+      return res
+        .status(500)
+        .json({ error: `LSN registration failed: ${error.message}` });
     }
   },
 );
@@ -748,7 +938,7 @@ app.post("/api/chat", async (req, res) => {
     });
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -813,7 +1003,7 @@ app.post("/api/moderate", async (req, res) => {
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -890,7 +1080,7 @@ app.post("/api/ai-proxy", async (req, res) => {
 
     try {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
         {
           method: "POST",
           headers: {
