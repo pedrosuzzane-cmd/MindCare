@@ -1,3 +1,4 @@
+  import { shadows } from "@/utils/shadows";
   import { Ionicons } from "@expo/vector-icons";
   import { LinearGradient } from "expo-linear-gradient";
   import { router } from "expo-router";
@@ -316,9 +317,7 @@
       width: CARD_WIDTH,
       backgroundColor: "white",
       borderRadius: 20,
-      // @ts-ignore — web-only shadow property
-      boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
-      elevation: 3,
+      ...(shadows.sm("#000") as any),
       overflow: "hidden",
       borderWidth: 1,
       borderColor: "rgba(156, 126, 235, 0.06)",

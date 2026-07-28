@@ -3,6 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import React from "react";
 import {
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -10,6 +11,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { shadows } from "@/utils/shadows";
 
 type RiskLevel = "low" | "normal" | "high";
 
@@ -104,7 +106,7 @@ export default function AssessmentCompleteScreen() {
         <View style={styles.iconContainer}>
           <LinearGradient
             colors={config.gradient}
-            style={[styles.iconGradient, { shadowColor: config.gradient[0] }]}
+            style={[styles.iconGradient, Platform.select<any>({ web: { boxShadow: `0px 2px 8px ${config.gradient[0]}` }, default: { shadowColor: config.gradient[0] } })]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
@@ -231,13 +233,7 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     justifyContent: "center",
     alignItems: "center",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 12,
+    ...(shadows.custom(8, 16, 0.3, 12) as any),
   },
   title: {
     fontSize: 24,
@@ -287,9 +283,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
     marginBottom: 40,
-    // @ts-ignore — web-only shadow property
-    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
-    elevation: 4,
+    ...(shadows.md("#000") as any),
     borderWidth: 1,
     borderColor: "rgba(156, 126, 235, 0.06)",
   },

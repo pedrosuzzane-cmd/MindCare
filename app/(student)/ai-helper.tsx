@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { shadows } from "@/utils/shadows";
 
 import { auth } from "@/constants/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -87,11 +88,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 18,
     marginBottom: 18,
-    shadowColor: "#8A63D2",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    ...(shadows.custom(2, 8, 0.08, 3, "#8A63D2") as any),
     borderWidth: 1,
     borderColor: "rgba(156, 126, 235, 0.06)",
   },

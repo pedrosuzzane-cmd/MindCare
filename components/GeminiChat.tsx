@@ -27,6 +27,7 @@ import ChatBubble from "@/components/chat/ChatBubble";
 import ChatInput from "@/components/chat/ChatInput";
 import SuggestedQuestions from "@/components/chat/SuggestedQuestions";
 import TypingIndicator from "@/components/chat/TypingIndicator";
+import { shadows } from "@/utils/shadows";
 import { useChat } from "@/hooks/useChat";
 import { useNetwork } from "@/contexts/NetworkContext";
 import type { ChatMessage } from "@/types/chat";
@@ -216,9 +217,9 @@ export default function GeminiChat() {
                   bottom: bottomInset + 10,
                   opacity: greetingOpacity,
                   transform: [{ scale: greetingScale }],
+                  pointerEvents: "none" as any,
                 },
               ]}
-              pointerEvents="none"
             >
               <Text style={styles.greetingText}>
                 Hello! How can I help you today? 👋
@@ -246,9 +247,9 @@ export default function GeminiChat() {
                     }),
                   },
                 ],
+                pointerEvents: "none" as any,
               },
             ]}
-            pointerEvents="none"
           />
           <Pressable
             onPress={handleFABPress}
@@ -418,11 +419,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#8A63D2",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#8A63D2",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 10,
+    ...(shadows.custom(4, 10, 0.35, 10, "#8A63D2") as any),
     zIndex: 1002,
   },
   fabGlow: {
@@ -451,11 +448,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     maxWidth: 220,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
+    ...(shadows.custom(3, 8, 0.15, 8, "#000") as any),
     zIndex: 1003,
     borderWidth: 1,
     borderColor: "rgba(156, 126, 235, 0.15)",
@@ -502,11 +495,7 @@ const styles = StyleSheet.create({
     paddingRight: 14,
     paddingVertical: 6,
     gap: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 10,
+    ...(shadows.custom(3, 8, 0.2, 10, "#000") as any),
     zIndex: 1001,
     borderWidth: 1,
     borderColor: "rgba(156, 126, 235, 0.15)",

@@ -39,6 +39,7 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context"; // This was already correct
+import { shadows } from "@/utils/shadows";
 
 const COLLEGES = [
   "Saint Louis University (SLU)",
@@ -3279,11 +3280,7 @@ const styles = StyleSheet.create({
     borderColor: "#E2E8F0",
     maxHeight: 240,
     marginTop: 4,
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    ...(shadows.custom(2, 8, 0.1, 5, "#000") as any),
   },
   dropdownOption: {
     paddingHorizontal: 16,
@@ -3351,12 +3348,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#8A63D2",
     justifyContent: "center",
     alignItems: "center",
-    elevation: 10,
+    ...(shadows.custom(4, 6, 0.3, 10, "#000") as any),
     zIndex: 999,
     overflow: "visible",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
   },
 });

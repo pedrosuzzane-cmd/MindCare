@@ -13,6 +13,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { shadows } from "@/utils/shadows";
 
 import { auth, db } from "@/constants/firebase";
 import {
@@ -495,14 +496,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 24,
     marginBottom: 30,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
+    ...(shadows.custom(4, 12, 0.1, 5, "#000") as any),
   },
   questionText: {
     fontSize: 18,

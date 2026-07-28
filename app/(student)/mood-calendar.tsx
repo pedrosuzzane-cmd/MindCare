@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 
+import { shadows } from "@/utils/shadows";
 import { auth, db } from "@/constants/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
@@ -400,11 +401,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 12,
     marginBottom: 24,
-    shadowColor: "#8A63D2",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    ...(shadows.custom(2, 8, 0.08, 3, "#8A63D2") as any),
     borderWidth: 1,
     borderColor: "rgba(156, 126, 235, 0.06)",
   },
@@ -461,11 +458,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 20,
     padding: 12,
-    shadowColor: "#8A63D2",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    ...(shadows.custom(1, 4, 0.05, 1, "#8A63D2") as any),
     borderWidth: 1,
     borderColor: "rgba(156, 126, 235, 0.06)",
   },
@@ -515,11 +508,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 12,
     marginBottom: 12,
-    shadowColor: "#8A63D2",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    ...(shadows.custom(1, 4, 0.06, 2, "#8A63D2") as any),
     borderWidth: 1,
     borderColor: "rgba(156, 126, 235, 0.06)",
   },

@@ -1,3 +1,4 @@
+import { shadows } from "@/utils/shadows";
 import { useJournal } from "@/hooks/useJournal";
 import { useNetwork } from "@/contexts/NetworkContext";
 import { analyzeJournalViaBackend } from "@/services/geminiService";
@@ -466,9 +467,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-around",
-    // @ts-ignore — web-only shadow property
-    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
-    elevation: 3,
+    ...(shadows.sm("#000") as any),
     borderWidth: 1,
     borderColor: "rgba(156, 126, 235, 0.06)",
   },
@@ -500,9 +499,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    // @ts-ignore — web-only shadow property
-    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
-    elevation: 3,
+    ...(shadows.sm("#000") as any),
     borderWidth: 1,
     borderColor: "rgba(156, 126, 235, 0.06)",
   },
@@ -532,9 +529,7 @@ const styles = StyleSheet.create({
   inputContainer: {
     backgroundColor: "white",
     borderRadius: 20,
-    // @ts-ignore — web-only shadow property
-    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
-    elevation: 3,
+    ...(shadows.sm("#000") as any),
     borderWidth: 1,
     borderColor: "rgba(156, 126, 235, 0.06)",
   },

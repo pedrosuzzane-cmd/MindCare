@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { shadows } from "@/utils/shadows";
 import { useJournal } from "@/hooks/useJournal";
 import { JournalCalendar } from "@/components/student/JournalCalendar";
 import { WellnessChart } from "@/components/WellnessChart";
@@ -230,9 +231,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
-    // @ts-ignore — web-only shadow property
-    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
-    elevation: 3,
+    ...(shadows.sm("#000") as any),
     paddingTop: 24,
     overflow: "hidden",
     borderWidth: 1,

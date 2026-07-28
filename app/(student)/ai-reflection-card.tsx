@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Animated,
+    Platform,
     Pressable,
     SafeAreaView,
     ScrollView,
@@ -12,6 +13,7 @@ import {
     Text,
     View,
 } from "react-native";
+import { shadows } from "@/utils/shadows";
 import {
   analyzeJournalViaBackend,
   analyzeJournal,
@@ -45,12 +47,12 @@ export default function AIReflectionCardScreen() {
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 600,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
         }),
         Animated.timing(slideAnim, {
           toValue: 0,
           duration: 600,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
         }),
       ]).start();
     }
@@ -356,11 +358,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 20,
     padding: 24,
-    shadowColor: "#8A63D2",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    ...(shadows.custom(2, 12, 0.08, 3, "#8A63D2") as any),
     borderWidth: 1,
     borderColor: "rgba(156, 126, 235, 0.06)",
   },

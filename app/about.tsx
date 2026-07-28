@@ -4,6 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React from "react";
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { shadows } from "@/utils/shadows";
 
 export default function AboutScreen() {
   const appVersion = Application.nativeApplicationVersion || "1.0.0";
@@ -91,11 +92,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#00BCD4",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    ...(shadows.custom(4, 8, 0.3, 8, "#00BCD4") as any),
   },
   heartIcon: {
     fontSize: 40,

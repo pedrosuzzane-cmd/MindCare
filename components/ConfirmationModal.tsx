@@ -8,6 +8,7 @@ import {
     Text,
     View,
 } from "react-native";
+import { shadows } from "@/utils/shadows";
 
 interface ConfirmationModalProps {
   visible: boolean;
@@ -92,14 +93,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 360,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
+    ...(shadows.custom(4, 12, 0.2, 8, "#000") as any),
   },
   modalTitle: {
     fontSize: 18,

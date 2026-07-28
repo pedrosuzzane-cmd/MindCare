@@ -2,6 +2,7 @@ import { JournalEntry } from "@/services/journalService";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { shadows } from "@/utils/shadows";
 
 interface JournalCalendarProps {
   journalEntries: JournalEntry[];
@@ -270,11 +271,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 18,
     marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+    ...(shadows.custom(2, 12, 0.1, 4, "#000") as any),
   },
   calendarHeader: {
     flexDirection: "row",

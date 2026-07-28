@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useRef } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
+import { Animated, Platform, StyleSheet, Text, View } from "react-native";
+import { shadows } from "@/utils/shadows";
 
 interface ToastProps {
   visible: boolean;
@@ -43,14 +44,14 @@ export default function Toast({
       Animated.timing(animValue, {
         toValue: 1,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== "web",
       }).start();
 
       const timer = setTimeout(() => {
         Animated.timing(animValue, {
           toValue: 0,
           duration: 300,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== "web",
         }).start(onDismiss);
       }, duration);
 
@@ -101,11 +102,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 30,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 10,
+    ...(shadows.custom(4, 8, 0.2, 10, "#000") as any),
   },
   message: {
     color: "white",

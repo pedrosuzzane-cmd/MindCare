@@ -12,6 +12,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { shadows } from "@/utils/shadows";
 
 interface SupportHotline {
   id: string;
@@ -298,14 +299,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#EF4444",
     borderRadius: 20,
     padding: 20,
-    shadowColor: "#EF4444",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    ...(shadows.custom(4, 12, 0.3, 8, "#EF4444") as any),
   },
   cardContent: {
     flexDirection: "row",
@@ -343,9 +337,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 20,
     padding: 20,
-    // @ts-ignore — web-only shadow property
-    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
-    elevation: 4,
+    ...(shadows.sm("#000") as any),
     borderWidth: 1,
     borderColor: "rgba(156, 126, 235, 0.06)",
   },

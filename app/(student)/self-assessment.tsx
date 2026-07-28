@@ -12,6 +12,7 @@ import {
     Text,
     View,
 } from "react-native";
+import { shadows } from "@/utils/shadows";
 
 import { auth, db } from "@/constants/firebase";
 import {
@@ -547,9 +548,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 24,
     marginBottom: 16,
-    // @ts-ignore — web-only shadow property
-    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
-    elevation: 4,
+    ...(shadows.sm("#000") as any),
     borderWidth: 1,
     borderColor: "rgba(156, 126, 235, 0.06)",
   },

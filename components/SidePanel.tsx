@@ -128,8 +128,8 @@ export default function SidePanel() {
         style={[
           styles.panel,
           { transform: [{ translateX: slideAnim }] },
+          { pointerEvents: isOpen ? "auto" as any : "none" as any },
         ]}
-        pointerEvents={isOpen ? "auto" : "none"}
       >
         <SafeAreaView style={styles.panelSafe}>
           <View style={styles.profileSection}>
