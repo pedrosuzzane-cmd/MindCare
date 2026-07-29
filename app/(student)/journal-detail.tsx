@@ -2,7 +2,7 @@ import { useJournal } from "@/hooks/useJournal";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import {
     ActivityIndicator,
     Pressable,
@@ -12,7 +12,7 @@ import {
     Text,
     View,
 } from "react-native";
-// Hide the default native/header provided by the navigation stack
+
 export const options = {
   headerShown: false,
 };
@@ -21,13 +21,10 @@ export default function JournalDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = params.id;
   const { getJournalEntry, loading } = useJournal();
-  const [entry, setEntry] = useState(id ? getJournalEntry(id) : null);
+  const entry = id ? getJournalEntry(id) : undefined;
 
   useEffect(() => {
-    if (id) {
-      const foundEntry = getJournalEntry(id);
-      setEntry(foundEntry);
-    } else {
+    if (!id) {
       router.replace("/daily-journal");
     }
   }, [id]);
