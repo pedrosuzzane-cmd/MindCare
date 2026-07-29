@@ -7,11 +7,10 @@ import {
 } from "@/services/journalService";
 import { offlineSyncQueue } from "@/services/offlineSyncQueue";
 import { syncService } from "@/services/syncService";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useJournal() {
-  const [user, setUser] = useState<User | null>(auth.currentUser);
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -20,10 +19,9 @@ export function useJournal() {
   const { isConnected } = useNetwork();
   const isSyncing = useRef(false);
 
-  // Effect for handling auth changes
+  // Clear entries when user signs out
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
       if (!currentUser) {
         setEntries([]);
         setLoading(false);
@@ -34,17 +32,18 @@ export function useJournal() {
 
   // Function to load local entries
   const loadLocalEntries = useCallback(async () => {
-    if (!user) return;
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
     setLoading(true);
     try {
-      const localEntries = await journalService.getJournalEntries(user.uid);
+      const localEntries = await journalService.getJournalEntries(uid);
       setEntries(localEntries);
     } catch (error) {
       console.error("Failed to load local journal entries:", error);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, []);
 
   // Refresh queue counts from AsyncStorage
   const refreshQueueCounts = useCallback(async () => {
@@ -63,11 +62,12 @@ export function useJournal() {
   }, [loadLocalEntries, refreshQueueCounts]);
 
   const triggerSync = useCallback(async () => {
-    if (isConnected && user && !isSyncing.current) {
+    const uid = auth.currentUser?.uid;
+    if (isConnected && uid && !isSyncing.current) {
       isSyncing.current = true;
       setSyncing(true);
       try {
-        await syncService.syncJournals(user.uid);
+        await syncService.syncJournals(uid);
         await offlineSyncQueue.clearQueue();
         await loadLocalEntries();
         await refreshQueueCounts();
@@ -78,7 +78,7 @@ export function useJournal() {
         isSyncing.current = false;
       }
     }
-  }, [isConnected, user, loadLocalEntries, refreshQueueCounts]);
+  }, [isConnected, loadLocalEntries, refreshQueueCounts]);
 
   // Effect for triggering sync on connection restore
   useEffect(() => {
@@ -90,8 +90,9 @@ export function useJournal() {
   const addJournalEntry = async (
     entryData: Omit<JournalEntry, "id" | "syncStatus" | "userId">,
   ): Promise<JournalEntry> => {
-    if (!user) throw new Error("User not authenticated");
-    const newEntry = await journalService.addJournalEntry(user.uid, entryData);
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error("User not authenticated");
+    const newEntry = await journalService.addJournalEntry(uid, entryData);
 
     // Enqueue for sync
     await offlineSyncQueue.enqueue({
@@ -113,13 +114,14 @@ export function useJournal() {
   };
 
   const retryFailedSync = useCallback(async () => {
-    if (!user) return;
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
     // Reset failed entries to pending for retry
-    const allEntries = await journalService.getJournalEntries(user.uid);
+    const allEntries = await journalService.getJournalEntries(uid);
     for (const entry of allEntries) {
       if (entry.syncStatus === "failed") {
         entry.syncStatus = "pending";
-        await journalService.updateJournalEntry(user.uid, entry);
+        await journalService.updateJournalEntry(uid, entry);
         await offlineSyncQueue.enqueue({
           journalId: entry.id,
           action: "create",
@@ -128,7 +130,7 @@ export function useJournal() {
     }
     await refreshQueueCounts();
     triggerSync();
-  }, [user, refreshQueueCounts, triggerSync]);
+  }, [refreshQueueCounts, triggerSync]);
 
   const getJournalEntry = (id: string): JournalEntry | undefined => {
     return entries.find((entry) => entry.id === id);
