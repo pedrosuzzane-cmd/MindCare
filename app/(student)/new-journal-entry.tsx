@@ -1,8 +1,6 @@
 import { shadows } from "@/utils/shadows";
 import { useJournal } from "@/hooks/useJournal";
 import { useNetwork } from "@/contexts/NetworkContext";
-import { analyzeJournalViaBackend } from "@/services/geminiService";
-import { journalService } from "@/services/journalService";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -145,61 +143,15 @@ export default function NewJournalEntryScreen() {
         updatedAt: new Date().toISOString(),
       };
 
-      const newEntry = await addJournalEntry(data);
+      await addJournalEntry(data);
 
-      // Navigate to AI Reflection Card
-      router.replace({
-        pathname: "/ai-reflection-card",
-        params: {
-          journalId: newEntry.id, // Pass the ID of the newly created local entry
-          title: newEntry.title,
-          thoughts: newEntry.thoughts,
-          mood: selectedMood,
-          category: selectedCategory,
-        },
-      });
-
-      // Fire-and-forget: call Gemini to analyze the journal
-      // Never blocks navigation if Gemini fails
-      analyzeJournalInBackground(newEntry);
+      // Navigate back to daily journal
+      router.replace("/daily-journal");
     } catch (err) {
       console.error("Error saving journal entry", err);
       Alert.alert("Error", "Unable to save entry. Please try again.");
     } finally {
       setSaving(false);
-    }
-  };
-
-  /**
-   * Calls the Render backend for Gemini-based wellness analysis and stores
-   * the resulting aiInsight on the journal entry.
-   * Runs asynchronously in the background — never blocks or throws.
-   * If the device is offline, the call is skipped entirely.
-   */
-  const analyzeJournalInBackground = async (
-    entry: import("@/services/journalService").JournalEntry,
-  ) => {
-    try {
-      const journalText = `Title: ${entry.title}\nMood: ${entry.mood}\nCategory: ${entry.category}\nThoughts: ${entry.thoughts}`;
-      const aiInsight = await analyzeJournalViaBackend(journalText);
-
-      if (!aiInsight) {
-        // Offline or backend failed — journal is already saved, no harm done
-        return;
-      }
-
-      // Update the stored entry with the backend AI insight
-      const updatedEntry: import("@/services/journalService").JournalEntry = {
-        ...entry,
-        aiInsight,
-      };
-
-      const userId = updatedEntry.userId;
-      await journalService.updateJournalEntry(userId, updatedEntry);
-      console.log("AI insight saved for journal:", entry.id);
-    } catch (err) {
-      // Silently ignore — journal was already saved successfully
-      console.warn("Background AI insight failed:", err);
     }
   };
 

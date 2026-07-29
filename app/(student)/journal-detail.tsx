@@ -86,19 +86,6 @@ export default function JournalDetailScreen() {
           <View style={{ height: 12 }} />
           <Text style={styles.body}>{entry.thoughts}</Text>
         </View>
-
-        {/* AI Wellness Insight Card */}
-        {entry.aiInsight ? (
-          <View style={styles.insightCard}>
-            <View style={styles.insightHeader}>
-              <View style={styles.insightIconCircle}>
-                <Text style={styles.insightEmoji}>💚</Text>
-              </View>
-              <Text style={styles.insightTitle}>Wellness Insight</Text>
-            </View>
-            <Text style={styles.insightBody}>{entry.aiInsight}</Text>
-          </View>
-        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -150,43 +137,5 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 10,
     fontWeight: "600",
-  },
-  // AI Wellness Insight
-  insightCard: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 20,
-    marginTop: 16,
-    elevation: 3,
-    // @ts-ignore — web-only shadow property
-    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
-  },
-  insightHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  insightIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#F3EAFF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  insightEmoji: { fontSize: 20 },
-  insightTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1E1B4B",
-  },
-  insightBody: {
-    fontSize: 15,
-    color: "#4B4453",
-    lineHeight: 24,
-    letterSpacing: 0.2,
   },
 });

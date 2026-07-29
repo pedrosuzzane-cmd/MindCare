@@ -62,39 +62,13 @@ export function useJournal() {
     refreshQueueCounts();
   }, [loadLocalEntries, refreshQueueCounts]);
 
-  // Define triggerSync before any useEffect that references it
   const triggerSync = useCallback(async () => {
     if (isConnected && user && !isSyncing.current) {
       isSyncing.current = true;
       setSyncing(true);
       try {
-        // Process pending queue items
-        const pendingItems = await offlineSyncQueue.getPendingItems();
-        for (const item of pendingItems) {
-          try {
-            await syncService.syncJournals(user.uid);
-            // On success, remove from queue
-            await offlineSyncQueue.dequeue(item.journalId);
-          } catch (err: any) {
-            // On failure, increment retry count
-            const canRetry = await offlineSyncQueue.incrementRetry(
-              item.journalId,
-              err?.message || "Sync failed",
-            );
-            if (!canRetry) {
-              console.warn(
-                `Journal ${item.journalId} exceeded max retries, marking as failed.`,
-              );
-              // Mark entry as failed in local storage
-              const allEntries = await journalService.getJournalEntries(user.uid);
-              const entry = allEntries.find((e) => e.id === item.journalId);
-              if (entry) {
-                entry.syncStatus = "failed";
-                await journalService.updateJournalEntry(user.uid, entry);
-              }
-            }
-          }
-        }
+        await syncService.syncJournals(user.uid);
+        await offlineSyncQueue.clearQueue();
         await loadLocalEntries();
         await refreshQueueCounts();
       } catch (error) {
@@ -140,13 +114,17 @@ export function useJournal() {
 
   const retryFailedSync = useCallback(async () => {
     if (!user) return;
-    // Reset retry counts for all failed items so they can be retried
-    const failedItems = await offlineSyncQueue.getFailedItems();
-    for (const item of failedItems) {
-      await offlineSyncQueue.enqueue({
-        journalId: item.journalId,
-        action: item.action,
-      });
+    // Reset failed entries to pending for retry
+    const allEntries = await journalService.getJournalEntries(user.uid);
+    for (const entry of allEntries) {
+      if (entry.syncStatus === "failed") {
+        entry.syncStatus = "pending";
+        await journalService.updateJournalEntry(user.uid, entry);
+        await offlineSyncQueue.enqueue({
+          journalId: entry.id,
+          action: "create",
+        });
+      }
     }
     await refreshQueueCounts();
     triggerSync();

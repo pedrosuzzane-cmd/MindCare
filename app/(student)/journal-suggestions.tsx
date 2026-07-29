@@ -28,10 +28,6 @@ export default function JournalSuggestionsScreen() {
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Check if the latest entry has AI analysis
-  const latestEntry = journalEntries.length > 0 ? journalEntries[0] : null;
-  const hasAiAnalysis = latestEntry?.aiGeneratedAt != null;
-
   const handleBack = () => {
     router.back();
   };
@@ -190,59 +186,6 @@ export default function JournalSuggestionsScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* AI Analysis Section (from latest journal entry) */}
-          {hasAiAnalysis ? (
-            <View style={styles.aiAnalysisSection}>
-              {/* Emotion */}
-              <View style={styles.insightCard}>
-                <Text style={styles.insightLabel}>Emotion</Text>
-                <Text style={styles.insightValue}>
-                  {latestEntry?.aiEmotion || "Unknown"}
-                </Text>
-              </View>
-
-              {/* Summary */}
-              <View style={styles.insightCard}>
-                <Text style={styles.insightLabel}>Summary</Text>
-                <Text style={styles.insightValue}>
-                  {latestEntry?.aiSummary || "No summary available."}
-                </Text>
-              </View>
-
-              {/* Encouragement */}
-              <View style={styles.insightCard}>
-                <Text style={styles.insightLabel}>Encouragement</Text>
-                <Text style={styles.insightValue}>
-                  {latestEntry?.aiEncouragement || "Keep going!"}
-                </Text>
-              </View>
-
-              {/* Suggestions */}
-              {latestEntry?.aiSuggestions &&
-                latestEntry.aiSuggestions.length > 0 && (
-                  <View style={styles.insightCard}>
-                    <Text style={styles.insightLabel}>Suggestions</Text>
-                    {latestEntry.aiSuggestions.map((suggestion, idx) => (
-                      <View key={idx} style={styles.suggestionRow}>
-                        <Text style={styles.suggestionBullet}>•</Text>
-                        <Text style={styles.suggestionText}>{suggestion}</Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-            </View>
-          ) : (
-            /* Show "Generating insights..." if no AI data yet but entries exist */
-            journalEntries.length > 0 && (
-              <View style={styles.generatingContainer}>
-                <ActivityIndicator size="small" color="#8A63D2" />
-                <Text style={styles.generatingText}>
-                  Generating insights...
-                </Text>
-              </View>
-            )
-          )}
-
           {/* Intro */}
           <View style={styles.introContainer}>
             <Text style={styles.introTitle}>Personalized for You</Text>
@@ -480,63 +423,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     marginLeft: 8,
-  },
-  // AI Analysis section styles
-  aiAnalysisSection: {
-    marginBottom: 24,
-  },
-  insightCard: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    boxShadow: "0px 1px 2px rgba(0,0,0,0.1)",
-    elevation: 2,
-  },
-  insightLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#8A63D2",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 6,
-  },
-  insightValue: {
-    fontSize: 15,
-    color: "#333",
-    lineHeight: 22,
-  },
-  suggestionRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 6,
-  },
-  suggestionBullet: {
-    fontSize: 15,
-    color: "#8A63D2",
-    marginRight: 8,
-    lineHeight: 22,
-  },
-  suggestionText: {
-    fontSize: 14,
-    color: "#555",
-    flex: 1,
-    lineHeight: 22,
-  },
-  generatingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
-    boxShadow: "0px 1px 2px rgba(0,0,0,0.1)",
-    elevation: 2,
-  },
-  generatingText: {
-    fontSize: 14,
-    color: "#666",
-    marginLeft: 10,
   },
 });

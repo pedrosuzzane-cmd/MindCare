@@ -1,3 +1,4 @@
+import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage";
 import { auth, db } from "@/constants/firebase";
 import { router } from "expo-router";
 import {
@@ -40,6 +41,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<UserRole>(null);
   const [loading, setLoading] = useState(true);
 
+  const CACHED_ROLE_KEY = (uid: string) => `@MindCare:user_role_${uid}`;
+
   const fetchUserRole = async (currentUser: User): Promise<UserRole> => {
     try {
       // Check if the user is an admin first
@@ -47,6 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const adminDocSnap = await getDoc(adminDocRef);
 
       if (adminDocSnap.exists()) {
+        await ReactNativeAsyncStorage.setItem(CACHED_ROLE_KEY(currentUser.uid), "admin");
         return "admin";
       }
 
@@ -55,6 +59,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userDocSnap = await getDoc(userDocRef);
 
       if (userDocSnap.exists()) {
+        await ReactNativeAsyncStorage.setItem(CACHED_ROLE_KEY(currentUser.uid), "student");
         return "student";
       }
 
@@ -63,7 +68,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       );
       return null;
     } catch (error) {
-      console.error("Error fetching user role:", error);
+      // Offline or network error — fall back to cached role
+      console.warn("Error fetching user role, using cached:", error);
+      try {
+        const cached = await ReactNativeAsyncStorage.getItem(CACHED_ROLE_KEY(currentUser.uid));
+        if (cached === "admin" || cached === "student") return cached;
+      } catch {}
       return null;
     }
   };

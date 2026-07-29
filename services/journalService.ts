@@ -16,14 +16,6 @@ export interface JournalEntry {
   updatedAt: string; // ISO 8601 string
   entryDate: string; // ISO 8601 string
   syncStatus: SyncStatus;
-  // AI-generated analysis fields (populated after save)
-  aiEmotion?: string;
-  aiSummary?: string;
-  aiEncouragement?: string;
-  aiSuggestions?: string[];
-  aiGeneratedAt?: string; // ISO 8601 string
-  // Gemini backend insight (supportive wellness reflection)
-  aiInsight?: string;
 }
 
 const getJournalEntries = async (userId: string): Promise<JournalEntry[]> => {

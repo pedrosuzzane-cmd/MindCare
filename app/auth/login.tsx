@@ -47,7 +47,8 @@ export default function LoginScreen() {
     if (authLoading || !user) return;
     if (role === "admin") {
       router.replace("/admin-panel");
-    } else if (role === "student") {
+    } else {
+      // Default to student dashboard (works offline when role can't be fetched)
       router.replace("/(student)/(tabs)/dashboard");
     }
   }, [user, role, authLoading]);

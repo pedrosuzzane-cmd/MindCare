@@ -11,7 +11,6 @@ export default function StudentLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="achievements" />
           <Stack.Screen name="ai-helper" />
-          <Stack.Screen name="ai-reflection-card" />
           <Stack.Screen name="assessment-complete" />
           <Stack.Screen name="daily-journal" />
           <Stack.Screen name="daily-reminders" />
