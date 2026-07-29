@@ -296,14 +296,6 @@ export default function NewJournalEntryScreen() {
         {/* Save Button */}
         <View style={styles.buttonContainer}>
           <Pressable
-            style={[
-              styles.saveButton,
-              (saving ||
-                !selectedCategory ||
-                !entryTitle.trim() ||
-                !thoughts.trim()) &&
-                styles.disabledButton,
-            ]}
             onPress={handleSaveEntry}
             disabled={
               saving ||
@@ -312,18 +304,34 @@ export default function NewJournalEntryScreen() {
               !thoughts.trim()
             }
           >
-            {saving ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <LinearGradient
-                colors={["#9C7EEB", "#8A63D2"]}
-                style={styles.saveButtonGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                <Text style={styles.saveButtonText}>Save Entry</Text>
-              </LinearGradient>
-            )}
+            <LinearGradient
+              colors={
+                saving ||
+                !selectedCategory ||
+                !entryTitle.trim() ||
+                !thoughts.trim()
+                  ? ["#C4B5D9", "#B09FD0"]
+                  : ["#9C7EEB", "#8A63D2"]
+              }
+              style={styles.saveButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              {saving ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <View style={styles.saveButtonContent}>
+                  <Ionicons
+                    name={isConnected === false ? "cloud-upload-outline" : "checkmark-circle"}
+                    size={20}
+                    color="white"
+                  />
+                  <Text style={styles.saveButtonText}>
+                    {isConnected === false ? "Save Offline" : "Save Entry"}
+                  </Text>
+                </View>
+              )}
+            </LinearGradient>
           </Pressable>
         </View>
       </ScrollView>
@@ -528,14 +536,15 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     overflow: "hidden",
   },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  saveButton: {
-    alignItems: "center",
-  },
   saveButtonGradient: {
     paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   saveButtonText: {
     fontSize: 16,
