@@ -1,6 +1,6 @@
 import { auth, db } from "@/constants/firebase";
 import { useAuth } from "@/hooks/AuthContext";
-import { changeProfileImage } from "@/services/userService";
+import { changeProfileImage, uploadProfileImageFromFile } from "@/services/userService";
 import { uploadDocumentToCloudinary } from "@/services/cloudinaryUpload";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
@@ -8,7 +8,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -39,6 +39,7 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [fullName, setFullName] = useState("");
   const [contactNo, setContactNo] = useState("");
@@ -100,15 +101,19 @@ export default function ProfileScreen() {
 
   const handleAvatarPress = async () => {
     if (uploadingImage || !uid) return;
-    setUploadingImage(true);
-    try {
-      const collectionName = role === "admin" ? "admins" : "users";
-      const newUrl = await changeProfileImage(uid, collectionName);
-      if (newUrl) {
-        setProfile((p) => ({ ...(p || {}), profileImage: newUrl }));
+    if (Platform.OS === "web") {
+      fileInputRef.current?.click();
+    } else {
+      setUploadingImage(true);
+      try {
+        const collectionName = role === "admin" ? "admins" : "users";
+        const newUrl = await changeProfileImage(uid, collectionName);
+        if (newUrl) {
+          setProfile((p) => ({ ...(p || {}), profileImage: newUrl }));
+        }
+      } finally {
+        setUploadingImage(false);
       }
-    } finally {
-      setUploadingImage(false);
     }
   };
 
@@ -281,6 +286,29 @@ export default function ProfileScreen() {
 
           {/* Avatar */}
           <Pressable style={s.avatarContainer} onPress={handleAvatarPress}>
+            {Platform.OS === "web" && (
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file || !uid) return;
+                  setUploadingImage(true);
+                  try {
+                    const collectionName = role === "admin" ? "admins" : "users";
+                    const newUrl = await uploadProfileImageFromFile(file, uid, collectionName);
+                    if (newUrl) {
+                      setProfile((p) => ({ ...(p || {}), profileImage: newUrl }));
+                    }
+                  } finally {
+                    setUploadingImage(false);
+                  }
+                  e.target.value = "";
+                }}
+              />
+            )}
             <View style={s.avatarRing}>
               {profile?.profileImage ? (
                 <Image

@@ -11,6 +11,7 @@ const UPLOAD_PRESET = "mindcare_upload";
 /**
  * Requests media library permissions and lets the user pick an image.
  * Returns the local URI or null if cancelled.
+ * Uses expo-image-picker (native only — safe for Android/iOS).
  */
 export async function pickProfileImage(): Promise<string | null> {
   const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -34,33 +35,6 @@ export async function pickProfileImage(): Promise<string | null> {
 }
 
 /**
- * Opens a browser file picker for images and returns the selected File object.
- * Uses the DOM file input API (web-only).
- */
-export function pickProfileImageWeb(): Promise<File | null> {
-  return new Promise((resolve) => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.style.display = "none";
-
-    input.onchange = () => {
-      const file = input.files?.[0] || null;
-      document.body.removeChild(input);
-      resolve(file);
-    };
-
-    input.oncancel = () => {
-      document.body.removeChild(input);
-      resolve(null);
-    };
-
-    document.body.appendChild(input);
-    input.click();
-  });
-}
-
-/**
  * Uploads a local image URI directly to Cloudinary and returns the secure URL.
  */
 export async function uploadAvatarToCloudinary(
@@ -68,29 +42,6 @@ export async function uploadAvatarToCloudinary(
 ): Promise<string> {
   const { secureUrl } = await uploadImageToCloudinary(localUri);
   return secureUrl;
-}
-
-/**
- * Uploads a File object (from web file picker) directly to Cloudinary and returns the secure URL.
- */
-export async function uploadAvatarToCloudinaryWeb(
-  file: File,
-): Promise<string> {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("upload_preset", UPLOAD_PRESET);
-  formData.append("folder", "mindcare/profile-images");
-
-  const response = await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-    { method: "POST", body: formData },
-  );
-
-  const data = await response.json();
-  if (!data.secure_url) {
-    throw new Error(data.error?.message || "Image upload failed");
-  }
-  return data.secure_url;
 }
 
 /**
@@ -111,7 +62,8 @@ export async function saveProfileImage(
 /**
  * Full flow: pick image → upload to Cloudinary → save to Firestore.
  * Returns the new image URL or null if cancelled/failed.
- * Uses expo-image-picker (native only).
+ * Uses expo-image-picker (native only — Android/iOS).
+ * Students & admins on native devices use this.
  */
 export async function changeProfileImage(
   uid: string,
@@ -132,23 +84,35 @@ export async function changeProfileImage(
 }
 
 /**
- * Full flow for web: pick image via DOM file input → upload to Cloudinary → save to Firestore.
- * Returns the new image URL or null if cancelled/failed.
- * Web-compatible (does not use expo-image-picker).
+ * Web-only: uploads a raw browser File object to Cloudinary, then saves the URL to Firestore.
+ * This function does NOT use expo-image-picker — it works with event.target.files[0].
+ * Admin & student-detail web uploads use this.
  */
-export async function changeProfileImageWeb(
+export async function uploadProfileImageFromFile(
+  file: File,
   uid: string,
   collectionName: "users" | "admins",
 ): Promise<string | null> {
   try {
-    const file = await pickProfileImageWeb();
-    if (!file) return null;
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", UPLOAD_PRESET);
+    formData.append("cloud_name", CLOUD_NAME);
 
-    const secureUrl = await uploadAvatarToCloudinaryWeb(file);
-    await saveProfileImage(uid, collectionName, secureUrl);
-    return secureUrl;
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+      { method: "POST", body: formData },
+    );
+
+    const data = await response.json();
+    if (!data.secure_url) {
+      throw new Error(data.error?.message || "Cloudinary upload failed");
+    }
+
+    await saveProfileImage(uid, collectionName, data.secure_url);
+    return data.secure_url;
   } catch (error: any) {
-    console.error("changeProfileImageWeb error:", error);
+    console.error("uploadProfileImageFromFile error:", error);
     Alert.alert("Upload Failed", error.message || "Could not update profile picture.");
     return null;
   }

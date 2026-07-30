@@ -16,7 +16,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/constants/firebase";
 import { useAuth } from "@/hooks/AuthContext";
 import { useSidePanel } from "@/contexts/SidePanelContext";
@@ -91,14 +91,15 @@ export default function SidePanel() {
 
   useEffect(() => {
     if (!user?.uid) return;
-    getDoc(doc(db, "users", user.uid)).then((snap) => {
+    const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
       if (snap.exists()) {
         setDisplayName(snap.data().fullName || snap.data().displayName || user?.displayName || "");
         setProfileImage(snap.data().profileImage || null);
       }
-    }).catch(() => {
+    }, () => {
       if (user?.displayName) setDisplayName(user.displayName);
     });
+    return () => unsub();
   }, [user?.uid]);
 
   const doSignOut = async () => {

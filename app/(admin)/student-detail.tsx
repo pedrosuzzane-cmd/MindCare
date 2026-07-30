@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -26,7 +26,7 @@ import {
   orderBy,
   query,
 } from "firebase/firestore";
-import { changeProfileImage, changeProfileImageWeb } from "@/services/userService";
+import { changeProfileImage, uploadProfileImageFromFile } from "@/services/userService";
 
 interface JournalEntry {
   id: string;
@@ -118,6 +118,7 @@ export default function StudentDetailScreen() {
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [moodCounts, setMoodCounts] = useState<Record<string, number>>({});
   const [assessments, setAssessments] = useState<AssessmentRecord[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Prevent execution until uid is fully parsed from route parameters
@@ -291,17 +292,38 @@ export default function StudentDetailScreen() {
                 <Pressable
                   onPress={async () => {
                     if (uploadingImage) return;
-                    setUploadingImage(true);
-                    const newUrl = Platform.OS === "web"
-                      ? await changeProfileImageWeb(uid, "users")
-                      : await changeProfileImage(uid, "users");
-                    if (newUrl) {
-                      setProfile((prev) => prev ? { ...prev, profileImage: newUrl } : prev);
+                    if (Platform.OS === "web") {
+                      fileInputRef.current?.click();
+                    } else {
+                      setUploadingImage(true);
+                      const newUrl = await changeProfileImage(uid, "users");
+                      if (newUrl) {
+                        setProfile((prev) => prev ? { ...prev, profileImage: newUrl } : prev);
+                      }
+                      setUploadingImage(false);
                     }
-                    setUploadingImage(false);
                   }}
                   style={styles.avatarPressable}
                 >
+                  {Platform.OS === "web" && (
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        setUploadingImage(true);
+                        const newUrl = await uploadProfileImageFromFile(file, uid, "users");
+                        if (newUrl) {
+                          setProfile((prev) => prev ? { ...prev, profileImage: newUrl } : prev);
+                        }
+                        setUploadingImage(false);
+                        e.target.value = "";
+                      }}
+                    />
+                  )}
                   <View style={styles.avatarCircle}>
                     {profile.profileImage ? (
                       <Image source={{ uri: profile.profileImage }} style={{ width: 56, height: 56, borderRadius: 28 }} />
