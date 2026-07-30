@@ -170,6 +170,8 @@ interface DepartmentRowData {
   highPct: number;
 }
 
+const YEAR_LEVEL_OPTIONS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "Graduate", "N/A"];
+
 // ─── Helper: Extract abbreviation from department name ───────────────────────
 const getDeptAbbreviation = (fullName: string): string => {
   const match = fullName.match(/\(([^)]+)\)/);
@@ -492,10 +494,7 @@ export default function AdminPanelScreen() {
   // ─── Year Level Filter State ──────────────────────────────────────────────
   const [yearLevelFilter, setYearLevelFilter] = useState<string>("All");
 
-  const yearLevelOptions = useMemo(() => {
-    const dataLevels = Array.from(new Set(studentSummaries.map((s) => s.yearLevel).filter(Boolean)));
-    return ["All", ...dataLevels.sort()];
-  }, [studentSummaries]);
+  const yearLevelOptions = useMemo(() => ["All", ...YEAR_LEVEL_OPTIONS], []);
 
   // ─── Computed Department Table Rows ────────────────────────────────────────
   const departmentRows = useMemo((): DepartmentRowData[] => {
@@ -1074,9 +1073,9 @@ export default function AdminPanelScreen() {
       totalAllDepts > 0
         ? Math.round((row.totalStudents / totalAllDepts) * 100)
         : 0;
-    const groupWidth = Math.max(56, Math.min(80, Math.floor(640 / deptCount)));
-    const barWidth = Math.max(6, Math.min(14, (groupWidth - 16) / 3));
-    const barMaxHeight = 100;
+    const groupWidth = Math.max(72, Math.min(100, Math.floor(640 / deptCount)));
+    const barWidth = Math.max(12, Math.min(22, (groupWidth - 16) / 3));
+    const barMaxHeight = 120;
 
     return (
       <Pressable
@@ -2012,7 +2011,7 @@ export default function AdminPanelScreen() {
                     </Pressable>
                     <Pressable
                       style={({ pressed }) => [styles.analyticsNavCard, pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 }]}
-                      onPress={() => router.push("/(admin)/analytics/risk-trends")}
+                      onPress={() => router.push("/(admin)/analytics/risk-variance")}
                     >
                       <View style={[styles.analyticsNavIcon, { backgroundColor: "#FEF3C7" }]}>
                         <Ionicons name="trending-up" size={22} color="#D97706" />
@@ -2093,7 +2092,7 @@ export default function AdminPanelScreen() {
                           </Text>
                         </View>
                       ) : (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.barChartScrollRow}>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.barChartScrollRow} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
                           <View style={styles.barChartRow}>
                             {(() => {
                               const totalAllDepts = departmentRows.reduce(
@@ -2138,20 +2137,26 @@ export default function AdminPanelScreen() {
                       <Text style={styles.thresholdDescription}>
                         Each student's risk level is calculated from their latest WEMWBS assessment score (out of 80):
                       </Text>
-                      <View style={styles.thresholdRow}>
-                        <View style={[styles.thresholdDot, { backgroundColor: "#22C55E" }]} />
-                        <Text style={styles.thresholdLabel}>Low (0–20)</Text>
-                        <Text style={styles.thresholdDetail}>— Healthy range, routine monitoring</Text>
+                      <View style={styles.thresholdBlock}>
+                        <View style={styles.thresholdBlockHeader}>
+                          <View style={[styles.thresholdDot, { backgroundColor: "#22C55E" }]} />
+                          <Text style={styles.thresholdLabel}>Low (0–20)</Text>
+                        </View>
+                        <Text style={styles.thresholdDetail}>Healthy range, routine monitoring</Text>
                       </View>
-                      <View style={styles.thresholdRow}>
-                        <View style={[styles.thresholdDot, { backgroundColor: "#F59E0B" }]} />
-                        <Text style={styles.thresholdLabel}>Moderate (21–50)</Text>
-                        <Text style={styles.thresholdDetail}>— Some distress indicators, may need support</Text>
+                      <View style={styles.thresholdBlock}>
+                        <View style={styles.thresholdBlockHeader}>
+                          <View style={[styles.thresholdDot, { backgroundColor: "#F59E0B" }]} />
+                          <Text style={styles.thresholdLabel}>Moderate (21–50)</Text>
+                        </View>
+                        <Text style={styles.thresholdDetail}>Some distress indicators, may need support</Text>
                       </View>
-                      <View style={styles.thresholdRow}>
-                        <View style={[styles.thresholdDot, { backgroundColor: "#EF4444" }]} />
-                        <Text style={styles.thresholdLabel}>High (51–80)</Text>
-                        <Text style={styles.thresholdDetail}>— Significant distress, intervention recommended</Text>
+                      <View style={styles.thresholdBlock}>
+                        <View style={styles.thresholdBlockHeader}>
+                          <View style={[styles.thresholdDot, { backgroundColor: "#EF4444" }]} />
+                          <Text style={styles.thresholdLabel}>High (51–80)</Text>
+                        </View>
+                        <Text style={styles.thresholdDetail}>Significant distress, intervention recommended</Text>
                       </View>
                     </View>
                   </View>
@@ -2879,11 +2884,15 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 14,
   },
-  thresholdRow: {
+  thresholdBlock: {
+    marginBottom: 14,
+    paddingLeft: 4,
+  },
+  thresholdBlockHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 2,
   },
   thresholdDot: {
     width: 12,
@@ -2891,15 +2900,15 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   thresholdLabel: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "700",
     color: "#1E1B4B",
-    minWidth: 110,
   },
   thresholdDetail: {
     fontSize: 13,
     color: "#64748B",
-    flex: 1,
+    paddingLeft: 20,
+    lineHeight: 18,
   },
   // ─── Advanced Analytics Navigation ──────────────────────────────────────
   analyticsNavRow: {
@@ -3019,7 +3028,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   deptKpiMetricLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "700",
     color: "#94A3B8",
     textTransform: "uppercase",
@@ -3087,7 +3096,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   comparisonInsightLabel: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "700",
     color: "#94A3B8",
     textTransform: "uppercase",
@@ -3133,7 +3142,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   barLegendText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "700",
     color: "#6B21A8",
   },
@@ -3153,7 +3162,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   barPctTop: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "800",
     color: "#581C87",
   },
@@ -3174,14 +3183,14 @@ const styles = StyleSheet.create({
     borderTopColor: "rgba(255,255,255,0.4)",
   },
   barDeptLabel: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "800",
     color: "#581C87",
     textAlign: "center",
     marginTop: 4,
   },
   barCountLabel: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: "700",
     color: "#8B5CF6",
     textAlign: "center",
@@ -3939,7 +3948,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   groupedBarVal: {
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: "700",
     color: "#64748B",
   },

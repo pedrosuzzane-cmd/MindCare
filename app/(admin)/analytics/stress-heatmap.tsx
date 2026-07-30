@@ -168,6 +168,50 @@ export default function StressHeatmapScreen() {
             title="Weekly Stress Distribution"
             subtitle="Color intensity reflects stress level derived from mood journal entries"
           />
+
+          <View style={styles.explanationCard}>
+            <View style={styles.explanationHeader}>
+              <Ionicons name="information-circle-outline" size={18} color="#8A63D2" />
+              <Text style={styles.explanationTitle}>How Stress Intensity Is Calculated</Text>
+            </View>
+            <Text style={styles.explanationText}>
+              Each student's mood entries are assigned a wellness score from 0 (most distressed) to 5 (most positive).
+              Stress intensity for each entry is computed as <Text style={{ fontWeight: "700" }}>(5 - wellness) / 5</Text>,
+              producing a value between 0 and 1.
+            </Text>
+            <View style={styles.explanationScaleRow}>
+              <View style={styles.explanationScaleItem}>
+                <View style={[styles.explanationDot, { backgroundColor: "#E0F2FE" }]} />
+                <Text style={styles.explanationScaleLabel}>Very Low</Text>
+                <Text style={styles.explanationScaleVal}>&lt; 0.15</Text>
+              </View>
+              <View style={styles.explanationScaleItem}>
+                <View style={[styles.explanationDot, { backgroundColor: "#7DD3FC" }]} />
+                <Text style={styles.explanationScaleLabel}>Low</Text>
+                <Text style={styles.explanationScaleVal}>&lt; 0.45</Text>
+              </View>
+              <View style={styles.explanationScaleItem}>
+                <View style={[styles.explanationDot, { backgroundColor: "#FBBF24" }]} />
+                <Text style={styles.explanationScaleLabel}>Moderate</Text>
+                <Text style={styles.explanationScaleVal}>&lt; 0.55</Text>
+              </View>
+              <View style={styles.explanationScaleItem}>
+                <View style={[styles.explanationDot, { backgroundColor: "#F87171" }]} />
+                <Text style={styles.explanationScaleLabel}>High</Text>
+                <Text style={styles.explanationScaleVal}>&lt; 0.85</Text>
+              </View>
+              <View style={styles.explanationScaleItem}>
+                <View style={[styles.explanationDot, { backgroundColor: "#B91C1C" }]} />
+                <Text style={styles.explanationScaleLabel}>Severe</Text>
+                <Text style={styles.explanationScaleVal}>≥ 0.85</Text>
+              </View>
+            </View>
+            <Text style={styles.explanationText}>
+              The grid maps these intensity values across days (rows) and time slots (columns). Each cell aggregates
+              multiple students, showing the <Text style={{ fontWeight: "700" }}>highest intensity</Text> recorded in that
+              time slot. The reported percentage is the average intensity across all cells.
+            </Text>
+          </View>
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -216,4 +260,19 @@ const styles = StyleSheet.create({
   },
   summaryValue: { fontSize: 22, fontWeight: "900", color: "#2D1B69" },
   summaryLabel: { fontSize: 11, fontWeight: "700", color: "#8B5CF6", marginTop: 4, textAlign: "center" },
+  explanationCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+  },
+  explanationHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 14 },
+  explanationTitle: { fontSize: 18, fontWeight: "800", color: "#2D1B69", flex: 1 },
+  explanationText: { fontSize: 15, color: "#475569", lineHeight: 24, marginBottom: 16 },
+  explanationScaleRow: { flexDirection: "row", justifyContent: "space-between", gap: 8, marginBottom: 16 },
+  explanationScaleItem: { alignItems: "center", gap: 6, flex: 1 },
+  explanationDot: { width: 28, height: 28, borderRadius: 8 },
+  explanationScaleLabel: { fontSize: 12, fontWeight: "700", color: "#334155", textAlign: "center" },
+  explanationScaleVal: { fontSize: 11, fontWeight: "600", color: "#64748B" },
 });

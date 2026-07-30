@@ -31,7 +31,10 @@ export function StackedBarChart({ data, title, subtitle }: StackedBarChartProps)
     [data],
   );
 
-  const barHeight = isWide ? 36 : 28;
+  const barHeight = isWide ? 52 : 28;
+  const labelFontSize = isWide ? 14 : 11;
+  const segmentFontSize = isWide ? 13 : 9;
+  const totalFontSize = isWide ? 13 : 10;
 
   if (data.length === 0) {
     return (
@@ -82,33 +85,33 @@ export function StackedBarChart({ data, title, subtitle }: StackedBarChartProps)
                 style={[styles.barRow, isSelected && styles.barRowSelected]}
                 onPress={() => setSelectedIndex(isSelected ? null : idx)}
               >
-                <Text style={[styles.barLabel, { minWidth: maxLabelLen * 7 }]} numberOfLines={1}>
+                <Text style={[styles.barLabel, { minWidth: maxLabelLen * (isWide ? 10 : 7), fontSize: labelFontSize }]} numberOfLines={1}>
                   {item.label}
                 </Text>
                 <View style={[styles.barTrack, { height: barHeight }]}>
                   {posPct > 0 && (
                     <View style={[styles.barSegment, { width: `${posPct}%`, backgroundColor: COLORS.positive }]}>
-                      {posPct >= 12 && (
-                        <Text style={styles.segmentText}>{posPct.toFixed(0)}%</Text>
+                      {posPct >= (isWide ? 8 : 12) && (
+                        <Text style={[styles.segmentText, { fontSize: segmentFontSize }]}>{posPct.toFixed(0)}%</Text>
                       )}
                     </View>
                   )}
                   {neuPct > 0 && (
                     <View style={[styles.barSegment, { width: `${neuPct}%`, backgroundColor: COLORS.neutral }]}>
-                      {neuPct >= 12 && (
-                        <Text style={styles.segmentText}>{neuPct.toFixed(0)}%</Text>
+                      {neuPct >= (isWide ? 8 : 12) && (
+                        <Text style={[styles.segmentText, { fontSize: segmentFontSize }]}>{neuPct.toFixed(0)}%</Text>
                       )}
                     </View>
                   )}
                   {disPct > 0 && (
                     <View style={[styles.barSegment, { width: `${disPct}%`, backgroundColor: COLORS.distressed }]}>
-                      {disPct >= 12 && (
-                        <Text style={styles.segmentText}>{disPct.toFixed(0)}%</Text>
+                      {disPct >= (isWide ? 8 : 12) && (
+                        <Text style={[styles.segmentText, { fontSize: segmentFontSize }]}>{disPct.toFixed(0)}%</Text>
                       )}
                     </View>
                   )}
                 </View>
-                <Text style={styles.barTotal}>{sum}</Text>
+                <Text style={[styles.barTotal, { fontSize: totalFontSize }]}>{sum}</Text>
               </Pressable>
             );
           })}
@@ -156,7 +159,7 @@ const styles = StyleSheet.create({
     shadowRadius: 22,
     elevation: 4,
   },
-  containerWide: { padding: 28 },
+  containerWide: { padding: 32 },
   header: {
     marginBottom: 16,
   },
@@ -192,14 +195,14 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   legendText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "700",
     color: "#6B21A8",
   },
   chartArea: {
-    gap: 8,
-    paddingRight: 16,
-    minWidth: 280,
+    gap: 10,
+    paddingRight: 24,
+    minWidth: 320,
   },
   barRow: {
     flexDirection: "row",
@@ -213,7 +216,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   barLabel: {
-    fontSize: 11,
     fontWeight: "700",
     color: "#475569",
     textAlign: "right",
@@ -231,15 +233,13 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   segmentText: {
-    fontSize: 9,
     fontWeight: "800",
     color: "#FFFFFF",
   },
   barTotal: {
-    fontSize: 10,
     fontWeight: "700",
     color: "#94A3B8",
-    minWidth: 24,
+    minWidth: 28,
     textAlign: "right",
   },
   tooltip: {

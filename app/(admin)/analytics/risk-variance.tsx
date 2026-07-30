@@ -9,6 +9,14 @@ import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+const DEPARTMENTS = ["CITCS", "COA", "CCJE", "CTE", "CN", "CEA", "CHTM"];
+
+const getBoxColor = (median: number): string => {
+  if (median <= 20) return "#22C55E";
+  if (median <= 50) return "#F59E0B";
+  return "#EF4444";
+};
+
 export default function RiskTrendsScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const isWide = screenWidth >= 900;
@@ -36,38 +44,52 @@ export default function RiskTrendsScreen() {
 
   const boxWhiskerData = useMemo((): BoxWhiskerDataPoint[] => {
     const deptScores = new Map<string, number[]>();
+    DEPARTMENTS.forEach((d) => deptScores.set(d, []));
 
     studentSummaries.forEach((s) => {
       if (s.latestTotalScore == null) return;
       const dept = s.department || "Unspecified";
-      if (!deptScores.has(dept)) {
-        deptScores.set(dept, []);
+      const abbr = dept.split("(").pop()?.replace(")", "") || dept;
+      if (deptScores.has(abbr)) {
+        deptScores.get(abbr)!.push(s.latestTotalScore);
       }
-      deptScores.get(dept)!.push(s.latestTotalScore);
     });
 
     return Array.from(deptScores.entries())
       .map(([label, scores]) => {
-        if (scores.length < 4) return null;
         const sorted = [...scores].sort((a, b) => a - b);
         const count = sorted.length;
-        const min = sorted[0];
-        const max = sorted[count - 1];
-        const q1 = sorted[Math.floor(count * 0.25)];
-        const median = sorted[Math.floor(count * 0.5)];
-        const q3 = sorted[Math.floor(count * 0.75)];
-        const iqr = q3 - q1;
 
-        const lowerFence = q1 - 1.5 * iqr;
-        const upperFence = q3 + 1.5 * iqr;
+        let min = 0, max = 0, q1 = 0, median = 0, q3 = 0;
+        const outliers: number[] = [];
+        let whiskerMin = 0, whiskerMax = 0;
 
-        const outliers = sorted.filter((v) => v < lowerFence || v > upperFence);
+        if (count > 0) {
+          min = sorted[0];
+          max = sorted[count - 1];
 
-        const whiskerMin = sorted.find((v) => v >= lowerFence) ?? min;
-        const whiskerMax = [...sorted].reverse().find((v) => v <= upperFence) ?? max;
+          if (count < 2) {
+            q1 = min; median = min; q3 = max;
+          } else if (count === 2) {
+            q1 = min; median = Math.round((min + max) / 2); q3 = max;
+          } else if (count === 3) {
+            q1 = sorted[0]; median = sorted[1]; q3 = sorted[2];
+          } else {
+            q1 = sorted[Math.floor(count * 0.25)];
+            median = sorted[Math.floor(count * 0.5)];
+            q3 = sorted[Math.floor(count * 0.75)];
+          }
+
+          const iqr = q3 - q1;
+          const lowerFence = q1 - 1.5 * iqr;
+          const upperFence = q3 + 1.5 * iqr;
+          sorted.forEach((v) => { if (v < lowerFence || v > upperFence) outliers.push(v); });
+          whiskerMin = sorted.find((v) => v >= lowerFence) ?? min;
+          whiskerMax = [...sorted].reverse().find((v) => v <= upperFence) ?? max;
+        }
 
         return {
-          label: label.split("(").pop()?.replace(")", "") || label,
+          label,
           min: whiskerMin,
           q1,
           median,
@@ -75,9 +97,9 @@ export default function RiskTrendsScreen() {
           max: whiskerMax,
           outliers,
           count,
+          boxColor: count > 0 ? getBoxColor(median) : "#E2E8F0",
         };
       })
-      .filter((d): d is BoxWhiskerDataPoint => d !== null)
       .sort((a, b) => b.median - a.median);
   }, [studentSummaries]);
 
@@ -177,6 +199,73 @@ export default function RiskTrendsScreen() {
               )}
             </View>
           )}
+
+          <View style={styles.explanationCard}>
+            <View style={styles.explanationHeader}>
+              <Ionicons name="school-outline" size={20} color="#8A63D2" />
+              <Text style={styles.explanationTitle}>Administrator Guide: Understanding Risk Score Variance & Scoring</Text>
+            </View>
+
+            <Text style={styles.guideSectionTitle}>The Core Score (WEMWBS Scale)</Text>
+            <Text style={styles.guideText}>
+              Each student's assessment score is evaluated out of <Text style={{ fontWeight: "700" }}>80 points</Text> based on standardized mental well-being metrics.
+            </Text>
+            <View style={styles.guideScaleRow}>
+              <View style={[styles.guideScaleItem, { backgroundColor: "#DCFCE7", borderColor: "#22C55E" }]}>
+                <Text style={[styles.guideScaleLabel, { color: "#166534" }]}>Low Risk (0–20)</Text>
+                <Text style={styles.guideScaleDesc}>Healthy emotional range; routine monitoring required.</Text>
+              </View>
+              <View style={[styles.guideScaleItem, { backgroundColor: "#FEF3C7", borderColor: "#F59E0B" }]}>
+                <Text style={[styles.guideScaleLabel, { color: "#92400E" }]}>Moderate Risk (21–50)</Text>
+                <Text style={styles.guideScaleDesc}>Mild to moderate distress indicators; may benefit from light guidance support.</Text>
+              </View>
+              <View style={[styles.guideScaleItem, { backgroundColor: "#FEE2E2", borderColor: "#EF4444" }]}>
+                <Text style={[styles.guideScaleLabel, { color: "#991B1B" }]}>High Risk (51–80)</Text>
+                <Text style={styles.guideScaleDesc}>Significant distress detected; immediate counselor intervention recommended.</Text>
+              </View>
+            </View>
+
+            <Text style={[styles.guideSectionTitle, { marginTop: 16 }]}>Reading the Box & Whisker Chart</Text>
+
+            <View style={styles.guideRow}>
+              <View style={styles.guideItem}>
+                <View style={[styles.guideBullet, { backgroundColor: "#2D1B69" }]} />
+                <View style={styles.guideItemContent}>
+                  <Text style={styles.guideItemTitle}>The Center Line (Median / Q2)</Text>
+                  <Text style={styles.guideItemText}>
+                    Represents the exact middle score of students in that department. A high median indicates widespread elevated stress across the department.
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.guideItem}>
+                <View style={[styles.guideBullet, { backgroundColor: "#8A63D2" }]} />
+                <View style={styles.guideItemContent}>
+                  <Text style={styles.guideItemTitle}>The Box (Interquartile Range / IQR)</Text>
+                  <Text style={styles.guideItemText}>
+                    Spans from the 25th percentile (Q1) to the 75th percentile (Q3). A wide box (high IQR) indicates inconsistent wellness — meaning some students are thriving while others are struggling heavily. A narrow box means students share similar risk levels.
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.guideItem}>
+                <View style={[styles.guideBullet, { backgroundColor: "#94A3B8" }]} />
+                <View style={styles.guideItemContent}>
+                  <Text style={styles.guideItemTitle}>The Whiskers (Range)</Text>
+                  <Text style={styles.guideItemText}>
+                    Show the spread from the lowest to highest recorded scores within normal statistical boundaries.
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.guideItem}>
+                <View style={[styles.guideBullet, { backgroundColor: "#EF4444" }]} />
+                <View style={styles.guideItemContent}>
+                  <Text style={styles.guideItemTitle}>Outliers (Red Crosses)</Text>
+                  <Text style={styles.guideItemText}>
+                    Individual student scores falling abnormally far from the department norm (&gt; Q3 + 1.5 × IQR). These represent acute outlier cases requiring urgent individual review.
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
 
           <BoxWhiskerChart
             data={boxWhiskerData}
@@ -284,9 +373,36 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 3,
   },
-  summaryTableTitle: { fontSize: 14, fontWeight: "800", color: "#2D1B69", marginBottom: 12 },
+  summaryTableTitle: { fontSize: 15, fontWeight: "800", color: "#2D1B69", marginBottom: 12 },
   summaryTableHeader: { flexDirection: "row", borderBottomWidth: 2, borderBottomColor: "#EDE9FE", paddingBottom: 8, marginBottom: 4 },
-  summaryTableRow: { flexDirection: "row", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#F8F6FC" },
-  summaryTableCell: { flex: 1, fontSize: 11, color: "#475569", fontWeight: "600", textAlign: "center" },
-  headerCell: { fontSize: 10, fontWeight: "800", color: "#8B5CF6", textTransform: "uppercase" },
+  summaryTableRow: { flexDirection: "row", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#F8F6FC" },
+  summaryTableCell: { flex: 1, fontSize: 13, color: "#475569", fontWeight: "600", textAlign: "center" },
+  headerCell: { fontSize: 11, fontWeight: "800", color: "#8B5CF6", textTransform: "uppercase" },
+  explanationCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+  },
+  explanationHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 14 },
+  explanationTitle: { fontSize: 16, fontWeight: "800", color: "#2D1B69", flex: 1 },
+  guideSectionTitle: { fontSize: 14, fontWeight: "800", color: "#4C1D95", marginBottom: 6 },
+  guideText: { fontSize: 13, color: "#64748B", lineHeight: 20, marginBottom: 12 },
+  guideScaleRow: { gap: 10, marginBottom: 4 },
+  guideScaleItem: {
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderLeftWidth: 4,
+    marginBottom: 8,
+  },
+  guideScaleLabel: { fontSize: 14, fontWeight: "800", marginBottom: 2 },
+  guideScaleDesc: { fontSize: 13, lineHeight: 18, color: "#475569" },
+  guideRow: { gap: 12 },
+  guideItem: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  guideBullet: { width: 12, height: 12, borderRadius: 6, marginTop: 4, flexShrink: 0 },
+  guideItemContent: { flex: 1 },
+  guideItemTitle: { fontSize: 14, fontWeight: "700", color: "#1E1B4B", marginBottom: 2 },
+  guideItemText: { fontSize: 13, color: "#475569", lineHeight: 18 },
 });

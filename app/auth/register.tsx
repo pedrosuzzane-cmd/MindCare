@@ -882,7 +882,7 @@ export default function RegisterScreen() {
                         <Ionicons name="camera" size={18} color="white" />
                       </View>
                     </View>
-                    <Text style={styles.avatarLabel}>Tap to add profile photo</Text>
+                    <Text style={styles.avatarLabel}>Optional: Tap to add profile photo</Text>
                   </Pressable>
                 </View>
 

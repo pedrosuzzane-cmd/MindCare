@@ -22,10 +22,10 @@ service cloud.firestore {
       allow get: if isOwner(userId) || isAdmin();
       // Signed-in users can list users for the messaging directory
       allow list: if signedIn();
-      // Owner can write their own doc; role cannot be escalated
+      // Owner can write their own doc; admins can update any user doc; role cannot be escalated
       allow create: if isOwner(userId)
         && request.resource.data.keys().hasAll(['fullName', 'email']);
-      allow update: if isOwner(userId)
+      allow update: if (isOwner(userId) || isAdmin())
         && (!request.resource.data.keys().hasAny(['role'])
             || request.resource.data.role == resource.data.role);
 

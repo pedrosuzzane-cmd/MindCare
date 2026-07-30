@@ -267,12 +267,6 @@ export function DepartmentCorrelationScatter({ points }: ScatterPlotProps) {
             tick={{ fill: "#475569", fontSize: 11 }}
             axisLine={{ stroke: "#E2E8F0" }}
             tickLine={false}
-            label={{
-              value: "Journal Entries",
-              position: "bottom",
-              offset: 20,
-              style: { fill: "#64748B", fontSize: 12, fontWeight: "600" },
-            }}
           />
           <YAxis
             dataKey="avgScore"

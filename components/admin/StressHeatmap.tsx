@@ -18,15 +18,15 @@ interface StressHeatmapProps {
 }
 
 function getColor(intensity: number): string {
-  if (intensity <= 0) return "#F0FDF4";
-  if (intensity <= 0.15) return "#DCFCE7";
-  if (intensity <= 0.3) return "#BBF7D0";
-  if (intensity <= 0.45) return "#86EFAC";
-  if (intensity <= 0.55) return "#FEF08A";
-  if (intensity <= 0.65) return "#FDE047";
-  if (intensity <= 0.75) return "#F97316";
-  if (intensity <= 0.85) return "#EA580C";
-  return "#DC2626";
+  if (intensity <= 0) return "#F1F5F9";
+  if (intensity <= 0.15) return "#E0F2FE";
+  if (intensity <= 0.3) return "#7DD3FC";
+  if (intensity <= 0.45) return "#38BDF8";
+  if (intensity <= 0.55) return "#FBBF24";
+  if (intensity <= 0.65) return "#FB923C";
+  if (intensity <= 0.75) return "#F87171";
+  if (intensity <= 0.85) return "#EF4444";
+  return "#B91C1C";
 }
 
 function getLabel(intensity: number): string {
@@ -80,12 +80,12 @@ export function StressHeatmap({ data, title, subtitle }: StressHeatmapProps) {
         <View style={styles.headerContent}>
           <Text style={styles.title}>{title || "Stress Pattern Heatmap"}</Text>
           <Text style={styles.subtitle}>
-            {subtitle || "Daily stress intensity mapped across hours — green (low) to red (high)"}
+            {subtitle || "Daily stress intensity mapped across hours — blue (low) to amber (moderate) to red (high)"}
           </Text>
         </View>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
         <View style={styles.heatmapWrapper}>
           <View style={styles.heatmapBody}>
             <View style={styles.dayLabelCol}>
@@ -196,15 +196,15 @@ const styles = StyleSheet.create({
   },
   headerContent: { flex: 1 },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "800",
     color: "#2D1B69",
   },
   subtitle: {
-    fontSize: 12,
+    fontSize: 14,
     color: "#94A3B8",
     marginTop: 4,
-    lineHeight: 18,
+    lineHeight: 20,
   },
   heatmapWrapper: { paddingBottom: 4 },
   heatmapBody: { flexDirection: "row" },
@@ -216,9 +216,9 @@ const styles = StyleSheet.create({
     paddingRight: 6,
   },
   dayLabelText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#64748B",
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#334155",
   },
   hourRow: {
     flexDirection: "row",
@@ -230,9 +230,9 @@ const styles = StyleSheet.create({
     height: 16,
   },
   hourLabelText: {
-    fontSize: 8,
-    fontWeight: "600",
-    color: "#94A3B8",
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#64748B",
     transform: [{ rotate: "-45deg" }],
   },
   cellRow: { flexDirection: "row" },
@@ -247,8 +247,8 @@ const styles = StyleSheet.create({
     borderColor: "#1E1B4B",
   },
   cellCount: {
-    fontWeight: "700",
-    color: "rgba(0,0,0,0.5)",
+    fontWeight: "800",
+    color: "rgba(0,0,0,0.6)",
   },
   tooltip: {
     marginTop: 16,
@@ -300,9 +300,9 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   legendLabel: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: "700",
-    color: "#64748B",
-    marginHorizontal: 4,
+    color: "#475569",
+    marginHorizontal: 6,
   },
 });

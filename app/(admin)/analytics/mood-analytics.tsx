@@ -1,5 +1,4 @@
-import { DonutGauge, MultiDonutGauge } from "@/components/admin/DonutGauge";
-import { StackedBarChart } from "@/components/admin/StackedBarChart";
+import { DonutGauge } from "@/components/admin/DonutGauge";
 import type { StackedBarItem } from "@/components/admin/StackedBarChart";
 import { listenForAdminDashboardData } from "@/services/adminFirestoreService";
 import type { StudentSummary } from "@/services/adminFirestoreService";
@@ -13,6 +12,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const POSITIVE_MOODS = new Set(["happy", "calm", "relaxed", "good"]);
 const NEUTRAL_MOODS = new Set(["neutral"]);
 const DISTRESSED_MOODS = new Set(["worried", "sad", "overwhelmed", "exhausted", "stressed", "burnout", "very-upset"]);
+
+const DEPARTMENTS = ["CITCS", "COA", "CCJE", "CTE", "CN", "CEA", "CHTM"];
+const MOOD_BAR_COLORS = { positive: "#22C55E", neutral: "#F59E0B", distressed: "#EF4444" };
+
+const getDeptAbbreviation = (fullName: string): string => {
+  const match = fullName.match(/\(([^)]+)\)/);
+  return match ? match[1] : fullName;
+};
 
 export default function MoodAnalyticsScreen() {
   const { width: screenWidth } = useWindowDimensions();
@@ -62,6 +69,8 @@ export default function MoodAnalyticsScreen() {
   const stackedBarData = useMemo((): StackedBarItem[] => {
     const deptMap = new Map<string, { positive: number; neutral: number; distressed: number }>();
 
+    DEPARTMENTS.forEach((d) => deptMap.set(d, { positive: 0, neutral: 0, distressed: 0 }));
+
     studentSummaries.forEach((s) => {
       const dept = s.department || "Unspecified";
       if (!deptMap.has(dept)) {
@@ -82,9 +91,7 @@ export default function MoodAnalyticsScreen() {
         label,
         ...vals,
         total: vals.positive + vals.neutral + vals.distressed,
-      }))
-      .filter((d) => d.total > 0)
-      .sort((a, b) => b.total - a.total);
+      }));
   }, [studentSummaries]);
 
   const deptCompletionData = useMemo(() => {
@@ -191,14 +198,14 @@ export default function MoodAnalyticsScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Department Assessment Completion</Text>
-            <View style={styles.deptGaugeRow}>
-              {deptCompletionData.slice(0, isWide ? 6 : 4).map((dept) => (
-                <View key={dept.label} style={styles.deptGaugeCard}>
+            <Text style={[styles.sectionTitle, isWide && { fontSize: 20 }]}>Department Assessment Completion</Text>
+            <View style={[styles.deptGaugeRow, isWide && { gap: 20 }]}>
+              {deptCompletionData.map((dept) => (
+                <View key={dept.label} style={[styles.deptGaugeCard, isWide && { padding: 20 }]}>
                   <DonutGauge
                     percentage={dept.percentage}
-                    size={100}
-                    strokeWidth={10}
+                    size={isWide ? 150 : 130}
+                    strokeWidth={isWide ? 14 : 12}
                     color={
                       dept.percentage >= 70 ? "#22C55E" : dept.percentage >= 40 ? "#F59E0B" : "#EF4444"
                     }
@@ -233,11 +240,67 @@ export default function MoodAnalyticsScreen() {
           </View>
 
           <View style={styles.section}>
-            <StackedBarChart
-              data={stackedBarData}
-              title="Mood Distribution by Department"
-              subtitle="Normalized proportions of positive, neutral, and distressed moods per department"
-            />
+            <View style={styles.moodBarCard}>
+              <View style={styles.moodBarHeader}>
+                <Text style={styles.moodBarTitle}>Mood Distribution by Department</Text>
+                <Text style={styles.moodBarSubtitle}>
+                  Positive, neutral, and distressed mood counts per department
+                </Text>
+              </View>
+
+              <View style={styles.moodBarLegend}>
+                <View style={styles.moodBarLegendItem}>
+                  <View style={[styles.moodBarLegendDot, { backgroundColor: MOOD_BAR_COLORS.positive }]} />
+                  <Text style={styles.moodBarLegendText}>Positive</Text>
+                </View>
+                <View style={styles.moodBarLegendItem}>
+                  <View style={[styles.moodBarLegendDot, { backgroundColor: MOOD_BAR_COLORS.neutral }]} />
+                  <Text style={styles.moodBarLegendText}>Neutral</Text>
+                </View>
+                <View style={styles.moodBarLegendItem}>
+                  <View style={[styles.moodBarLegendDot, { backgroundColor: MOOD_BAR_COLORS.distressed }]} />
+                  <Text style={styles.moodBarLegendText}>Distressed</Text>
+                </View>
+              </View>
+
+              {stackedBarData.length === 0 ? (
+                <View style={styles.moodBarEmpty}>
+                  <Text style={styles.moodBarEmptyText}>No mood data available yet.</Text>
+                </View>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={true} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
+                  <View style={styles.moodBarChartRow}>
+                    {(() => {
+                      const globalMax = Math.max(
+                        ...stackedBarData.flatMap((d) => [d.positive, d.neutral, d.distressed]),
+                        1,
+                      );
+                      const barMaxHeight = 140;
+                      return stackedBarData.map((dept) => (
+                        <View key={dept.label} style={styles.moodBarColumn}>
+                          <Text style={styles.moodBarPctTop}>{dept.total}</Text>
+                          <View style={styles.moodBarGroup}>
+                            <View style={styles.moodBarSingle}>
+                              <View style={[styles.moodBarDept, { height: Math.max(4, (dept.positive / globalMax) * barMaxHeight), backgroundColor: MOOD_BAR_COLORS.positive }]} />
+                              <Text style={styles.moodBarVal}>{dept.positive}</Text>
+                            </View>
+                            <View style={styles.moodBarSingle}>
+                              <View style={[styles.moodBarDept, { height: Math.max(4, (dept.neutral / globalMax) * barMaxHeight), backgroundColor: MOOD_BAR_COLORS.neutral }]} />
+                              <Text style={styles.moodBarVal}>{dept.neutral}</Text>
+                            </View>
+                            <View style={styles.moodBarSingle}>
+                              <View style={[styles.moodBarDept, { height: Math.max(4, (dept.distressed / globalMax) * barMaxHeight), backgroundColor: MOOD_BAR_COLORS.distressed }]} />
+                              <Text style={styles.moodBarVal}>{dept.distressed}</Text>
+                            </View>
+                          </View>
+                          <Text style={styles.moodBarDeptLabel} numberOfLines={1}>{getDeptAbbreviation(dept.label)}</Text>
+                        </View>
+                      ));
+                    })()}
+                  </View>
+                </ScrollView>
+              )}
+            </View>
           </View>
         </ScrollView>
       </View>
@@ -313,4 +376,48 @@ const styles = StyleSheet.create({
   moodBar: { width: "100%", borderRadius: 6, minHeight: 4, marginBottom: 8 },
   moodPct: { fontSize: 18, fontWeight: "900", color: "#2D1B69" },
   moodLabel: { fontSize: 11, fontWeight: "700", color: "#8B5CF6", marginTop: 2 },
+  moodBarCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+    shadowColor: "#6D28D9",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 22,
+    elevation: 4,
+  },
+  moodBarHeader: { marginBottom: 16 },
+  moodBarTitle: { fontSize: 18, fontWeight: "800", color: "#2D1B69" },
+  moodBarSubtitle: { fontSize: 12, color: "#94A3B8", marginTop: 4, lineHeight: 18 },
+  moodBarLegend: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 20,
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3EAFF",
+  },
+  moodBarLegendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
+  moodBarLegendDot: { width: 10, height: 10, borderRadius: 5 },
+  moodBarLegendText: { fontSize: 12, fontWeight: "700", color: "#6B21A8" },
+  moodBarEmpty: { paddingVertical: 32, alignItems: "center" },
+  moodBarEmptyText: { fontSize: 14, color: "#94A3B8", fontWeight: "500" },
+  moodBarChartRow: {
+    flexDirection: "row",
+    gap: 16,
+    alignItems: "flex-end",
+    minHeight: 200,
+    paddingHorizontal: 8,
+    paddingBottom: 4,
+  },
+  moodBarColumn: { alignItems: "center", gap: 6, width: 72 },
+  moodBarPctTop: { fontSize: 14, fontWeight: "800", color: "#581C87" },
+  moodBarGroup: { flexDirection: "row", alignItems: "flex-end", gap: 4 },
+  moodBarSingle: { alignItems: "center", gap: 2 },
+  moodBarDept: { width: 14, borderRadius: 4 },
+  moodBarVal: { fontSize: 11, fontWeight: "700", color: "#64748B" },
+  moodBarDeptLabel: { fontSize: 13, fontWeight: "800", color: "#581C87", textAlign: "center", marginTop: 4 },
 });

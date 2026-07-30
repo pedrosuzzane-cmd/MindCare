@@ -11,6 +11,7 @@ export interface BoxWhiskerDataPoint {
   max: number;
   outliers: number[];
   count: number;
+  boxColor?: string;
 }
 
 interface BoxWhiskerChartProps {
@@ -20,7 +21,11 @@ interface BoxWhiskerChartProps {
   yAxisLabel?: string;
 }
 
-const BOX_COLORS = ["#8A63D2", "#16A34A", "#D97706", "#0EA5E9", "#EC4899", "#F97316", "#06B6D4"];
+const getBoxColor = (median: number): string => {
+  if (median <= 20) return "#22C55E";
+  if (median <= 50) return "#F59E0B";
+  return "#EF4444";
+};
 
 export function generateMockBoxData(): BoxWhiskerDataPoint[] {
   return [
@@ -102,12 +107,12 @@ export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiske
   const isWide = screenWidth >= 900;
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
-  const boxWidth = isWide ? 36 : 28;
+  const boxWidth = isWide ? 44 : 28;
   const chartWidth = useMemo(
-    () => Math.max(screenWidth - 64, data.length * (boxWidth + 40) + 60),
+    () => Math.max(screenWidth - 64, data.length * (boxWidth + 50) + 60),
     [data.length, boxWidth, screenWidth],
   );
-  const chartHeight = 280;
+  const chartHeight = isWide ? 320 : 280;
   const padding = { top: 20, right: 20, bottom: 40, left: 50 };
 
   const globalMin = useMemo(() => Math.min(...data.map((d) => d.min)), [data]);
@@ -232,9 +237,9 @@ export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiske
                     width={boxWidth}
                     height={yScale(d.q1) - yScale(d.q3)}
                     rx={3}
-                    fill={BOX_COLORS[idx % BOX_COLORS.length]}
+                    fill={d.boxColor || getBoxColor(d.median)}
                     fillOpacity={isSelected ? 0.85 : 0.6}
-                    stroke={BOX_COLORS[idx % BOX_COLORS.length]}
+                    stroke={d.boxColor || getBoxColor(d.median)}
                     strokeWidth={isSelected ? 2 : 1}
                   />
 
@@ -355,7 +360,7 @@ export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiske
                   styles.varianceFill,
                   {
                     width: `${Math.min((selectedBox.q3 - selectedBox.q1) / range * 100, 100)}%`,
-                    backgroundColor: BOX_COLORS[data.indexOf(selectedBox) % BOX_COLORS.length],
+                    backgroundColor: selectedBox.boxColor || getBoxColor(selectedBox.median),
                   },
                 ]}
               />
