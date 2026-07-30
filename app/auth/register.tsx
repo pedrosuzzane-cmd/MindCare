@@ -20,11 +20,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import NetInfo from "@react-native-community/netinfo";
 
 // Firebase imports
-import { API_URL } from "@/backend/config";
 import { auth } from "@/constants/firebase";
 import { createUserDocument } from "@/firestore/profileFirestore";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { pickProfileImage, uploadAvatarToCloudinary } from "@/services/userService";
+import { uploadDocumentToCloudinary } from "@/services/cloudinaryUpload";
 
 const COLLEGES = [
   "Saint Louis University (SLU)",
@@ -413,91 +413,11 @@ export default function RegisterScreen() {
     }
   };
 
-  const uploadToCloudinary = async (
-    fileAsset: DocumentPicker.DocumentPickerAsset,
-    onProgress: (progress: number) => void,
+  const uploadLsnDoc = async (
+    asset: DocumentPicker.DocumentPickerAsset,
+    onProgress: (pct: number) => void,
   ): Promise<{ secureUrl: string; publicId: string }> => {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      const formDataObj = new FormData();
-
-      formDataObj.append("file", {
-        uri: fileAsset.uri,
-        name: fileAsset.name,
-        type: fileAsset.mimeType,
-      } as any);
-
-      xhr.open("POST", `${API_URL}/api/upload-pwd-document`);
-      xhr.timeout = 90_000;
-
-      if (xhr.upload) {
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const progress = Math.round((event.loaded / event.total) * 100);
-            onProgress(progress);
-          }
-        };
-      }
-
-      xhr.onload = () => {
-        onProgress(100);
-        let response: {
-          error?: string;
-          details?: string;
-          secureUrl?: string;
-          publicId?: string;
-        } = {};
-        try {
-          response = xhr.responseText ? JSON.parse(xhr.responseText) : {};
-        } catch {
-          // A non-JSON server response is handled below with the HTTP status.
-        }
-        if (xhr.status >= 200 && xhr.status < 300) {
-          if (!response.secureUrl || !response.publicId) {
-            reject(
-              new Error("The upload service returned an incomplete response."),
-            );
-            return;
-          }
-          resolve(response as { secureUrl: string; publicId: string });
-        } else {
-          const serverMessage = response.details || response.error;
-          reject(
-            new Error(
-              serverMessage ||
-                `The document-upload service returned status ${xhr.status}.`,
-            ),
-          );
-        }
-      };
-
-      xhr.onerror = () => {
-        // Differentiate between DNS/network failure vs server not responding
-        if (xhr.status === 0) {
-          reject(
-            new Error(
-              "The upload service is temporarily unavailable. If this is the first upload attempt, the server may still be starting up. Please try again in 30-60 seconds.",
-            ),
-          );
-        } else {
-          reject(
-            new Error(
-              "The document-upload service could not be reached. Please try again later.",
-            ),
-          );
-        }
-      };
-
-      xhr.ontimeout = () => {
-        reject(
-          new Error(
-            "Document upload timed out. Check your connection and try again.",
-          ),
-        );
-      };
-
-      xhr.send(formDataObj);
-    });
+    return uploadDocumentToCloudinary(asset.uri, asset.name, asset.mimeType || "application/pdf", undefined, onProgress);
   };
 
   const validateEmail = (email: string) => {
@@ -630,7 +550,7 @@ export default function RegisterScreen() {
             console.warn("No internet for LSN file upload, saving profile without document");
           } else {
             const asset = lsnDocument.assets[0];
-            const { secureUrl, publicId } = await uploadToCloudinary(
+            const { secureUrl, publicId } = await uploadLsnDoc(
               asset,
               setUploadProgress,
             );

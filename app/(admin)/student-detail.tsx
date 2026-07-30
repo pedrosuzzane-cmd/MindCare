@@ -7,6 +7,7 @@ import {
   Dimensions,
   Image,
   Linking,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -25,7 +26,7 @@ import {
   orderBy,
   query,
 } from "firebase/firestore";
-import { changeProfileImage } from "@/services/userService";
+import { changeProfileImage, changeProfileImageWeb } from "@/services/userService";
 
 interface JournalEntry {
   id: string;
@@ -291,7 +292,9 @@ export default function StudentDetailScreen() {
                   onPress={async () => {
                     if (uploadingImage) return;
                     setUploadingImage(true);
-                    const newUrl = await changeProfileImage(uid, "users");
+                    const newUrl = Platform.OS === "web"
+                      ? await changeProfileImageWeb(uid, "users")
+                      : await changeProfileImage(uid, "users");
                     if (newUrl) {
                       setProfile((prev) => prev ? { ...prev, profileImage: newUrl } : prev);
                     }

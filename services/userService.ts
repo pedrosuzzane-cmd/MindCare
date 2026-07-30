@@ -1,9 +1,12 @@
+import { Platform } from "react-native";
 import { doc, setDoc } from "firebase/firestore";
 import * as ImagePicker from "expo-image-picker";
 import { Alert } from "react-native";
 import { db } from "@/constants/firebase";
+import { uploadImageToCloudinary } from "./cloudinaryUpload";
 
-const API_BASE = "https://mindcare-api-wcqr.onrender.com";
+const CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME || "hj1vnhs0";
+const UPLOAD_PRESET = "mindcare_upload";
 
 /**
  * Requests media library permissions and lets the user pick an image.
@@ -31,36 +34,63 @@ export async function pickProfileImage(): Promise<string | null> {
 }
 
 /**
- * Uploads a local image URI to the backend (Cloudinary) and returns the secure URL.
+ * Opens a browser file picker for images and returns the selected File object.
+ * Uses the DOM file input API (web-only).
+ */
+export function pickProfileImageWeb(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.style.display = "none";
+
+    input.onchange = () => {
+      const file = input.files?.[0] || null;
+      document.body.removeChild(input);
+      resolve(file);
+    };
+
+    input.oncancel = () => {
+      document.body.removeChild(input);
+      resolve(null);
+    };
+
+    document.body.appendChild(input);
+    input.click();
+  });
+}
+
+/**
+ * Uploads a local image URI directly to Cloudinary and returns the secure URL.
  */
 export async function uploadAvatarToCloudinary(
   localUri: string,
 ): Promise<string> {
+  const { secureUrl } = await uploadImageToCloudinary(localUri);
+  return secureUrl;
+}
+
+/**
+ * Uploads a File object (from web file picker) directly to Cloudinary and returns the secure URL.
+ */
+export async function uploadAvatarToCloudinaryWeb(
+  file: File,
+): Promise<string> {
   const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", UPLOAD_PRESET);
+  formData.append("folder", "mindcare/profile-images");
 
-  const filename = localUri.split("/").pop() || "avatar.jpg";
-  const match = /\.(\w+)$/.exec(filename);
-  const type = match ? `image/${match[1]}` : "image/jpeg";
-
-  formData.append("file", {
-    uri: localUri,
-    name: filename,
-    type,
-  } as any);
-
-  const response = await fetch(`${API_BASE}/api/users/upload-avatar`, {
-    method: "POST",
-    body: formData,
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || "Avatar upload failed");
-  }
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+    { method: "POST", body: formData },
+  );
 
   const data = await response.json();
-  return data.secureUrl;
+  if (!data.secure_url) {
+    throw new Error(data.error?.message || "Image upload failed");
+  }
+  return data.secure_url;
 }
 
 /**
@@ -81,6 +111,7 @@ export async function saveProfileImage(
 /**
  * Full flow: pick image → upload to Cloudinary → save to Firestore.
  * Returns the new image URL or null if cancelled/failed.
+ * Uses expo-image-picker (native only).
  */
 export async function changeProfileImage(
   uid: string,
@@ -95,6 +126,29 @@ export async function changeProfileImage(
     return secureUrl;
   } catch (error: any) {
     console.error("changeProfileImage error:", error);
+    Alert.alert("Upload Failed", error.message || "Could not update profile picture.");
+    return null;
+  }
+}
+
+/**
+ * Full flow for web: pick image via DOM file input → upload to Cloudinary → save to Firestore.
+ * Returns the new image URL or null if cancelled/failed.
+ * Web-compatible (does not use expo-image-picker).
+ */
+export async function changeProfileImageWeb(
+  uid: string,
+  collectionName: "users" | "admins",
+): Promise<string | null> {
+  try {
+    const file = await pickProfileImageWeb();
+    if (!file) return null;
+
+    const secureUrl = await uploadAvatarToCloudinaryWeb(file);
+    await saveProfileImage(uid, collectionName, secureUrl);
+    return secureUrl;
+  } catch (error: any) {
+    console.error("changeProfileImageWeb error:", error);
     Alert.alert("Upload Failed", error.message || "Could not update profile picture.");
     return null;
   }

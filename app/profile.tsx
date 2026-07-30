@@ -1,7 +1,7 @@
-import { API_URL } from "@/backend/config";
 import { auth, db } from "@/constants/firebase";
 import { useAuth } from "@/hooks/AuthContext";
 import { changeProfileImage } from "@/services/userService";
+import { uploadDocumentToCloudinary } from "@/services/cloudinaryUpload";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -112,41 +112,10 @@ export default function ProfileScreen() {
     }
   };
 
-  const uploadLsnDocument = async (
+  const uploadLsnDoc = async (
     asset: DocumentPicker.DocumentPickerAsset,
   ): Promise<{ secureUrl: string; publicId: string }> => {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      const fd = new FormData();
-      fd.append("file", { uri: asset.uri, name: asset.name, type: asset.mimeType } as any);
-      xhr.open("POST", `${API_URL}/api/upload-pwd-document`);
-      xhr.timeout = 90_000;
-      if (xhr.upload) {
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) setLsnDocUploadProgress(Math.round((e.loaded / e.total) * 100));
-        };
-      }
-      xhr.onload = () => {
-        setLsnDocUploadProgress(100);
-        try {
-          const resp = JSON.parse(xhr.responseText);
-          if (xhr.status >= 200 && xhr.status < 300) {
-            if (!resp.secureUrl || !resp.publicId) {
-              reject(new Error("Upload returned an incomplete response."));
-              return;
-            }
-            resolve({ secureUrl: resp.secureUrl, publicId: resp.publicId });
-          } else {
-            reject(new Error(resp.details || resp.error || `Upload failed (${xhr.status}).`));
-          }
-        } catch {
-          reject(new Error("Upload service returned an invalid response."));
-        }
-      };
-      xhr.onerror = () => reject(new Error(xhr.status === 0 ? "Service unavailable." : "Could not reach upload service."));
-      xhr.ontimeout = () => reject(new Error("Upload timed out."));
-      xhr.send(fd);
-    });
+    return uploadDocumentToCloudinary(asset.uri, asset.name, asset.mimeType || "application/pdf", undefined, setLsnDocUploadProgress);
   };
 
   const handlePickLsnDocument = async () => {
@@ -173,7 +142,7 @@ export default function ProfileScreen() {
     setLsnDocUploadProgress(0);
     try {
       const asset = lsnDocPickResult.assets[0];
-      const { secureUrl, publicId } = await uploadLsnDocument(asset);
+      const { secureUrl, publicId } = await uploadLsnDoc(asset);
       const lsnData = {
         isLSN: true,
         lsnDocument: {

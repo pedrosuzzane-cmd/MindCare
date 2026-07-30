@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
+  Image,
   Linking,
   Modal,
   Platform,
@@ -84,6 +85,7 @@ export default function SidePanel() {
 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [displayName, setDisplayName] = useState("");
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const [legalModalVisible, setLegalModalVisible] = useState(false);
   const [legalModalType, setLegalModalType] = useState<"terms" | "about" | "privacy">("terms");
 
@@ -92,6 +94,7 @@ export default function SidePanel() {
     getDoc(doc(db, "users", user.uid)).then((snap) => {
       if (snap.exists()) {
         setDisplayName(snap.data().fullName || snap.data().displayName || user?.displayName || "");
+        setProfileImage(snap.data().profileImage || null);
       }
     }).catch(() => {
       if (user?.displayName) setDisplayName(user.displayName);
@@ -108,8 +111,8 @@ export default function SidePanel() {
     }
   };
 
-  const initials = user?.displayName
-    ? user.displayName
+  const initials = displayName
+    ? displayName
         .split(" ")
         .map((s) => s.charAt(0))
         .join("")
@@ -133,9 +136,13 @@ export default function SidePanel() {
       >
         <SafeAreaView style={styles.panelSafe}>
           <View style={styles.profileSection}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{initials}</Text>
-            </View>
+            {profileImage ? (
+              <Image source={{ uri: profileImage }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initials}</Text>
+              </View>
+            )}
             <Text style={styles.userName} numberOfLines={1}>
               {displayName || "User"}
             </Text>
@@ -146,7 +153,7 @@ export default function SidePanel() {
 
           <View style={styles.divider} />
 
-          <View style={styles.menuSection}>
+          <ScrollView style={styles.menuSection} contentContainerStyle={styles.menuSectionContent} showsVerticalScrollIndicator={false}>
             {MENU_ITEMS.map((item) => (
               <Pressable
                 key={item.route}
@@ -157,33 +164,33 @@ export default function SidePanel() {
                 <Text style={styles.menuLabel}>{item.label}</Text>
               </Pressable>
             ))}
-          </View>
 
-          <View style={styles.divider} />
+            <View style={styles.divider} />
 
-          <Pressable style={styles.menuItem} onPress={() => navigate("/help-and-support")}>
-            <Ionicons name="help-circle-outline" size={22} color="#4B5563" />
-            <Text style={styles.menuLabel}>Help & Support</Text>
-          </Pressable>
-          <Pressable style={styles.menuItem} onPress={() => { setLegalModalType("terms"); setLegalModalVisible(true); }}>
-            <Ionicons name="document-text-outline" size={22} color="#4B5563" />
-            <Text style={styles.menuLabel}>Terms of Service</Text>
-          </Pressable>
-          <Pressable style={styles.menuItem} onPress={() => { setLegalModalType("about"); setLegalModalVisible(true); }}>
-            <Ionicons name="information-circle-outline" size={22} color="#4B5563" />
-            <Text style={styles.menuLabel}>About MindCare</Text>
-          </Pressable>
-          <Pressable style={styles.menuItem} onPress={() => { setLegalModalType("privacy"); setLegalModalVisible(true); }}>
-            <Ionicons name="lock-closed-outline" size={22} color="#4B5563" />
-            <Text style={styles.menuLabel}>Privacy Policy</Text>
-          </Pressable>
+            <Pressable style={styles.menuItem} onPress={() => navigate("/help-and-support")}>
+              <Ionicons name="help-circle-outline" size={22} color="#4B5563" />
+              <Text style={styles.menuLabel}>Help & Support</Text>
+            </Pressable>
+            <Pressable style={styles.menuItem} onPress={() => { setLegalModalType("terms"); setLegalModalVisible(true); }}>
+              <Ionicons name="document-text-outline" size={22} color="#4B5563" />
+              <Text style={styles.menuLabel}>Terms of Service</Text>
+            </Pressable>
+            <Pressable style={styles.menuItem} onPress={() => { setLegalModalType("about"); setLegalModalVisible(true); }}>
+              <Ionicons name="information-circle-outline" size={22} color="#4B5563" />
+              <Text style={styles.menuLabel}>About MindCare</Text>
+            </Pressable>
+            <Pressable style={styles.menuItem} onPress={() => { setLegalModalType("privacy"); setLegalModalVisible(true); }}>
+              <Ionicons name="lock-closed-outline" size={22} color="#4B5563" />
+              <Text style={styles.menuLabel}>Privacy Policy</Text>
+            </Pressable>
 
-          <View style={styles.divider} />
+            <View style={styles.divider} />
 
-          <Pressable style={styles.signOutItem} onPress={() => setShowLogoutConfirm(true)}>
-            <Ionicons name="log-out-outline" size={22} color="#EF4444" />
-            <Text style={styles.signOutLabel}>Sign Out</Text>
-          </Pressable>
+            <Pressable style={styles.signOutItem} onPress={() => setShowLogoutConfirm(true)}>
+              <Ionicons name="log-out-outline" size={22} color="#EF4444" />
+              <Text style={styles.signOutLabel}>Sign Out</Text>
+            </Pressable>
+          </ScrollView>
         </SafeAreaView>
 
         <Modal visible={showLogoutConfirm} transparent animationType="fade" onRequestClose={() => setShowLogoutConfirm(false)}>
@@ -372,6 +379,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
+  avatarImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    marginBottom: 12,
+  },
   avatarText: {
     color: "white",
     fontSize: 22,
@@ -396,6 +409,8 @@ const styles = StyleSheet.create({
   },
   menuSection: {
     flex: 1,
+  },
+  menuSectionContent: {
     paddingVertical: 12,
   },
   menuItem: {
