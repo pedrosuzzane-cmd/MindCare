@@ -31,6 +31,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Image,
     Modal,
     Platform,
     Pressable,
@@ -1831,6 +1832,7 @@ export default function AdminPanelScreen() {
                               links: validLinks,
                               authorName: user!.displayName || adminData?.displayName || "Admin",
                               authorPosition: adminData?.position || undefined,
+                              authorPhotoUrl: adminData?.profileImage || undefined,
                               targetDepartments,
                             });
                           } else {
@@ -1841,6 +1843,7 @@ export default function AdminPanelScreen() {
                               authorName: user!.displayName || adminData?.displayName || "Admin",
                               adminId: user!.uid,
                               authorPosition: adminData?.position || undefined,
+                              authorPhotoUrl: adminData?.profileImage || undefined,
                               targetDepartments,
                             });
                           }
@@ -1900,13 +1903,24 @@ export default function AdminPanelScreen() {
                           </View>
                         )}
                         <View style={styles.announcementCardFooter}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.announcementCardMeta}>
-                              {a.authorName}{a.authorPosition ? `, ${a.authorPosition}` : ""}
-                            </Text>
-                            <Text style={styles.announcementCardDate}>
-                              {formatAnnouncementDateTime(a.createdAt)}
-                            </Text>
+                          <View style={styles.announcementAuthorRow}>
+                            {a.authorPhotoUrl ? (
+                              <Image source={{ uri: a.authorPhotoUrl }} style={styles.announcementAuthorAvatar} />
+                            ) : (
+                              <View style={styles.announcementAuthorAvatarPlaceholder}>
+                                <Text style={styles.announcementAuthorAvatarText}>
+                                  {(a.authorName || "A").charAt(0).toUpperCase()}
+                                </Text>
+                              </View>
+                            )}
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.announcementCardMeta}>
+                                {a.authorName}{a.authorPosition ? `, ${a.authorPosition}` : ""}
+                              </Text>
+                              <Text style={styles.announcementCardDate}>
+                                {formatAnnouncementDateTime(a.createdAt)}
+                              </Text>
+                            </View>
                           </View>
                           <View style={styles.expiryBadge}>
                             <Ionicons name="time-outline" size={12} color="#8A63D2" />
@@ -3819,6 +3833,30 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#F3EAFF",
     paddingTop: 12,
+  },
+  announcementAuthorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  announcementAuthorAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  announcementAuthorAvatarPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#8A63D2",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  announcementAuthorAvatarText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "700",
   },
   announcementCardMeta: { fontSize: 12, color: "#94A3B8", fontWeight: "600", flex: 1 },
   announcementCardDate: { fontSize: 11, color: "#CBD5E1", marginTop: 2 },

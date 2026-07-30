@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useState } from "react";
 import {
+  Image,
   Linking,
   Pressable,
   ScrollView,
@@ -79,13 +80,26 @@ export default function AnnouncementsTab() {
                   ))}
                 </View>
               )}
-              <Text style={styles.cardMeta}>
-                Posted by {announcement.authorName}
-                {announcement.authorPosition ? `, ${announcement.authorPosition}` : ""}
-              </Text>
-              <Text style={styles.cardDate}>
-                {formatAnnouncementDateTime(announcement.createdAt)}
-              </Text>
+              <View style={styles.authorRow}>
+                {announcement.authorPhotoUrl ? (
+                  <Image source={{ uri: announcement.authorPhotoUrl }} style={styles.authorAvatar} />
+                ) : (
+                  <View style={styles.authorAvatarPlaceholder}>
+                    <Text style={styles.authorAvatarText}>
+                      {(announcement.authorName || "A").charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.cardMeta}>
+                    {announcement.authorName}
+                    {announcement.authorPosition ? `, ${announcement.authorPosition}` : ""}
+                  </Text>
+                  <Text style={styles.cardDate}>
+                    {formatAnnouncementDateTime(announcement.createdAt)}
+                  </Text>
+                </View>
+              </View>
               <View style={styles.expiry}>
                 <Text style={styles.expiryText}>
                   Expires in {getDaysRemaining(announcement.expiresAt)} days
@@ -142,6 +156,30 @@ const styles = StyleSheet.create({
     color: "#8A63D2",
     fontWeight: "600",
     textDecorationLine: "underline",
+  },
+  authorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 8,
+  },
+  authorAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  authorAvatarPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#8A63D2",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  authorAvatarText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "700",
   },
   cardMeta: { fontSize: 12, color: "#9CA3AF", marginBottom: 2 },
   cardDate: { fontSize: 11, color: "#D1D5DB" },

@@ -56,6 +56,7 @@ export async function createAnnouncement(
     authorName: payload.authorName,
     adminId: payload.adminId,
     authorPosition: payload.authorPosition || null,
+    authorPhotoUrl: payload.authorPhotoUrl || null,
     targetDepartments: payload.targetDepartments,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -76,6 +77,7 @@ export async function updateAnnouncement(
       links: payload.links,
       authorName: payload.authorName,
       authorPosition: payload.authorPosition || null,
+      authorPhotoUrl: payload.authorPhotoUrl || null,
       targetDepartments: payload.targetDepartments,
       updatedAt: serverTimestamp(),
     },
@@ -107,6 +109,7 @@ export function listenForAnnouncements(
           authorName: data.authorName || "Admin",
           adminId: data.adminId || "",
           authorPosition: data.authorPosition || undefined,
+          authorPhotoUrl: data.authorPhotoUrl || undefined,
           targetDepartments: Array.isArray(data.targetDepartments) ? data.targetDepartments : ["ALL"],
         };
       })
