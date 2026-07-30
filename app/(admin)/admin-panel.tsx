@@ -1,59 +1,55 @@
 import { API_URL } from "@/backend/config";
-import { DepartmentComparisonChart, DepartmentCorrelationScatter } from "@/components/admin/DepartmentCharts";
-import type { DeptComparisonMetric, ScatterPoint } from "@/components/admin/DepartmentCharts";
+import type {
+  DeptComparisonMetric,
+  ScatterPoint,
+} from "@/components/admin/DepartmentCharts";
+import {
+  DepartmentComparisonChart,
+  DepartmentCorrelationScatter,
+} from "@/components/admin/DepartmentCharts";
 import { StudentListModal } from "@/components/admin/StudentListModal";
 import { db } from "@/constants/firebase";
 import { useAuth } from "@/hooks/AuthContext";
 import { listenForAdminDashboardData } from "@/services/adminFirestoreService";
 import {
-  listenForAnnouncements,
-  createAnnouncement,
-  updateAnnouncement,
-  deleteAnnouncement as deleteAnnouncementService,
   cleanupExpiredAnnouncements,
+  createAnnouncement,
+  deleteAnnouncement as deleteAnnouncementService,
   formatAnnouncementDateTime,
   getDaysRemaining,
+  listenForAnnouncements,
+  updateAnnouncement,
 } from "@/services/announcementService";
 import type { Announcement, AnnouncementLink } from "@/types/announcement";
+import { shadows } from "@/utils/shadows";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { Redirect, router } from "expo-router";
+import { router } from "expo-router";
 import {
-    collection,
-    deleteDoc,
-    doc,
-    getDoc,
-    getDocs,
-    setDoc,
-    writeBatch,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  writeBatch
 } from "firebase/firestore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    useWindowDimensions,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context"; // This was already correct
-import { shadows } from "@/utils/shadows";
 
-const DEPARTMENTS = [
-  "CITCS",
-  "COA",
-  "CCJE",
-  "CTE",
-  "CN",
-  "CEA",
-  "CHTM",
-];
+const DEPARTMENTS = ["CITCS", "COA", "CCJE", "CTE", "CN", "CEA", "CHTM"];
 
 const COLLEGES = [
   "Saint Louis University (SLU)",
@@ -171,7 +167,14 @@ interface DepartmentRowData {
   highPct: number;
 }
 
-const YEAR_LEVEL_OPTIONS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "Graduate", "N/A"];
+const YEAR_LEVEL_OPTIONS = [
+  "1st Year",
+  "2nd Year",
+  "3rd Year",
+  "4th Year",
+  "Graduate",
+  "N/A",
+];
 
 // ─── Helper: Extract abbreviation from department name ───────────────────────
 const getDeptAbbreviation = (fullName: string): string => {
@@ -213,9 +216,9 @@ export default function AdminPanelScreen() {
     [],
   );
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState<"students" | "analytics" | "announcements">(
-    "students",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "students" | "analytics" | "announcements"
+  >("students");
   const [removingStudent, setRemovingStudent] = useState<string | null>(null);
   const [confirmRemoveUid, setConfirmRemoveUid] = useState<string | null>(null);
   const [confirmRemoveName, setConfirmRemoveName] = useState<string>("");
@@ -242,12 +245,20 @@ export default function AdminPanelScreen() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcementDescription, setAnnouncementDescription] = useState("");
-  const [announcementLinks, setAnnouncementLinks] = useState<AnnouncementLink[]>([]);
+  const [announcementLinks, setAnnouncementLinks] = useState<
+    AnnouncementLink[]
+  >([]);
   const [creatingAnnouncement, setCreatingAnnouncement] = useState(false);
-  const [announcementError, setAnnouncementError] = useState<string | null>(null);
+  const [announcementError, setAnnouncementError] = useState<string | null>(
+    null,
+  );
   const [deleteAnnounceId, setDeleteAnnounceId] = useState<string | null>(null);
-  const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
-  const [announcementDepartments, setAnnouncementDepartments] = useState<string[]>(["ALL"]);
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState<
+    string | null
+  >(null);
+  const [announcementDepartments, setAnnouncementDepartments] = useState<
+    string[]
+  >(["ALL"]);
 
   const toggleDepartment = (code: string) => {
     setAnnouncementDepartments((prev) => {
@@ -278,12 +289,14 @@ export default function AdminPanelScreen() {
       },
     );
 
-    getDoc(doc(db, "admins", user.uid)).then((snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data.college) setAdminCollege(data.college);
-      }
-    }).catch(() => {});
+    getDoc(doc(db, "admins", user.uid))
+      .then((snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.college) setAdminCollege(data.college);
+        }
+      })
+      .catch(() => {});
 
     return () => {
       unsubData();
@@ -499,14 +512,30 @@ export default function AdminPanelScreen() {
 
   // ─── Computed Department Table Rows ────────────────────────────────────────
   const departmentRows = useMemo((): DepartmentRowData[] => {
-    const filtered = yearLevelFilter === "All"
-      ? studentSummaries
-      : studentSummaries.filter((s) => s.yearLevel === yearLevelFilter);
+    const filtered =
+      yearLevelFilter === "All"
+        ? studentSummaries
+        : studentSummaries.filter((s) => s.yearLevel === yearLevelFilter);
 
-    const deptMap = new Map<string, { total: number; low: number; normal: number; high: number; scoreSum: number }>();
+    const deptMap = new Map<
+      string,
+      {
+        total: number;
+        low: number;
+        normal: number;
+        high: number;
+        scoreSum: number;
+      }
+    >();
     for (const s of filtered) {
       if (!deptMap.has(s.department)) {
-        deptMap.set(s.department, { total: 0, low: 0, normal: 0, high: 0, scoreSum: 0 });
+        deptMap.set(s.department, {
+          total: 0,
+          low: 0,
+          normal: 0,
+          high: 0,
+          scoreSum: 0,
+        });
       }
       const entry = deptMap.get(s.department)!;
       entry.total++;
@@ -596,14 +625,17 @@ export default function AdminPanelScreen() {
   const perDepartmentKpiData = useMemo((): PerDepartmentKpi[] => {
     const maxJournal = Math.max(
       ...analyticsData.department.map((d) => {
-        return studentSummaries.filter((s) => s.department === d.label)
+        return studentSummaries
+          .filter((s) => s.department === d.label)
           .reduce((sum, s) => sum + s.journalCount, 0);
       }),
       1,
     );
     const maxLsn = Math.max(
-      ...analyticsData.department.map((d) =>
-        studentSummaries.filter((s) => s.department === d.label && s.isLSN).length,
+      ...analyticsData.department.map(
+        (d) =>
+          studentSummaries.filter((s) => s.department === d.label && s.isLSN)
+            .length,
       ),
       1,
     );
@@ -624,11 +656,17 @@ export default function AdminPanelScreen() {
         }),
       );
       const topMood =
-        Object.entries(mergedMoods)
-          .sort(([, a], [, b]) => b - a)[0]?.[0] || "N/A";
+        Object.entries(mergedMoods).sort(([, a], [, b]) => b - a)[0]?.[0] ||
+        "N/A";
 
       const positiveMoods = ["happy", "calm", "relaxed", "good"];
-      const distressedMoods = ["stressed", "burnout", "very-upset", "exhausted", "overwhelmed"];
+      const distressedMoods = [
+        "stressed",
+        "burnout",
+        "very-upset",
+        "exhausted",
+        "overwhelmed",
+      ];
       let wellSum = 0;
       let moodTotal = 0;
       Object.entries(mergedMoods).forEach(([mood, count]) => {
@@ -637,9 +675,8 @@ export default function AdminPanelScreen() {
         else if (distressedMoods.includes(m)) wellSum -= count;
         moodTotal += count;
       });
-      const moodWellnessPct = moodTotal > 0
-        ? Math.round(((wellSum / moodTotal) + 1) / 2 * 100)
-        : 50;
+      const moodWellnessPct =
+        moodTotal > 0 ? Math.round(((wellSum / moodTotal + 1) / 2) * 100) : 50;
 
       return {
         deptName: d.label,
@@ -648,7 +685,8 @@ export default function AdminPanelScreen() {
         journalEntries,
         lsnStudents,
         topMood,
-        scorePct: d.total > 0 ? Math.min((d.scoreSum / d.total / 80) * 100, 100) : 0,
+        scorePct:
+          d.total > 0 ? Math.min((d.scoreSum / d.total / 80) * 100, 100) : 0,
         journalPct: Math.min((journalEntries / maxJournal) * 100, 100),
         lsnPct: Math.min((lsnStudents / maxLsn) * 100, 100),
         moodWellnessPct,
@@ -709,7 +747,8 @@ export default function AdminPanelScreen() {
         (s) => s.department === d.label,
       );
       const journalCount = deptStudents.reduce(
-        (sum, s) => sum + s.journalCount, 0,
+        (sum, s) => sum + s.journalCount,
+        0,
       );
       const lsnCount = deptStudents.filter((s) => s.isLSN).length;
       const assessedCount = deptStudents.filter(
@@ -855,9 +894,7 @@ export default function AdminPanelScreen() {
             ...(newAdminAddress.trim()
               ? { address: newAdminAddress.trim() }
               : {}),
-            ...(newAdminCollege
-              ? { college: newAdminCollege }
-              : {}),
+            ...(newAdminCollege ? { college: newAdminCollege } : {}),
           },
           { merge: true },
         );
@@ -924,9 +961,7 @@ export default function AdminPanelScreen() {
         </View>
         <Text style={styles.kpiCount}>{kpi.count}</Text>
         <Text style={styles.kpiLabel}>{kpi.riskLabel}</Text>
-        <Text style={styles.kpiBaseline}>
-          Baseline: ({kpi.baselineCount})
-        </Text>
+        <Text style={styles.kpiBaseline}>Baseline: ({kpi.baselineCount})</Text>
       </Pressable>
     );
   };
@@ -970,8 +1005,18 @@ export default function AdminPanelScreen() {
   };
 
   const renderPerDepartmentKpiCard = (kpi: PerDepartmentKpi, index: number) => {
-    const moodColor = kpi.moodWellnessPct >= 60 ? "#22C55E" : kpi.moodWellnessPct >= 40 ? "#F59E0B" : "#EF4444";
-    const scoreColor = kpi.scorePct <= 40 ? "#22C55E" : kpi.scorePct <= 62 ? "#F59E0B" : "#EF4444";
+    const moodColor =
+      kpi.moodWellnessPct >= 60
+        ? "#22C55E"
+        : kpi.moodWellnessPct >= 40
+          ? "#F59E0B"
+          : "#EF4444";
+    const scoreColor =
+      kpi.scorePct <= 40
+        ? "#22C55E"
+        : kpi.scorePct <= 62
+          ? "#F59E0B"
+          : "#EF4444";
 
     return (
       <Pressable
@@ -994,7 +1039,12 @@ export default function AdminPanelScreen() {
               </Text>
             </View>
             <View style={styles.sparklineTrack}>
-              <View style={[styles.sparklineFill, { width: `${kpi.scorePct}%`, backgroundColor: scoreColor }]} />
+              <View
+                style={[
+                  styles.sparklineFill,
+                  { width: `${kpi.scorePct}%`, backgroundColor: scoreColor },
+                ]}
+              />
             </View>
           </View>
           <View style={styles.deptKpiMetricSpark}>
@@ -1005,7 +1055,12 @@ export default function AdminPanelScreen() {
               </Text>
             </View>
             <View style={styles.sparklineTrack}>
-              <View style={[styles.sparklineFill, { width: `${kpi.journalPct}%`, backgroundColor: "#7C3AED" }]} />
+              <View
+                style={[
+                  styles.sparklineFill,
+                  { width: `${kpi.journalPct}%`, backgroundColor: "#7C3AED" },
+                ]}
+              />
             </View>
           </View>
           <View style={styles.deptKpiMetricSpark}>
@@ -1016,7 +1071,12 @@ export default function AdminPanelScreen() {
               </Text>
             </View>
             <View style={styles.sparklineTrack}>
-              <View style={[styles.sparklineFill, { width: `${kpi.lsnPct}%`, backgroundColor: "#9333EA" }]} />
+              <View
+                style={[
+                  styles.sparklineFill,
+                  { width: `${kpi.lsnPct}%`, backgroundColor: "#9333EA" },
+                ]}
+              />
             </View>
           </View>
           <View style={styles.deptKpiMetricSpark}>
@@ -1027,7 +1087,15 @@ export default function AdminPanelScreen() {
               </Text>
             </View>
             <View style={styles.sparklineTrack}>
-              <View style={[styles.sparklineFill, { width: `${kpi.moodWellnessPct}%`, backgroundColor: moodColor }]} />
+              <View
+                style={[
+                  styles.sparklineFill,
+                  {
+                    width: `${kpi.moodWellnessPct}%`,
+                    backgroundColor: moodColor,
+                  },
+                ]}
+              />
             </View>
           </View>
         </View>
@@ -1094,15 +1162,45 @@ export default function AdminPanelScreen() {
         {/* Grouped bars */}
         <View style={styles.groupedBarRow}>
           <View style={styles.groupedBarCol}>
-            <View style={[styles.groupedBar, { height: Math.max(4, (row.lowCount / maxLow) * barMaxHeight), width: barWidth, backgroundColor: "#22C55E" }]} />
+            <View
+              style={[
+                styles.groupedBar,
+                {
+                  height: Math.max(4, (row.lowCount / maxLow) * barMaxHeight),
+                  width: barWidth,
+                  backgroundColor: "#22C55E",
+                },
+              ]}
+            />
             <Text style={styles.groupedBarVal}>{row.lowCount}</Text>
           </View>
           <View style={styles.groupedBarCol}>
-            <View style={[styles.groupedBar, { height: Math.max(4, (row.normalCount / maxNormal) * barMaxHeight), width: barWidth, backgroundColor: "#F59E0B" }]} />
+            <View
+              style={[
+                styles.groupedBar,
+                {
+                  height: Math.max(
+                    4,
+                    (row.normalCount / maxNormal) * barMaxHeight,
+                  ),
+                  width: barWidth,
+                  backgroundColor: "#F59E0B",
+                },
+              ]}
+            />
             <Text style={styles.groupedBarVal}>{row.normalCount}</Text>
           </View>
           <View style={styles.groupedBarCol}>
-            <View style={[styles.groupedBar, { height: Math.max(4, (row.highCount / maxHigh) * barMaxHeight), width: barWidth, backgroundColor: "#EF4444" }]} />
+            <View
+              style={[
+                styles.groupedBar,
+                {
+                  height: Math.max(4, (row.highCount / maxHigh) * barMaxHeight),
+                  width: barWidth,
+                  backgroundColor: "#EF4444",
+                },
+              ]}
+            />
             <Text style={styles.groupedBarVal}>{row.highCount}</Text>
           </View>
         </View>
@@ -1235,13 +1333,21 @@ export default function AdminPanelScreen() {
           </View>
           <View style={styles.radialLegend}>
             <View style={styles.radialLegendItem}>
-              <View style={[styles.radialLegendDot, { backgroundColor: "#7C3AED" }]} />
-              <Text style={styles.radialLegendText} numberOfLines={1}>Took assessment</Text>
+              <View
+                style={[styles.radialLegendDot, { backgroundColor: "#7C3AED" }]}
+              />
+              <Text style={styles.radialLegendText} numberOfLines={1}>
+                Took assessment
+              </Text>
               <Text style={styles.radialLegendValue}>{clampedPct}%</Text>
             </View>
             <View style={styles.radialLegendItem}>
-              <View style={[styles.radialLegendDot, { backgroundColor: "#EF4444" }]} />
-              <Text style={styles.radialLegendText} numberOfLines={1}>Did not take</Text>
+              <View
+                style={[styles.radialLegendDot, { backgroundColor: "#EF4444" }]}
+              />
+              <Text style={styles.radialLegendText} numberOfLines={1}>
+                Did not take
+              </Text>
               <Text style={styles.radialLegendValue}>{notCompletedPct}%</Text>
             </View>
           </View>
@@ -1317,7 +1423,10 @@ export default function AdminPanelScreen() {
       const dept = title.split(" - ")[0];
       return (s) => s.department === dept && s.latestRiskLevel === "high";
     }
-    if (lowerTitle.includes("special needs (lsn)") || lowerTitle.includes("lsn students")) {
+    if (
+      lowerTitle.includes("special needs (lsn)") ||
+      lowerTitle.includes("lsn students")
+    ) {
       return (s) => s.isLSN === true;
     }
     if (lowerTitle.includes("at-risk students")) {
@@ -1357,8 +1466,17 @@ export default function AdminPanelScreen() {
   return (
     <SafeAreaView style={[styles.container, isWide && styles.containerWide]}>
       <View style={[styles.mainLayout, isWide && styles.mainLayoutWide]}>
-        <View style={[styles.header, isWide && { paddingHorizontal: responsivePadding }]}>
-          <Text style={styles.headerTitle}>{adminCollege ? `${adminCollege} Analytics Overview` : "Analytics Overview"}</Text>
+        <View
+          style={[
+            styles.header,
+            isWide && { paddingHorizontal: responsivePadding },
+          ]}
+        >
+          <Text style={styles.headerTitle}>
+            {adminCollege
+              ? `${adminCollege} Analytics Overview`
+              : "Analytics Overview"}
+          </Text>
           <View style={styles.headerActions}>
             <Pressable
               style={styles.profileButton}
@@ -1394,7 +1512,10 @@ export default function AdminPanelScreen() {
 
         <ScrollView
           ref={scrollRef}
-          contentContainerStyle={[styles.content, isWide && { padding: responsivePadding, paddingBottom: 40 }]}
+          contentContainerStyle={[
+            styles.content,
+            isWide && { padding: responsivePadding, paddingBottom: 40 },
+          ]}
           showsVerticalScrollIndicator={false}
           onScroll={(e) => {
             const offsetY = e.nativeEvent.contentOffset.y;
@@ -1504,150 +1625,175 @@ export default function AdminPanelScreen() {
                     </View>
                   ) : (
                     <View style={isWide && styles.studentGrid}>
-                    {paginatedStudents.map((student) => {
-                      const moods = Object.entries(student.moodCounts)
-                        .sort(([, a], [, b]) => b - a)
-                        .map(([mood, count]) => `${mood} (${count})`)
-                        .slice(0, 3)
-                        .join(", ");
+                      {paginatedStudents.map((student) => {
+                        const moods = Object.entries(student.moodCounts)
+                          .sort(([, a], [, b]) => b - a)
+                          .map(([mood, count]) => `${mood} (${count})`)
+                          .slice(0, 3)
+                          .join(", ");
 
-                      return (
-                        <Pressable
-                          key={student.uid}
-                          style={[styles.studentCard, isWide && styles.studentCardWide]}
-                          onPress={() =>
-                            router.push({
-                              pathname: "./student-detail",
-                              params: { uid: student.uid },
-                            })
-                          }
-                        >
-                          <View style={styles.studentHeader}>
-                            <View style={styles.studentIdentityBlock}>
-                              <View style={styles.studentNameRow}>
-                                <Text style={styles.studentName}>
-                                  {student.name}
-                                </Text>
-                                <Ionicons name="chevron-forward" size={14} color="#8A63D2" />
-                              </View>
-                              <Text style={styles.studentMeta}>
-                                {student.yearLevel}
-                              </Text>
-                            </View>
-                            <View style={styles.studentInfoBlock}>
-                              <Text style={styles.studentId}>
-                                {student.schoolId}
-                              </Text>
-                              <Text style={styles.studentCourse}>
-                                {student.department}
-                              </Text>
-                            </View>
-                          </View>
-                          {student.isLSN && (
-                            <View style={styles.lsnBadgeRow}>
-                              <View style={styles.lsnBadge}>
-                                <Ionicons name="accessibility" size={12} color="white" />
-                                <Text style={styles.lsnBadgeText}>LSN</Text>
-                              </View>
-                              {student.specialNeedsType ? (
-                                <Text style={styles.lsnTypeText}>{student.specialNeedsType}</Text>
-                              ) : null}
-                              {student.lsnDocument?.secureUrl ? (
-                                <View style={styles.lsnDocIndicator}>
-                                  <Ionicons name="document-attach" size={11} color="#8A63D2" />
-                                  <Text style={styles.lsnDocText}>Doc attached</Text>
-                                </View>
-                              ) : null}
-                            </View>
-                          )}
-                          <View style={styles.studentStatsRow}>
-                            <View style={styles.statItem}>
-                              <Text style={styles.statLabel}>Assessments</Text>
-                              <Text style={styles.statValue}>
-                                {student.assessmentsCount}
-                              </Text>
-                            </View>
-                            <View style={styles.statItem}>
-                              <Text style={styles.statLabel}>Journals</Text>
-                              <Text style={styles.statValue}>
-                                {student.journalCount}
-                              </Text>
-                            </View>
-                          </View>
-                          <View style={styles.studentStatsRow}>
-                            <View style={styles.statItemWide}>
-                              <Text style={styles.statLabel}>
-                                Latest Concern
-                              </Text>
-                              <Text
-                                style={[
-                                  styles.statValueHighlight,
-                                  student.latestRiskLevel === "low"
-                                    ? styles.riskLow
-                                    : student.latestRiskLevel === "high"
-                                      ? styles.riskHigh
-                                      : styles.riskModerate,
-                                ]}
-                              >
-                                {student.latestRiskLevel === "low"
-                                  ? "Low"
-                                  : student.latestRiskLevel === "high"
-                                    ? "High"
-                                    : student.latestRiskLevel
-                                      ? "Moderate"
-                                      : "N/A"}
-                              </Text>
-                            </View>
-                            <View style={styles.statItemWide}>
-                              <Text style={styles.statLabel}>Latest Score</Text>
-                              <Text style={styles.statValueHighlight}>
-                                {student.latestTotalScore ?? "N/A"}
-                              </Text>
-                            </View>
-                          </View>
-                          <View style={styles.studentStatsRow}>
-                            <View style={styles.statItemWide}>
-                              <Text style={styles.statLabel}>
-                                Last Assessment
-                              </Text>
-                              <Text style={styles.statValue}>
-                                {student.latestAssessmentDate
-                                  ? student.latestAssessmentDate.toLocaleDateString()
-                                  : "N/A"}
-                              </Text>
-                            </View>
-                            <View style={styles.statItemWide}>
-                              <Text style={styles.statLabel}>Recent Mood</Text>
-                              <Text style={styles.statValue}>
-                                {student.latestJournalMood || "None"}
-                              </Text>
-                            </View>
-                          </View>
-                          {moods ? (
-                            <Text style={styles.moodSummary}>
-                              Moods: {moods}
-                            </Text>
-                          ) : null}
+                        return (
                           <Pressable
-                            style={styles.removeButton}
-                            onPress={() => {
-                              setConfirmRemoveUid(student.uid);
-                              setConfirmRemoveName(student.name);
-                            }}
+                            key={student.uid}
+                            style={[
+                              styles.studentCard,
+                              isWide && styles.studentCardWide,
+                            ]}
+                            onPress={() =>
+                              router.push({
+                                pathname: "./student-detail",
+                                params: { uid: student.uid },
+                              })
+                            }
                           >
-                            <Ionicons
-                              name="trash-outline"
-                              size={16}
-                              color="#EF4444"
-                            />
-                            <Text style={styles.removeButtonText}>
-                              Remove Student
-                            </Text>
+                            <View style={styles.studentHeader}>
+                              <View style={styles.studentIdentityBlock}>
+                                <View style={styles.studentNameRow}>
+                                  <Text style={styles.studentName}>
+                                    {student.name}
+                                  </Text>
+                                  <Ionicons
+                                    name="chevron-forward"
+                                    size={14}
+                                    color="#8A63D2"
+                                  />
+                                </View>
+                                <Text style={styles.studentMeta}>
+                                  {student.yearLevel}
+                                </Text>
+                              </View>
+                              <View style={styles.studentInfoBlock}>
+                                <Text style={styles.studentId}>
+                                  {student.schoolId}
+                                </Text>
+                                <Text style={styles.studentCourse}>
+                                  {student.department}
+                                </Text>
+                              </View>
+                            </View>
+                            {student.isLSN && (
+                              <View style={styles.lsnBadgeRow}>
+                                <View style={styles.lsnBadge}>
+                                  <Ionicons
+                                    name="accessibility"
+                                    size={12}
+                                    color="white"
+                                  />
+                                  <Text style={styles.lsnBadgeText}>LSN</Text>
+                                </View>
+                                {student.specialNeedsType ? (
+                                  <Text style={styles.lsnTypeText}>
+                                    {student.specialNeedsType}
+                                  </Text>
+                                ) : null}
+                                {student.lsnDocument?.secureUrl ? (
+                                  <View style={styles.lsnDocIndicator}>
+                                    <Ionicons
+                                      name="document-attach"
+                                      size={11}
+                                      color="#8A63D2"
+                                    />
+                                    <Text style={styles.lsnDocText}>
+                                      Doc attached
+                                    </Text>
+                                  </View>
+                                ) : null}
+                              </View>
+                            )}
+                            <View style={styles.studentStatsRow}>
+                              <View style={styles.statItem}>
+                                <Text style={styles.statLabel}>
+                                  Assessments
+                                </Text>
+                                <Text style={styles.statValue}>
+                                  {student.assessmentsCount}
+                                </Text>
+                              </View>
+                              <View style={styles.statItem}>
+                                <Text style={styles.statLabel}>Journals</Text>
+                                <Text style={styles.statValue}>
+                                  {student.journalCount}
+                                </Text>
+                              </View>
+                            </View>
+                            <View style={styles.studentStatsRow}>
+                              <View style={styles.statItemWide}>
+                                <Text style={styles.statLabel}>
+                                  Latest Concern
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.statValueHighlight,
+                                    student.latestRiskLevel === "low"
+                                      ? styles.riskLow
+                                      : student.latestRiskLevel === "high"
+                                        ? styles.riskHigh
+                                        : styles.riskModerate,
+                                  ]}
+                                >
+                                  {student.latestRiskLevel === "low"
+                                    ? "Low"
+                                    : student.latestRiskLevel === "high"
+                                      ? "High"
+                                      : student.latestRiskLevel
+                                        ? "Moderate"
+                                        : "N/A"}
+                                </Text>
+                              </View>
+                              <View style={styles.statItemWide}>
+                                <Text style={styles.statLabel}>
+                                  Latest Score
+                                </Text>
+                                <Text style={styles.statValueHighlight}>
+                                  {student.latestTotalScore ?? "N/A"}
+                                </Text>
+                              </View>
+                            </View>
+                            <View style={styles.studentStatsRow}>
+                              <View style={styles.statItemWide}>
+                                <Text style={styles.statLabel}>
+                                  Last Assessment
+                                </Text>
+                                <Text style={styles.statValue}>
+                                  {student.latestAssessmentDate
+                                    ? student.latestAssessmentDate.toLocaleDateString()
+                                    : "N/A"}
+                                </Text>
+                              </View>
+                              <View style={styles.statItemWide}>
+                                <Text style={styles.statLabel}>
+                                  Recent Mood
+                                </Text>
+                                <Text style={styles.statValue}>
+                                  {student.latestJournalMood || "None"}
+                                </Text>
+                              </View>
+                            </View>
+                            {moods ? (
+                              <Text style={styles.moodSummary}>
+                                Moods: {moods}
+                              </Text>
+                            ) : null}
+                            <Pressable
+                              style={styles.removeButton}
+                              onPress={() => {
+                                setConfirmRemoveUid(student.uid);
+                                setConfirmRemoveName(student.name);
+                              }}
+                            >
+                              <Ionicons
+                                name="trash-outline"
+                                size={16}
+                                color="#EF4444"
+                              />
+                              <Text style={styles.removeButtonText}>
+                                Remove Student
+                              </Text>
+                            </Pressable>
                           </Pressable>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
+                        );
+                      })}
+                    </View>
                   )}
                   {totalPages > 1 && (
                     <View style={styles.paginationContainer}>
@@ -1694,9 +1840,13 @@ export default function AdminPanelScreen() {
                 </>
               ) : activeTab === "announcements" ? (
                 <>
-                    <View style={styles.lookupCard}>
+                  <View style={styles.lookupCard}>
                     <View style={styles.lookupHeader}>
-                      <Text style={styles.sectionTitle}>{editingAnnouncementId ? "Edit Announcement" : "Create Announcement"}</Text>
+                      <Text style={styles.sectionTitle}>
+                        {editingAnnouncementId
+                          ? "Edit Announcement"
+                          : "Create Announcement"}
+                      </Text>
                       {editingAnnouncementId && (
                         <Pressable
                           style={styles.editAnnouncementBtn}
@@ -1709,8 +1859,14 @@ export default function AdminPanelScreen() {
                             setAnnouncementError(null);
                           }}
                         >
-                          <Ionicons name="close-circle" size={18} color="#EF4444" />
-                          <Text style={styles.editAnnouncementBtnText}>Cancel</Text>
+                          <Ionicons
+                            name="close-circle"
+                            size={18}
+                            color="#EF4444"
+                          />
+                          <Text style={styles.editAnnouncementBtnText}>
+                            Cancel
+                          </Text>
                         </Pressable>
                       )}
                     </View>
@@ -1727,7 +1883,10 @@ export default function AdminPanelScreen() {
                     <View style={styles.formGroup}>
                       <Text style={styles.formLabel}>Description</Text>
                       <TextInput
-                        style={[styles.formInput, { minHeight: 80, textAlignVertical: "top" as const }]}
+                        style={[
+                          styles.formInput,
+                          { minHeight: 80, textAlignVertical: "top" as const },
+                        ]}
                         placeholder="Write your announcement here..."
                         placeholderTextColor="#94A3B8"
                         value={announcementDescription}
@@ -1742,22 +1901,40 @@ export default function AdminPanelScreen() {
                         <Pressable
                           style={[
                             styles.deptChip,
-                            announcementDepartments.includes("ALL") && styles.deptChipActive,
+                            announcementDepartments.includes("ALL") &&
+                              styles.deptChipActive,
                           ]}
                           onPress={() => toggleDepartment("ALL")}
                         >
-                          <Text style={[styles.deptChipText, announcementDepartments.includes("ALL") && styles.deptChipTextActive]}>All Departments</Text>
+                          <Text
+                            style={[
+                              styles.deptChipText,
+                              announcementDepartments.includes("ALL") &&
+                                styles.deptChipTextActive,
+                            ]}
+                          >
+                            All Departments
+                          </Text>
                         </Pressable>
                         {DEPARTMENTS.map((code) => (
                           <Pressable
                             key={code}
                             style={[
                               styles.deptChip,
-                              announcementDepartments.includes(code) && styles.deptChipActive,
+                              announcementDepartments.includes(code) &&
+                                styles.deptChipActive,
                             ]}
                             onPress={() => toggleDepartment(code)}
                           >
-                            <Text style={[styles.deptChipText, announcementDepartments.includes(code) && styles.deptChipTextActive]}>{code}</Text>
+                            <Text
+                              style={[
+                                styles.deptChipText,
+                                announcementDepartments.includes(code) &&
+                                  styles.deptChipTextActive,
+                              ]}
+                            >
+                              {code}
+                            </Text>
                           </Pressable>
                         ))}
                       </View>
@@ -1792,17 +1969,34 @@ export default function AdminPanelScreen() {
                           />
                           <Pressable
                             style={styles.deleteLinkBtn}
-                            onPress={() => setAnnouncementLinks(announcementLinks.filter((_, i) => i !== idx))}
+                            onPress={() =>
+                              setAnnouncementLinks(
+                                announcementLinks.filter((_, i) => i !== idx),
+                              )
+                            }
                           >
-                            <Ionicons name="close-circle" size={22} color="#EF4444" />
+                            <Ionicons
+                              name="close-circle"
+                              size={22}
+                              color="#EF4444"
+                            />
                           </Pressable>
                         </View>
                       ))}
                       <Pressable
                         style={styles.addLinkBtn}
-                        onPress={() => setAnnouncementLinks([...announcementLinks, { title: "", url: "" }])}
+                        onPress={() =>
+                          setAnnouncementLinks([
+                            ...announcementLinks,
+                            { title: "", url: "" },
+                          ])
+                        }
                       >
-                        <Ionicons name="add-circle-outline" size={18} color="#8A63D2" />
+                        <Ionicons
+                          name="add-circle-outline"
+                          size={18}
+                          color="#8A63D2"
+                        />
                         <Text style={styles.addLinkText}>Add Link</Text>
                       </Pressable>
                     </View>
@@ -1810,29 +2004,46 @@ export default function AdminPanelScreen() {
                       <Text style={styles.errorText}>{announcementError}</Text>
                     )}
                     <Pressable
-                      style={[styles.postButton, creatingAnnouncement && { opacity: 0.7 }]}
+                      style={[
+                        styles.postButton,
+                        creatingAnnouncement && { opacity: 0.7 },
+                      ]}
                       onPress={async () => {
-                        if (!announcementTitle.trim() || !announcementDescription.trim()) {
-                          setAnnouncementError("Title and description are required.");
+                        if (
+                          !announcementTitle.trim() ||
+                          !announcementDescription.trim()
+                        ) {
+                          setAnnouncementError(
+                            "Title and description are required.",
+                          );
                           return;
                         }
-                        const validLinks = announcementLinks.filter(l => l.title.trim() && l.url.trim());
+                        const validLinks = announcementLinks.filter(
+                          (l) => l.title.trim() && l.url.trim(),
+                        );
                         setCreatingAnnouncement(true);
                         setAnnouncementError(null);
                         try {
-                          const adminDoc = await getDoc(doc(db, "admins", user!.uid));
+                          const adminDoc = await getDoc(
+                            doc(db, "admins", user!.uid),
+                          );
                           const adminData = adminDoc.data();
-                          const targetDepartments = announcementDepartments.includes("ALL")
-                            ? ["ALL"]
-                            : announcementDepartments;
+                          const targetDepartments =
+                            announcementDepartments.includes("ALL")
+                              ? ["ALL"]
+                              : announcementDepartments;
                           if (editingAnnouncementId) {
                             await updateAnnouncement(editingAnnouncementId, {
                               title: announcementTitle.trim(),
                               description: announcementDescription.trim(),
                               links: validLinks,
-                              authorName: user!.displayName || adminData?.displayName || "Admin",
+                              authorName:
+                                user!.displayName ||
+                                adminData?.displayName ||
+                                "Admin",
                               authorPosition: adminData?.position || undefined,
-                              authorPhotoUrl: adminData?.profileImage || undefined,
+                              authorPhotoUrl:
+                                adminData?.profileImage || undefined,
                               targetDepartments,
                             });
                           } else {
@@ -1840,10 +2051,14 @@ export default function AdminPanelScreen() {
                               title: announcementTitle.trim(),
                               description: announcementDescription.trim(),
                               links: validLinks,
-                              authorName: user!.displayName || adminData?.displayName || "Admin",
+                              authorName:
+                                user!.displayName ||
+                                adminData?.displayName ||
+                                "Admin",
                               adminId: user!.uid,
                               authorPosition: adminData?.position || undefined,
-                              authorPhotoUrl: adminData?.profileImage || undefined,
+                              authorPhotoUrl:
+                                adminData?.profileImage || undefined,
                               targetDepartments,
                             });
                           }
@@ -1852,9 +2067,18 @@ export default function AdminPanelScreen() {
                           setAnnouncementLinks([]);
                           setAnnouncementDepartments(["ALL"]);
                           setEditingAnnouncementId(null);
-                          Alert.alert("Success", editingAnnouncementId ? "Announcement updated." : "Announcement posted.");
+                          Alert.alert(
+                            "Success",
+                            editingAnnouncementId
+                              ? "Announcement updated."
+                              : "Announcement posted.",
+                          );
                         } catch (err) {
-                          setAnnouncementError(err instanceof Error ? err.message : "Failed to post.");
+                          setAnnouncementError(
+                            err instanceof Error
+                              ? err.message
+                              : "Failed to post.",
+                          );
                         } finally {
                           setCreatingAnnouncement(false);
                         }
@@ -1864,7 +2088,11 @@ export default function AdminPanelScreen() {
                       {creatingAnnouncement ? (
                         <ActivityIndicator color="white" />
                       ) : (
-                        <Text style={styles.postButtonText}>{editingAnnouncementId ? "Update Announcement" : "Post Announcement"}</Text>
+                        <Text style={styles.postButtonText}>
+                          {editingAnnouncementId
+                            ? "Update Announcement"
+                            : "Post Announcement"}
+                        </Text>
                       )}
                     </Pressable>
                   </View>
@@ -1872,21 +2100,38 @@ export default function AdminPanelScreen() {
                   <Text style={styles.sectionHeader}>All Announcements</Text>
                   {announcements.length === 0 ? (
                     <View style={styles.stateCard}>
-                      <Ionicons name="megaphone-outline" size={40} color="#D1D5DB" />
-                      <Text style={styles.stateText}>No announcements yet.</Text>
+                      <Ionicons
+                        name="megaphone-outline"
+                        size={40}
+                        color="#D1D5DB"
+                      />
+                      <Text style={styles.stateText}>
+                        No announcements yet.
+                      </Text>
                     </View>
                   ) : (
                     announcements.map((a) => (
                       <View key={a.id} style={styles.announcementCard}>
                         <View style={styles.announcementCardHeader}>
-                          <Ionicons name="megaphone" size={18} color="#8A63D2" />
-                          <Text style={styles.announcementCardTitle}>{a.title}</Text>
+                          <Ionicons
+                            name="megaphone"
+                            size={18}
+                            color="#8A63D2"
+                          />
+                          <Text style={styles.announcementCardTitle}>
+                            {a.title}
+                          </Text>
                         </View>
-                        <Text style={styles.announcementCardBody}>{a.description}</Text>
+                        <Text style={styles.announcementCardBody}>
+                          {a.description}
+                        </Text>
                         {a.links.length > 0 && (
                           <View style={styles.announcementLinksWrap}>
                             {a.links.map((link, idx) => (
-                              <Text key={idx} style={styles.announcementLinkItem}>
+                              <Text
+                                key={idx}
+                                style={styles.announcementLinkItem}
+                              >
                                 {link.title}: {link.url}
                               </Text>
                             ))}
@@ -1896,7 +2141,11 @@ export default function AdminPanelScreen() {
                           <View style={styles.announcementDeptRow}>
                             {a.targetDepartments.map((dept) => (
                               <View key={dept} style={styles.expiryBadge}>
-                                <Ionicons name="people-outline" size={12} color="#8A63D2" />
+                                <Ionicons
+                                  name="people-outline"
+                                  size={12}
+                                  color="#8A63D2"
+                                />
                                 <Text style={styles.expiryText}>{dept}</Text>
                               </View>
                             ))}
@@ -1905,17 +2154,31 @@ export default function AdminPanelScreen() {
                         <View style={styles.announcementCardFooter}>
                           <View style={styles.announcementAuthorRow}>
                             {a.authorPhotoUrl ? (
-                              <Image source={{ uri: a.authorPhotoUrl }} style={styles.announcementAuthorAvatar} />
+                              <Image
+                                source={{ uri: a.authorPhotoUrl }}
+                                style={styles.announcementAuthorAvatar}
+                              />
                             ) : (
-                              <View style={styles.announcementAuthorAvatarPlaceholder}>
-                                <Text style={styles.announcementAuthorAvatarText}>
-                                  {(a.authorName || "A").charAt(0).toUpperCase()}
+                              <View
+                                style={
+                                  styles.announcementAuthorAvatarPlaceholder
+                                }
+                              >
+                                <Text
+                                  style={styles.announcementAuthorAvatarText}
+                                >
+                                  {(a.authorName || "A")
+                                    .charAt(0)
+                                    .toUpperCase()}
                                 </Text>
                               </View>
                             )}
                             <View style={{ flex: 1 }}>
                               <Text style={styles.announcementCardMeta}>
-                                {a.authorName}{a.authorPosition ? `, ${a.authorPosition}` : ""}
+                                {a.authorName}
+                                {a.authorPosition
+                                  ? `, ${a.authorPosition}`
+                                  : ""}
                               </Text>
                               <Text style={styles.announcementCardDate}>
                                 {formatAnnouncementDateTime(a.createdAt)}
@@ -1923,7 +2186,11 @@ export default function AdminPanelScreen() {
                             </View>
                           </View>
                           <View style={styles.expiryBadge}>
-                            <Ionicons name="time-outline" size={12} color="#8A63D2" />
+                            <Ionicons
+                              name="time-outline"
+                              size={12}
+                              color="#8A63D2"
+                            />
                             <Text style={styles.expiryText}>
                               {getDaysRemaining(a.expiresAt)}d left
                             </Text>
@@ -1934,18 +2201,30 @@ export default function AdminPanelScreen() {
                               setEditingAnnouncementId(a.id);
                               setAnnouncementTitle(a.title);
                               setAnnouncementDescription(a.description);
-                              setAnnouncementLinks(a.links.map((l) => ({ ...l })));
-                              setAnnouncementDepartments([...a.targetDepartments]);
+                              setAnnouncementLinks(
+                                a.links.map((l) => ({ ...l })),
+                              );
+                              setAnnouncementDepartments([
+                                ...a.targetDepartments,
+                              ]);
                               setAnnouncementError(null);
                             }}
                           >
-                            <Ionicons name="pencil-outline" size={16} color="#8A63D2" />
+                            <Ionicons
+                              name="pencil-outline"
+                              size={16}
+                              color="#8A63D2"
+                            />
                           </Pressable>
                           <Pressable
                             style={styles.deleteAnnouncementBtn}
                             onPress={() => setDeleteAnnounceId(a.id)}
                           >
-                            <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                            <Ionicons
+                              name="trash-outline"
+                              size={16}
+                              color="#EF4444"
+                            />
                           </Pressable>
                         </View>
                       </View>
@@ -2004,34 +2283,89 @@ export default function AdminPanelScreen() {
                   <Text style={styles.sectionHeader}>Advanced Analytics</Text>
                   <View style={[styles.analyticsNavRow, isWide && { gap: 20 }]}>
                     <Pressable
-                      style={({ pressed }) => [styles.analyticsNavCard, pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 }]}
-                      onPress={() => router.push("/(admin)/analytics/stress-heatmap")}
+                      style={({ pressed }) => [
+                        styles.analyticsNavCard,
+                        pressed && {
+                          transform: [{ scale: 0.97 }],
+                          opacity: 0.9,
+                        },
+                      ]}
+                      onPress={() =>
+                        router.push("/(admin)/analytics/stress-heatmap")
+                      }
                     >
-                      <View style={[styles.analyticsNavIcon, { backgroundColor: "#FEE2E2" }]}>
+                      <View
+                        style={[
+                          styles.analyticsNavIcon,
+                          { backgroundColor: "#FEE2E2" },
+                        ]}
+                      >
                         <Ionicons name="grid" size={22} color="#DC2626" />
                       </View>
-                      <Text style={styles.analyticsNavTitle}>Stress Heatmap</Text>
-                      <Text style={styles.analyticsNavDesc}>Color-coded intensity grid across days and hours</Text>
+                      <Text style={styles.analyticsNavTitle}>
+                        Stress Heatmap
+                      </Text>
+                      <Text style={styles.analyticsNavDesc}>
+                        Color-coded intensity grid across days and hours
+                      </Text>
                     </Pressable>
                     <Pressable
-                      style={({ pressed }) => [styles.analyticsNavCard, pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 }]}
-                      onPress={() => router.push("/(admin)/analytics/mood-analytics")}
+                      style={({ pressed }) => [
+                        styles.analyticsNavCard,
+                        pressed && {
+                          transform: [{ scale: 0.97 }],
+                          opacity: 0.9,
+                        },
+                      ]}
+                      onPress={() =>
+                        router.push("/(admin)/analytics/mood-analytics")
+                      }
                     >
-                      <View style={[styles.analyticsNavIcon, { backgroundColor: "#DCFCE7" }]}>
+                      <View
+                        style={[
+                          styles.analyticsNavIcon,
+                          { backgroundColor: "#DCFCE7" },
+                        ]}
+                      >
                         <Ionicons name="pie-chart" size={22} color="#16A34A" />
                       </View>
-                      <Text style={styles.analyticsNavTitle}>Mood & Assessment</Text>
-                      <Text style={styles.analyticsNavDesc}>Donut gauges and stacked mood distribution bars</Text>
+                      <Text style={styles.analyticsNavTitle}>
+                        Mood & Assessment
+                      </Text>
+                      <Text style={styles.analyticsNavDesc}>
+                        Donut gauges and stacked mood distribution bars
+                      </Text>
                     </Pressable>
                     <Pressable
-                      style={({ pressed }) => [styles.analyticsNavCard, pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 }]}
-                      onPress={() => router.push("/(admin)/analytics/risk-variance")}
+                      style={({ pressed }) => [
+                        styles.analyticsNavCard,
+                        pressed && {
+                          transform: [{ scale: 0.97 }],
+                          opacity: 0.9,
+                        },
+                      ]}
+                      onPress={() =>
+                        router.push("/(admin)/analytics/risk-variance")
+                      }
                     >
-                      <View style={[styles.analyticsNavIcon, { backgroundColor: "#FEF3C7" }]}>
-                        <Ionicons name="trending-up" size={22} color="#D97706" />
+                      <View
+                        style={[
+                          styles.analyticsNavIcon,
+                          { backgroundColor: "#FEF3C7" },
+                        ]}
+                      >
+                        <Ionicons
+                          name="trending-up"
+                          size={22}
+                          color="#D97706"
+                        />
                       </View>
-                      <Text style={styles.analyticsNavTitle}>Risk Variance</Text>
-                      <Text style={styles.analyticsNavDesc}>Box & whisker charts with outlier detection</Text>
+                      <Text style={styles.analyticsNavTitle}>
+                        Risk Variance
+                      </Text>
+                      <Text style={styles.analyticsNavDesc}>
+                        Box & whisker charts with outlier detection
+                      </Text>
                     </Pressable>
                   </View>
 
@@ -2057,21 +2391,31 @@ export default function AdminPanelScreen() {
                       Assessment Participation by Department
                     </Text>
                     <View style={styles.yearLevelFilterRow}>
-                      <Ionicons name="funnel-outline" size={14} color="#8A63D2" />
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.yearLevelScroll}>
+                      <Ionicons
+                        name="funnel-outline"
+                        size={14}
+                        color="#8A63D2"
+                      />
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.yearLevelScroll}
+                      >
                         {yearLevelOptions.map((level) => (
                           <Pressable
                             key={level}
                             style={[
                               styles.yearLevelChip,
-                              yearLevelFilter === level && styles.yearLevelChipActive,
+                              yearLevelFilter === level &&
+                                styles.yearLevelChipActive,
                             ]}
                             onPress={() => setYearLevelFilter(level)}
                           >
                             <Text
                               style={[
                                 styles.yearLevelChipText,
-                                yearLevelFilter === level && styles.yearLevelChipTextActive,
+                                yearLevelFilter === level &&
+                                  styles.yearLevelChipTextActive,
                               ]}
                             >
                               {level}
@@ -2081,20 +2425,45 @@ export default function AdminPanelScreen() {
                       </ScrollView>
                     </View>
                   </View>
-                  <View style={[styles.assessmentParticipationRow, isWide && styles.assessmentParticipationRowWide]}>
-                    <View style={[styles.barChartContainer, isWide && { flex: 1, marginBottom: 0 }]}>
+                  <View
+                    style={[
+                      styles.assessmentParticipationRow,
+                      isWide && styles.assessmentParticipationRowWide,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.barChartContainer,
+                        isWide && { flex: 1, marginBottom: 0 },
+                      ]}
+                    >
                       {/* Legend */}
                       <View style={styles.barLegend}>
                         <View style={styles.barLegendItem}>
-                          <View style={[styles.barLegendDot, { backgroundColor: "#22C55E" }]} />
+                          <View
+                            style={[
+                              styles.barLegendDot,
+                              { backgroundColor: "#22C55E" },
+                            ]}
+                          />
                           <Text style={styles.barLegendText}>Low</Text>
                         </View>
                         <View style={styles.barLegendItem}>
-                          <View style={[styles.barLegendDot, { backgroundColor: "#F59E0B" }]} />
+                          <View
+                            style={[
+                              styles.barLegendDot,
+                              { backgroundColor: "#F59E0B" },
+                            ]}
+                          />
                           <Text style={styles.barLegendText}>Moderate</Text>
                         </View>
                         <View style={styles.barLegendItem}>
-                          <View style={[styles.barLegendDot, { backgroundColor: "#EF4444" }]} />
+                          <View
+                            style={[
+                              styles.barLegendDot,
+                              { backgroundColor: "#EF4444" },
+                            ]}
+                          />
                           <Text style={styles.barLegendText}>High</Text>
                         </View>
                       </View>
@@ -2106,7 +2475,15 @@ export default function AdminPanelScreen() {
                           </Text>
                         </View>
                       ) : (
-                        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.barChartScrollRow} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={true}
+                          style={styles.barChartScrollRow}
+                          contentContainerStyle={{
+                            flexGrow: 1,
+                            justifyContent: "center",
+                          }}
+                        >
                           <View style={styles.barChartRow}>
                             {(() => {
                               const totalAllDepts = departmentRows.reduce(
@@ -2143,34 +2520,75 @@ export default function AdminPanelScreen() {
                     </View>
 
                     {/* Risk Threshold Legend */}
-                    <View style={[styles.thresholdCard, isWide && { marginBottom: 0, width: 280, flexShrink: 0 }]}>
+                    <View
+                      style={[
+                        styles.thresholdCard,
+                        isWide && {
+                          marginBottom: 0,
+                          width: 280,
+                          flexShrink: 0,
+                        },
+                      ]}
+                    >
                       <View style={styles.thresholdHeader}>
-                        <Ionicons name="information-circle-outline" size={18} color="#8A63D2" />
-                        <Text style={styles.thresholdTitle}>How Risk Levels Are Determined</Text>
+                        <Ionicons
+                          name="information-circle-outline"
+                          size={18}
+                          color="#8A63D2"
+                        />
+                        <Text style={styles.thresholdTitle}>
+                          How Risk Levels Are Determined
+                        </Text>
                       </View>
                       <Text style={styles.thresholdDescription}>
-                        Each student's risk level is calculated from their latest WEMWBS assessment score (out of 80):
+                        Each student's risk level is calculated from their
+                        latest WEMWBS assessment score (out of 80):
                       </Text>
                       <View style={styles.thresholdBlock}>
                         <View style={styles.thresholdBlockHeader}>
-                          <View style={[styles.thresholdDot, { backgroundColor: "#22C55E" }]} />
+                          <View
+                            style={[
+                              styles.thresholdDot,
+                              { backgroundColor: "#22C55E" },
+                            ]}
+                          />
                           <Text style={styles.thresholdLabel}>Low (0–20)</Text>
                         </View>
-                        <Text style={styles.thresholdDetail}>Healthy range, routine monitoring</Text>
+                        <Text style={styles.thresholdDetail}>
+                          Healthy range, routine monitoring
+                        </Text>
                       </View>
                       <View style={styles.thresholdBlock}>
                         <View style={styles.thresholdBlockHeader}>
-                          <View style={[styles.thresholdDot, { backgroundColor: "#F59E0B" }]} />
-                          <Text style={styles.thresholdLabel}>Moderate (21–50)</Text>
+                          <View
+                            style={[
+                              styles.thresholdDot,
+                              { backgroundColor: "#F59E0B" },
+                            ]}
+                          />
+                          <Text style={styles.thresholdLabel}>
+                            Moderate (21–50)
+                          </Text>
                         </View>
-                        <Text style={styles.thresholdDetail}>Some distress indicators, may need support</Text>
+                        <Text style={styles.thresholdDetail}>
+                          Some distress indicators, may need support
+                        </Text>
                       </View>
                       <View style={styles.thresholdBlock}>
                         <View style={styles.thresholdBlockHeader}>
-                          <View style={[styles.thresholdDot, { backgroundColor: "#EF4444" }]} />
-                          <Text style={styles.thresholdLabel}>High (51–80)</Text>
+                          <View
+                            style={[
+                              styles.thresholdDot,
+                              { backgroundColor: "#EF4444" },
+                            ]}
+                          />
+                          <Text style={styles.thresholdLabel}>
+                            High (51–80)
+                          </Text>
                         </View>
-                        <Text style={styles.thresholdDetail}>Significant distress, intervention recommended</Text>
+                        <Text style={styles.thresholdDetail}>
+                          Significant distress, intervention recommended
+                        </Text>
                       </View>
                     </View>
                   </View>
@@ -2191,19 +2609,31 @@ export default function AdminPanelScreen() {
                       </View>
                       {/* Scatter plot – correlation analysis */}
                       {scatterPlotData.length > 1 && (
-                        <View style={[styles.insightsEnlargedCard, { marginTop: 16 }]}>
+                        <View
+                          style={[
+                            styles.insightsEnlargedCard,
+                            { marginTop: 16 },
+                          ]}
+                        >
                           <View style={styles.insightsEnlargedHeader}>
-                            <Ionicons name="analytics" size={18} color="#8A63D2" />
+                            <Ionicons
+                              name="analytics"
+                              size={18}
+                              color="#8A63D2"
+                            />
                             <Text style={styles.insightsEnlargedTitle}>
                               Score vs Journal Frequency Correlation
                             </Text>
                           </View>
                           <Text style={styles.insightsEnlargedSubtitle}>
-                            Each student plotted by assessment severity (Y) and journal activity (X).
-                            High-risk outliers appear in the upper region.
+                            Each student plotted by assessment severity (Y) and
+                            journal activity (X). High-risk outliers appear in
+                            the upper region.
                           </Text>
                           <View style={styles.chartContainer}>
-                            <DepartmentCorrelationScatter points={scatterPlotData} />
+                            <DepartmentCorrelationScatter
+                              points={scatterPlotData}
+                            />
                           </View>
                         </View>
                       )}
@@ -2226,13 +2656,19 @@ export default function AdminPanelScreen() {
                       {deptComparisonChartData.length > 1 && (
                         <View style={styles.insightsEnlargedCard}>
                           <View style={styles.insightsEnlargedHeader}>
-                            <Ionicons name="bar-chart" size={18} color="#8A63D2" />
+                            <Ionicons
+                              name="bar-chart"
+                              size={18}
+                              color="#8A63D2"
+                            />
                             <Text style={styles.insightsEnlargedTitle}>
                               Multi-Metric Department Comparison
                             </Text>
                           </View>
                           <View style={styles.chartContainer}>
-                            <DepartmentComparisonChart data={deptComparisonChartData} />
+                            <DepartmentComparisonChart
+                              data={deptComparisonChartData}
+                            />
                           </View>
                         </View>
                       )}
@@ -2241,7 +2677,9 @@ export default function AdminPanelScreen() {
 
                   {/* ─── SECTION 6: Visual Insights ──────────────────────── */}
                   <Text style={styles.sectionHeader}>Visual Insights</Text>
-                  <View style={[styles.chartsRow, isWide && styles.chartsRowWide]}>
+                  <View
+                    style={[styles.chartsRow, isWide && styles.chartsRowWide]}
+                  >
                     {renderDonutChart(donutData)}
                     {renderRadialProgress(surveyCompletionPct)}
                     {renderComparativeChart(engagementData)}
@@ -2253,7 +2691,13 @@ export default function AdminPanelScreen() {
         </ScrollView>
 
         <Pressable
-          style={[styles.scrollToTopBtn, { opacity: showScrollTop ? 1 : 0, pointerEvents: showScrollTop ? "auto" : "none" }]}
+          style={[
+            styles.scrollToTopBtn,
+            {
+              opacity: showScrollTop ? 1 : 0,
+              pointerEvents: showScrollTop ? "auto" : "none",
+            },
+          ]}
           onPress={() => {
             scrollRef.current?.scrollTo({ y: 0, animated: true });
             setShowScrollTop(false);
@@ -2345,8 +2789,15 @@ export default function AdminPanelScreen() {
                     onChangeText={(text) => {
                       const raw = text.replace(/-/g, "").slice(0, 9);
                       let formatted = raw;
-                      if (raw.length > 4) formatted = raw.slice(0, 2) + "-" + raw.slice(2, 6) + "-" + raw.slice(6);
-                      else if (raw.length > 2) formatted = raw.slice(0, 2) + "-" + raw.slice(2);
+                      if (raw.length > 4)
+                        formatted =
+                          raw.slice(0, 2) +
+                          "-" +
+                          raw.slice(2, 6) +
+                          "-" +
+                          raw.slice(6);
+                      else if (raw.length > 2)
+                        formatted = raw.slice(0, 2) + "-" + raw.slice(2);
                       setNewAdminIdNo(formatted);
                     }}
                     keyboardType="number-pad"
@@ -2358,7 +2809,9 @@ export default function AdminPanelScreen() {
                   <TextInput
                     style={styles.formInput}
                     placeholder="Search college..."
-                    value={newAdminCollege ? newAdminCollege : newAdminCollegeSearch}
+                    value={
+                      newAdminCollege ? newAdminCollege : newAdminCollegeSearch
+                    }
                     editable={!newAdminCollege}
                     onChangeText={(text) => setNewAdminCollegeSearch(text)}
                     autoCapitalize="words"
@@ -2366,7 +2819,9 @@ export default function AdminPanelScreen() {
                   {!newAdminCollege && !!newAdminCollegeSearch && (
                     <View style={styles.dropdownContainer}>
                       {COLLEGES.filter((c) =>
-                        c.toLowerCase().includes(newAdminCollegeSearch.toLowerCase()),
+                        c
+                          .toLowerCase()
+                          .includes(newAdminCollegeSearch.toLowerCase()),
                       )
                         .slice(0, 8)
                         .map((college) => (
@@ -2385,7 +2840,9 @@ export default function AdminPanelScreen() {
                   )}
                   {newAdminCollege && (
                     <View style={styles.selectedTag}>
-                      <Text style={styles.selectedTagText}>{newAdminCollege}</Text>
+                      <Text style={styles.selectedTagText}>
+                        {newAdminCollege}
+                      </Text>
                       <Pressable onPress={() => setNewAdminCollege("")}>
                         <Ionicons name="close-circle" size={18} color="white" />
                       </Pressable>
@@ -2586,7 +3043,8 @@ export default function AdminPanelScreen() {
               <Ionicons name="warning-outline" size={48} color="#EF4444" />
               <Text style={styles.confirmTitle}>Delete Announcement</Text>
               <Text style={styles.confirmText}>
-                Are you sure you want to delete this announcement? This action cannot be undone.
+                Are you sure you want to delete this announcement? This action
+                cannot be undone.
               </Text>
               <View style={styles.confirmActions}>
                 <Pressable
@@ -3822,8 +4280,18 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 8,
   },
-  announcementCardTitle: { fontSize: 16, fontWeight: "800", color: "#0F172A", flex: 1 },
-  announcementCardBody: { fontSize: 14, color: "#475569", lineHeight: 22, marginBottom: 12 },
+  announcementCardTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0F172A",
+    flex: 1,
+  },
+  announcementCardBody: {
+    fontSize: 14,
+    color: "#475569",
+    lineHeight: 22,
+    marginBottom: 12,
+  },
   announcementLinksWrap: { gap: 4, marginBottom: 12 },
   announcementLinkItem: { fontSize: 12, color: "#8A63D2", fontWeight: "600" },
   announcementCardFooter: {
@@ -3858,7 +4326,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
   },
-  announcementCardMeta: { fontSize: 12, color: "#94A3B8", fontWeight: "600", flex: 1 },
+  announcementCardMeta: {
+    fontSize: 12,
+    color: "#94A3B8",
+    fontWeight: "600",
+    flex: 1,
+  },
   announcementCardDate: { fontSize: 11, color: "#CBD5E1", marginTop: 2 },
   expiryBadge: {
     flexDirection: "row",
@@ -3871,9 +4344,22 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   expiryText: { fontSize: 11, fontWeight: "600", color: "#8A63D2" },
-  deleteAnnouncementBtn: { padding: 8, borderRadius: 10, backgroundColor: "#FEF2F2" },
-  editAnnouncementBtn: { padding: 8, borderRadius: 10, backgroundColor: "#F3EEFF" },
-  editAnnouncementBtnText: { fontSize: 12, fontWeight: "600", color: "#EF4444", marginLeft: 4 },
+  deleteAnnouncementBtn: {
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: "#FEF2F2",
+  },
+  editAnnouncementBtn: {
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: "#F3EEFF",
+  },
+  editAnnouncementBtnText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#EF4444",
+    marginLeft: 4,
+  },
   deptChipRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -3911,7 +4397,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
     gap: 8,
   },
-  selectedTagText: { color: "#FFFFFF", fontSize: 14, fontWeight: "600", flex: 1 },
+  selectedTagText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+    flex: 1,
+  },
 
   // ─── Wide screen (desktop) overrides ──────────────────────────
   containerWide: {

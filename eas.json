@@ -23,10 +23,5 @@
   },
   "submit": {
     "production": {}
-  },
-  "hosting": {
-    "production": {
-      "singlePageApp": true
-    }
   }
 }
