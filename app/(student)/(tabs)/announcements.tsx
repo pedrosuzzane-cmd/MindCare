@@ -1,5 +1,15 @@
+import { auth, db } from "@/constants/firebase";
+import { useAuth } from "@/hooks/AuthContext";
+import {
+  formatAnnouncementDateTime,
+  getDaysRemaining,
+  listenForAnnouncements,
+  markAnnouncementAsRead,
+} from "@/services/announcementService";
+import type { Announcement } from "@/types/announcement";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
   Image,
@@ -11,21 +21,13 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuth } from "@/hooks/AuthContext";
-import {
-  listenForAnnouncements,
-  markAnnouncementAsRead,
-  formatAnnouncementDateTime,
-  getDaysRemaining,
-} from "@/services/announcementService";
-import type { Announcement } from "@/types/announcement";
-import { auth, db } from "@/constants/firebase";
-import { doc, getDoc } from "firebase/firestore";
 
 export default function AnnouncementsTab() {
   const { user } = useAuth();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [studentDepartment, setStudentDepartment] = useState<string | null>(null);
+  const [studentDepartment, setStudentDepartment] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
@@ -61,52 +63,74 @@ export default function AnnouncementsTab() {
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
       >
-        {announcements.filter((a) => a.targetDepartments.includes("ALL") || (studentDepartment && a.targetDepartments.includes(studentDepartment))).length === 0 ? (
+        {announcements.filter(
+          (a) =>
+            a.targetDepartments.includes("ALL") ||
+            (studentDepartment &&
+              a.targetDepartments.includes(studentDepartment)),
+        ).length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="megaphone-outline" size={48} color="#D1D5DB" />
             <Text style={styles.emptyStateText}>No announcements yet</Text>
           </View>
         ) : (
-          announcements.filter((a) => a.targetDepartments.includes("ALL") || (studentDepartment && a.targetDepartments.includes(studentDepartment))).map((announcement) => (
-            <View key={announcement.id} style={styles.card}>
-              <Text style={styles.cardTitle}>{announcement.title}</Text>
-              <Text style={styles.cardBody}>{announcement.description}</Text>
-              {announcement.links.length > 0 && (
-                <View style={styles.linksContainer}>
-                  {announcement.links.map((link, idx) => (
-                    <Pressable key={idx} onPress={() => Linking.openURL(link.url)}>
-                      <Text style={styles.linkText}>{link.title}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-              <View style={styles.authorRow}>
-                {announcement.authorPhotoUrl ? (
-                  <Image source={{ uri: announcement.authorPhotoUrl }} style={styles.authorAvatar} />
-                ) : (
-                  <View style={styles.authorAvatarPlaceholder}>
-                    <Text style={styles.authorAvatarText}>
-                      {(announcement.authorName || "A").charAt(0).toUpperCase()}
-                    </Text>
+          announcements
+            .filter(
+              (a) =>
+                a.targetDepartments.includes("ALL") ||
+                (studentDepartment &&
+                  a.targetDepartments.includes(studentDepartment)),
+            )
+            .map((announcement) => (
+              <View key={announcement.id} style={styles.card}>
+                <Text style={styles.cardTitle}>{announcement.title}</Text>
+                <Text style={styles.cardBody}>{announcement.description}</Text>
+                {announcement.links.length > 0 && (
+                  <View style={styles.linksContainer}>
+                    {announcement.links.map((link, idx) => (
+                      <Pressable
+                        key={idx}
+                        onPress={() => Linking.openURL(link.url)}
+                      >
+                        <Text style={styles.linkText}>{link.title}</Text>
+                      </Pressable>
+                    ))}
                   </View>
                 )}
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cardMeta}>
-                    {announcement.authorName}
-                    {announcement.authorPosition ? `, ${announcement.authorPosition}` : ""}
-                  </Text>
-                  <Text style={styles.cardDate}>
-                    {formatAnnouncementDateTime(announcement.createdAt)}
+                <View style={styles.authorRow}>
+                  {announcement.authorPhotoUrl ? (
+                    <Image
+                      source={{ uri: announcement.authorPhotoUrl }}
+                      style={styles.authorAvatar}
+                    />
+                  ) : (
+                    <View style={styles.authorAvatarPlaceholder}>
+                      <Text style={styles.authorAvatarText}>
+                        {(announcement.authorName || "A")
+                          .charAt(0)
+                          .toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardMeta}>
+                      {announcement.authorName}
+                      {announcement.authorPosition
+                        ? `, ${announcement.authorPosition}`
+                        : ""}
+                    </Text>
+                    <Text style={styles.cardDate}>
+                      {formatAnnouncementDateTime(announcement.createdAt)}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.expiry}>
+                  <Text style={styles.expiryText}>
+                    Expires in {getDaysRemaining(announcement.expiresAt)} days
                   </Text>
                 </View>
               </View>
-              <View style={styles.expiry}>
-                <Text style={styles.expiryText}>
-                  Expires in {getDaysRemaining(announcement.expiresAt)} days
-                </Text>
-              </View>
-            </View>
-          ))
+            ))
         )}
       </ScrollView>
     </SafeAreaView>
