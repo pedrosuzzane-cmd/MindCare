@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   Image,
   Linking,
@@ -24,6 +25,7 @@ import {
   orderBy,
   query,
 } from "firebase/firestore";
+import { changeProfileImage } from "@/services/userService";
 
 interface JournalEntry {
   id: string;
@@ -110,6 +112,7 @@ interface ProfileData {
 export default function StudentDetailScreen() {
   const { uid } = useLocalSearchParams<{ uid: string }>();
   const [loading, setLoading] = useState(true);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [moodCounts, setMoodCounts] = useState<Record<string, number>>({});
@@ -284,15 +287,36 @@ export default function StudentDetailScreen() {
             {/* Profile Card */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <View style={styles.avatarCircle}>
-                  {profile.profileImage ? (
-                    <Image source={{ uri: profile.profileImage }} style={{ width: 56, height: 56, borderRadius: 28 }} />
-                  ) : (
-                    <Text style={styles.avatarText}>
-                      {(profile.fullName || "?").charAt(0).toUpperCase()}
-                    </Text>
-                  )}
-                </View>
+                <Pressable
+                  onPress={async () => {
+                    if (uploadingImage) return;
+                    setUploadingImage(true);
+                    const newUrl = await changeProfileImage(uid, "users");
+                    if (newUrl) {
+                      setProfile((prev) => prev ? { ...prev, profileImage: newUrl } : prev);
+                    }
+                    setUploadingImage(false);
+                  }}
+                  style={styles.avatarPressable}
+                >
+                  <View style={styles.avatarCircle}>
+                    {profile.profileImage ? (
+                      <Image source={{ uri: profile.profileImage }} style={{ width: 56, height: 56, borderRadius: 28 }} />
+                    ) : (
+                      <Text style={styles.avatarText}>
+                        {(profile.fullName || "?").charAt(0).toUpperCase()}
+                      </Text>
+                    )}
+                    {uploadingImage && (
+                      <View style={styles.avatarUploadingOverlay}>
+                        <ActivityIndicator color="white" size="small" />
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.avatarCameraBadge}>
+                    <Ionicons name="camera" size={12} color="white" />
+                  </View>
+                </Pressable>
                 <View style={styles.nameBlock}>
                   <Text style={styles.studentName}>{profile.fullName}</Text>
                   <Text style={styles.studentIdLabel}>
@@ -795,6 +819,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  avatarPressable: {
+    position: "relative",
+    marginRight: 14,
+  },
   avatarCircle: {
     width: 56,
     height: 56,
@@ -802,12 +830,32 @@ const styles = StyleSheet.create({
     backgroundColor: "#6366F1",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 14,
+    overflow: "hidden",
   },
   avatarText: {
     color: "white",
     fontSize: 24,
     fontWeight: "800",
+  },
+  avatarCameraBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#8A63D2",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "white",
+  },
+  avatarUploadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 28,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   nameBlock: {
     flex: 1,

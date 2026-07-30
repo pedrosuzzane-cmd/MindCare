@@ -13,6 +13,7 @@ export interface Announcement {
   authorName: string;
   adminId: string;
   authorPosition?: string;
+  targetDepartments: string[];
 }
 
 export interface CreateAnnouncementPayload {
@@ -22,4 +23,14 @@ export interface CreateAnnouncementPayload {
   authorName: string;
   adminId: string;
   authorPosition?: string;
+  targetDepartments: string[];
+}
+
+export interface UpdateAnnouncementPayload {
+  title: string;
+  description: string;
+  links: AnnouncementLink[];
+  authorName: string;
+  authorPosition?: string;
+  targetDepartments: string[];
 }

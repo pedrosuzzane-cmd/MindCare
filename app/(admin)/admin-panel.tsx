@@ -1,4 +1,6 @@
 import { API_URL } from "@/backend/config";
+import { DepartmentComparisonChart, DepartmentCorrelationScatter } from "@/components/admin/DepartmentCharts";
+import type { DeptComparisonMetric, ScatterPoint } from "@/components/admin/DepartmentCharts";
 import { StudentListModal } from "@/components/admin/StudentListModal";
 import { db } from "@/constants/firebase";
 import { useAuth } from "@/hooks/AuthContext";
@@ -6,6 +8,7 @@ import { listenForAdminDashboardData } from "@/services/adminFirestoreService";
 import {
   listenForAnnouncements,
   createAnnouncement,
+  updateAnnouncement,
   deleteAnnouncement as deleteAnnouncementService,
   cleanupExpiredAnnouncements,
   formatAnnouncementDateTime,
@@ -40,6 +43,16 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context"; // This was already correct
 import { shadows } from "@/utils/shadows";
+
+const DEPARTMENTS = [
+  "CITCS",
+  "COA",
+  "CCJE",
+  "CTE",
+  "CN",
+  "CEA",
+  "CHTM",
+];
 
 const COLLEGES = [
   "Saint Louis University (SLU)",
@@ -129,6 +142,10 @@ interface PerDepartmentKpi {
   journalEntries: number;
   lsnStudents: number;
   topMood: string;
+  scorePct: number;
+  journalPct: number;
+  lsnPct: number;
+  moodWellnessPct: number;
 }
 
 // ─── Comparison Insight ──────────────────────────────────────────────────────
@@ -226,6 +243,20 @@ export default function AdminPanelScreen() {
   const [creatingAnnouncement, setCreatingAnnouncement] = useState(false);
   const [announcementError, setAnnouncementError] = useState<string | null>(null);
   const [deleteAnnounceId, setDeleteAnnounceId] = useState<string | null>(null);
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
+  const [announcementDepartments, setAnnouncementDepartments] = useState<string[]>(["ALL"]);
+
+  const toggleDepartment = (code: string) => {
+    setAnnouncementDepartments((prev) => {
+      if (code === "ALL") return ["ALL"];
+      const withoutAll = prev.filter((d) => d !== "ALL");
+      if (withoutAll.includes(code)) {
+        const next = withoutAll.filter((d) => d !== code);
+        return next.length === 0 ? ["ALL"] : next;
+      }
+      return [...withoutAll, code];
+    });
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -458,19 +489,46 @@ export default function AdminPanelScreen() {
     ];
   }, [studentSummaries, analyticsData]);
 
+  // ─── Year Level Filter State ──────────────────────────────────────────────
+  const [yearLevelFilter, setYearLevelFilter] = useState<string>("All");
+
+  const yearLevelOptions = useMemo(() => {
+    const dataLevels = Array.from(new Set(studentSummaries.map((s) => s.yearLevel).filter(Boolean)));
+    return ["All", ...dataLevels.sort()];
+  }, [studentSummaries]);
+
   // ─── Computed Department Table Rows ────────────────────────────────────────
   const departmentRows = useMemo((): DepartmentRowData[] => {
-    return analyticsData.department.map((d) => ({
-      name: d.label,
-      totalStudents: d.total,
-      lowCount: d.low,
-      lowPct: d.total ? Math.round((d.low / d.total) * 100) : 0,
-      normalCount: d.normal,
-      normalPct: d.total ? Math.round((d.normal / d.total) * 100) : 0,
-      highCount: d.high,
-      highPct: d.total ? Math.round((d.high / d.total) * 100) : 0,
-    }));
-  }, [analyticsData]);
+    const filtered = yearLevelFilter === "All"
+      ? studentSummaries
+      : studentSummaries.filter((s) => s.yearLevel === yearLevelFilter);
+
+    const deptMap = new Map<string, { total: number; low: number; normal: number; high: number; scoreSum: number }>();
+    for (const s of filtered) {
+      if (!deptMap.has(s.department)) {
+        deptMap.set(s.department, { total: 0, low: 0, normal: 0, high: 0, scoreSum: 0 });
+      }
+      const entry = deptMap.get(s.department)!;
+      entry.total++;
+      if (s.latestRiskLevel === "low") entry.low++;
+      else if (s.latestRiskLevel === "high") entry.high++;
+      else if (s.latestRiskLevel === "normal") entry.normal++;
+      if (s.latestTotalScore != null) entry.scoreSum += s.latestTotalScore;
+    }
+
+    return Array.from(deptMap.entries())
+      .map(([name, d]) => ({
+        name,
+        totalStudents: d.total,
+        lowCount: d.low,
+        lowPct: d.total ? Math.round((d.low / d.total) * 100) : 0,
+        normalCount: d.normal,
+        normalPct: d.total ? Math.round((d.normal / d.total) * 100) : 0,
+        highCount: d.high,
+        highPct: d.total ? Math.round((d.high / d.total) * 100) : 0,
+      }))
+      .sort((a, b) => b.totalStudents - a.totalStudents);
+  }, [yearLevelFilter, studentSummaries]);
 
   // ─── Computed Chart Data ───────────────────────────────────────────────────
   const donutData = useMemo((): DonutSlice[] => {
@@ -536,6 +594,20 @@ export default function AdminPanelScreen() {
 
   // ─── Computed Per-Department KPI Data ──────────────────────────────────────
   const perDepartmentKpiData = useMemo((): PerDepartmentKpi[] => {
+    const maxJournal = Math.max(
+      ...analyticsData.department.map((d) => {
+        return studentSummaries.filter((s) => s.department === d.label)
+          .reduce((sum, s) => sum + s.journalCount, 0);
+      }),
+      1,
+    );
+    const maxLsn = Math.max(
+      ...analyticsData.department.map((d) =>
+        studentSummaries.filter((s) => s.department === d.label && s.isLSN).length,
+      ),
+      1,
+    );
+
     return analyticsData.department.map((d) => {
       const deptStudents = studentSummaries.filter(
         (s) => s.department === d.label,
@@ -554,6 +626,21 @@ export default function AdminPanelScreen() {
       const topMood =
         Object.entries(mergedMoods)
           .sort(([, a], [, b]) => b - a)[0]?.[0] || "N/A";
+
+      const positiveMoods = ["happy", "calm", "relaxed", "good"];
+      const distressedMoods = ["stressed", "burnout", "very-upset", "exhausted", "overwhelmed"];
+      let wellSum = 0;
+      let moodTotal = 0;
+      Object.entries(mergedMoods).forEach(([mood, count]) => {
+        const m = mood.toLowerCase();
+        if (positiveMoods.includes(m)) wellSum += count;
+        else if (distressedMoods.includes(m)) wellSum -= count;
+        moodTotal += count;
+      });
+      const moodWellnessPct = moodTotal > 0
+        ? Math.round(((wellSum / moodTotal) + 1) / 2 * 100)
+        : 50;
+
       return {
         deptName: d.label,
         deptAbbr: getDeptAbbreviation(d.label),
@@ -561,6 +648,10 @@ export default function AdminPanelScreen() {
         journalEntries,
         lsnStudents,
         topMood,
+        scorePct: d.total > 0 ? Math.min((d.scoreSum / d.total / 80) * 100, 100) : 0,
+        journalPct: Math.min((journalEntries / maxJournal) * 100, 100),
+        lsnPct: Math.min((lsnStudents / maxLsn) * 100, 100),
+        moodWellnessPct,
       };
     });
   }, [analyticsData, studentSummaries]);
@@ -610,6 +701,46 @@ export default function AdminPanelScreen() {
       },
     ];
   }, [perDepartmentKpiData, analyticsData]);
+
+  // ─── Computed Data for Department Comparison Charts ────────────────────
+  const deptComparisonChartData = useMemo((): DeptComparisonMetric[] => {
+    return analyticsData.department.map((d) => {
+      const deptStudents = studentSummaries.filter(
+        (s) => s.department === d.label,
+      );
+      const journalCount = deptStudents.reduce(
+        (sum, s) => sum + s.journalCount, 0,
+      );
+      const lsnCount = deptStudents.filter((s) => s.isLSN).length;
+      const assessedCount = deptStudents.filter(
+        (s) => s.assessmentsCount > 0,
+      ).length;
+      const participationRate =
+        deptStudents.length > 0 ? assessedCount / deptStudents.length : 0;
+      return {
+        deptAbbr: getDeptAbbreviation(d.label),
+        deptName: d.label,
+        avgScore: d.total > 0 ? +(d.scoreSum / d.total).toFixed(1) : 0,
+        journalCount,
+        lsnCount,
+        assessmentCount: d.total,
+        participationRate,
+      };
+    });
+  }, [analyticsData, studentSummaries]);
+
+  // ─── Computed Data for Scatter Plot ────────────────────────────────────
+  const scatterPlotData = useMemo((): ScatterPoint[] => {
+    return studentSummaries
+      .filter((s) => s.assessmentsCount > 0 || s.journalCount > 0)
+      .map((s) => ({
+        studentId: s.uid,
+        department: s.department,
+        journalCount: s.journalCount,
+        avgScore: s.latestTotalScore ?? 0,
+        riskLevel: (s.latestRiskLevel ?? "low") as "low" | "normal" | "high",
+      }));
+  }, [studentSummaries]);
 
   const handleRemoveStudent = async (uid: string) => {
     setRemovingStudent(uid);
@@ -839,6 +970,9 @@ export default function AdminPanelScreen() {
   };
 
   const renderPerDepartmentKpiCard = (kpi: PerDepartmentKpi, index: number) => {
+    const moodColor = kpi.moodWellnessPct >= 60 ? "#22C55E" : kpi.moodWellnessPct >= 40 ? "#F59E0B" : "#EF4444";
+    const scoreColor = kpi.scorePct <= 40 ? "#22C55E" : kpi.scorePct <= 62 ? "#F59E0B" : "#EF4444";
+
     return (
       <Pressable
         key={index}
@@ -852,32 +986,49 @@ export default function AdminPanelScreen() {
       >
         <Text style={styles.deptKpiCardTitle}>{kpi.deptAbbr}</Text>
         <View style={styles.deptKpiMetricsGrid}>
-          <View style={styles.deptKpiMetric}>
-            <Text style={styles.deptKpiMetricLabel}>Avg Score</Text>
-            <Text style={[styles.deptKpiMetricValue, { color: "#6D28D9" }]}>
-              {kpi.avgScore}
-            </Text>
+          <View style={styles.deptKpiMetricSpark}>
+            <View style={styles.sparklineRow}>
+              <Text style={styles.deptKpiMetricLabel}>Avg Score</Text>
+              <Text style={[styles.sparklineValue, { color: scoreColor }]}>
+                {kpi.avgScore}
+              </Text>
+            </View>
+            <View style={styles.sparklineTrack}>
+              <View style={[styles.sparklineFill, { width: `${kpi.scorePct}%`, backgroundColor: scoreColor }]} />
+            </View>
           </View>
-          <View style={styles.deptKpiMetric}>
-            <Text style={styles.deptKpiMetricLabel}>Journals</Text>
-            <Text style={[styles.deptKpiMetricValue, { color: "#7C3AED" }]}>
-              {kpi.journalEntries}
-            </Text>
+          <View style={styles.deptKpiMetricSpark}>
+            <View style={styles.sparklineRow}>
+              <Text style={styles.deptKpiMetricLabel}>Journals</Text>
+              <Text style={[styles.sparklineValue, { color: "#7C3AED" }]}>
+                {kpi.journalEntries}
+              </Text>
+            </View>
+            <View style={styles.sparklineTrack}>
+              <View style={[styles.sparklineFill, { width: `${kpi.journalPct}%`, backgroundColor: "#7C3AED" }]} />
+            </View>
           </View>
-          <View style={styles.deptKpiMetric}>
-            <Text style={styles.deptKpiMetricLabel}>LSN</Text>
-            <Text style={[styles.deptKpiMetricValue, { color: "#9333EA" }]}>
-              {kpi.lsnStudents}
-            </Text>
+          <View style={styles.deptKpiMetricSpark}>
+            <View style={styles.sparklineRow}>
+              <Text style={styles.deptKpiMetricLabel}>LSN</Text>
+              <Text style={[styles.sparklineValue, { color: "#9333EA" }]}>
+                {kpi.lsnStudents}
+              </Text>
+            </View>
+            <View style={styles.sparklineTrack}>
+              <View style={[styles.sparklineFill, { width: `${kpi.lsnPct}%`, backgroundColor: "#9333EA" }]} />
+            </View>
           </View>
-          <View style={styles.deptKpiMetric}>
-            <Text style={styles.deptKpiMetricLabel}>Top Mood</Text>
-            <Text
-              style={[styles.deptKpiMetricValue, { color: "#5B21B6", fontSize: 12 }]}
-              numberOfLines={1}
-            >
-              {kpi.topMood}
-            </Text>
+          <View style={styles.deptKpiMetricSpark}>
+            <View style={styles.sparklineRow}>
+              <Text style={styles.deptKpiMetricLabel}>Wellness</Text>
+              <Text style={[styles.sparklineValue, { color: moodColor }]}>
+                {kpi.moodWellnessPct}%
+              </Text>
+            </View>
+            <View style={styles.sparklineTrack}>
+              <View style={[styles.sparklineFill, { width: `${kpi.moodWellnessPct}%`, backgroundColor: moodColor }]} />
+            </View>
           </View>
         </View>
       </Pressable>
@@ -909,25 +1060,30 @@ export default function AdminPanelScreen() {
     );
   };
 
-  /** Department bar graph row - vertical stacked bar with percentage on top */
+  /** Department bar graph row - grouped bars (low/moderate/high) with percentage on top */
   const renderDepartmentRow = (
     row: DepartmentRowData,
     totalAllDepts: number,
-    maxDeptCount: number,
+    maxLow: number,
+    maxNormal: number,
+    maxHigh: number,
+    deptCount: number,
   ) => {
     const deptAbbr = getDeptAbbreviation(row.name);
     const shareOfTotal =
       totalAllDepts > 0
         ? Math.round((row.totalStudents / totalAllDepts) * 100)
         : 0;
-    const barScale = maxDeptCount > 0 ? row.totalStudents / maxDeptCount : 0;
-    const barHeight = Math.max(Math.round(barScale * 140), 12);
+    const groupWidth = Math.max(56, Math.min(80, Math.floor(640 / deptCount)));
+    const barWidth = Math.max(6, Math.min(14, (groupWidth - 16) / 3));
+    const barMaxHeight = 100;
 
     return (
       <Pressable
         key={row.name}
         style={({ pressed }) => [
           styles.barColumn,
+          { width: groupWidth },
           pressed && { transform: [{ scale: 0.96 }], opacity: 0.9 },
         ]}
         onPress={() => setStudentListModal({ visible: true, title: row.name })}
@@ -935,41 +1091,20 @@ export default function AdminPanelScreen() {
         {/* Percentage label on top */}
         <Text style={styles.barPctTop}>{shareOfTotal}%</Text>
 
-        {/* Stacked vertical bar */}
-        <View style={[styles.barTrack, { height: barHeight }]}>
-          {row.lowPct > 0 && (
-            <View
-              style={[
-                styles.barFill,
-                {
-                  height: `${row.lowPct}%`,
-                  backgroundColor: "#22C55E",
-                },
-              ]}
-            />
-          )}
-          {row.normalPct > 0 && (
-            <View
-              style={[
-                styles.barFill,
-                {
-                  height: `${row.normalPct}%`,
-                  backgroundColor: "#F59E0B",
-                },
-              ]}
-            />
-          )}
-          {row.highPct > 0 && (
-            <View
-              style={[
-                styles.barFill,
-                {
-                  height: `${row.highPct}%`,
-                  backgroundColor: "#EF4444",
-                },
-              ]}
-            />
-          )}
+        {/* Grouped bars */}
+        <View style={styles.groupedBarRow}>
+          <View style={styles.groupedBarCol}>
+            <View style={[styles.groupedBar, { height: Math.max(4, (row.lowCount / maxLow) * barMaxHeight), width: barWidth, backgroundColor: "#22C55E" }]} />
+            <Text style={styles.groupedBarVal}>{row.lowCount}</Text>
+          </View>
+          <View style={styles.groupedBarCol}>
+            <View style={[styles.groupedBar, { height: Math.max(4, (row.normalCount / maxNormal) * barMaxHeight), width: barWidth, backgroundColor: "#F59E0B" }]} />
+            <Text style={styles.groupedBarVal}>{row.normalCount}</Text>
+          </View>
+          <View style={styles.groupedBarCol}>
+            <View style={[styles.groupedBar, { height: Math.max(4, (row.highCount / maxHigh) * barMaxHeight), width: barWidth, backgroundColor: "#EF4444" }]} />
+            <Text style={styles.groupedBarVal}>{row.highCount}</Text>
+          </View>
         </View>
 
         {/* Department label below */}
@@ -1004,22 +1139,24 @@ export default function AdminPanelScreen() {
         </Text>
         <View style={styles.donutContainer}>
           {/* Arc-based donut ring */}
-          <View style={styles.donutRing}>
-            {segments.map((seg, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.donutArcSegment,
-                  {
-                    backgroundColor: seg.color,
-                    transform: [{ rotate: `${seg.rotation}deg` }],
-                  },
-                ]}
-              />
-            ))}
-            <View style={styles.donutHole}>
-              <Text style={styles.donutHoleValue}>{totalAssessed}</Text>
-              <Text style={styles.donutHoleLabel}>Assessed</Text>
+          <View style={styles.donutRingWrap}>
+            <View style={styles.donutRing}>
+              {segments.map((seg, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.donutArcSegment,
+                    {
+                      backgroundColor: seg.color,
+                      transform: [{ rotate: `${seg.rotation}deg` }],
+                    },
+                  ]}
+                />
+              ))}
+              <View style={styles.donutHole}>
+                <Text style={styles.donutHoleValue}>{totalAssessed}</Text>
+                <Text style={styles.donutHoleLabel}>Assessed</Text>
+              </View>
             </View>
           </View>
           <View style={styles.donutLegend}>
@@ -1037,9 +1174,10 @@ export default function AdminPanelScreen() {
                 <View
                   style={[styles.donutDot, { backgroundColor: slice.color }]}
                 />
-                <Text style={styles.donutLegendText}>
-                  {slice.label}: {slice.value}%
+                <Text style={styles.donutLegendText} numberOfLines={1}>
+                  {slice.label}
                 </Text>
+                <Text style={styles.donutLegendValue}>{slice.value}%</Text>
               </Pressable>
             ))}
           </View>
@@ -1065,64 +1203,48 @@ export default function AdminPanelScreen() {
       >
         <Text style={styles.bottomWidgetTitle}>Survey Assessment Status</Text>
         <View style={styles.radialContainer}>
-          <View style={styles.radialRing}>
-            {/* Not completed arc (red) — full circle base */}
-            {notCompletedPct > 0 && (
-              <View
-                style={[
-                  styles.radialArcSegment,
-                  {
-                    backgroundColor: "#EF4444",
-                    transform: [{ rotate: "0deg" }],
-                  },
-                ]}
-              />
-            )}
-            {/* Completed arc (purple) — rotated to start after red */}
-            {clampedPct > 0 && (
-              <View
-                style={[
-                  styles.radialArcSegment,
-                  {
-                    backgroundColor: "#7C3AED",
-                    transform: [{ rotate: `${completedAngle}deg` }],
-                  },
-                ]}
-              />
-            )}
-            <View style={styles.radialHole}>
-              <Text style={styles.radialPctText}>{clampedPct}%</Text>
-              <Text style={styles.radialLabelText}>Completed</Text>
+          <View style={styles.radialRingWrap}>
+            <View style={styles.radialRing}>
+              {notCompletedPct > 0 && (
+                <View
+                  style={[
+                    styles.radialArcSegment,
+                    {
+                      backgroundColor: "#EF4444",
+                      transform: [{ rotate: "0deg" }],
+                    },
+                  ]}
+                />
+              )}
+              {clampedPct > 0 && (
+                <View
+                  style={[
+                    styles.radialArcSegment,
+                    {
+                      backgroundColor: "#7C3AED",
+                      transform: [{ rotate: `${completedAngle}deg` }],
+                    },
+                  ]}
+                />
+              )}
+              <View style={styles.radialHole}>
+                <Text style={styles.radialPctText}>{clampedPct}%</Text>
+                <Text style={styles.radialLabelText}>Completed</Text>
+              </View>
             </View>
           </View>
-          {/* Legend */}
           <View style={styles.radialLegend}>
             <View style={styles.radialLegendItem}>
-              <View
-                style={[
-                  styles.radialLegendDot,
-                  { backgroundColor: "#7C3AED" },
-                ]}
-              />
-              <Text style={styles.radialLegendText}>
-                Took assessment ({clampedPct}%)
-              </Text>
+              <View style={[styles.radialLegendDot, { backgroundColor: "#7C3AED" }]} />
+              <Text style={styles.radialLegendText} numberOfLines={1}>Took assessment</Text>
+              <Text style={styles.radialLegendValue}>{clampedPct}%</Text>
             </View>
             <View style={styles.radialLegendItem}>
-              <View
-                style={[
-                  styles.radialLegendDot,
-                  { backgroundColor: "#EF4444" },
-                ]}
-              />
-              <Text style={styles.radialLegendText}>
-                Did not take ({notCompletedPct}%)
-              </Text>
+              <View style={[styles.radialLegendDot, { backgroundColor: "#EF4444" }]} />
+              <Text style={styles.radialLegendText} numberOfLines={1}>Did not take</Text>
+              <Text style={styles.radialLegendValue}>{notCompletedPct}%</Text>
             </View>
           </View>
-          <Text style={styles.radialFooterText}>
-            Students who took assessment
-          </Text>
         </View>
       </Pressable>
     );
@@ -1402,9 +1524,12 @@ export default function AdminPanelScreen() {
                         >
                           <View style={styles.studentHeader}>
                             <View style={styles.studentIdentityBlock}>
-                              <Text style={styles.studentName}>
-                                {student.name}
-                              </Text>
+                              <View style={styles.studentNameRow}>
+                                <Text style={styles.studentName}>
+                                  {student.name}
+                                </Text>
+                                <Ionicons name="chevron-forward" size={14} color="#8A63D2" />
+                              </View>
                               <Text style={styles.studentMeta}>
                                 {student.yearLevel}
                               </Text>
@@ -1569,9 +1694,25 @@ export default function AdminPanelScreen() {
                 </>
               ) : activeTab === "announcements" ? (
                 <>
-                  <View style={styles.lookupCard}>
+                    <View style={styles.lookupCard}>
                     <View style={styles.lookupHeader}>
-                      <Text style={styles.sectionTitle}>Create Announcement</Text>
+                      <Text style={styles.sectionTitle}>{editingAnnouncementId ? "Edit Announcement" : "Create Announcement"}</Text>
+                      {editingAnnouncementId && (
+                        <Pressable
+                          style={styles.editAnnouncementBtn}
+                          onPress={() => {
+                            setEditingAnnouncementId(null);
+                            setAnnouncementTitle("");
+                            setAnnouncementDescription("");
+                            setAnnouncementLinks([]);
+                            setAnnouncementDepartments(["ALL"]);
+                            setAnnouncementError(null);
+                          }}
+                        >
+                          <Ionicons name="close-circle" size={18} color="#EF4444" />
+                          <Text style={styles.editAnnouncementBtnText}>Cancel</Text>
+                        </Pressable>
+                      )}
                     </View>
                     <View style={styles.formGroup}>
                       <Text style={styles.formLabel}>Title</Text>
@@ -1594,6 +1735,32 @@ export default function AdminPanelScreen() {
                         multiline
                         numberOfLines={4}
                       />
+                    </View>
+                    <View style={styles.formGroup}>
+                      <Text style={styles.formLabel}>Target Departments</Text>
+                      <View style={styles.deptChipRow}>
+                        <Pressable
+                          style={[
+                            styles.deptChip,
+                            announcementDepartments.includes("ALL") && styles.deptChipActive,
+                          ]}
+                          onPress={() => toggleDepartment("ALL")}
+                        >
+                          <Text style={[styles.deptChipText, announcementDepartments.includes("ALL") && styles.deptChipTextActive]}>All Departments</Text>
+                        </Pressable>
+                        {DEPARTMENTS.map((code) => (
+                          <Pressable
+                            key={code}
+                            style={[
+                              styles.deptChip,
+                              announcementDepartments.includes(code) && styles.deptChipActive,
+                            ]}
+                            onPress={() => toggleDepartment(code)}
+                          >
+                            <Text style={[styles.deptChipText, announcementDepartments.includes(code) && styles.deptChipTextActive]}>{code}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
                     </View>
                     <View style={styles.formGroup}>
                       <Text style={styles.formLabel}>Links (optional)</Text>
@@ -1655,18 +1822,35 @@ export default function AdminPanelScreen() {
                         try {
                           const adminDoc = await getDoc(doc(db, "admins", user!.uid));
                           const adminData = adminDoc.data();
-                          await createAnnouncement({
-                            title: announcementTitle.trim(),
-                            description: announcementDescription.trim(),
-                            links: validLinks,
-                            authorName: user!.displayName || adminData?.displayName || "Admin",
-                            adminId: user!.uid,
-                            authorPosition: adminData?.position || undefined,
-                          });
+                          const targetDepartments = announcementDepartments.includes("ALL")
+                            ? ["ALL"]
+                            : announcementDepartments;
+                          if (editingAnnouncementId) {
+                            await updateAnnouncement(editingAnnouncementId, {
+                              title: announcementTitle.trim(),
+                              description: announcementDescription.trim(),
+                              links: validLinks,
+                              authorName: user!.displayName || adminData?.displayName || "Admin",
+                              authorPosition: adminData?.position || undefined,
+                              targetDepartments,
+                            });
+                          } else {
+                            await createAnnouncement({
+                              title: announcementTitle.trim(),
+                              description: announcementDescription.trim(),
+                              links: validLinks,
+                              authorName: user!.displayName || adminData?.displayName || "Admin",
+                              adminId: user!.uid,
+                              authorPosition: adminData?.position || undefined,
+                              targetDepartments,
+                            });
+                          }
                           setAnnouncementTitle("");
                           setAnnouncementDescription("");
                           setAnnouncementLinks([]);
-                          Alert.alert("Success", "Announcement posted.");
+                          setAnnouncementDepartments(["ALL"]);
+                          setEditingAnnouncementId(null);
+                          Alert.alert("Success", editingAnnouncementId ? "Announcement updated." : "Announcement posted.");
                         } catch (err) {
                           setAnnouncementError(err instanceof Error ? err.message : "Failed to post.");
                         } finally {
@@ -1678,7 +1862,7 @@ export default function AdminPanelScreen() {
                       {creatingAnnouncement ? (
                         <ActivityIndicator color="white" />
                       ) : (
-                        <Text style={styles.postButtonText}>Post Announcement</Text>
+                        <Text style={styles.postButtonText}>{editingAnnouncementId ? "Update Announcement" : "Post Announcement"}</Text>
                       )}
                     </Pressable>
                   </View>
@@ -1706,6 +1890,16 @@ export default function AdminPanelScreen() {
                             ))}
                           </View>
                         )}
+                        {!a.targetDepartments.includes("ALL") && (
+                          <View style={styles.announcementDeptRow}>
+                            {a.targetDepartments.map((dept) => (
+                              <View key={dept} style={styles.expiryBadge}>
+                                <Ionicons name="people-outline" size={12} color="#8A63D2" />
+                                <Text style={styles.expiryText}>{dept}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
                         <View style={styles.announcementCardFooter}>
                           <View style={{ flex: 1 }}>
                             <Text style={styles.announcementCardMeta}>
@@ -1721,6 +1915,19 @@ export default function AdminPanelScreen() {
                               {getDaysRemaining(a.expiresAt)}d left
                             </Text>
                           </View>
+                          <Pressable
+                            style={styles.editAnnouncementBtn}
+                            onPress={() => {
+                              setEditingAnnouncementId(a.id);
+                              setAnnouncementTitle(a.title);
+                              setAnnouncementDescription(a.description);
+                              setAnnouncementLinks(a.links.map((l) => ({ ...l })));
+                              setAnnouncementDepartments([...a.targetDepartments]);
+                              setAnnouncementError(null);
+                            }}
+                          >
+                            <Ionicons name="pencil-outline" size={16} color="#8A63D2" />
+                          </Pressable>
                           <Pressable
                             style={styles.deleteAnnouncementBtn}
                             onPress={() => setDeleteAnnounceId(a.id)}
@@ -1780,6 +1987,41 @@ export default function AdminPanelScreen() {
                     </View>
                   </LinearGradient>
 
+                  {/* ─── SECTION: Advanced Analytics Navigation ──────────── */}
+                  <Text style={styles.sectionHeader}>Advanced Analytics</Text>
+                  <View style={[styles.analyticsNavRow, isWide && { gap: 20 }]}>
+                    <Pressable
+                      style={({ pressed }) => [styles.analyticsNavCard, pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 }]}
+                      onPress={() => router.push("/(admin)/analytics/stress-heatmap")}
+                    >
+                      <View style={[styles.analyticsNavIcon, { backgroundColor: "#FEE2E2" }]}>
+                        <Ionicons name="grid" size={22} color="#DC2626" />
+                      </View>
+                      <Text style={styles.analyticsNavTitle}>Stress Heatmap</Text>
+                      <Text style={styles.analyticsNavDesc}>Color-coded intensity grid across days and hours</Text>
+                    </Pressable>
+                    <Pressable
+                      style={({ pressed }) => [styles.analyticsNavCard, pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 }]}
+                      onPress={() => router.push("/(admin)/analytics/mood-analytics")}
+                    >
+                      <View style={[styles.analyticsNavIcon, { backgroundColor: "#DCFCE7" }]}>
+                        <Ionicons name="pie-chart" size={22} color="#16A34A" />
+                      </View>
+                      <Text style={styles.analyticsNavTitle}>Mood & Assessment</Text>
+                      <Text style={styles.analyticsNavDesc}>Donut gauges and stacked mood distribution bars</Text>
+                    </Pressable>
+                    <Pressable
+                      style={({ pressed }) => [styles.analyticsNavCard, pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 }]}
+                      onPress={() => router.push("/(admin)/analytics/risk-trends")}
+                    >
+                      <View style={[styles.analyticsNavIcon, { backgroundColor: "#FEF3C7" }]}>
+                        <Ionicons name="trending-up" size={22} color="#D97706" />
+                      </View>
+                      <Text style={styles.analyticsNavTitle}>Risk Variance</Text>
+                      <Text style={styles.analyticsNavDesc}>Box & whisker charts with outlier detection</Text>
+                    </Pressable>
+                  </View>
+
                   {/* ─── SECTION 1: Overall Summary KPIs ──────────────────── */}
                   <Text style={styles.sectionHeader}>Overall Summary</Text>
                   <View style={[styles.kpiRow, isWide && styles.kpiRowWide]}>
@@ -1796,68 +2038,122 @@ export default function AdminPanelScreen() {
                     {riskTrendKpiData.map((kpi, i) => renderKpiCard(kpi, i))}
                   </View>
 
-                  {/* ─── SECTION 3: Department Bar Chart ───────────────────── */}
-                  <Text style={styles.sectionHeader}>
-                    Assessment Participation by Department
-                  </Text>
-                  <View style={[styles.barChartContainer, isWide && styles.barChartContainerWide]}>
-                    {/* Legend */}
-                    <View style={styles.barLegend}>
-                      <View style={styles.barLegendItem}>
-                        <View
-                          style={[
-                            styles.barLegendDot,
-                            { backgroundColor: "#22C55E" },
-                          ]}
-                        />
-                        <Text style={styles.barLegendText}>Low</Text>
+                  {/* ─── SECTION 3: Assessment Participation by Department ── */}
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionHeader}>
+                      Assessment Participation by Department
+                    </Text>
+                    <View style={styles.yearLevelFilterRow}>
+                      <Ionicons name="funnel-outline" size={14} color="#8A63D2" />
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.yearLevelScroll}>
+                        {yearLevelOptions.map((level) => (
+                          <Pressable
+                            key={level}
+                            style={[
+                              styles.yearLevelChip,
+                              yearLevelFilter === level && styles.yearLevelChipActive,
+                            ]}
+                            onPress={() => setYearLevelFilter(level)}
+                          >
+                            <Text
+                              style={[
+                                styles.yearLevelChipText,
+                                yearLevelFilter === level && styles.yearLevelChipTextActive,
+                              ]}
+                            >
+                              {level}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  </View>
+                  <View style={[styles.assessmentParticipationRow, isWide && styles.assessmentParticipationRowWide]}>
+                    <View style={[styles.barChartContainer, isWide && { flex: 1, marginBottom: 0 }]}>
+                      {/* Legend */}
+                      <View style={styles.barLegend}>
+                        <View style={styles.barLegendItem}>
+                          <View style={[styles.barLegendDot, { backgroundColor: "#22C55E" }]} />
+                          <Text style={styles.barLegendText}>Low</Text>
+                        </View>
+                        <View style={styles.barLegendItem}>
+                          <View style={[styles.barLegendDot, { backgroundColor: "#F59E0B" }]} />
+                          <Text style={styles.barLegendText}>Moderate</Text>
+                        </View>
+                        <View style={styles.barLegendItem}>
+                          <View style={[styles.barLegendDot, { backgroundColor: "#EF4444" }]} />
+                          <Text style={styles.barLegendText}>High</Text>
+                        </View>
                       </View>
-                      <View style={styles.barLegendItem}>
-                        <View
-                          style={[
-                            styles.barLegendDot,
-                            { backgroundColor: "#F59E0B" },
-                          ]}
-                        />
-                        <Text style={styles.barLegendText}>Moderate</Text>
-                      </View>
-                      <View style={styles.barLegendItem}>
-                        <View
-                          style={[
-                            styles.barLegendDot,
-                            { backgroundColor: "#EF4444" },
-                          ]}
-                        />
-                        <Text style={styles.barLegendText}>High</Text>
-                      </View>
+
+                      {departmentRows.length === 0 ? (
+                        <View style={styles.stateCard}>
+                          <Text style={styles.stateText}>
+                            No department data available yet.
+                          </Text>
+                        </View>
+                      ) : (
+                        <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.barChartScrollRow}>
+                          <View style={styles.barChartRow}>
+                            {(() => {
+                              const totalAllDepts = departmentRows.reduce(
+                                (sum, r) => sum + r.totalStudents,
+                                0,
+                              );
+                              const maxLow = Math.max(
+                                ...departmentRows.map((r) => r.lowCount),
+                                1,
+                              );
+                              const maxNormal = Math.max(
+                                ...departmentRows.map((r) => r.normalCount),
+                                1,
+                              );
+                              const maxHigh = Math.max(
+                                ...departmentRows.map((r) => r.highCount),
+                                1,
+                              );
+                              const deptCount = departmentRows.length;
+                              return departmentRows.map((row) =>
+                                renderDepartmentRow(
+                                  row,
+                                  totalAllDepts,
+                                  maxLow,
+                                  maxNormal,
+                                  maxHigh,
+                                  deptCount,
+                                ),
+                              );
+                            })()}
+                          </View>
+                        </ScrollView>
+                      )}
                     </View>
 
-                    {departmentRows.length === 0 ? (
-                      <View style={styles.stateCard}>
-                        <Text style={styles.stateText}>
-                          No department data available yet.
-                        </Text>
+                    {/* Risk Threshold Legend */}
+                    <View style={[styles.thresholdCard, isWide && { marginBottom: 0, width: 280, flexShrink: 0 }]}>
+                      <View style={styles.thresholdHeader}>
+                        <Ionicons name="information-circle-outline" size={18} color="#8A63D2" />
+                        <Text style={styles.thresholdTitle}>How Risk Levels Are Determined</Text>
                       </View>
-                    ) : (
-                      <View style={styles.barChartRow}>
-                        {(() => {
-                          const totalAllDepts = departmentRows.reduce(
-                            (sum, r) => sum + r.totalStudents,
-                            0,
-                          );
-                          const maxDeptCount = Math.max(
-                            ...departmentRows.map((r) => r.totalStudents),
-                          );
-                          return departmentRows.map((row) =>
-                            renderDepartmentRow(
-                              row,
-                              totalAllDepts,
-                              maxDeptCount,
-                            ),
-                          );
-                        })()}
+                      <Text style={styles.thresholdDescription}>
+                        Each student's risk level is calculated from their latest WEMWBS assessment score (out of 80):
+                      </Text>
+                      <View style={styles.thresholdRow}>
+                        <View style={[styles.thresholdDot, { backgroundColor: "#22C55E" }]} />
+                        <Text style={styles.thresholdLabel}>Low (0–20)</Text>
+                        <Text style={styles.thresholdDetail}>— Healthy range, routine monitoring</Text>
                       </View>
-                    )}
+                      <View style={styles.thresholdRow}>
+                        <View style={[styles.thresholdDot, { backgroundColor: "#F59E0B" }]} />
+                        <Text style={styles.thresholdLabel}>Moderate (21–50)</Text>
+                        <Text style={styles.thresholdDetail}>— Some distress indicators, may need support</Text>
+                      </View>
+                      <View style={styles.thresholdRow}>
+                        <View style={[styles.thresholdDot, { backgroundColor: "#EF4444" }]} />
+                        <Text style={styles.thresholdLabel}>High (51–80)</Text>
+                        <Text style={styles.thresholdDetail}>— Significant distress, intervention recommended</Text>
+                      </View>
+                    </View>
                   </View>
 
                   {/* ─── SECTION 4: Department Insights ──────────────────── */}
@@ -1866,6 +2162,7 @@ export default function AdminPanelScreen() {
                       <Text style={styles.sectionHeader}>
                         Department Insights
                       </Text>
+                      {/* Existing KPI cards */}
                       <View style={styles.deptKpiSection}>
                         <View style={styles.deptKpiGrid}>
                           {perDepartmentKpiData.map((kpi, i) =>
@@ -1873,6 +2170,24 @@ export default function AdminPanelScreen() {
                           )}
                         </View>
                       </View>
+                      {/* Scatter plot – correlation analysis */}
+                      {scatterPlotData.length > 1 && (
+                        <View style={[styles.insightsEnlargedCard, { marginTop: 16 }]}>
+                          <View style={styles.insightsEnlargedHeader}>
+                            <Ionicons name="analytics" size={18} color="#8A63D2" />
+                            <Text style={styles.insightsEnlargedTitle}>
+                              Score vs Journal Frequency Correlation
+                            </Text>
+                          </View>
+                          <Text style={styles.insightsEnlargedSubtitle}>
+                            Each student plotted by assessment severity (Y) and journal activity (X).
+                            High-risk outliers appear in the upper region.
+                          </Text>
+                          <View style={styles.chartContainer}>
+                            <DepartmentCorrelationScatter points={scatterPlotData} />
+                          </View>
+                        </View>
+                      )}
                     </>
                   )}
 
@@ -1882,11 +2197,26 @@ export default function AdminPanelScreen() {
                       <Text style={styles.sectionHeader}>
                         Department Comparison
                       </Text>
+                      {/* Existing comparison insight cards */}
                       <View style={styles.comparisonInsightRow}>
                         {comparisonInsightData.map((insight, i) =>
                           renderComparisonInsightCard(insight, i),
                         )}
                       </View>
+                      {/* Grouped bar / radar chart */}
+                      {deptComparisonChartData.length > 1 && (
+                        <View style={styles.insightsEnlargedCard}>
+                          <View style={styles.insightsEnlargedHeader}>
+                            <Ionicons name="bar-chart" size={18} color="#8A63D2" />
+                            <Text style={styles.insightsEnlargedTitle}>
+                              Multi-Metric Department Comparison
+                            </Text>
+                          </View>
+                          <View style={styles.chartContainer}>
+                            <DepartmentComparisonChart data={deptComparisonChartData} />
+                          </View>
+                        </View>
+                      )}
                     </>
                   )}
 
@@ -2414,6 +2744,57 @@ const styles = StyleSheet.create({
     marginTop: 12,
     letterSpacing: 0.3,
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 14,
+    marginTop: 12,
+  },
+  yearLevelFilterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+  },
+  yearLevelScroll: { flex: 1 },
+  yearLevelChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: "#F3EEFF",
+    marginRight: 6,
+  },
+  yearLevelChipActive: {
+    backgroundColor: "#8A63D2",
+  },
+  yearLevelChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#6D5BBF",
+  },
+  yearLevelChipTextActive: {
+    color: "white",
+  },
+  deptChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: "#F3EEFF",
+    marginRight: 6,
+  },
+  deptChipActive: {
+    backgroundColor: "#8A63D2",
+  },
+  deptChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#6D5BBF",
+  },
+  deptChipTextActive: {
+    color: "white",
+  },
   kpiRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -2472,6 +2853,90 @@ const styles = StyleSheet.create({
     color: "#8B5CF6",
     fontWeight: "600",
   },
+  // ─── Risk Threshold Legend ──────────────────────────────────────────────
+  thresholdCard: {
+    backgroundColor: "white",
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 28,
+    borderWidth: 1,
+    borderColor: "rgba(138, 99, 210, 0.1)",
+  },
+  thresholdHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  thresholdTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#1E1B4B",
+  },
+  thresholdDescription: {
+    fontSize: 13,
+    color: "#64748B",
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+  thresholdRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  thresholdDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  thresholdLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1E1B4B",
+    minWidth: 110,
+  },
+  thresholdDetail: {
+    fontSize: 13,
+    color: "#64748B",
+    flex: 1,
+  },
+  // ─── Advanced Analytics Navigation ──────────────────────────────────────
+  analyticsNavRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 24,
+  },
+  analyticsNavCard: {
+    flex: 1,
+    minWidth: 200,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.10)",
+    gap: 8,
+  },
+  analyticsNavIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  analyticsNavTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#1E1B4B",
+  },
+  analyticsNavDesc: {
+    fontSize: 12,
+    color: "#64748B",
+    lineHeight: 17,
+  },
   // ─── Summary KPI Cards ─────────────────────────────────────────────────
   summaryKpiCard: {
     width: "48%",
@@ -2525,43 +2990,68 @@ const styles = StyleSheet.create({
   deptKpiGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 14,
   },
   deptKpiCard: {
     flexGrow: 1,
-    flexBasis: "45%",
-    minWidth: 0,
+    flexBasis: "46%",
+    minWidth: 220,
     backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 18,
+    padding: 18,
     borderWidth: 1,
     borderColor: "#EDE9FE",
-    gap: 8,
+    gap: 10,
   },
   deptKpiCardTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "800",
     color: "#581C87",
   },
   deptKpiMetricsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 6,
+    gap: 8,
   },
   deptKpiMetric: {
     flexGrow: 1,
-    flexBasis: "45%",
+    flexBasis: "46%",
     minWidth: 0,
   },
   deptKpiMetricLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "700",
     color: "#94A3B8",
     textTransform: "uppercase",
   },
   deptKpiMetricValue: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: "800",
+  },
+  deptKpiMetricSpark: {
+    flexGrow: 1,
+    flexBasis: "46%",
+    minWidth: 0,
+    gap: 4,
+  },
+  sparklineRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  sparklineValue: {
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  sparklineTrack: {
+    height: 4,
+    backgroundColor: "#F3EAFF",
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  sparklineFill: {
+    height: "100%",
+    borderRadius: 2,
   },
   // ─── Comparison Insight Cards ───────────────────────────────────────────
   comparisonInsightRow: {
@@ -2571,10 +3061,11 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   comparisonInsightCard: {
-    width: "48%",
-    minWidth: "47%",
+    flexGrow: 1,
+    flexBasis: "46%",
+    minWidth: 200,
     borderRadius: 20,
-    padding: 16,
+    padding: 18,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#E9D5FF",
@@ -2589,26 +3080,26 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   comparisonInsightIconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
   comparisonInsightLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "700",
     color: "#94A3B8",
     textTransform: "uppercase",
     flex: 1,
   },
   comparisonInsightDept: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: "800",
     color: "#3B0764",
   },
   comparisonInsightValue: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "700",
   },
   // ─── Department Bar Chart Styles ───────────────────────────────────────
@@ -2646,29 +3137,31 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#6B21A8",
   },
+  barChartScrollRow: {
+    marginBottom: 4,
+  },
   barChartRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 10,
+    gap: 14,
     alignItems: "flex-end",
-    minHeight: 200,
+    minHeight: 220,
+    paddingHorizontal: 8,
+    paddingBottom: 4,
   },
   barColumn: {
     alignItems: "center",
-    width: 64,
-    gap: 4,
+    gap: 6,
   },
   barPctTop: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: "800",
     color: "#581C87",
   },
   barTrack: {
-    width: 36,
-    height: 140,
+    width: 48,
+    height: 180,
     backgroundColor: "#F3EAFF",
-    borderRadius: 8,
+    borderRadius: 10,
     flexDirection: "column",
     justifyContent: "flex-end",
     overflow: "hidden",
@@ -2681,15 +3174,15 @@ const styles = StyleSheet.create({
     borderTopColor: "rgba(255,255,255,0.4)",
   },
   barDeptLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "800",
     color: "#581C87",
     textAlign: "center",
-    marginTop: 2,
+    marginTop: 4,
   },
   barCountLabel: {
-    fontSize: 9,
-    fontWeight: "600",
+    fontSize: 10,
+    fontWeight: "700",
     color: "#8B5CF6",
     textAlign: "center",
   },
@@ -2699,13 +3192,46 @@ const styles = StyleSheet.create({
     gap: 16,
     marginBottom: 24,
   },
+
+  // ─── Enlarged Insights / Comparison Cards ────────────────────────────
+  insightsEnlargedCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+    // @ts-ignore
+    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.10)",
+    elevation: 4,
+  },
+  insightsEnlargedHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6,
+  },
+  insightsEnlargedTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#2D1B69",
+  },
+  insightsEnlargedSubtitle: {
+    fontSize: 12,
+    color: "#94A3B8",
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+  chartContainer: {
+    minHeight: 200,
+  },
   bottomWidget: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
-    padding: 18,
+    padding: 20,
     width: "48%",
     flex: 1,
-    minWidth: 200,
+    minWidth: 220,
     borderWidth: 1,
     borderColor: "#E9D5FF",
     boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.10)",
@@ -2721,7 +3247,11 @@ const styles = StyleSheet.create({
   donutContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
+    gap: 12,
+  },
+  donutRingWrap: {
+    alignItems: "center",
+    justifyContent: "center",
   },
   donutRing: {
     width: 110,
@@ -2769,26 +3299,41 @@ const styles = StyleSheet.create({
   },
   donutLegend: {
     flex: 1,
-    gap: 8,
+    gap: 10,
+    minWidth: 120,
   },
   donutLegendItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    paddingVertical: 2,
   },
   donutDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
+    flexShrink: 0,
   },
   donutLegendText: {
     fontSize: 12,
     fontWeight: "600",
     color: "#6B21A8",
+    flex: 1,
+  },
+  donutLegendValue: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#2D1B69",
+    minWidth: 40,
+    textAlign: "right",
   },
   radialContainer: {
     alignItems: "center",
-    gap: 12,
+    gap: 14,
+  },
+  radialRingWrap: {
+    alignItems: "center",
+    justifyContent: "center",
   },
   radialRing: {
     width: 120,
@@ -2831,32 +3376,38 @@ const styles = StyleSheet.create({
     color: "#8B5CF6",
     textTransform: "uppercase",
   },
-  radialFooterText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#8B5CF6",
-    textAlign: "center",
-    marginTop: 4,
-  },
   radialLegend: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 14,
+    flexDirection: "column",
+    gap: 8,
+    width: "100%",
   },
   radialLegendItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: "#FDFBFF",
+    borderRadius: 8,
   },
   radialLegendDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
+    flexShrink: 0,
   },
   radialLegendText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "700",
     color: "#6B21A8",
+    flex: 1,
+  },
+  radialLegendValue: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#2D1B69",
+    minWidth: 36,
+    textAlign: "right",
   },
   compChartContainer: {
     flexDirection: "row",
@@ -2963,7 +3514,8 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     maxWidth: "45%",
   },
-  studentName: { fontSize: 16, fontWeight: "800", color: "#0F172A" },
+  studentName: { fontSize: 16, fontWeight: "800", color: "#8A63D2" },
+  studentNameRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   studentId: {
     fontSize: 13,
     fontWeight: "800",
@@ -3273,6 +3825,19 @@ const styles = StyleSheet.create({
   },
   expiryText: { fontSize: 11, fontWeight: "600", color: "#8A63D2" },
   deleteAnnouncementBtn: { padding: 8, borderRadius: 10, backgroundColor: "#FEF2F2" },
+  editAnnouncementBtn: { padding: 8, borderRadius: 10, backgroundColor: "#F3EEFF" },
+  editAnnouncementBtnText: { fontSize: 12, fontWeight: "600", color: "#EF4444", marginLeft: 4 },
+  deptChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  announcementDeptRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    marginBottom: 12,
+  },
   dropdownContainer: {
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
@@ -3351,5 +3916,31 @@ const styles = StyleSheet.create({
     ...(shadows.custom(4, 6, 0.3, 10, "#000") as any),
     zIndex: 999,
     overflow: "visible",
+  },
+  assessmentParticipationRow: {
+    flexDirection: "column",
+    gap: 16,
+    marginBottom: 24,
+  },
+  assessmentParticipationRowWide: {
+    flexDirection: "row",
+    alignItems: "stretch",
+  },
+  groupedBarRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 3,
+  },
+  groupedBarCol: {
+    alignItems: "center",
+    gap: 2,
+  },
+  groupedBar: {
+    borderRadius: 4,
+  },
+  groupedBarVal: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#64748B",
   },
 });

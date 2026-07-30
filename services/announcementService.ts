@@ -17,6 +17,7 @@ import type {
   Announcement,
   AnnouncementLink,
   CreateAnnouncementPayload,
+  UpdateAnnouncementPayload,
 } from "@/types/announcement";
 
 const EXPIRY_DAYS = 7;
@@ -55,10 +56,31 @@ export async function createAnnouncement(
     authorName: payload.authorName,
     adminId: payload.adminId,
     authorPosition: payload.authorPosition || null,
+    targetDepartments: payload.targetDepartments,
     createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
     expiresAt: now + EXPIRY_MS,
   });
   return docRef.id;
+}
+
+export async function updateAnnouncement(
+  announcementId: string,
+  payload: UpdateAnnouncementPayload,
+): Promise<void> {
+  await setDoc(
+    doc(db, "announcements", announcementId),
+    {
+      title: payload.title,
+      description: payload.description,
+      links: payload.links,
+      authorName: payload.authorName,
+      authorPosition: payload.authorPosition || null,
+      targetDepartments: payload.targetDepartments,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
 }
 
 export function listenForAnnouncements(
@@ -85,6 +107,7 @@ export function listenForAnnouncements(
           authorName: data.authorName || "Admin",
           adminId: data.adminId || "",
           authorPosition: data.authorPosition || undefined,
+          targetDepartments: Array.isArray(data.targetDepartments) ? data.targetDepartments : ["ALL"],
         };
       })
       .filter((a) => a.expiresAt.getTime() > now);

@@ -144,6 +144,38 @@ export default function DailyJournalScreen() {
           onSelectedDateChange={setSelectedDate}
         />
 
+        {/* Write Journal Button for Today */}
+        <Pressable
+          style={styles.writeJournalBtn}
+          onPress={() => {
+            const today = new Date();
+            const existing = getEntryForDate(today);
+            if (existing) {
+              router.push({
+                pathname: "/journal-detail",
+                params: { id: existing.id },
+              });
+            } else {
+              router.push({
+                pathname: "/new-journal-entry",
+                params: { date: today.toISOString() },
+              });
+            }
+          }}
+        >
+          <LinearGradient
+            colors={["#9C7EEB", "#8A63D2"]}
+            style={styles.writeJournalGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            <Ionicons name="create-outline" size={20} color="white" />
+            <Text style={styles.writeJournalBtnText}>
+              {getEntryForDate(new Date()) ? "View Today's Journal" : "Write Today's Journal"}
+            </Text>
+          </LinearGradient>
+        </Pressable>
+
         {/* Emotional Wellness Chart */}
         <View style={styles.wellnessCard}>
           <View style={styles.wellnessHeader}>
@@ -255,5 +287,22 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     paddingLeft: 4,
     paddingRight: 10,
+  },
+  writeJournalBtn: {
+    borderRadius: 14,
+    overflow: "hidden",
+    marginBottom: 20,
+  },
+  writeJournalGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    gap: 8,
+  },
+  writeJournalBtnText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

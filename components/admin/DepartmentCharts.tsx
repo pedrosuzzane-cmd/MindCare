@@ -1,0 +1,416 @@
+import { Ionicons } from "@expo/vector-icons";
+import React, { useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+
+// ─── Types ────────────────────────────────────────────────────────────────
+export interface DeptComparisonMetric {
+  deptAbbr: string;
+  deptName: string;
+  avgScore: number;
+  journalCount: number;
+  lsnCount: number;
+  assessmentCount: number;
+  participationRate: number;
+}
+
+export interface ScatterPoint {
+  studentId: string;
+  department: string;
+  journalCount: number;
+  avgScore: number;
+  riskLevel: "low" | "normal" | "high";
+}
+
+const RADAR_COLORS = ["#8A63D2", "#16A34A", "#D97706", "#EF4444", "#0EA5E9", "#EC4899"];
+
+// ─── Component: DepartmentComparisonChart ──────────────────────────────────
+interface ComparisonChartProps {
+  data: DeptComparisonMetric[];
+}
+
+export function DepartmentComparisonChart({ data }: ComparisonChartProps) {
+  const [chartMode, setChartMode] = useState<"bar" | "radar">("bar");
+
+  if (data.length === 0) {
+    return (
+      <View style={styles.emptyCard}>
+        <Ionicons name="bar-chart-outline" size={32} color="#CBD5E1" />
+        <Text style={styles.emptyText}>No department data available</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      <View style={styles.chartToggle}>
+        <Pressable
+          style={[styles.toggleBtn, chartMode === "bar" && styles.toggleBtnActive]}
+          onPress={() => setChartMode("bar")}
+        >
+          <Text style={[styles.toggleText, chartMode === "bar" && styles.toggleTextActive]}>Grouped Bar</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.toggleBtn, chartMode === "radar" && styles.toggleBtnActive]}
+          onPress={() => setChartMode("radar")}
+        >
+          <Text style={[styles.toggleText, chartMode === "radar" && styles.toggleTextActive]}>Radar</Text>
+        </Pressable>
+      </View>
+      {chartMode === "bar" ? renderMobileBar(data) : renderMobileRadar(data, RADAR_COLORS)}
+    </View>
+  );
+}
+
+// ─── Component: DepartmentCorrelationScatter ───────────────────────────────
+interface ScatterPlotProps {
+  points: ScatterPoint[];
+}
+
+function deptAbbr(full: string): string {
+  const match = full.match(/\(([^)]+)\)/);
+  return match ? match[1] : full.split(" ").slice(0, 3).join(" ");
+}
+
+export function DepartmentCorrelationScatter({ points }: ScatterPlotProps) {
+  const deptColors: Record<string, string> = {};
+  const uniqueDepts = [...new Set(points.map((p) => p.department))];
+  const palette = ["#8A63D2", "#16A34A", "#D97706", "#0EA5E9", "#EC4899", "#F97316", "#06B6D4"];
+  uniqueDepts.forEach((d, i) => {
+    deptColors[d] = palette[i % palette.length];
+  });
+  return renderMobileScatter(points, deptColors);
+}
+
+// ─── Mobile Renderers ──────────────────────────────────────────────────────
+function renderMobileBar(data: DeptComparisonMetric[]) {
+  const maxScore = Math.max(...data.map((d) => d.avgScore), 1);
+  const maxJournal = Math.max(...data.map((d) => d.journalCount), 1);
+  const maxLsn = Math.max(...data.map((d) => d.lsnCount), 1);
+  const maxAssessment = Math.max(...data.map((d) => d.assessmentCount), 1);
+  const deptCount = data.length;
+  const groupWidth = Math.max(56, Math.min(72, Math.floor(480 / deptCount)));
+
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mobileScroll}>
+      <View style={[styles.mobileBarContainer, { gap: Math.max(4, Math.min(16, 40 / deptCount)) }]}>
+        {data.map((d) => (
+          <View key={d.deptAbbr} style={[styles.mobileBarGroup, { width: groupWidth }]}>
+            <Text style={styles.mobileBarLabel}>{d.deptAbbr}</Text>
+            <View style={styles.mobileBarCol}>
+              <View style={[styles.mobileBar, { height: Math.max(4, (d.avgScore / maxScore) * 100), backgroundColor: "#8A63D2" }]} />
+              <Text style={styles.mobileBarVal}>{d.avgScore.toFixed(0)}</Text>
+            </View>
+            <View style={styles.mobileBarCol}>
+              <View style={[styles.mobileBar, { height: Math.max(4, (d.journalCount / maxJournal) * 100), backgroundColor: "#16A34A" }]} />
+              <Text style={styles.mobileBarVal}>{d.journalCount}</Text>
+            </View>
+            <View style={styles.mobileBarCol}>
+              <View style={[styles.mobileBar, { height: Math.max(4, (d.lsnCount / maxLsn) * 100), backgroundColor: "#D97706" }]} />
+              <Text style={styles.mobileBarVal}>{d.lsnCount}</Text>
+            </View>
+            <View style={styles.mobileBarCol}>
+              <View style={[styles.mobileBar, { height: Math.max(4, (d.assessmentCount / maxAssessment) * 100), backgroundColor: "#0EA5E9" }]} />
+              <Text style={styles.mobileBarVal}>{d.assessmentCount}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
+function renderMobileRadar(data: DeptComparisonMetric[], colors: string[]) {
+  const maxScore = Math.max(...data.map((d) => d.avgScore), 1);
+  const maxJournal = Math.max(...data.map((d) => d.journalCount), 1);
+  const maxLsn = Math.max(...data.map((d) => d.lsnCount), 1);
+  const maxAssessment = Math.max(...data.map((d) => d.assessmentCount), 1);
+
+  const normalized = (val: number, max: number) => max > 0 ? (val / max) * 100 : 0;
+
+  return (
+    <View style={styles.mobileRadarTable}>
+      <View style={styles.mobileRadarHeader}>
+        <Text style={styles.mobileRadarHeaderCell}>Metric</Text>
+        {data.map((d) => (
+          <Text key={d.deptAbbr} style={[styles.mobileRadarHeaderCell, { color: colors[data.indexOf(d) % colors.length] }]}>
+            {d.deptAbbr}
+          </Text>
+        ))}
+      </View>
+      {[
+        { label: "Avg Score", get: (d: DeptComparisonMetric) => `${d.avgScore.toFixed(1)} (${normalized(d.avgScore, maxScore).toFixed(0)}%)` },
+        { label: "Journals", get: (d: DeptComparisonMetric) => `${d.journalCount} (${normalized(d.journalCount, maxJournal).toFixed(0)}%)` },
+        { label: "LSN Count", get: (d: DeptComparisonMetric) => `${d.lsnCount} (${normalized(d.lsnCount, maxLsn).toFixed(0)}%)` },
+        { label: "Assessments", get: (d: DeptComparisonMetric) => `${d.assessmentCount} (${normalized(d.assessmentCount, maxAssessment).toFixed(0)}%)` },
+        { label: "Participation", get: (d: DeptComparisonMetric) => `${(d.participationRate * 100).toFixed(0)}%` },
+      ].map((m) => (
+        <View key={m.label} style={styles.mobileRadarRow}>
+          <Text style={styles.mobileRadarCell}>{m.label}</Text>
+          {data.map((d) => (
+            <Text key={d.deptAbbr} style={styles.mobileRadarCell}>{m.get(d)}</Text>
+          ))}
+        </View>
+      ))}
+      <View style={styles.radarFootnote}>
+        <Text style={styles.chartFooterNote}>
+          Percentages show each value normalized against the max in its category for fair cross-metric comparison.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function renderMobileScatter(points: ScatterPoint[], deptColors: Record<string, string>) {
+  const maxJournal = Math.max(...points.map((p) => p.journalCount), 1);
+  const cellW = 20;
+  const cellH = 20;
+  const cols = 10;
+  const rows = 8;
+
+  const cellMap = new Map<string, { points: ScatterPoint[]; dept: string; riskLevel: string }>();
+
+  points.forEach((p) => {
+    let row = Math.min(rows - 1, Math.max(0, Math.floor((80 - Math.min(p.avgScore, 80)) / 10)));
+    let col = Math.min(cols - 1, Math.max(0, Math.floor((p.journalCount / maxJournal) * cols)));
+    if (col >= cols) col = cols - 1;
+    if (row >= rows) row = rows - 1;
+    const key = `${row}-${col}`;
+    if (!cellMap.has(key)) {
+      cellMap.set(key, { points: [], dept: p.department, riskLevel: p.riskLevel });
+    }
+    cellMap.get(key)!.points.push(p);
+  });
+
+  return (
+    <View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={[styles.mobileScatterGrid, { width: cellW * cols, height: cellH * rows + 20 }]}>
+          {Array.from({ length: rows }, (_, row) =>
+            Array.from({ length: cols }, (_, col) => {
+              const key = `${row}-${col}`;
+              const cellData = cellMap.get(key);
+              const count = cellData ? cellData.points.length : 0;
+              const primary = cellData ? cellData.points[0] : null;
+              const color = primary ? deptColors[primary.department] || "#8A63D2" : "transparent";
+
+              const jitterX = count > 1 ? (Math.random() - 0.5) * 6 : 0;
+              const jitterY = count > 1 ? (Math.random() - 0.5) * 6 : 0;
+              const opacity = count === 0 ? 0 : Math.min(0.3 + count * 0.12, 0.95);
+
+              return (
+                <View
+                  key={key}
+                  style={[
+                    styles.mobileScatterCell,
+                    { width: cellW, height: cellH },
+                    count > 0 && {
+                      backgroundColor: color,
+                      opacity,
+                    },
+                  ]}
+                >
+                  {count > 0 && (
+                    <Text style={[
+                      styles.mobileScatterDot,
+                      {
+                        fontSize: count > 3 ? 8 : 10,
+                        transform: [
+                          { translateX: jitterX },
+                          { translateY: jitterY },
+                        ],
+                      },
+                    ]}>
+                      {count > 1 ? `${count}` : "•"}
+                    </Text>
+                  )}
+                </View>
+              );
+            })
+          )}
+        </View>
+      </ScrollView>
+      <View style={styles.scatterLegend}>
+        <Text style={styles.chartFooterNote}>
+          Cell darkness reflects density. Higher count = darker cell.
+        </Text>
+        <View style={styles.scatterRiskLegend}>
+          {Object.entries(deptColors).slice(0, 6).map(([dept, color]) => (
+            <View key={dept} style={styles.riskDotRow}>
+              <View style={[styles.riskDot, { backgroundColor: color }]} />
+              <Text style={styles.riskDotLabel}>{deptAbbr(dept)}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ─── Styles ────────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  chartToggle: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 16,
+  },
+  toggleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#F3EEFF",
+  },
+  toggleBtnActive: {
+    backgroundColor: "#8A63D2",
+  },
+  toggleText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#8A63D2",
+  },
+  toggleTextActive: {
+    color: "white",
+  },
+  chartFooter: {
+    marginTop: 12,
+    paddingHorizontal: 4,
+  },
+  chartFooterNote: {
+    fontSize: 12,
+    color: "#94A3B8",
+    fontStyle: "italic",
+    lineHeight: 18,
+  },
+  emptyCard: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 40,
+    gap: 8,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: "#94A3B8",
+    fontWeight: "500",
+  },
+  scatterLegend: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  scatterRiskLegend: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  riskDotRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  riskDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  riskDotLabel: {
+    fontSize: 11,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+  mobileScroll: {
+    marginBottom: 8,
+  },
+  mobileBarContainer: {
+    flexDirection: "row",
+    gap: 16,
+    paddingHorizontal: 4,
+    paddingBottom: 8,
+  },
+  mobileBarGroup: {
+    alignItems: "center",
+    gap: 4,
+    width: 56,
+  },
+  mobileBarLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#475569",
+    marginBottom: 4,
+  },
+  mobileBarCol: {
+    alignItems: "center",
+    gap: 2,
+  },
+  mobileBar: {
+    width: 10,
+    borderRadius: 4,
+  },
+  mobileBarVal: {
+    fontSize: 9,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  mobileRadarTable: {
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  mobileRadarHeader: {
+    flexDirection: "row",
+    backgroundColor: "#F8F6FC",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+  mobileRadarHeaderCell: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#475569",
+    textAlign: "center",
+  },
+  mobileRadarRow: {
+    flexDirection: "row",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F5F9",
+  },
+  mobileRadarCell: {
+    flex: 1,
+    fontSize: 11,
+    color: "#334155",
+    textAlign: "center",
+    fontWeight: "500",
+  },
+  mobileScatterGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    width: 200,
+    height: 160,
+  },
+  mobileScatterCell: {
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 0.5,
+    borderColor: "#F1F5F9",
+  },
+  mobileScatterDot: {
+    fontSize: 10,
+    color: "white",
+  },
+  radarFootnote: {
+    padding: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
+  },
+});

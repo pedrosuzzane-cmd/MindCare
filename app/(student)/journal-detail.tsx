@@ -83,6 +83,26 @@ export default function JournalDetailScreen() {
           <View style={{ height: 12 }} />
           <Text style={styles.body}>{entry.thoughts}</Text>
         </View>
+
+        <Pressable
+          style={styles.editButton}
+          onPress={() =>
+            router.push({
+              pathname: "/new-journal-entry",
+              params: { entryId: id },
+            })
+          }
+        >
+          <LinearGradient
+            colors={["#9C7EEB", "#8A63D2"]}
+            style={styles.editBtnGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            <Ionicons name="create-outline" size={20} color="white" />
+            <Text style={styles.editButtonText}>Edit Entry</Text>
+          </LinearGradient>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -125,6 +145,15 @@ const styles = StyleSheet.create({
   tagText: { color: "#8A63D2", fontSize: 12, fontWeight: "600" },
   body: { marginTop: 12, fontSize: 16, color: "#4B4453", lineHeight: 22 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  editButton: { borderRadius: 14, overflow: "hidden", marginTop: 20 },
+  editBtnGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    gap: 8,
+  },
+  editButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
   categoryRow: { marginTop: 8 },
   categoryText: {
     alignSelf: "flex-start",

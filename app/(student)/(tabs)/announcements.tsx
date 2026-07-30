@@ -18,10 +18,23 @@ import {
   getDaysRemaining,
 } from "@/services/announcementService";
 import type { Announcement } from "@/types/announcement";
+import { auth, db } from "@/constants/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 export default function AnnouncementsTab() {
   const { user } = useAuth();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [studentDepartment, setStudentDepartment] = useState<string | null>(null);
+
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    getDoc(doc(db, "users", uid)).then((snap) => {
+      if (snap.exists()) {
+        setStudentDepartment(snap.data().department || null);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -47,13 +60,13 @@ export default function AnnouncementsTab() {
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
       >
-        {announcements.length === 0 ? (
+        {announcements.filter((a) => a.targetDepartments.includes("ALL") || (studentDepartment && a.targetDepartments.includes(studentDepartment))).length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="megaphone-outline" size={48} color="#D1D5DB" />
             <Text style={styles.emptyStateText}>No announcements yet</Text>
           </View>
         ) : (
-          announcements.map((announcement) => (
+          announcements.filter((a) => a.targetDepartments.includes("ALL") || (studentDepartment && a.targetDepartments.includes(studentDepartment))).map((announcement) => (
             <View key={announcement.id} style={styles.card}>
               <Text style={styles.cardTitle}>{announcement.title}</Text>
               <Text style={styles.cardBody}>{announcement.description}</Text>

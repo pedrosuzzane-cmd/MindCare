@@ -164,14 +164,13 @@ function detectDominantMood(moods: string[]): MoodKey {
 
 export default function JournalSuggestionsScreen() {
   const { entries: journalEntries, loading: entriesLoading } = useJournal();
+  const [seed, setSeed] = useState(0);
 
   const suggestions = useMemo(() => {
     const moods = journalEntries.map((e) => e.mood);
     const dominant = detectDominantMood(moods);
     return pickSuggestions(dominant);
-  }, [journalEntries]);
-
-  const [seed, setSeed] = useState(0);
+  }, [journalEntries, seed]);
 
   const handleRefresh = useCallback(() => {
     setSeed((s) => s + 1);
@@ -207,7 +206,6 @@ export default function JournalSuggestionsScreen() {
           style={styles.scrollContainer}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          key={seed}
         >
           {/* Intro */}
           <View style={styles.introContainer}>

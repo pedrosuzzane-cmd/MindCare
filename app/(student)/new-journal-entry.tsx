@@ -26,14 +26,16 @@ interface Category {
 }
 
 export default function NewJournalEntryScreen() {
-  const params = useLocalSearchParams<{ date?: string }>();
-  const { addJournalEntry } = useJournal();
+  const params = useLocalSearchParams<{ date?: string; entryId?: string }>();
+  const { addJournalEntry, updateJournalEntry, getJournalEntry } = useJournal();
   const { isConnected } = useNetwork();
   const [entryDate, setEntryDate] = useState<Date>(new Date());
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [entryTitle, setEntryTitle] = useState<string>("");
 
   const [selectedMood, setSelectedMood] = useState<string>("");
+  const editEntryId = params.entryId;
+  const isEditing = !!editEntryId;
 
   const moods = [
     { id: "happy", emoji: "😄", label: "Happy" },
@@ -62,7 +64,16 @@ export default function NewJournalEntryScreen() {
   };
 
   useEffect(() => {
-    if (params.date) {
+    if (editEntryId) {
+      const entry = getJournalEntry(editEntryId);
+      if (entry) {
+        setEntryTitle(entry.title || "");
+        setThoughts(entry.thoughts || "");
+        setSelectedMood(entry.mood || "");
+        setSelectedCategory(entry.category || "");
+        setEntryDate(new Date(entry.entryDate));
+      }
+    } else if (params.date) {
       const parsed = new Date(params.date);
       if (!Number.isNaN(parsed.getTime())) {
         if (isFutureDate(parsed)) {
@@ -76,7 +87,7 @@ export default function NewJournalEntryScreen() {
         setEntryDate(parsed);
       }
     }
-  }, [params.date]);
+  }, [params.date, editEntryId]);
 
   const categories: Category[] = [
     { id: "personal", name: "Personal", color: "#9C7EEB" },
@@ -133,17 +144,22 @@ export default function NewJournalEntryScreen() {
     setSaving(true);
     try {
       const sanitize = (s: string, max = 2000) => s.trim().slice(0, max);
+      const now = new Date().toISOString();
       const data = {
         category: selectedCategory,
         mood: selectedMood,
         title: sanitize(entryTitle, 200),
         thoughts: sanitize(thoughts, 2000),
         entryDate: entryDate.toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: now,
+        updatedAt: now,
       };
 
-      await addJournalEntry(data);
+      if (isEditing && editEntryId) {
+        await updateJournalEntry({ id: editEntryId, ...data });
+      } else {
+        await addJournalEntry(data);
+      }
 
       // Navigate back to daily journal
       router.replace("/daily-journal");
@@ -174,7 +190,7 @@ export default function NewJournalEntryScreen() {
           <Pressable style={styles.backButton} onPress={handleBack}>
             <Ionicons name="arrow-back" size={24} color="white" />
           </Pressable>
-          <Text style={styles.headerTitle}>New Entry</Text>
+          <Text style={styles.headerTitle}>{isEditing ? "Edit Entry" : "New Entry"}</Text>
           <View style={styles.placeholder} />
         </View>
 
@@ -327,7 +343,7 @@ export default function NewJournalEntryScreen() {
                     color="white"
                   />
                   <Text style={styles.saveButtonText}>
-                    {isConnected === false ? "Save Offline" : "Save Entry"}
+                    {isConnected === false ? "Save Offline" : isEditing ? "Update Entry" : "Save Entry"}
                   </Text>
                 </View>
               )}

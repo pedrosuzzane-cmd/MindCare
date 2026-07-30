@@ -113,6 +113,44 @@ export function useJournal() {
     return newEntry;
   };
 
+  const updateJournalEntry = async (
+    entryData: Omit<JournalEntry, "syncStatus" | "userId">,
+  ): Promise<JournalEntry> => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error("User not authenticated");
+    const existing = await journalService.getJournalEntries(uid).then(
+      (entries) => entries.find((e) => e.id === entryData.id),
+    );
+    if (!existing) throw new Error("Entry not found");
+
+    const updated: JournalEntry = {
+      ...existing,
+      title: entryData.title,
+      thoughts: entryData.thoughts,
+      mood: entryData.mood,
+      category: entryData.category,
+      entryDate: entryData.entryDate,
+      updatedAt: new Date().toISOString(),
+      syncStatus: "pending",
+    };
+
+    await journalService.updateJournalEntry(uid, updated);
+    await offlineSyncQueue.enqueue({ journalId: updated.id, action: "update" });
+
+    setEntries((prev) =>
+      prev
+        .map((e) => (e.id === updated.id ? updated : e))
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        ),
+    );
+
+    await refreshQueueCounts();
+    triggerSync();
+    return updated;
+  };
+
   const retryFailedSync = useCallback(async () => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
@@ -171,6 +209,7 @@ export function useJournal() {
     pendingCount,
     failedCount,
     addJournalEntry,
+    updateJournalEntry,
     getJournalEntry,
     getMoodEmoji,
     getSyncStatusLabel,

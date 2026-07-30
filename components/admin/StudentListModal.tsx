@@ -121,7 +121,10 @@ export function StudentListModal({
                         </View>
                         <View style={styles.studentHeader}>
                           <View style={styles.studentIdentityBlock}>
-                            <Text style={styles.studentName}>{student.name}</Text>
+                            <View style={styles.studentNameRow}>
+                              <Text style={styles.studentName}>{student.name}</Text>
+                              <Ionicons name="chevron-forward" size={14} color="#8A63D2" />
+                            </View>
                             <Text style={styles.studentMeta}>
                               {student.yearLevel}
                             </Text>
@@ -275,7 +278,8 @@ const styles = StyleSheet.create({
   },
   studentIdentityBlock: { flex: 1, paddingRight: 12 },
   studentInfoBlock: { alignItems: "flex-end", maxWidth: "45%" },
-  studentName: { fontSize: 16, fontWeight: "800", color: "#0F172A" },
+  studentName: { fontSize: 16, fontWeight: "800", color: "#8A63D2" },
+  studentNameRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   studentId: {
     fontSize: 13,
     fontWeight: "800",

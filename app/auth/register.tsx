@@ -5,6 +5,7 @@ import { useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Image,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -23,6 +24,7 @@ import { API_URL } from "@/backend/config";
 import { auth } from "@/constants/firebase";
 import { createUserDocument } from "@/firestore/profileFirestore";
 import { createUserWithEmailAndPassword } from "firebase/auth";
+import { pickProfileImage, uploadAvatarToCloudinary } from "@/services/userService";
 
 const COLLEGES = [
   "Saint Louis University (SLU)",
@@ -343,6 +345,9 @@ export default function RegisterScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
+  const [profileImageUploading, setProfileImageUploading] = useState(false);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
 
   const formatSchoolId = (text: string) => {
     const cleaned = text.replace(/\D/g, "");
@@ -644,6 +649,20 @@ export default function RegisterScreen() {
         }
       }
 
+      // Upload profile image if selected
+      let profileImageUrlFinal: string | null = null;
+      if (profileImageUri) {
+        try {
+          setProfileImageUploading(true);
+          profileImageUrlFinal = await uploadAvatarToCloudinary(profileImageUri);
+          console.log("Profile image uploaded:", profileImageUrlFinal);
+        } catch (uploadErr) {
+          console.error("Profile image upload failed, continuing without it:", uploadErr);
+        } finally {
+          setProfileImageUploading(false);
+        }
+      }
+
       // Generate keywords for searching
       const nameKeywords = generateKeywords(sanitize(formData.fullName, 200));
       const emailKeywords = generateKeywords(emailClean.split("@")[0]);
@@ -668,6 +687,7 @@ export default function RegisterScreen() {
         dateOfBirth: formData.dateOfBirth,
         provincialAddress: sanitize(formData.provincialAddress, 500),
         createdAt: new Date().toISOString(),
+        profileImage: profileImageUrlFinal,
         isLSN: lsnStatus !== "no",
         specialNeedsType:
           lsnStatus !== "no" ? sanitize(specialNeedsType, 150) : "",
@@ -841,6 +861,30 @@ export default function RegisterScreen() {
                 <Text style={styles.stepSubtitle}>
                   Enter your core contact and personal details.
                 </Text>
+
+                {/* Profile Image Picker */}
+                <View style={styles.avatarSection}>
+                  <Pressable
+                    onPress={async () => {
+                      if (profileImageUploading) return;
+                      const uri = await pickProfileImage();
+                      if (uri) setProfileImageUri(uri);
+                    }}
+                    style={styles.avatarPressable}
+                  >
+                    <View style={styles.avatarCircle}>
+                      {profileImageUri ? (
+                        <Image source={{ uri: profileImageUri }} style={styles.avatarImage} />
+                      ) : (
+                        <Ionicons name="person" size={36} color="#94A3B8" />
+                      )}
+                      <View style={styles.avatarOverlay}>
+                        <Ionicons name="camera" size={18} color="white" />
+                      </View>
+                    </View>
+                    <Text style={styles.avatarLabel}>Tap to add profile photo</Text>
+                  </Pressable>
+                </View>
 
                 <View style={styles.inputContainer}>
                   <View style={styles.inputHeader}>
@@ -2478,5 +2522,44 @@ const styles = StyleSheet.create({
   modalConfirmText: {
     color: "white",
     fontWeight: "700",
+  },
+  avatarSection: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  avatarPressable: {
+    alignItems: "center",
+    gap: 8,
+  },
+  avatarCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#F3EEFF",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#E9D5FF",
+    position: "relative",
+    overflow: "hidden",
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  avatarOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(138, 99, 210, 0.75)",
+    paddingVertical: 4,
+    alignItems: "center",
+  },
+  avatarLabel: {
+    fontSize: 12,
+    color: "#8A63D2",
+    fontWeight: "600",
   },
 });
