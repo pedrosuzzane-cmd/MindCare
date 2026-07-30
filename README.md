@@ -15,16 +15,16 @@ A mental wellness mobile & web application built with **Expo (SDK 51)**, **React
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| **Framework** | Expo SDK 51 (React Native 0.74.5) |
-| **Routing** | Expo Router (file-based) |
-| **Backend** | Node.js + Express |
-| **AI** | Google Gemini AI |
-| **Auth & DB** | Firebase Auth + Firestore |
-| **Notifications** | Expo Notifications |
-| **Media** | Cloudinary |
-| **Build** | EAS Build (Android APK / Web) |
+| Layer             | Technology                        |
+| ----------------- | --------------------------------- |
+| **Framework**     | Expo SDK 51 (React Native 0.74.5) |
+| **Routing**       | Expo Router (file-based)          |
+| **Backend**       | Node.js + Express                 |
+| **AI**            | Google Gemini AI                  |
+| **Auth & DB**     | Firebase Auth + Firestore         |
+| **Notifications** | Expo Notifications                |
+| **Media**         | Cloudinary                        |
+| **Build**         | EAS Build (Android APK / Web)     |
 
 ---
 
@@ -131,6 +131,7 @@ npx expo start --web
 This starts the Expo dev server. Open the URL shown in the terminal (usually `http://localhost:8081`) in your browser.
 
 **Troubleshooting:**
+
 - If you see `getReactNativePersistence is not a function`, ensure you're on the latest code — this was fixed with a platform check in `constants/firebase.ts`
 - Web builds use in-memory Firebase auth persistence (no AsyncStorage needed)
 
@@ -174,24 +175,29 @@ This starts the Expo dev server. Open the URL shown in the terminal (usually `ht
 ### Using EAS Build (Cloud)
 
 1. **Login to EAS:**
+
    ```bash
    eas login
    ```
 
 2. **Configure the project** (first time only):
+
    ```bash
    eas build:configure
    ```
 
 3. **Build an APK for development:**
+
    ```bash
    eas build --platform android --profile development
    ```
 
 4. **Build a preview APK:**
+
    ```bash
    eas build --platform android --profile preview
    ```
+
    The APK will be downloadable from the EAS dashboard.
 
 5. **Build a production APK:**
@@ -201,11 +207,11 @@ This starts the Expo dev server. Open the URL shown in the terminal (usually `ht
 
 ### Build Profiles (from `eas.json`)
 
-| Profile | Type | Use Case |
-|---------|------|----------|
+| Profile       | Type               | Use Case                   |
+| ------------- | ------------------ | -------------------------- |
 | `development` | Development client | Testing during development |
-| `preview` | Internal APK | Sharing with testers |
-| `production` | Release APK | Play Store submission |
+| `preview`     | Internal APK       | Sharing with testers       |
+| `production`  | Release APK        | Play Store submission      |
 
 > 💡 **Note:** The `expo-build-properties` plugin is pre-configured in `app.config.js` with `compileSdkVersion: 34`, `targetSdkVersion: 34`, and Kotlin 1.9.24 to fix known EAS build issues.
 
@@ -221,6 +227,7 @@ node server.js
 The backend server starts on `http://localhost:3000` by default (configurable via `AI_BACKEND_URL` in `.env`).
 
 **Available backend routes:**
+
 - `POST /api/chat` — AI chat endpoint (Gemini/GROQ)
 - `POST /api/send-otp` — Send OTP for password reset
 - `POST /api/verify-otp` — Verify OTP
@@ -268,14 +275,14 @@ MindCare/
 
 ## ❗ Troubleshooting
 
-| Problem | Solution |
-|---------|----------|
-| `compileSdkVersion is not specified` during EAS build | ✅ Fixed — the `expo-build-properties` plugin in `app.config.js` sets it to 34 |
-| `Could not get unknown property 'release'` during EAS build | ✅ Fixed — Kotlin version pinned to `1.9.24` in `expo-build-properties` |
-| `getReactNativePersistence is not a function` on web | ✅ Fixed — Added `Platform.OS === "web"` check in `constants/firebase.ts` |
-| `auth/already-initialized` during hot reload | Handled — falls back to `getAuth(app)` gracefully |
-| Module not found errors | Run `npm install` in both root and `backend/` directories |
-| EAS build fails | Ensure you're logged in (`eas login`) and the project is configured |
+| Problem                                                     | Solution                                                                       |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `compileSdkVersion is not specified` during EAS build       | ✅ Fixed — the `expo-build-properties` plugin in `app.config.js` sets it to 34 |
+| `Could not get unknown property 'release'` during EAS build | ✅ Fixed — Kotlin version pinned to `1.9.24` in `expo-build-properties`        |
+| `getReactNativePersistence is not a function` on web        | ✅ Fixed — Added `Platform.OS === "web"` check in `constants/firebase.ts`      |
+| `auth/already-initialized` during hot reload                | Handled — falls back to `getAuth(app)` gracefully                              |
+| Module not found errors                                     | Run `npm install` in both root and `backend/` directories                      |
+| EAS build fails                                             | Ensure you're logged in (`eas login`) and the project is configured            |
 
 ---
 
