@@ -9,10 +9,6 @@ dotenv.config();
 const { Ollama } = require("ollama");
 const { Buffer } = require("buffer");
 const multer = require("multer");
-const Groq = require("groq-sdk");
-
-// 2. Initialize Groq AFTER dotenv.config()
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 let cloudinary;
 try {
@@ -366,7 +362,7 @@ app.post("/api/journal/analyze", async (req, res) => {
   }
 });
 
-// ── Unified Document Upload & Groq Vision Verification Route ──
+// ── PWD Document Upload (Cloudinary) ──
 app.post(
   "/api/upload-pwd-document",
   upload.single("file"),
@@ -392,89 +388,11 @@ app.post(
       const uploadedImageUrl = result.secure_url;
       console.log("Cloudinary Upload Successful. URL:", uploadedImageUrl);
 
-      // 2. Verify document using Groq's Vision AI model
-      console.log("Starting Groq AI verification...");
-
-      const groqSystemPrompt = `
-        You are an AI assistant tasked with verifying official documents for a student support app.
-        You will be given an image or document (via a URL).
-        Your goal is to determine if this document is likely a valid PWD (Person with Disability) ID,
-        a medical certificate indicating special needs, or a student special needs accommodation ID.
-        
-        CRITICAL: Respond ONLY with valid JSON. No markdown, no code fences.
-
-        Respond with this exact JSON schema:
-        {
-          "is_valid": true,
-          "confidence": "high" | "medium" | "low",
-          "reasoning": "A brief sentence explaining why it is valid or invalid"
-        }
-      `;
-
-      const chatCompletion = await groq.chat.completions.create({
-        messages: [
-          { role: "system", content: groqSystemPrompt },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Verify this document." },
-              {
-                type: "image_url",
-                image_url: { url: uploadedImageUrl },
-              },
-            ],
-          },
-        ],
-        model: "llama-3.2-11b-vision-preview",
-        temperature: 0,
-      });
-
-      const groqResponseText = chatCompletion.choices[0]?.message?.content;
-      console.log("Groq Raw Response:", groqResponseText);
-
-      let verificationResult;
-      try {
-        const cleanJson = groqResponseText.match(/\{[\s\S]*\}/);
-        verificationResult = cleanJson
-          ? JSON.parse(cleanJson[0])
-          : { is_valid: false };
-      } catch (parseError) {
-        console.error("Error parsing Groq JSON:", parseError);
-        throw new Error("Failed to parse AI verification result.");
-      }
-
-      // 3. Handle Verification Outcome
-      if (!verificationResult.is_valid) {
-        // Delete invalid/fake images from Cloudinary immediately
-        try {
-          await cloudinary.uploader.destroy(result.public_id);
-          console.log(
-            "Deleted invalid document from Cloudinary:",
-            result.public_id,
-          );
-        } catch (delErr) {
-          console.error(
-            "Error deleting invalid image from Cloudinary:",
-            delErr,
-          );
-        }
-
-        return res.status(400).json({
-          error: "AI Verification Failed",
-          details:
-            verificationResult.reasoning ||
-            "Document does not appear to be a valid ID/certificate.",
-        });
-      }
-
-      // 4. Success Response
-      console.log("Document verified as valid by Groq.");
       return res.json({
         success: true,
-        message: "Document uploaded and verified successfully.",
+        message: "Document uploaded successfully.",
         secureUrl: uploadedImageUrl,
         publicId: result.public_id,
-        ai_verification: verificationResult,
       });
     } catch (error) {
       console.error("Upload/Verification error:", error.message);
@@ -559,79 +477,8 @@ app.post(
       const publicId = uploadResult.public_id;
       console.log("LSN Document uploaded to Cloudinary:", secureUrl);
 
-      // 3. Verify document using Groq Vision AI
-      console.log("Starting Groq LSN document verification...");
-
-      const groqSystemPrompt = `
-        You are an AI assistant tasked with verifying LSN (Learner with Special Needs) verification documents for a student support app.
-        You will be given an image or document (via a URL).
-        Your goal is to determine if this document is a valid medical certificate, clinical diagnosis, psychological evaluation,
-        or official government-issued ID that confirms a learner has special needs or disabilities.
-
-        CRITICAL: Respond ONLY with valid JSON. No markdown, no code fences.
-
-        Respond with this exact JSON schema:
-        {
-          "is_valid": true,
-          "confidence": "high" | "medium" | "low",
-          "reasoning": "A brief sentence explaining why it is valid or invalid"
-        }
-      `;
-
-      const chatCompletion = await groq.chat.completions.create({
-        messages: [
-          { role: "system", content: groqSystemPrompt },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Verify this LSN document." },
-              {
-                type: "image_url",
-                image_url: { url: secureUrl },
-              },
-            ],
-          },
-        ],
-        model: "llama-3.2-11b-vision-preview",
-        temperature: 0,
-      });
-
-      const groqResponseText = chatCompletion.choices[0]?.message?.content;
-      console.log("Groq Raw Response:", groqResponseText);
-
-      let verificationResult;
-      try {
-        const cleanJson = groqResponseText.match(/\{[\s\S]*\}/);
-        verificationResult = cleanJson
-          ? JSON.parse(cleanJson[0])
-          : { is_valid: false };
-      } catch (parseError) {
-        console.error("Error parsing Groq JSON:", parseError);
-        // Cleanup Cloudinary on parse failure
-        await cloudinary.uploader.destroy(publicId);
-        throw new Error("Failed to parse AI verification result.");
-      }
-
-      // 4. Conditional Branching
-      if (!verificationResult.is_valid) {
-        // Delete invalid document from Cloudinary
-        try {
-          await cloudinary.uploader.destroy(publicId);
-          console.log("Deleted invalid LSN document from Cloudinary:", publicId);
-        } catch (delErr) {
-          console.error("Error deleting invalid image from Cloudinary:", delErr);
-        }
-
-        return res.status(400).json({
-          error: "Document Verification Failed",
-          details:
-            verificationResult.reasoning ||
-            "Document does not appear to be a valid LSN verification document.",
-        });
-      }
-
-      // 5. Document is valid — create Firebase Auth user and Firestore document
-      console.log("LSN document verified by Groq. Creating user...");
+      // 3. Create Firebase Auth user and Firestore document
+      console.log("LSN document uploaded. Creating user...");
 
       const userRecord = await admin.auth().createUser({
         email,

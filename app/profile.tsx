@@ -1,7 +1,9 @@
+import { API_URL } from "@/backend/config";
 import { auth, db } from "@/constants/firebase";
 import { useAuth } from "@/hooks/AuthContext";
 import { changeProfileImage } from "@/services/userService";
 import { Ionicons } from "@expo/vector-icons";
+import * as DocumentPicker from "expo-document-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { onAuthStateChanged } from "firebase/auth";
@@ -49,6 +51,10 @@ export default function ProfileScreen() {
   const [college, setCollege] = useState("");
   const [academicProgram, setAcademicProgram] = useState("");
   const [yearLevel, setYearLevel] = useState("");
+
+  const [lsnDocPickResult, setLsnDocPickResult] = useState<DocumentPicker.DocumentPickerResult | null>(null);
+  const [lsnDocUploading, setLsnDocUploading] = useState(false);
+  const [lsnDocUploadProgress, setLsnDocUploadProgress] = useState(0);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -103,6 +109,90 @@ export default function ProfileScreen() {
       }
     } finally {
       setUploadingImage(false);
+    }
+  };
+
+  const uploadLsnDocument = async (
+    asset: DocumentPicker.DocumentPickerAsset,
+  ): Promise<{ secureUrl: string; publicId: string }> => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const fd = new FormData();
+      fd.append("file", { uri: asset.uri, name: asset.name, type: asset.mimeType } as any);
+      xhr.open("POST", `${API_URL}/api/upload-pwd-document`);
+      xhr.timeout = 90_000;
+      if (xhr.upload) {
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) setLsnDocUploadProgress(Math.round((e.loaded / e.total) * 100));
+        };
+      }
+      xhr.onload = () => {
+        setLsnDocUploadProgress(100);
+        try {
+          const resp = JSON.parse(xhr.responseText);
+          if (xhr.status >= 200 && xhr.status < 300) {
+            if (!resp.secureUrl || !resp.publicId) {
+              reject(new Error("Upload returned an incomplete response."));
+              return;
+            }
+            resolve({ secureUrl: resp.secureUrl, publicId: resp.publicId });
+          } else {
+            reject(new Error(resp.details || resp.error || `Upload failed (${xhr.status}).`));
+          }
+        } catch {
+          reject(new Error("Upload service returned an invalid response."));
+        }
+      };
+      xhr.onerror = () => reject(new Error(xhr.status === 0 ? "Service unavailable." : "Could not reach upload service."));
+      xhr.ontimeout = () => reject(new Error("Upload timed out."));
+      xhr.send(fd);
+    });
+  };
+
+  const handlePickLsnDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf", "image/jpeg", "image/png"],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      if (asset.size && asset.size > 10 * 1024 * 1024) {
+        Alert.alert("File Too Large", "Max file size is 10 MB.");
+        return;
+      }
+      setLsnDocPickResult(result);
+    } catch {
+      Alert.alert("Error", "Could not pick the document.");
+    }
+  };
+
+  const handleUploadLsnDocument = async () => {
+    if (!uid || !lsnDocPickResult?.assets?.[0]) return;
+    setLsnDocUploading(true);
+    setLsnDocUploadProgress(0);
+    try {
+      const asset = lsnDocPickResult.assets[0];
+      const { secureUrl, publicId } = await uploadLsnDocument(asset);
+      const lsnData = {
+        isLSN: true,
+        lsnDocument: {
+          fileName: asset.name,
+          fileType: asset.mimeType,
+          fileSize: asset.size,
+          uploadedAt: new Date().toISOString(),
+          publicId,
+          secureUrl,
+        },
+      };
+      await setDoc(doc(db, "users", uid), lsnData, { merge: true });
+      setProfile((p) => ({ ...(p || {}), ...lsnData }));
+      setLsnDocPickResult(null);
+      Alert.alert("Success", "LSN document uploaded successfully.");
+    } catch (err: any) {
+      Alert.alert("Upload Failed", err.message || "Please try again.");
+    } finally {
+      setLsnDocUploading(false);
     }
   };
 
@@ -476,7 +566,77 @@ export default function ProfileScreen() {
             </View>
           )}
 
+          {/* ── LSN Document Section (students only) ── */}
+          {!isAdmin && (
+            <View style={s.sectionCard}>
+              <View style={s.sectionHeader}>
+                <View style={[s.sectionIcon, { backgroundColor: "#FCE7F3" }]}>
+                  <Ionicons name="document-text-outline" size={18} color="#DB2777" />
+                </View>
+                <Text style={s.sectionTitle}>LSN Document</Text>
+              </View>
 
+              {profile?.lsnDocument ? (
+                <>
+                  <View style={s.fieldRow}>
+                    <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
+                    <Text style={s.fieldValue} numberOfLines={1}>
+                      {profile.lsnDocument.fileName || "Document uploaded"}
+                    </Text>
+                  </View>
+                  <Pressable
+                    style={s.lsnReplaceBtn}
+                    onPress={handlePickLsnDocument}
+                  >
+                    <Ionicons name="refresh" size={16} color="#7B2CBF" />
+                    <Text style={s.lsnReplaceText}>Replace Document</Text>
+                  </Pressable>
+                </>
+              ) : profile?.isLSN || lsnDocPickResult ? (
+                <>
+                  {lsnDocPickResult && !lsnDocPickResult.canceled ? (
+                    <View style={s.fieldRow}>
+                      <Ionicons name="document-outline" size={18} color="#7B2CBF" />
+                      <Text style={s.fieldValue} numberOfLines={1}>
+                        {(lsnDocPickResult.assets[0] as any).name}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={s.lsnHintText}>
+                      Your LSN document was not uploaded during registration. Please upload it here.
+                    </Text>
+                  )}
+
+                  {lsnDocUploading ? (
+                    <View style={s.lsnProgressRow}>
+                      <View style={s.lsnProgressBar}>
+                        <View style={[s.lsnProgressFill, { width: `${lsnDocUploadProgress}%` }]} />
+                      </View>
+                      <Text style={s.lsnProgressText}>{lsnDocUploadProgress}%</Text>
+                    </View>
+                  ) : (
+                    <View style={s.lsnActions}>
+                      <Pressable style={s.lsnPickBtn} onPress={handlePickLsnDocument}>
+                        <Ionicons name="cloud-upload-outline" size={18} color="#7B2CBF" />
+                        <Text style={s.lsnPickText}>
+                          {lsnDocPickResult ? "Choose Different File" : "Pick Document"}
+                        </Text>
+                      </Pressable>
+                      {lsnDocPickResult && !lsnDocPickResult.canceled && (
+                        <Pressable style={s.lsnUploadBtn} onPress={handleUploadLsnDocument}>
+                          <Text style={s.lsnUploadText}>Upload</Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  )}
+                </>
+              ) : (
+                <Text style={s.lsnHintText}>
+                  No LSN document on file. If you have special needs, contact your guidance office.
+                </Text>
+              )}
+            </View>
+          )}
 
           <View style={{ height: 100 }} />
         </ScrollView>
@@ -884,6 +1044,91 @@ const s = StyleSheet.create({
   },
   modalConfirmText: {
     fontSize: 15,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+
+  /* ── LSN Document ──────────────────────────────────────────────── */
+  lsnHintText: {
+    fontSize: 13,
+    color: "#64748B",
+    lineHeight: 19,
+    marginTop: 4,
+  },
+  lsnReplaceBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: "#F5F0FF",
+    borderRadius: 10,
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+  },
+  lsnReplaceText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#7B2CBF",
+  },
+  lsnProgressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 12,
+  },
+  lsnProgressBar: {
+    flex: 1,
+    height: 8,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  lsnProgressFill: {
+    height: "100%",
+    backgroundColor: "#8A63D2",
+    borderRadius: 4,
+  },
+  lsnProgressText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#8A63D2",
+    width: 36,
+    textAlign: "right",
+  },
+  lsnActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 12,
+  },
+  lsnPickBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: "#F5F0FF",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+    borderStyle: "dashed",
+  },
+  lsnPickText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#7B2CBF",
+  },
+  lsnUploadBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    backgroundColor: "#8A63D2",
+    borderRadius: 12,
+    justifyContent: "center",
+  },
+  lsnUploadText: {
+    fontSize: 13,
     fontWeight: "700",
     color: "#FFFFFF",
   },
