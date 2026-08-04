@@ -42,6 +42,7 @@ export interface StudentSummary {
   moodCounts: Record<string, number>;
   isLSN?: boolean;
   specialNeedsType?: string;
+  lsnCategory?: string;
   profileImage?: string;
   lsnDocument?: {
     fileName?: string;
@@ -126,6 +127,7 @@ export function listenForAdminDashboardData(
             moodCounts,
             isLSN: userData.isLSN || false,
             specialNeedsType: userData.specialNeedsType || "",
+            lsnCategory: userData.lsnCategory || "",
             lsnDocument: userData.lsnDocument || null,
             profileImage: userData.profileImage || undefined,
           };

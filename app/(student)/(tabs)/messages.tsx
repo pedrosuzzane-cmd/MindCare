@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "@/hooks/AuthContext";
+import { useStudentProfile } from "@/hooks/useStudentProfile";
 import {
   fetchAllUsers,
   getOrCreateConversation,
@@ -226,6 +227,19 @@ export default function InboxTab() {
 
   const currentList = directoryTab === "peers" ? filteredPeers : filteredAdmins;
 
+  // Live partner profile for the chat header — resolves from the centralized
+  // users/admins collections by senderId so updated avatars/names show instantly.
+  const partnerUid = useMemo(() => {
+    if (viewMode !== "chat" || !activeConversation) return undefined;
+    if (activeConversation.type === "peer") {
+      return activeConversation.participants?.find((u) => u !== user?.uid);
+    }
+    return activeConversation.adminId || undefined;
+  }, [viewMode, activeConversation, user?.uid]);
+
+  const liveProfile = useStudentProfile(partnerUid);
+  const headerName = liveProfile?.fullName || chatPartnerName;
+
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}>
@@ -236,9 +250,23 @@ export default function InboxTab() {
                 <Ionicons name="arrow-back" size={22} color="white" />
               </Pressable>
             ) : <View style={{ width: 40 }} />}
-            <Text style={styles.headerTitle}>
-              {viewMode === "chat" ? chatPartnerName : "Inbox"}
-            </Text>
+            <View style={styles.headerTitleWrap}>
+              {viewMode === "chat" && (
+                liveProfile?.profileImage ? (
+                  <Image
+                    source={{ uri: liveProfile.profileImage }}
+                    style={styles.headerAvatar}
+                  />
+                ) : (
+                  <View style={[styles.headerAvatar, styles.headerAvatarFallback]}>
+                    <Ionicons name="person" size={16} color="white" />
+                  </View>
+                )
+              )}
+              <Text style={styles.headerTitle} numberOfLines={1}>
+                {viewMode === "chat" ? headerName : "Inbox"}
+              </Text>
+            </View>
             <View style={{ width: 40 }} />
           </View>
         </LinearGradient>
@@ -369,7 +397,16 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
   },
   backBtn: { width: 40, height: 40, justifyContent: "center", alignItems: "center" },
-  headerTitle: { color: "white", fontSize: 18, fontWeight: "700", flex: 1, textAlign: "center" },
+  headerTitleWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  headerAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#7A54C4" },
+  headerAvatarFallback: { alignItems: "center", justifyContent: "center" },
+  headerTitle: { color: "white", fontSize: 18, fontWeight: "700", flexShrink: 1 },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",

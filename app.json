@@ -5,7 +5,7 @@
     "owner": "zane97",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logoicon.png",
+      "icon": "./assets/images/appicon.png",
     "primaryColor": "#8A63D2",
     "scheme": "mindcarev2",
     "userInterfaceStyle": "automatic",
@@ -15,15 +15,15 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#8A63D2",
-        "foregroundImage": "./assets/images/logoicon.png"
+        "foregroundImage": "./assets/images/appicon.png"
       },
-      "icon": "./assets/images/logoicon.png",
+    "icon": "./assets/images/appicon.png",
       "predictiveBackGestureEnabled": false,
       "package": "com.nervachan.MindCareV2"
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/logoicon.png"
+      "favicon": "./assets/images/applogo.png"
     },
     "plugins": [
       "expo-router",

@@ -736,6 +736,154 @@ app.post("/api/auth/forgot-password/verify-and-reset", async (req, res) => {
   }
 });
 
+// ── Registration OTP (email verification for new sign-ups) ──
+const REGISTRATION_OTP_COLLECTION = "registrationOtps";
+const REGISTRATION_OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+
+// POST /api/auth/register-otp/request — generate OTP for a new account email
+app.post("/api/auth/register-otp/request", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email || typeof email !== "string") {
+    return res.status(400).json({ error: "Email is required." });
+  }
+
+  const emailClean = email.trim().toLowerCase();
+
+  try {
+    // Reject if the email is already registered
+    let userExists = false;
+    try {
+      await admin.auth().getUserByEmail(emailClean);
+      userExists = true;
+    } catch (err) {
+      if (err && err.code === "auth/user-not-found") {
+        userExists = false;
+      } else {
+        console.warn("Failed to check email existence:", err.message);
+      }
+    }
+
+    if (userExists) {
+      return res.status(409).json({
+        error: "This email address is already in use by another account.",
+      });
+    }
+
+    const otp = generateOtp();
+    const expiresAt = Date.now() + REGISTRATION_OTP_EXPIRY_MS;
+
+    const db = admin.firestore();
+    await db.collection(REGISTRATION_OTP_COLLECTION).doc(emailClean).set({
+      otp,
+      email: emailClean,
+      expiresAt,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      verified: false,
+    });
+
+    const mailOptions = {
+      from: process.env.SMTP_FROM || "MindCare <noreply@mindcare.app>",
+      to: emailClean,
+      subject: "MindCare — Verify Your Email",
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;">
+          <h2 style="color:#8A63D2;">Verify Your Email</h2>
+          <p>Welcome to MindCare! Use the code below to verify your email and finish creating your account.</p>
+          <div style="background:#F3EAFF;border-radius:12px;padding:24px;text-align:center;margin:24px 0;">
+            <p style="font-size:14px;color:#666;margin:0 0 8px;">Your 6-digit code:</p>
+            <p style="font-size:36px;font-weight:bold;color:#8A63D2;letter-spacing:8px;margin:0;">${otp}</p>
+          </div>
+          <p style="color:#666;font-size:14px;">This code expires in <strong>10 minutes</strong>. If you didn't request this, you can safely ignore this email.</p>
+          <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+          <p style="color:#999;font-size:12px;">MindCare Student Wellness App</p>
+        </div>
+      `,
+    };
+
+    if (otpTransporter) {
+      await otpTransporter.sendMail(mailOptions);
+      console.log(`Registration OTP email sent to ${emailClean}`);
+    } else {
+      console.log(
+        `[OTP TEST MODE] Registration code for ${emailClean}: ${otp}`
+      );
+    }
+
+    return res.json({
+      success: true,
+      message: "Verification code sent to your email.",
+    });
+  } catch (err) {
+    console.error("Registration OTP request error:", err);
+    return res
+      .status(500)
+      .json({ error: "Unable to send verification code." });
+  }
+});
+
+// POST /api/auth/register-otp/verify — verify OTP before account creation
+app.post("/api/auth/register-otp/verify", async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res
+      .status(400)
+      .json({ error: "Email and OTP code are required." });
+  }
+
+  const emailClean = email.trim().toLowerCase();
+  const otpClean = otp.trim();
+
+  try {
+    const db = admin.firestore();
+    const otpDoc = await db
+      .collection(REGISTRATION_OTP_COLLECTION)
+      .doc(emailClean)
+      .get();
+
+    if (!otpDoc.exists) {
+      return res
+        .status(400)
+        .json({ error: "Invalid or expired verification code." });
+    }
+
+    const otpData = otpDoc.data();
+
+    // Idempotent — allow retrying account creation with an already-verified code
+    if (otpData.verified) {
+      return res.json({ success: true, message: "Email already verified." });
+    }
+
+    if (Date.now() > otpData.expiresAt) {
+      return res.status(400).json({
+        error: "Verification code has expired. Please request a new one.",
+      });
+    }
+
+    if (otpData.otp !== otpClean) {
+      return res
+        .status(400)
+        .json({ error: "Incorrect verification code. Please try again." });
+    }
+
+    await db.collection(REGISTRATION_OTP_COLLECTION).doc(emailClean).update({
+      verified: true,
+    });
+
+    console.log(`Email verified for ${emailClean}`);
+    return res.json({
+      success: true,
+      message: "Email verified successfully.",
+    });
+  } catch (err) {
+    console.error("Registration OTP verify error:", err);
+    return res
+      .status(500)
+      .json({ error: "Unable to verify code. Please try again." });
+  }
+});
+
 // ── Mindy Chat (Gemini multi-turn with system instruction) ──
 const MINDY_SYSTEM_INSTRUCTION = `You are Mindy, a supportive wellness companion for university students. Respond with empathy, encouragement, and practical coping strategies. Do not diagnose medical or mental health conditions, prescribe medication, or claim to be a licensed professional. If the user expresses thoughts of self-harm, suicide, or harming others, respond calmly, encourage them to seek immediate help from trusted people or local emergency services, and recommend professional support. Keep responses concise (under 200 words), warm, and conversational.`;
 

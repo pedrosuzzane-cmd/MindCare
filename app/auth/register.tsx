@@ -1,7 +1,8 @@
+import { API_URL } from "@/backend/config";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -18,6 +19,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import NetInfo from "@react-native-community/netinfo";
+import { AccessibleText } from "@/components/AccessibleText";
 
 // Firebase imports
 import { auth } from "@/constants/firebase";
@@ -266,7 +268,14 @@ const GENDERS = [
   "Prefer not to say",
 ];
 
-const YEAR_LEVELS = ["1st Year", "2nd Year", "3rd Year", "4th Year"];
+const YEAR_LEVELS = [
+  "1st Year",
+  "2nd Year",
+  "3rd Year",
+  "4th Year",
+  "5th Year",
+  "Irregular",
+];
 
 const CITIZENSHIP_OPTIONS = [
   "Filipino (Natural-born)",
@@ -302,8 +311,155 @@ function getDepartmentPrograms(college: string, department: string): string[] {
   return depts?.[department] || [];
 }
 
+/**
+ * Strips all non-digit characters, enforces an 11-digit maximum, and inserts
+ * separators as the user types (09XX XXX XXXX). Returns both the formatted
+ * display value and the clean raw numeric value for storage.
+ */
+function formatPhilippineMobileNumber(input: string): {
+  formattedValue: string;
+  rawValue: string;
+} {
+  const cleaned = input.replace(/\D/g, "");
+  const truncated = cleaned.slice(0, 11);
+
+  let formatted = truncated;
+  if (truncated.length > 4 && truncated.length <= 7) {
+    formatted = `${truncated.slice(0, 4)} ${truncated.slice(4)}`;
+  } else if (truncated.length > 7) {
+    formatted = `${truncated.slice(0, 4)} ${truncated.slice(4, 7)} ${truncated.slice(7)}`;
+  }
+
+  return {
+    formattedValue: formatted,
+    rawValue: truncated,
+  };
+}
+
+/**
+ * Validates a Philippine mobile number: exactly 11 digits starting with "09".
+ */
+function validatePhoneNumber(number: string): boolean {
+  const phMobileRegex = /^09\d{9}$/;
+  return phMobileRegex.test(number);
+}
+
+function formatLsnCategory(category: string): string {
+  if (category === "additional-needs") return "Students with Additional Needs";
+  if (category === "disabilities") return "Students with Disabilities";
+  return "None";
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  fullName: "Full Name",
+  email: "Email Address",
+  dateOfBirth: "Date of Birth",
+  contactNo: "Mobile Number",
+  schoolId: "School ID",
+  college: "College",
+  department: "Department",
+  academicProgram: "Academic Program",
+  yearLevel: "Year Level",
+  nationality: "Nationality",
+  citizenship: "Citizenship",
+  civilStatus: "Civil Status",
+  genderIdentity: "Gender Identity",
+  provincialAddress: "Provincial Address",
+};
+
+const formatMissingFields = (missing: string[]): string => {
+  return missing.map((key) => `• ${FIELD_LABELS[key] || key}`).join("\n");
+};
+
+/**
+ * Dedicated document verification preview. Renders an image thumbnail for
+ * image files or a document badge for PDFs, plus controls to replace or
+ * remove the attachment before submission.
+ */
+function LsnDocumentPreview({
+  lsnDocument,
+  onReplace,
+  onRemove,
+  progress = 0,
+}: {
+  lsnDocument: DocumentPicker.DocumentPickerResult | null;
+  onReplace: () => void;
+  onRemove: () => void;
+  progress?: number;
+}) {
+  if (!lsnDocument || lsnDocument.canceled) {
+    return (
+      <Pressable
+        style={styles.uploadButton}
+        onPress={onReplace}
+        android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
+      >
+        <Ionicons name="cloud-upload-outline" size={22} color="#7C3AED" />
+        <Text style={styles.uploadButtonText}>
+          Select File (PDF, JPG, PNG)
+        </Text>
+      </Pressable>
+    );
+  }
+
+  const asset = lsnDocument.assets[0];
+  const isImage = asset.mimeType?.toLowerCase().startsWith("image/");
+  const uploading = progress > 0 && progress < 100;
+
+  return (
+    <View style={styles.documentPreviewContainer}>
+      {isImage ? (
+        <Image source={{ uri: asset.uri }} style={styles.documentThumbnail} />
+      ) : (
+        <View style={styles.documentBadge}>
+          <Ionicons name="document-text-outline" size={26} color="#7C3AED" />
+        </View>
+      )}
+      <View style={styles.documentPreviewInfo}>
+        <Text style={styles.fileName} numberOfLines={1}>
+          {asset.name}
+        </Text>
+        {uploading ? (
+          <View style={styles.progressBarContainer}>
+            <View style={[styles.progressBar, { width: `${progress}%` }]} />
+          </View>
+        ) : (
+          <Text style={styles.fileStatus}>
+            {progress === 100 ? "✓ Uploaded" : "✓ Ready for verification"}
+          </Text>
+        )}
+      </View>
+      <Pressable
+        style={styles.documentActionButton}
+        onPress={onReplace}
+        hitSlop={8}
+      >
+        <Ionicons name="refresh-outline" size={20} color="#7C3AED" />
+      </Pressable>
+      <Pressable
+        style={styles.documentActionButton}
+        onPress={onRemove}
+        hitSlop={8}
+      >
+        <Ionicons name="trash-outline" size={20} color="#EF4444" />
+      </Pressable>
+    </View>
+  );
+}
+
+function ReviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.reviewRow}>
+      <Text style={styles.reviewRowLabel}>{label}</Text>
+      <Text style={styles.reviewRowValue} numberOfLines={2}>
+        {value || "—"}
+      </Text>
+    </View>
+  );
+}
+
 export default function RegisterScreen() {
-  const [activeTab, setActiveTab] = useState<1 | 2 | 3>(1);
+  const [activeTab, setActiveTab] = useState<1 | 2 | 3 | 4>(1);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -325,9 +481,14 @@ export default function RegisterScreen() {
     emergencyContactPerson: "",
   });
 
-  const [lsnStatus, setLsnStatus] = useState<
-    "no" | "yes-no-id" | "yes-with-id"
-  >("no");
+  const [mobileNumberDisplay, setMobileNumberDisplay] = useState("");
+
+  const [lsnCategory, setLsnCategory] = useState<
+    "" | "additional-needs" | "disabilities"
+  >("");
+  const [lsnDocumentChoice, setLsnDocumentChoice] = useState<
+    "none" | "with-document"
+  >("none");
   const [specialNeedsType, setSpecialNeedsType] = useState("");
   const [lsnDocument, setLsnDocument] =
     useState<DocumentPicker.DocumentPickerResult | null>(null);
@@ -337,17 +498,31 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswords, setShowPasswords] = useState(false);
   const [agreedToPolicy, setAgreedToPolicy] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [showOtpModal, setShowOtpModal] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [finalizing, setFinalizing] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
   const [profileImageUploading, setProfileImageUploading] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+
+  const resendTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (resendTimer.current) clearInterval(resendTimer.current);
+    };
+  }, []);
 
   const formatSchoolId = (text: string) => {
     const cleaned = text.replace(/\D/g, "");
@@ -434,83 +609,271 @@ export default function RegisterScreen() {
     return value.trim().slice(0, maxLength);
   };
 
-  const handleNextTab = () => {
-    setError(null);
-    setValidationErrors([]);
-
-    if (activeTab === 1) {
-      const missing: string[] = [];
-      if (!formData.fullName.trim()) missing.push("fullName");
-      if (!formData.email.trim()) missing.push("email");
-      if (!formData.dateOfBirth.trim()) missing.push("dateOfBirth");
-      if (!formData.contactNo.trim()) missing.push("contactNo");
-
-      if (missing.length > 0) {
-        setValidationErrors(missing);
-        return Alert.alert(
-          "Missing Information",
-          "Please fill out all required Profile fields before proceeding.",
-        );
-      }
-      if (!validateEmail(formData.email.toLowerCase())) {
-        return Alert.alert("Validation", "Please enter a valid email address.");
-      }
-      setActiveTab(2);
-    } else if (activeTab === 2) {
-      const missing: string[] = [];
-      if (!formData.schoolId.trim()) missing.push("schoolId");
-      if (!formData.college.trim()) missing.push("college");
-      if (!formData.department.trim()) missing.push("department");
-      if (!formData.academicProgram.trim()) missing.push("academicProgram");
-      if (!formData.yearLevel.trim()) missing.push("yearLevel");
-
-      if (missing.length > 0) {
-        setValidationErrors(missing);
-        return Alert.alert(
-          "Missing Information",
-          "Please fill out all School Information fields before proceeding.",
-        );
-      }
-      setActiveTab(3);
+  const collectMissingFields = (): string[] => {
+    const missing: string[] = [];
+    const checks: Array<[string, string]> = [
+      ["fullName", formData.fullName],
+      ["email", formData.email],
+      ["dateOfBirth", formData.dateOfBirth],
+      ["contactNo", formData.contactNo],
+      ["schoolId", formData.schoolId],
+      ["college", formData.college],
+      ["department", formData.department],
+      ["academicProgram", formData.academicProgram],
+      ["yearLevel", formData.yearLevel],
+      ["nationality", formData.nationality],
+      ["citizenship", formData.citizenship],
+      ["civilStatus", formData.civilStatus],
+      ["genderIdentity", formData.genderIdentity],
+      ["provincialAddress", formData.provincialAddress],
+    ];
+    for (const [key, value] of checks) {
+      if (!value.trim()) missing.push(key);
     }
+    return missing;
   };
 
-  const handleOpenConfirmation = () => {
+  const validateTab = (tab: 1 | 2 | 3): boolean => {
     setError(null);
     setValidationErrors([]);
 
-    const missing: string[] = [];
-    if (!formData.nationality.trim()) missing.push("nationality");
-    if (!formData.citizenship.trim()) missing.push("citizenship");
-    if (!formData.civilStatus.trim()) missing.push("civilStatus");
-    if (!formData.genderIdentity.trim()) missing.push("genderIdentity");
-    if (!formData.provincialAddress.trim()) missing.push("provincialAddress");
+    if (tab === 1) {
+      const missing = collectMissingFields().filter((key) =>
+        ["fullName", "email", "dateOfBirth", "contactNo"].includes(key),
+      );
+
+      if (missing.length > 0) {
+        setValidationErrors(missing);
+        Alert.alert(
+          "Missing Information",
+          `Please fill in the following required Profile fields:\n\n${formatMissingFields(missing)}`,
+        );
+        return false;
+      }
+      if (!validateEmail(formData.email.toLowerCase())) {
+        Alert.alert("Validation", "Please enter a valid email address.");
+        return false;
+      }
+      if (!validatePhoneNumber(formData.contactNo)) {
+        Alert.alert(
+          "Validation",
+          "Please enter a valid Philippine mobile number (e.g., 0912 345 6789).",
+        );
+        return false;
+      }
+      return true;
+    }
+
+    if (tab === 2) {
+      const missing = collectMissingFields().filter((key) =>
+        ["schoolId", "college", "department", "academicProgram", "yearLevel"].includes(key),
+      );
+
+      if (missing.length > 0) {
+        setValidationErrors(missing);
+        Alert.alert(
+          "Missing Information",
+          `Please fill in the following required School Information fields:\n\n${formatMissingFields(missing)}`,
+        );
+        return false;
+      }
+      return true;
+    }
+
+    const missing = collectMissingFields().filter((key) =>
+      ["nationality", "citizenship", "civilStatus", "genderIdentity", "provincialAddress"].includes(key),
+    );
 
     if (missing.length > 0) {
       setValidationErrors(missing);
-      return Alert.alert(
+      Alert.alert(
         "Missing Information",
-        "Please fill out all required Personal Information fields.",
+        `Please fill in the following required Personal Information fields:\n\n${formatMissingFields(missing)}`,
       );
+      return false;
     }
-    if (lsnStatus === "yes-with-id" && (!lsnDocument || lsnDocument.canceled)) {
-      return Alert.alert(
+    if (
+      lsnCategory !== "" &&
+      lsnDocumentChoice === "with-document" &&
+      (!lsnDocument || lsnDocument.canceled)
+    ) {
+      Alert.alert(
         "Validation",
         "Please upload a supporting document for LSN status.",
       );
+      return false;
     }
     if (!agreedToPolicy) {
-      return Alert.alert(
+      Alert.alert(
         "Agreement Required",
         "You must agree to the Privacy Policy to create an account.",
       );
+      return false;
     }
+    return true;
+  };
 
+  const validateAllFields = (): boolean => {
+    setError(null);
+    setValidationErrors([]);
+
+    const missing = collectMissingFields();
+    if (missing.length > 0) {
+      setValidationErrors(missing);
+      Alert.alert(
+        "Missing Information",
+        `Please fill in all required fields before proceeding:\n\n${formatMissingFields(missing)}`,
+      );
+      return false;
+    }
+    if (!validateEmail(formData.email.toLowerCase())) {
+      Alert.alert("Validation", "Please enter a valid email address.");
+      return false;
+    }
+    if (!validatePhoneNumber(formData.contactNo)) {
+      Alert.alert(
+        "Validation",
+        "Please enter a valid Philippine mobile number (e.g., 0912 345 6789).",
+      );
+      return false;
+    }
+    if (
+      lsnCategory !== "" &&
+      lsnDocumentChoice === "with-document" &&
+      (!lsnDocument || lsnDocument.canceled)
+    ) {
+      Alert.alert(
+        "Validation",
+        "Please upload a supporting document for LSN status.",
+      );
+      return false;
+    }
+    if (!agreedToPolicy) {
+      Alert.alert(
+        "Agreement Required",
+        "You must agree to the Privacy Policy to create an account.",
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const handleNextTab = () => {
+    if (activeTab === 4) return;
+    if (!validateTab(activeTab as 1 | 2 | 3)) return;
+    setActiveTab((activeTab + 1) as 1 | 2 | 3 | 4);
+  };
+
+  const handleGoToTab = (target: 1 | 2 | 3 | 4) => {
+    if (target === activeTab) return;
+    if (target < activeTab) {
+      setActiveTab(target);
+      return;
+    }
+    for (let tab = activeTab; tab < target; tab++) {
+      if (!validateTab(tab as 1 | 2 | 3)) return;
+    }
+    setActiveTab(target);
+  };
+
+  const handleOpenConfirmation = () => {
+    if (!validateAllFields()) return;
+    setShowSummaryModal(true);
+  };
+
+  const handleProceedToPassword = () => {
+    setShowSummaryModal(false);
     setShowConfirmModal(true);
   };
 
-  const handleFinalizeAccountCreation = async () => {
-    if (finalizing) return;
+  const startResendCooldown = () => {
+    setResendCooldown(45);
+    if (resendTimer.current) clearInterval(resendTimer.current);
+    resendTimer.current = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) {
+          if (resendTimer.current) clearInterval(resendTimer.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const handleRequestOtp = async () => {
+    if (otpSending) return;
+    const emailClean = sanitize(formData.email.toLowerCase(), 256);
+    setOtpSending(true);
+    setOtpError(null);
+    try {
+      const response = await fetch(
+        `${API_URL}/api/auth/register-otp/request`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: emailClean }),
+        },
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        setOtpError(data.error || "Unable to send verification code.");
+        Alert.alert(
+          "Verification Error",
+          data.error || "Unable to send verification code.",
+        );
+        return;
+      }
+      setShowConfirmModal(false);
+      setShowOtpModal(true);
+      startResendCooldown();
+      Alert.alert(
+        "Code Sent",
+        "We've sent a 6-digit verification code to your email.",
+      );
+    } catch (err: any) {
+      console.error("Request register OTP error:", err);
+      setOtpError("Network error. Please check your connection and try again.");
+      Alert.alert(
+        "Network Error",
+        "Unable to send verification code. Please check your connection.",
+      );
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0 || otpSending) return;
+    setOtpCode("");
+    setOtpError(null);
+    const emailClean = sanitize(formData.email.toLowerCase(), 256);
+    setOtpSending(true);
+    try {
+      const response = await fetch(
+        `${API_URL}/api/auth/register-otp/request`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: emailClean }),
+        },
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        setOtpError(data.error || "Unable to resend code.");
+        return;
+      }
+      startResendCooldown();
+      Alert.alert("Code Resent", "A new verification code has been sent to your email.");
+    } catch (err: any) {
+      console.error("Resend register OTP error:", err);
+      setOtpError("Network error. Please try again.");
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const handleConfirmPassword = async () => {
+    if (!validateAllFields()) return;
 
     if (!validatePassword(password)) {
       Alert.alert(
@@ -528,6 +891,46 @@ export default function RegisterScreen() {
       return;
     }
 
+    await handleRequestOtp();
+  };
+
+  const handleVerifyOtp = async () => {
+    setOtpError(null);
+    const codeClean = otpCode.trim();
+    if (!/^\d{6}$/.test(codeClean)) {
+      setOtpError("Please enter the 6-digit code.");
+      return;
+    }
+    const emailClean = sanitize(formData.email.toLowerCase(), 256);
+    setOtpVerifying(true);
+    try {
+      const response = await fetch(
+        `${API_URL}/api/auth/register-otp/verify`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: emailClean, otp: codeClean }),
+        },
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        setOtpError(data.error || "Unable to verify code.");
+        return;
+      }
+      setShowOtpModal(false);
+      setOtpCode("");
+      await handleFinalizeAccountCreation();
+    } catch (err: any) {
+      console.error("Verify register OTP error:", err);
+      setOtpError("Network error. Please try again.");
+    } finally {
+      setOtpVerifying(false);
+    }
+  };
+
+  const handleFinalizeAccountCreation = async () => {
+    if (finalizing) return;
+
     setFinalizing(true);
     const emailClean = sanitize(formData.email.toLowerCase(), 256);
     setLoading(true);
@@ -542,7 +945,12 @@ export default function RegisterScreen() {
 
       let lsnDocumentData = null;
       let lsnUploadAttempted = false;
-      if (lsnStatus === "yes-with-id" && lsnDocument && !lsnDocument.canceled) {
+      if (
+        lsnCategory !== "" &&
+        lsnDocumentChoice === "with-document" &&
+        lsnDocument &&
+        !lsnDocument.canceled
+      ) {
         lsnUploadAttempted = true;
         try {
           const netState = await NetInfo.fetch();
@@ -599,7 +1007,7 @@ export default function RegisterScreen() {
         nationality: sanitize(formData.nationality, 50),
         religiousAffiliation: sanitize(formData.religiousAffiliation, 100),
         culturalAffiliation: sanitize(formData.culturalAffiliation, 100),
-        contactNo: sanitize(formData.contactNo.replace(/[^0-9+]/g, ""), 20),
+        contactNo: sanitize(formData.contactNo, 20),
         emergencyContactPerson: sanitize(formData.emergencyContactPerson, 200),
         civilStatus: sanitize(formData.civilStatus, 50),
         citizenship: sanitize(formData.citizenship, 50),
@@ -608,9 +1016,10 @@ export default function RegisterScreen() {
         provincialAddress: sanitize(formData.provincialAddress, 500),
         createdAt: new Date().toISOString(),
         profileImage: profileImageUrlFinal,
-        isLSN: lsnStatus !== "no",
+        isLSN: lsnCategory !== "",
+        lsnCategory,
         specialNeedsType:
-          lsnStatus !== "no" ? sanitize(specialNeedsType, 150) : "",
+          lsnCategory !== "" ? sanitize(specialNeedsType, 150) : "",
         lsnDocument: lsnDocumentData,
         role: "student",
         keywords,
@@ -627,7 +1036,7 @@ export default function RegisterScreen() {
 
       router.replace("/(student)/(tabs)/dashboard");
     } catch (err: any) {
-      setShowConfirmModal(false);
+      setShowOtpModal(true);
       console.error("Registration error", err);
       let errorMessage = "An unexpected error occurred during registration.";
       if (err.code === "auth/email-already-in-use") {
@@ -677,7 +1086,7 @@ export default function RegisterScreen() {
                 styles.tabNavItem,
                 activeTab === 1 && styles.tabNavItemActive,
               ]}
-              onPress={() => setActiveTab(1)}
+              onPress={() => handleGoToTab(1)}
             >
               <View
                 style={[
@@ -709,7 +1118,7 @@ export default function RegisterScreen() {
                 styles.tabNavItem,
                 activeTab === 2 && styles.tabNavItemActive,
               ]}
-              onPress={() => handleNextTab()}
+              onPress={() => handleGoToTab(2)}
             >
               <View
                 style={[
@@ -741,10 +1150,7 @@ export default function RegisterScreen() {
                 styles.tabNavItem,
                 activeTab === 3 && styles.tabNavItemActive,
               ]}
-              onPress={() => {
-                if (activeTab === 1) handleNextTab();
-                else setActiveTab(3);
-              }}
+              onPress={() => handleGoToTab(3)}
             >
               <View
                 style={[
@@ -770,6 +1176,38 @@ export default function RegisterScreen() {
                 Personal Info
               </Text>
             </Pressable>
+
+            <Pressable
+              style={[
+                styles.tabNavItem,
+                activeTab === 4 && styles.tabNavItemActive,
+              ]}
+              onPress={() => handleGoToTab(4)}
+            >
+              <View
+                style={[
+                  styles.tabBadge,
+                  activeTab === 4 && styles.tabBadgeActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tabBadgeText,
+                    activeTab === 4 && styles.tabBadgeTextActive,
+                  ]}
+                >
+                  4
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.tabNavText,
+                  activeTab === 4 && styles.tabNavTextActive,
+                ]}
+              >
+                Review
+              </Text>
+            </Pressable>
           </View>
 
           {/* Form Card Container */}
@@ -778,9 +1216,10 @@ export default function RegisterScreen() {
             {activeTab === 1 && (
               <View>
                 <Text style={styles.stepTitle}>Step 1: Your Profile</Text>
-                <Text style={styles.stepSubtitle}>
-                  Enter your core contact and personal details.
-                </Text>
+                <AccessibleText
+                  text="Enter your core contact and personal details."
+                  style={styles.stepSubtitle}
+                />
 
                 {/* Profile Image Picker */}
                 <View style={styles.avatarSection}>
@@ -902,13 +1341,16 @@ export default function RegisterScreen() {
                       validationErrors.includes("contactNo") &&
                         styles.inputError,
                     ]}
-                    placeholder="Enter your phone number"
+                    placeholder="0912 345 6789"
                     placeholderTextColor="#94A3B8"
-                    value={formData.contactNo}
+                    value={mobileNumberDisplay}
                     onChangeText={(text) => {
+                      const { formattedValue, rawValue } =
+                        formatPhilippineMobileNumber(text);
+                      setMobileNumberDisplay(formattedValue);
                       setFormData((prev) => ({
                         ...prev,
-                        contactNo: text.replace(/[^0-9+\-() ]/g, ""),
+                        contactNo: rawValue,
                       }));
                       if (validationErrors.includes("contactNo"))
                         setValidationErrors((p) =>
@@ -916,6 +1358,7 @@ export default function RegisterScreen() {
                         );
                     }}
                     keyboardType="phone-pad"
+                    maxLength={13}
                   />
                   {validationErrors.includes("contactNo") ? <Text style={styles.fieldError}>Phone number is required</Text> : null}
                 </View>
@@ -937,9 +1380,10 @@ export default function RegisterScreen() {
             {activeTab === 2 && (
               <View>
                 <Text style={styles.stepTitle}>Step 2: School Information</Text>
-                <Text style={styles.stepSubtitle}>
-                  Provide your academic credentials and program.
-                </Text>
+                <AccessibleText
+                  text="Provide your academic credentials and program."
+                  style={styles.stepSubtitle}
+                />
 
                 <View style={styles.inputContainer}>
                   <View style={styles.inputHeader}>
@@ -1356,9 +1800,10 @@ export default function RegisterScreen() {
                 <Text style={styles.stepTitle}>
                   Step 3: Personal Information
                 </Text>
-                <Text style={styles.stepSubtitle}>
-                  Additional background, demographics, and support needs.
-                </Text>
+                <AccessibleText
+                  text="Additional background, demographics, and support needs."
+                  style={styles.stepSubtitle}
+                />
 
                 <View style={styles.inputContainer}>
                   <View style={styles.inputHeader}>
@@ -1630,62 +2075,93 @@ export default function RegisterScreen() {
                       Learner with Special Needs (LSN)
                     </Text>
                   </View>
+
+                  <Text style={styles.subFieldLabel}>
+                    LSN Classification *
+                  </Text>
                   <View style={styles.lsnOptionContainer}>
                     <Pressable
                       style={[
-                        styles.listOption,
-                        lsnStatus === "yes-with-id" &&
-                          styles.listOptionSelected,
+                        styles.radioOption,
+                        lsnCategory === "additional-needs" &&
+                          styles.radioOptionSelected,
                       ]}
-                      onPress={() => setLsnStatus("yes-with-id")}
+                      onPress={() => {
+                        setLsnCategory("additional-needs");
+                        if (lsnCategory === "") setLsnDocumentChoice("none");
+                      }}
                     >
+                      <View style={styles.radioOuter}>
+                        {lsnCategory === "additional-needs" && (
+                          <View style={styles.radioInner} />
+                        )}
+                      </View>
                       <Text
                         style={[
-                          styles.listOptionText,
-                          lsnStatus === "yes-with-id" &&
-                            styles.listOptionSelectedText,
+                          styles.radioOptionText,
+                          lsnCategory === "additional-needs" &&
+                            styles.radioOptionTextSelected,
                         ]}
                       >
-                        Yes, with ID/Certificate
+                        Students with Additional Needs
                       </Text>
                     </Pressable>
                     <Pressable
                       style={[
-                        styles.listOption,
-                        lsnStatus === "yes-no-id" && styles.listOptionSelected,
+                        styles.radioOption,
+                        lsnCategory === "disabilities" &&
+                          styles.radioOptionSelected,
                       ]}
-                      onPress={() => setLsnStatus("yes-no-id")}
+                      onPress={() => {
+                        setLsnCategory("disabilities");
+                        if (lsnCategory === "") setLsnDocumentChoice("none");
+                      }}
                     >
+                      <View style={styles.radioOuter}>
+                        {lsnCategory === "disabilities" && (
+                          <View style={styles.radioInner} />
+                        )}
+                      </View>
                       <Text
                         style={[
-                          styles.listOptionText,
-                          lsnStatus === "yes-no-id" &&
-                            styles.listOptionSelectedText,
+                          styles.radioOptionText,
+                          lsnCategory === "disabilities" &&
+                            styles.radioOptionTextSelected,
                         ]}
                       >
-                        Yes, no ID available
+                        Students with Disabilities
                       </Text>
                     </Pressable>
                     <Pressable
                       style={[
-                        styles.listOption,
-                        lsnStatus === "no" && styles.listOptionSelected,
+                        styles.radioOption,
+                        lsnCategory === "" && styles.radioOptionSelected,
                       ]}
-                      onPress={() => setLsnStatus("no")}
+                      onPress={() => {
+                        setLsnCategory("");
+                        setLsnDocumentChoice("none");
+                        setLsnDocument(null);
+                        setUploadProgress(0);
+                      }}
                     >
+                      <View style={styles.radioOuter}>
+                        {lsnCategory === "" && (
+                          <View style={styles.radioInner} />
+                        )}
+                      </View>
                       <Text
                         style={[
-                          styles.listOptionText,
-                          lsnStatus === "no" && styles.listOptionSelectedText,
+                          styles.radioOptionText,
+                          lsnCategory === "" && styles.radioOptionTextSelected,
                         ]}
                       >
-                        No
+                        None (not a Learner with Special Needs)
                       </Text>
                     </Pressable>
                   </View>
                 </View>
 
-                {lsnStatus !== "no" && (
+                {lsnCategory !== "" && (
                   <View style={styles.conditionalSection}>
                     <View style={styles.inputContainer}>
                       <View style={styles.inputHeader}>
@@ -1707,72 +2183,85 @@ export default function RegisterScreen() {
                       />
                     </View>
 
-                    {lsnStatus === "yes-with-id" && (
-                      <View style={styles.inputContainer}>
-                        <View style={styles.inputHeader}>
-                          <Ionicons
-                            name="cloud-upload-outline"
-                            size={18}
-                            color="#7C3AED"
-                          />
-                          <Text style={styles.inputLabel}>
-                            Upload Supporting Document
-                          </Text>
-                        </View>
-                        {lsnDocument && !lsnDocument.canceled ? (
-                          <View style={styles.filePreview}>
-                            <Ionicons
-                              name="document-text-outline"
-                              size={24}
-                              color="#7C3AED"
-                            />
-                            <View style={{ flex: 1, marginLeft: 12 }}>
-                              <Text style={styles.fileName} numberOfLines={1}>
-                                {(lsnDocument.assets[0] as any).name}
-                              </Text>
-                              {uploadProgress > 0 && uploadProgress < 100 ? (
-                                <View style={styles.progressBarContainer}>
-                                  <View
-                                    style={[
-                                      styles.progressBar,
-                                      { width: `${uploadProgress}%` },
-                                    ]}
-                                  />
-                                </View>
-                              ) : (
-                                <Text style={styles.fileStatus}>
-                                  {uploadProgress === 100
-                                    ? "✓ Uploaded"
-                                    : "✓ Ready to upload"}
-                                </Text>
-                              )}
-                            </View>
-                            <Pressable
-                              onPress={() => {
-                                setLsnDocument(null);
-                                setUploadProgress(0);
-                              }}
-                            >
-                              <Ionicons
-                                name="close-circle"
-                                size={24}
-                                color="#EF4444"
-                              />
-                            </Pressable>
+                    <View style={styles.inputContainer}>
+                      <View style={styles.inputHeader}>
+                        <Ionicons
+                          name="cloud-upload-outline"
+                          size={18}
+                          color="#7C3AED"
+                        />
+                        <Text style={styles.inputLabel}>
+                          Supporting Document
+                        </Text>
+                      </View>
+                      <View style={styles.lsnOptionContainer}>
+                        <Pressable
+                          style={[
+                            styles.radioOption,
+                            lsnDocumentChoice === "with-document" &&
+                              styles.radioOptionSelected,
+                          ]}
+                          onPress={() => setLsnDocumentChoice("with-document")}
+                        >
+                          <View style={styles.radioOuter}>
+                            {lsnDocumentChoice === "with-document" && (
+                              <View style={styles.radioInner} />
+                            )}
                           </View>
-                        ) : (
-                          <Pressable
-                            style={styles.uploadButton}
-                            onPress={handlePickDocument}
-                            android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
+                          <Text
+                            style={[
+                              styles.radioOptionText,
+                              lsnDocumentChoice === "with-document" &&
+                                styles.radioOptionTextSelected,
+                            ]}
                           >
-                            <Text style={styles.uploadButtonText}>
-                              Select File (PDF, JPG, PNG)
-                            </Text>
-                          </Pressable>
-                        )}
+                            Yes, with ID/Certificate
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          style={[
+                            styles.radioOption,
+                            lsnDocumentChoice === "none" &&
+                              styles.radioOptionSelected,
+                          ]}
+                          onPress={() => {
+                            setLsnDocumentChoice("none");
+                            setLsnDocument(null);
+                            setUploadProgress(0);
+                          }}
+                        >
+                          <View style={styles.radioOuter}>
+                            {lsnDocumentChoice === "none" && (
+                              <View style={styles.radioInner} />
+                            )}
+                          </View>
+                          <Text
+                            style={[
+                              styles.radioOptionText,
+                              lsnDocumentChoice === "none" &&
+                                styles.radioOptionTextSelected,
+                            ]}
+                          >
+                            None (no supporting document available)
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </View>
+
+                    {lsnDocumentChoice === "with-document" && (
+                      <View style={styles.inputContainer}>
+                        <LsnDocumentPreview
+                          lsnDocument={lsnDocument}
+                          onReplace={handlePickDocument}
+                          onRemove={() => {
+                            setLsnDocument(null);
+                            setUploadProgress(0);
+                          }}
+                          progress={uploadProgress}
+                        />
                       </View>
                     )}
+
                     <View style={styles.privacyNotice}>
                       <Ionicons
                         name="lock-closed-outline"
@@ -1825,6 +2314,148 @@ export default function RegisterScreen() {
                     <Text style={styles.prevStepButtonText}>Back</Text>
                   </Pressable>
                   <Pressable
+                    style={styles.nextStepButton}
+                    onPress={handleNextTab}
+                    android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
+                  >
+                    <Text style={styles.nextStepButtonText}>
+                      Next: Review
+                    </Text>
+                    <Ionicons name="arrow-forward" size={18} color="white" />
+                  </Pressable>
+                </View>
+              </View>
+            )}
+
+            {/* ──────── TAB 4: REVIEW ──────── */}
+            {activeTab === 4 && (
+              <View>
+                <Text style={styles.stepTitle}>Step 4: Review</Text>
+                <AccessibleText
+                  text="Double-check your details and supporting document before creating your account."
+                  style={styles.stepSubtitle}
+                />
+
+                <View style={styles.reviewSection}>
+                  <Text style={styles.reviewSectionTitle}>Profile</Text>
+                  <ReviewRow label="Full Name" value={formData.fullName} />
+                  <ReviewRow label="Email" value={formData.email} />
+                  <ReviewRow
+                    label="Contact No."
+                    value={
+                      formData.contactNo
+                        ? formatPhilippineMobileNumber(formData.contactNo)
+                            .formattedValue
+                        : ""
+                    }
+                  />
+                  <ReviewRow
+                    label="Date of Birth"
+                    value={formData.dateOfBirth}
+                  />
+                </View>
+
+                <View style={styles.reviewSection}>
+                  <Text style={styles.reviewSectionTitle}>School Information</Text>
+                  <ReviewRow label="School ID" value={formData.schoolId} />
+                  <ReviewRow label="College / University" value={formData.college} />
+                  <ReviewRow label="Department" value={formData.department} />
+                  <ReviewRow label="Academic Program" value={formData.academicProgram} />
+                  <ReviewRow label="Year Level" value={formData.yearLevel} />
+                </View>
+
+                <View style={styles.reviewSection}>
+                  <Text style={styles.reviewSectionTitle}>
+                    Personal Information
+                  </Text>
+                  <ReviewRow label="Nationality" value={formData.nationality} />
+                  <ReviewRow label="Citizenship" value={formData.citizenship} />
+                  <ReviewRow label="Civil Status" value={formData.civilStatus} />
+                  <ReviewRow label="Gender Identity" value={formData.genderIdentity} />
+                  <ReviewRow
+                    label="Religious Affiliation"
+                    value={formData.religiousAffiliation}
+                  />
+                  <ReviewRow
+                    label="Cultural Affiliation"
+                    value={formData.culturalAffiliation}
+                  />
+                  <ReviewRow
+                    label="Provincial Address"
+                    value={formData.provincialAddress}
+                  />
+                  <ReviewRow
+                    label="Emergency Contact"
+                    value={formData.emergencyContactPerson}
+                  />
+                </View>
+
+                <View style={styles.reviewSection}>
+                  <Text style={styles.reviewSectionTitle}>Learner Support</Text>
+                  <ReviewRow
+                    label="LSN Classification"
+                    value={formatLsnCategory(lsnCategory)}
+                  />
+                  <ReviewRow
+                    label="Supporting Document"
+                    value={
+                      lsnCategory === ""
+                        ? "Not required"
+                        : lsnDocumentChoice === "none"
+                        ? "None (no supporting document available)"
+                        : lsnDocument && !lsnDocument.canceled
+                        ? (lsnDocument.assets[0] as any).name
+                        : "Not yet uploaded"
+                    }
+                  />
+                  {lsnCategory !== "" && (
+                    <View style={styles.reviewDocBlock}>
+                      <View style={styles.reviewDocHeader}>
+                        <Ionicons
+                          name="document-attach-outline"
+                          size={18}
+                          color="#7C3AED"
+                        />
+                        <Text style={styles.reviewDocTitle}>
+                          Document Verification
+                        </Text>
+                      </View>
+                      <LsnDocumentPreview
+                        lsnDocument={lsnDocument}
+                        onReplace={handlePickDocument}
+                        onRemove={() => {
+                          setLsnDocument(null);
+                          setUploadProgress(0);
+                        }}
+                        progress={uploadProgress}
+                      />
+                      <Text style={styles.reviewDocHint}>
+                        You can replace or remove this document before
+                        finalizing your registration.
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.agreementSummary}>
+                  <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
+                  <Text style={styles.agreementSummaryText}>
+                    I have read and agreed to the Privacy Policy.
+                  </Text>
+                </View>
+
+                {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+                <View style={styles.stepButtonRow}>
+                  <Pressable
+                    style={styles.prevStepButton}
+                    onPress={() => setActiveTab(3)}
+                    android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
+                  >
+                    <Ionicons name="arrow-back" size={18} color="#334155" />
+                    <Text style={styles.prevStepButtonText}>Back</Text>
+                  </Pressable>
+                  <Pressable
                     style={[
                       styles.createAccountButton,
                       loading && { opacity: 0.6 },
@@ -1855,6 +2486,75 @@ export default function RegisterScreen() {
           </View>
         </ScrollView>
 
+        {/* Pre-Confirmation Summary Modal */}
+        <Modal
+          visible={showSummaryModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowSummaryModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.summaryIconContainer}>
+                <Ionicons name="clipboard-outline" size={28} color="#7C3AED" />
+              </View>
+              <Text style={styles.modalTitle}>Confirm Your Details</Text>
+              <Text style={styles.modalSubtitle}>
+                Please review your registration details before proceeding.
+              </Text>
+              <View style={styles.summaryCard}>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Full Name</Text>
+                  <Text style={styles.summaryValue} numberOfLines={1}>
+                    {sanitize(formData.fullName, 200) || "—"}
+                  </Text>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Email</Text>
+                  <Text style={styles.summaryValue} numberOfLines={1}>
+                    {sanitize(formData.email.toLowerCase(), 256) || "—"}
+                  </Text>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Mobile Number</Text>
+                  <Text style={styles.summaryValue}>
+                    {mobileNumberDisplay || "—"}
+                  </Text>
+                </View>
+                <View style={styles.summaryDivider} />
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>LSN Category</Text>
+                  <Text style={styles.summaryValue}>
+                    {lsnCategory !== ""
+                      ? formatLsnCategory(lsnCategory)
+                      : "Not a learner with special needs"}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.modalActions}>
+                <Pressable
+                  style={[styles.modalButton, styles.modalCancelButton]}
+                  onPress={() => setShowSummaryModal(false)}
+                  android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
+                >
+                  <Text style={styles.modalCancelText}>Back</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.modalButton, styles.modalConfirmButton]}
+                  onPress={handleProceedToPassword}
+                  android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
+                >
+                  <Text style={styles.modalConfirmText}>
+                    Proceed to Password
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
         {/* Final Password Confirmation Modal */}
         <Modal
           visible={showConfirmModal}
@@ -1878,19 +2578,9 @@ export default function RegisterScreen() {
                     placeholderTextColor="#94A3B8"
                     value={password}
                     onChangeText={setPassword}
-                    secureTextEntry={!showPassword}
+                    secureTextEntry={!showPasswords}
                     autoCapitalize="none"
                   />
-                  <Pressable
-                    style={styles.eyeIconButton}
-                    onPress={() => setShowPassword((p) => !p)}
-                  >
-                    <Ionicons
-                      name={showPassword ? "eye-outline" : "eye-off-outline"}
-                      size={20}
-                      color="#64748B"
-                    />
-                  </Pressable>
                 </View>
               </View>
               <View style={styles.modalInputGroup}>
@@ -1902,23 +2592,24 @@ export default function RegisterScreen() {
                     placeholderTextColor="#94A3B8"
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
-                    secureTextEntry={!showConfirmPassword}
+                    secureTextEntry={!showPasswords}
                     autoCapitalize="none"
                   />
-                  <Pressable
-                    style={styles.eyeIconButton}
-                    onPress={() => setShowConfirmPassword((p) => !p)}
-                  >
-                    <Ionicons
-                      name={
-                        showConfirmPassword ? "eye-outline" : "eye-off-outline"
-                      }
-                      size={20}
-                      color="#64748B"
-                    />
-                  </Pressable>
                 </View>
               </View>
+              <Pressable
+                style={styles.showPasswordRow}
+                onPress={() => setShowPasswords((p) => !p)}
+              >
+                <Ionicons
+                  name={showPasswords ? "eye-outline" : "eye-off-outline"}
+                  size={18}
+                  color="#7C3AED"
+                />
+                <Text style={styles.showPasswordLabel}>
+                  {showPasswords ? "Hide passwords" : "Show passwords"}
+                </Text>
+              </Pressable>
               <View style={styles.modalActions}>
                 <Pressable
                   style={[styles.modalButton, styles.modalCancelButton]}
@@ -1927,7 +2618,7 @@ export default function RegisterScreen() {
                     setPassword("");
                     setConfirmPassword("");
                   }}
-                  disabled={finalizing}
+                  disabled={otpSending}
                   android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
                 >
                   <Text style={styles.modalCancelText}>Cancel</Text>
@@ -1936,16 +2627,102 @@ export default function RegisterScreen() {
                   style={[
                     styles.modalButton,
                     styles.modalConfirmButton,
-                    finalizing && { opacity: 0.7 },
+                    otpSending && { opacity: 0.7 },
                   ]}
-                  onPress={handleFinalizeAccountCreation}
-                  disabled={finalizing}
+                  onPress={handleConfirmPassword}
+                  disabled={otpSending}
                   android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
                 >
-                  {finalizing ? (
+                  {otpSending ? (
                     <ActivityIndicator color="white" />
                   ) : (
-                    <Text style={styles.modalConfirmText}>Confirm</Text>
+                    <Text style={styles.modalConfirmText}>Continue</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* OTP Verification Modal */}
+        <Modal
+          visible={showOtpModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowOtpModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.summaryIconContainer}>
+                <Ionicons name="mail-outline" size={28} color="#7C3AED" />
+              </View>
+              <Text style={styles.modalTitle}>Verify Your Email</Text>
+              <Text style={styles.modalSubtitle}>
+                We sent a 6-digit code to{"\n"}
+                <Text style={styles.modalSubtitleEmail}>
+                  {sanitize(formData.email.toLowerCase(), 256)}
+                </Text>
+              </Text>
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalInputLabel}>Verification Code</Text>
+                <View style={styles.passwordInputContainer}>
+                  <TextInput
+                    style={styles.otpInput}
+                    placeholder="000000"
+                    placeholderTextColor="#94A3B8"
+                    value={otpCode}
+                    onChangeText={(text) =>
+                      setOtpCode(text.replace(/[^0-9]/g, "").slice(0, 6))
+                    }
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    editable={!otpVerifying && !otpSending}
+                  />
+                </View>
+              </View>
+              {otpError ? (
+                <Text style={styles.otpErrorText}>{otpError}</Text>
+              ) : null}
+              <Pressable
+                style={styles.showPasswordRow}
+                onPress={handleResendOtp}
+                disabled={resendCooldown > 0 || otpSending || otpVerifying}
+              >
+                <Text
+                  style={[
+                    styles.resendText,
+                    (resendCooldown > 0 || otpSending || otpVerifying) &&
+                      styles.resendTextDisabled,
+                  ]}
+                >
+                  {resendCooldown > 0
+                    ? `Resend code in ${resendCooldown}s`
+                    : "Resend code"}
+                </Text>
+              </Pressable>
+              <View style={styles.modalActions}>
+                <Pressable
+                  style={[styles.modalButton, styles.modalCancelButton]}
+                  onPress={() => setShowOtpModal(false)}
+                  disabled={otpVerifying || otpSending}
+                  android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.modalButton,
+                    styles.modalConfirmButton,
+                    (otpVerifying || otpSending) && { opacity: 0.7 },
+                  ]}
+                  onPress={handleVerifyOtp}
+                  disabled={otpVerifying || otpSending}
+                  android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
+                >
+                  {otpVerifying ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text style={styles.modalConfirmText}>Verify</Text>
                   )}
                 </Pressable>
               </View>
@@ -2273,6 +3050,54 @@ const styles = StyleSheet.create({
   lsnOptionContainer: {
     gap: 8,
   },
+  subFieldLabel: {
+    fontSize: 12,
+    color: "#64748B",
+    fontWeight: "700",
+    marginBottom: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  radioOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    gap: 10,
+  },
+  radioOptionSelected: {
+    backgroundColor: "#EDE9FE",
+    borderColor: "#7C3AED",
+  },
+  radioOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: "#CBD5E1",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#7C3AED",
+  },
+  radioOptionText: {
+    fontSize: 14,
+    color: "#334155",
+    fontWeight: "600",
+    flex: 1,
+  },
+  radioOptionTextSelected: {
+    color: "#7C3AED",
+    fontWeight: "800",
+  },
   conditionalSection: {
     backgroundColor: "#FAF5FF",
     borderRadius: 16,
@@ -2289,6 +3114,9 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 20,
     alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
   },
   uploadButtonText: {
     color: "#7C3AED",
@@ -2312,6 +3140,37 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#16A34A",
     fontWeight: "700",
+  },
+  documentPreviewContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  documentThumbnail: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    backgroundColor: "#F1F5F9",
+  },
+  documentBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    backgroundColor: "#F3E8FF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  documentPreviewInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  documentActionButton: {
+    padding: 8,
+    marginLeft: 4,
   },
   privacyNotice: {
     flexDirection: "row",
@@ -2375,6 +3234,87 @@ const styles = StyleSheet.create({
     color: "#7C3AED",
     fontWeight: "800",
     textDecorationLine: "underline",
+  },
+  reviewSection: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+  reviewSectionTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#7C3AED",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  reviewRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    paddingVertical: 7,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#E2E8F0",
+  },
+  reviewRowLabel: {
+    fontSize: 13,
+    color: "#64748B",
+    fontWeight: "600",
+    flex: 1,
+    paddingRight: 12,
+  },
+  reviewRowValue: {
+    fontSize: 13,
+    color: "#0F172A",
+    fontWeight: "700",
+    flex: 1.4,
+    textAlign: "right",
+  },
+  reviewDocBlock: {
+    marginTop: 10,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#EDE9FE",
+  },
+  reviewDocHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  reviewDocTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#7C3AED",
+  },
+  reviewDocHint: {
+    fontSize: 12,
+    color: "#64748B",
+    marginTop: 8,
+    fontWeight: "500",
+    lineHeight: 17,
+  },
+  agreementSummary: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#F0FDF4",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+    marginBottom: 4,
+  },
+  agreementSummaryText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#166534",
+    fontWeight: "600",
   },
   // Modal Styles
   modalOverlay: {
@@ -2442,6 +3382,91 @@ const styles = StyleSheet.create({
   modalConfirmText: {
     color: "white",
     fontWeight: "700",
+  },
+  summaryIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#F3EAFF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  summaryCard: {
+    width: "100%",
+    backgroundColor: "#F8FAFC",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    marginBottom: 4,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  summaryLabel: {
+    fontSize: 13,
+    color: "#64748B",
+    fontWeight: "600",
+    flexShrink: 0,
+  },
+  summaryValue: {
+    fontSize: 14,
+    color: "#0F172A",
+    fontWeight: "700",
+    flex: 1,
+    textAlign: "right",
+  },
+  summaryDivider: {
+    height: 1,
+    backgroundColor: "#E2E8F0",
+    marginVertical: 10,
+  },
+  modalSubtitleEmail: {
+    fontWeight: "700",
+    color: "#7C3AED",
+  },
+  showPasswordRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 8,
+    marginBottom: 4,
+  },
+  showPasswordLabel: {
+    fontSize: 13,
+    color: "#7C3AED",
+    fontWeight: "600",
+  },
+  otpInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#0F172A",
+    letterSpacing: 8,
+    textAlign: "center",
+  },
+  otpErrorText: {
+    color: "#DC2626",
+    fontSize: 13,
+    fontWeight: "500",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  resendText: {
+    fontSize: 14,
+    color: "#7C3AED",
+    fontWeight: "600",
+    padding: 6,
+  },
+  resendTextDisabled: {
+    color: "#94A3B8",
   },
   avatarSection: {
     alignItems: "center",

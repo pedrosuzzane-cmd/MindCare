@@ -21,6 +21,15 @@ interface StudentSummary {
   latestTotalScore?: number;
   assessmentsCount: number;
   profileImage?: string;
+  isLSN?: boolean;
+  lsnCategory?: string;
+  specialNeedsType?: string;
+}
+
+function formatLsnCategory(category?: string): string {
+  if (category === "additional-needs") return "Students with Additional Needs";
+  if (category === "disabilities") return "Students with Disabilities";
+  return "LSN";
 }
 
 interface StudentListModalProps {
@@ -106,37 +115,36 @@ export function StudentListModal({
                         }
                       }}
                     >
-                      <View style={styles.studentCardRow}>
-                        <View style={styles.studentAvatarCircle}>
-                          {student.profileImage ? (
-                            <Image
-                              source={{ uri: student.profileImage }}
-                              style={{ width: 40, height: 40, borderRadius: 20 }}
-                            />
-                          ) : (
-                            <Text style={styles.studentAvatarText}>
-                              {student.name.charAt(0).toUpperCase()}
-                            </Text>
-                          )}
-                        </View>
-                        <View style={styles.studentHeader}>
-                          <View style={styles.studentIdentityBlock}>
+                      <View style={styles.cardHeader}>
+                        <View style={styles.leftSection}>
+                          <View style={styles.studentAvatarCircle}>
+                            {student.profileImage ? (
+                              <Image
+                                source={{ uri: student.profileImage }}
+                                style={{ width: 40, height: 40, borderRadius: 20 }}
+                              />
+                            ) : (
+                              <Text style={styles.studentAvatarText}>
+                                {student.name.charAt(0).toUpperCase()}
+                              </Text>
+                            )}
+                          </View>
+                          <View style={styles.studentIdentity}>
                             <View style={styles.studentNameRow}>
-                              <Text style={styles.studentName}>{student.name}</Text>
+                              <Text style={styles.studentName} numberOfLines={1}>
+                                {student.name}
+                              </Text>
                               <Ionicons name="chevron-forward" size={14} color="#8A63D2" />
                             </View>
-                            <Text style={styles.studentMeta}>
-                              {student.yearLevel}
+                            <Text style={styles.studentMeta} numberOfLines={1}>
+                              {student.yearLevel} • {student.department}
                             </Text>
                           </View>
-                          <View style={styles.studentInfoBlock}>
-                            <Text style={styles.studentId}>
-                              {student.schoolId}
-                            </Text>
-                            <Text style={styles.studentCourse}>
-                              {student.department}
-                            </Text>
-                          </View>
+                        </View>
+                        <View style={styles.rightSection}>
+                          <Text style={styles.studentId} numberOfLines={1}>
+                            {student.schoolId}
+                          </Text>
                         </View>
                       </View>
 
@@ -173,8 +181,24 @@ export function StudentListModal({
                         </View>
                       )}
 
-                      <View style={styles.studentStatsRow}>
-                        <View style={styles.statItemWide}>
+                      {student.isLSN && (
+                        <View style={styles.lsnBadgeRow}>
+                          <Ionicons
+                            name="accessibility"
+                            size={12}
+                            color="#7C3AED"
+                          />
+                          <Text style={styles.lsnBadgeText} numberOfLines={2}>
+                            {formatLsnCategory(student.lsnCategory)}
+                            {student.specialNeedsType
+                              ? ` · ${student.specialNeedsType}`
+                              : ""}
+                          </Text>
+                        </View>
+                      )}
+
+                      <View style={styles.cardFooter}>
+                        <View style={styles.footerStat}>
                           <Text style={styles.statLabel}>Concern Level</Text>
                           <Text
                             style={[
@@ -195,9 +219,9 @@ export function StudentListModal({
                                   : "N/A"}
                           </Text>
                         </View>
-                        <View style={styles.statItemWide}>
+                        <View style={[styles.footerStat, styles.footerStatRight]}>
                           <Text style={styles.statLabel}>Score</Text>
-                          <Text style={styles.statValueHighlight}>
+                          <Text style={styles.scoreValue}>
                             {student.latestTotalScore ?? "N/A"}
                           </Text>
                         </View>
@@ -252,7 +276,14 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 14,
   },
-  studentCardRow: {
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  leftSection: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -270,36 +301,61 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
   },
-  studentHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 8,
+  studentIdentity: {
+    flex: 1,
+    minWidth: 0,
   },
-  studentIdentityBlock: { flex: 1, paddingRight: 12 },
-  studentInfoBlock: { alignItems: "flex-end", maxWidth: "45%" },
   studentName: { fontSize: 16, fontWeight: "800", color: "#8A63D2" },
   studentNameRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  rightSection: {
+    maxWidth: "42%",
+    alignItems: "flex-end",
+  },
   studentId: {
     fontSize: 13,
     fontWeight: "800",
     color: "#0B3D91",
     textAlign: "right",
   },
-  studentCourse: {
+  studentMeta: { fontSize: 12, color: "#475569", marginTop: 2 },
+  lsnBadgeRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    backgroundColor: "#EDE9FE",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 12,
+  },
+  lsnBadgeText: {
+    flex: 1,
     fontSize: 12,
     fontWeight: "700",
-    color: "#334155",
-    marginTop: 2,
-    textAlign: "right",
+    color: "#6D28D9",
+    lineHeight: 16,
   },
-  studentMeta: { fontSize: 12, color: "#475569" },
-  studentStatsRow: {
+  cardFooter: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 4,
+    alignItems: "flex-start",
+    gap: 12,
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
   },
-  statItemWide: { width: "48%" },
+  footerStat: {
+    flex: 1,
+    minWidth: 0,
+  },
+  footerStatRight: {
+    alignItems: "flex-end",
+  },
+  scoreValue: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#0B3D91",
+  },
   statLabel: {
     fontSize: 11,
     color: "#64748B",

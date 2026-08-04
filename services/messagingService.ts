@@ -330,6 +330,13 @@ export async function getOrCreatePeerConversation(
       lastMessageAt: Date.now(),
       unreadBy: [],
     });
+  } else if (!snap.data().participants) {
+    // Migrate old conversations that lack the participants field
+    await setDoc(
+      conversationRef,
+      { participants: [uidA, uidB] },
+      { merge: true },
+    );
   }
 
   return conversationId;

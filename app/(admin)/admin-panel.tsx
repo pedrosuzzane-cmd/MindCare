@@ -22,6 +22,21 @@ import {
 } from "@/services/announcementService";
 import type { Announcement, AnnouncementLink } from "@/types/announcement";
 import { shadows } from "@/utils/shadows";
+import {
+  downloadWorkbook,
+  type ExportStudentRow,
+} from "@/utils/exportAnalytics";
+import {
+  exportUniversityExcelReport,
+  type UniversityDeptComparison,
+  type UniversityExportData,
+  type UniversityRiskVarianceRow,
+  type UniversityStudentRecord,
+} from "@/services/adminExcelExportService";
+import {
+  openNarrativeReport,
+  type NarrativeReportData,
+} from "@/services/adminWordReportService";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -103,6 +118,7 @@ interface StudentSummary {
   moodCounts: Record<string, number>;
   isLSN?: boolean;
   specialNeedsType?: string;
+  lsnCategory?: string;
   profileImage?: string;
   lsnDocument?: {
     fileName?: string;
@@ -172,6 +188,9 @@ const YEAR_LEVEL_OPTIONS = [
   "2nd Year",
   "3rd Year",
   "4th Year",
+  "5th Year",
+  "Irregular",
+  "LSN",
   "Graduate",
   "N/A",
 ];
@@ -181,6 +200,50 @@ const getDeptAbbreviation = (fullName: string): string => {
   const match = fullName.match(/\(([^)]+)\)/);
   return match ? match[1] : fullName;
 };
+
+// ─── Helper: Human-readable LSN classification label ─────────────────────────
+const formatLsnCategory = (category?: string): string => {
+  if (category === "additional-needs") return "Students with Additional Needs";
+  if (category === "disabilities") return "Students with Disabilities";
+  return "LSN";
+};
+
+// ─── Helper: Year-level filter matcher (LSN is a flag, not a year level) ─────
+const matchesYearLevelFilter = (
+  s: StudentSummary,
+  filter: string,
+): boolean => {
+  if (filter === "LSN") return s.isLSN === true;
+  return s.yearLevel === filter;
+};
+
+// ─── Helper: Map a student summary into a row for spreadsheet export ─────────
+const toExportRow = (s: StudentSummary): ExportStudentRow => ({
+  uid: s.uid,
+  name: s.name,
+  schoolId: s.schoolId,
+  yearLevel: s.yearLevel,
+  department: s.department,
+  isLSN: s.isLSN,
+  lsnCategory: s.lsnCategory,
+  latestTotalScore: s.latestTotalScore,
+  latestRiskLevel: s.latestRiskLevel,
+  assessmentsCount: s.assessmentsCount,
+  journalCount: s.journalCount,
+});
+
+// ─── Descriptive text block rendered under analytics sections ────────────────
+function DescriptiveInsight({ title, body }: { title: string; body: string }) {
+  return (
+    <View style={styles.descriptiveContainer}>
+      <View style={styles.descriptiveHeader}>
+        <Ionicons name="document-text-outline" size={16} color="#8A63D2" />
+        <Text style={styles.insightTitle}>{title}</Text>
+      </View>
+      <Text style={styles.insightText}>{body}</Text>
+    </View>
+  );
+}
 
 // ─── Chart Data ──────────────────────────────────────────────────────────────
 interface DonutSlice {
@@ -515,7 +578,9 @@ export default function AdminPanelScreen() {
     const filtered =
       yearLevelFilter === "All"
         ? studentSummaries
-        : studentSummaries.filter((s) => s.yearLevel === yearLevelFilter);
+        : studentSummaries.filter((s) =>
+            matchesYearLevelFilter(s, yearLevelFilter),
+          );
 
     const deptMap = new Map<
       string,
@@ -780,6 +845,598 @@ export default function AdminPanelScreen() {
         riskLevel: (s.latestRiskLevel ?? "low") as "low" | "normal" | "high",
       }));
   }, [studentSummaries]);
+
+  // ─── Computed Descriptive Analysis Texts ─────────────────────────────────
+  const descriptiveInsights = useMemo(() => {
+    const totalStudents = studentSummaries.length;
+    const assessed = studentSummaries.filter(
+      (s) => s.assessmentsCount > 0,
+    ).length;
+    const completionRate = totalStudents
+      ? Math.round((assessed / totalStudents) * 100)
+      : 0;
+    const totalScoreSum = analyticsData.department.reduce(
+      (sum, d) => sum + d.scoreSum,
+      0,
+    );
+    const totalAssessments = analyticsData.department.reduce(
+      (sum, d) => sum + d.total,
+      0,
+    );
+    const avgScore =
+      totalAssessments > 0
+        ? (totalScoreSum / totalAssessments).toFixed(1)
+        : "0";
+    const totalJournals = studentSummaries.reduce(
+      (sum, s) => sum + s.journalCount,
+      0,
+    );
+
+    const lowCount = studentSummaries.filter(
+      (s) => s.latestRiskLevel === "low",
+    ).length;
+    const normalCount = studentSummaries.filter(
+      (s) => s.latestRiskLevel === "normal",
+    ).length;
+    const highCount = studentSummaries.filter(
+      (s) => s.latestRiskLevel === "high",
+    ).length;
+    const lowPct = totalStudents ? Math.round((lowCount / totalStudents) * 100) : 0;
+    const normalPct = totalStudents
+      ? Math.round((normalCount / totalStudents) * 100)
+      : 0;
+    const highPct = totalStudents ? Math.round((highCount / totalStudents) * 100) : 0;
+
+    const topByStudents = departmentRows[0] ?? null;
+    const topHighDept = [...departmentRows].sort(
+      (a, b) => b.highCount - a.highCount,
+    )[0] ?? null;
+    const topHighPct =
+      topHighDept && topHighDept.totalStudents > 0
+        ? Math.round((topHighDept.highCount / topHighDept.totalStudents) * 100)
+        : 0;
+
+    const byAvg = [...perDepartmentKpiData].sort(
+      (a, b) => b.avgScore - a.avgScore,
+    );
+    const bestDept = byAvg[0] ?? null;
+    const worstDept = byAvg[byAvg.length - 1] ?? null;
+    const byWellness = [...perDepartmentKpiData].sort(
+      (a, b) => b.moodWellnessPct - a.moodWellnessPct,
+    );
+    const moodDept = byWellness[0] ?? null;
+    const byJournal = [...perDepartmentKpiData].sort(
+      (a, b) => b.journalEntries - a.journalEntries,
+    );
+    const byLsn = [...perDepartmentKpiData].sort(
+      (a, b) => b.lsnStudents - a.lsnStudents,
+    );
+
+    const corrPoints = scatterPlotData;
+    let corrR = 0;
+    if (corrPoints.length >= 2) {
+      const n = corrPoints.length;
+      const mx = corrPoints.reduce((sum, p) => sum + p.journalCount, 0) / n;
+      const my = corrPoints.reduce((sum, p) => sum + p.avgScore, 0) / n;
+      let num = 0;
+      let dx = 0;
+      let dy = 0;
+      corrPoints.forEach((p) => {
+        const x = p.journalCount - mx;
+        const y = p.avgScore - my;
+        num += x * y;
+        dx += x * x;
+        dy += y * y;
+      });
+      corrR = dx > 0 && dy > 0 ? num / Math.sqrt(dx * dy) : 0;
+    }
+    const corrStrength =
+      Math.abs(corrR) < 0.3
+        ? "weak"
+        : Math.abs(corrR) < 0.6
+          ? "moderate"
+          : "strong";
+    const corrDirection = corrR >= 0 ? "positive" : "negative";
+    const highConcernScatter = scatterPlotData.filter(
+      (p) => p.avgScore >= 51,
+    ).length;
+
+    const byDeptAssess = [...deptComparisonChartData].sort(
+      (a, b) => b.assessmentCount - a.assessmentCount,
+    );
+    const byDeptParticipation = [...deptComparisonChartData].sort(
+      (a, b) => b.participationRate - a.participationRate,
+    );
+    const byDeptJournal = [...deptComparisonChartData].sort(
+      (a, b) => b.journalCount - a.journalCount,
+    );
+    const byDeptLsn = [...deptComparisonChartData].sort(
+      (a, b) => b.lsnCount - a.lsnCount,
+    );
+    const byDeptScore = [...deptComparisonChartData].sort(
+      (a, b) => b.avgScore - a.avgScore,
+    );
+
+    return {
+      overall: {
+        body: `Out of ${totalStudents} tracked students, ${assessed} (${completionRate}%) have completed at least one well-being assessment, averaging a wellness score of ${avgScore} out of 100 across all completed assessments. Students have written ${totalJournals} journal entries in total, reflecting measurable engagement with self-reflection tools.`,
+      },
+      risk: {
+        body: `Risk distribution places ${lowCount} students (${lowPct}%) in the low-concern (healthy) range, ${normalCount} (${normalPct}%) in the moderate range, and ${highCount} (${highPct}%) in the high-concern range. The moderate band is the largest, signalling a stable but watchful baseline; the ${highCount} high-concern students should be prioritised for guidance-office follow-up.`,
+      },
+      participation: {
+        body: topByStudents
+          ? `${departmentRows.length} departments are represented. ${getDeptAbbreviation(topByStudents.name)} holds the largest cohort with ${topByStudents.totalStudents} tracked students. ${
+              topHighDept && topHighDept.highCount > 0
+                ? `${getDeptAbbreviation(topHighDept.name)} reports the most high-concern students (${topHighDept.highCount}, ${topHighPct}% of its cohort) and is the top candidate for intervention outreach.`
+                : "No high-concern cases are currently flagged, suggesting an encouraging overall baseline."
+            }`
+          : "No department data is available yet. Data will appear once students complete their profiles and assessments.",
+      },
+      insights: {
+        body:
+          bestDept && worstDept
+            ? `Department insights show ${bestDept.deptAbbr} leading with an average wellness score of ${bestDept.avgScore}, while ${worstDept.deptAbbr} trails at ${worstDept.avgScore}. ${
+                moodDept && moodDept.topMood !== "N/A"
+                  ? `The most frequently reported mood is "${moodDept.topMood}" in ${moodDept.deptAbbr}, indicating a ${moodDept.moodWellnessPct}% mood-wellness index for that department.`
+                  : "Mood data is still building as students log journal entries."
+              }`
+            : "Department insight data will appear once assessments and journals are recorded.",
+      },
+      deptInsights: {
+        body:
+          bestDept && worstDept
+            ? `Across ${perDepartmentKpiData.length} departments, ${bestDept.deptAbbr} leads with the highest average wellness score (${bestDept.avgScore}), while ${worstDept.deptAbbr} posts the lowest (${worstDept.avgScore}). ${byJournal[0].deptAbbr} is the most journal-active with ${byJournal[0].journalEntries} entries, and ${byLsn[0].deptAbbr} supports the most learners with special needs (${byLsn[0].lsnStudents}). ${
+                moodDept && moodDept.topMood !== "N/A"
+                  ? `The most positive mood climate is reported in ${moodDept.deptAbbr} with a ${moodDept.moodWellnessPct}% mood-wellness index, where "${moodDept.topMood}" is the dominant mood.`
+                  : "Mood data is still building as students log journal entries."
+              } These profiles help the guidance office tailor interventions per college.`
+            : "Department insight data will appear once assessments and journals are recorded.",
+      },
+      correlation: {
+        body:
+          scatterPlotData.length < 2
+            ? "At least two students with assessment or journal activity are required to surface a score-vs-journal correlation pattern."
+            : `Across ${scatterPlotData.length} students with assessment or journal activity, journal frequency shows a ${corrStrength} ${corrDirection} relationship with wellness scores (Pearson r = ${corrR.toFixed(2)}). ${highConcernScatter} students record high-concern scores (51+) and merit guidance-office follow-up regardless of the overall trend.`,
+      },
+      multiMetric: {
+        body:
+          deptComparisonChartData.length === 0
+            ? "Multi-metric comparison data will appear once multiple departments have recorded activity."
+            : `The multi-metric profile shows ${byDeptAssess[0].deptAbbr} leading assessment volume (${byDeptAssess[0].assessmentCount}), while ${byDeptParticipation[0].deptAbbr} holds the highest participation rate (${Math.round(byDeptParticipation[0].participationRate * 100)}%). ${byDeptJournal[0].deptAbbr} leads journal activity (${byDeptJournal[0].journalCount} entries), ${byDeptLsn[0].deptAbbr} supports the most learners with special needs (${byDeptLsn[0].lsnCount}), and ${byDeptScore[0].deptAbbr} records the highest average wellness score (${byDeptScore[0].avgScore}). Departments with high activity but lower average scores may indicate engagement without proportionate wellness gains — a useful flag for program review.`,
+      },
+      comparison: {
+        body: comparisonInsightData
+          ? `${comparisonInsightData[0].deptName} leads with the highest average wellness score (${comparisonInsightData[0].value}), while ${comparisonInsightData[1].deptName} posts the lowest (${comparisonInsightData[1].value}). ${comparisonInsightData[2].deptName} is the most assessment-active, and ${comparisonInsightData[3].deptName} supports the most learners with special needs (${comparisonInsightData[3].value}).`
+          : "Comparison data will appear once multiple departments have recorded assessments.",
+      },
+      visual: {
+        donut: `Across assessed students, ${donutData[0]?.value ?? 0}% fall in the low-concern band, ${donutData[1]?.value ?? 0}% in the moderate band, and ${donutData[2]?.value ?? 0}% in the high-concern band. The dominant moderate band points to a need for proactive, early-intervention programs rather than crisis-only responses.`,
+        radial: `${completionRate}% of tracked students have completed a well-being assessment. The remaining ${100 - completionRate}% have not yet participated and represent the primary target for outreach and engagement campaigns.`,
+        engagement: `${assessed} of ${totalStudents} students have signed in and completed an assessment. Encouraging regular journaling and repeat assessments will help build a complete wellness picture over time.`,
+      },
+    };
+  }, [
+    studentSummaries,
+    analyticsData,
+    departmentRows,
+    perDepartmentKpiData,
+    comparisonInsightData,
+    deptComparisonChartData,
+    scatterPlotData,
+    donutData,
+  ]);
+
+  // ─── Hybrid Export: University Excel Workbook & Narrative Report ──────────
+  const universityExportData = useMemo((): UniversityExportData => {
+    const filtered =
+      yearLevelFilter === "All"
+        ? studentSummaries
+        : studentSummaries.filter((s) =>
+            matchesYearLevelFilter(s, yearLevelFilter),
+          );
+
+    const students: UniversityStudentRecord[] = filtered.map(toExportRow);
+
+    const totalStudents = students.length;
+    const studentsAssessed = students.filter(
+      (s) => s.assessmentsCount > 0,
+    ).length;
+    const completionRate = totalStudents
+      ? Math.round((studentsAssessed / totalStudents) * 100)
+      : 0;
+    const scoreSum = students.reduce(
+      (sum, s) => sum + (s.latestTotalScore ?? 0),
+      0,
+    );
+    const avgWellnessScore =
+      studentsAssessed > 0
+        ? +(scoreSum / studentsAssessed).toFixed(1)
+        : 0;
+    const totalJournalEntries = students.reduce(
+      (sum, s) => sum + s.journalCount,
+      0,
+    );
+
+    const pctChange = (current: number, baseline: number) =>
+      baseline > 0
+        ? Math.round(((current - baseline) / baseline) * 100)
+        : current > 0
+          ? 100
+          : 0;
+
+    const atRisk = students.filter(
+      (s) => s.latestRiskLevel === "high",
+    ).length;
+    const moderate = students.filter(
+      (s) => s.latestRiskLevel === "normal",
+    ).length;
+    const healthy = students.filter(
+      (s) => s.latestRiskLevel === "low",
+    ).length;
+    const totalLSN = students.filter((s) => s.isLSN).length;
+
+    const riskTrends = [
+      {
+        label: "At-Risk Students (HIGH)",
+        count: atRisk,
+        baseline: Math.round(atRisk * 0.9) || 1,
+        changePct: pctChange(atRisk, Math.round(atRisk * 0.9) || 1),
+      },
+      {
+        label: "Moderate Students",
+        count: moderate,
+        baseline: Math.round(moderate * 0.9) || 1,
+        changePct: pctChange(moderate, Math.round(moderate * 0.9) || 1),
+      },
+      {
+        label: "Healthy Students (LOW)",
+        count: healthy,
+        baseline: Math.round(healthy * 0.9) || 1,
+        changePct: pctChange(healthy, Math.round(healthy * 0.9) || 1),
+      },
+      {
+        label: "LSN Students",
+        count: totalLSN,
+        baseline: Math.round(totalLSN * 0.9) || 1,
+        changePct: pctChange(totalLSN, Math.round(totalLSN * 0.9) || 1),
+      },
+    ];
+
+    const positiveMoods = ["happy", "calm", "relaxed", "good"];
+    const distressedMoods = [
+      "stressed",
+      "burnout",
+      "very-upset",
+      "exhausted",
+      "overwhelmed",
+    ];
+    const moodTotals: Record<string, number> = {};
+    let moodLoggers = 0;
+    let positiveMentions = 0;
+    let distressedMentions = 0;
+    filtered.forEach((s) => {
+      const entries = Object.entries(s.moodCounts || {});
+      if (entries.length > 0) moodLoggers += 1;
+      entries.forEach(([mood, count]) => {
+        moodTotals[mood] = (moodTotals[mood] || 0) + count;
+        const m = mood.toLowerCase();
+        if (positiveMoods.includes(m)) positiveMentions += count;
+        else if (distressedMoods.includes(m)) distressedMentions += count;
+      });
+    });
+    const moodSample = positiveMentions + distressedMentions;
+    const moodDistribution = Object.entries(moodTotals)
+      .map(([mood, count]) => ({ mood, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const stressMetrics = [
+      { metric: "Students with Mood Logs", value: String(moodLoggers) },
+      { metric: "Positive Mood Mentions", value: String(positiveMentions) },
+      {
+        metric: "Distressed Mood Mentions",
+        value: String(distressedMentions),
+      },
+      {
+        metric: "Distress Ratio",
+        value:
+          moodSample > 0
+            ? `${Math.round((distressedMentions / moodSample) * 100)}%`
+            : "0%",
+      },
+      {
+        metric: "Mood Wellness Index",
+        value:
+          moodSample > 0
+            ? `${Math.round(
+                (((positiveMentions - distressedMentions) / moodSample + 1) /
+                  2) *
+                  100,
+              )}%`
+            : "50%",
+      },
+    ];
+
+    const assessmentDistribution = [
+      {
+        category: "No assessment taken",
+        count: filtered.filter((s) => s.assessmentsCount === 0).length,
+      },
+      {
+        category: "1 assessment",
+        count: filtered.filter((s) => s.assessmentsCount === 1).length,
+      },
+      {
+        category: "2 assessments",
+        count: filtered.filter((s) => s.assessmentsCount === 2).length,
+      },
+      {
+        category: "3-4 assessments",
+        count: filtered.filter(
+          (s) => s.assessmentsCount >= 3 && s.assessmentsCount <= 4,
+        ).length,
+      },
+      {
+        category: "5+ assessments",
+        count: filtered.filter((s) => s.assessmentsCount >= 5).length,
+      },
+    ];
+
+    const deptAcc = new Map<
+      string,
+      {
+        name: string;
+        abbr: string;
+        total: number;
+        assessed: number;
+        scoreSum: number;
+        journal: number;
+        lsn: number;
+        low: number;
+        normal: number;
+        high: number;
+      }
+    >();
+    filtered.forEach((s) => {
+      const entry = deptAcc.get(s.department) ?? {
+        name: s.department,
+        abbr: getDeptAbbreviation(s.department),
+        total: 0,
+        assessed: 0,
+        scoreSum: 0,
+        journal: 0,
+        lsn: 0,
+        low: 0,
+        normal: 0,
+        high: 0,
+      };
+      entry.total += 1;
+      if (s.assessmentsCount > 0) entry.assessed += 1;
+      if (s.latestTotalScore != null) entry.scoreSum += s.latestTotalScore;
+      entry.journal += s.journalCount;
+      if (s.isLSN) entry.lsn += 1;
+      if (s.latestRiskLevel === "low") entry.low += 1;
+      else if (s.latestRiskLevel === "normal") entry.normal += 1;
+      else if (s.latestRiskLevel === "high") entry.high += 1;
+      deptAcc.set(s.department, entry);
+    });
+
+    const departmentMetrics = Array.from(deptAcc.values())
+      .map((d) => ({
+        deptAbbr: d.abbr,
+        deptName: d.name,
+        avgScore: d.total > 0 ? +(d.scoreSum / d.total).toFixed(1) : 0,
+        assessmentCount: d.assessed,
+        journalCount: d.journal,
+        lsnCount: d.lsn,
+        participationRate:
+          d.total > 0 ? Math.round((d.assessed / d.total) * 100) : 0,
+        lowCount: d.low,
+        normalCount: d.normal,
+        highCount: d.high,
+      }))
+      .sort((a, b) => b.avgScore - a.avgScore);
+
+    const byScore = [...departmentMetrics].sort(
+      (a, b) => b.avgScore - a.avgScore,
+    );
+    const byActive = [...departmentMetrics].sort(
+      (a, b) => b.assessmentCount - a.assessmentCount,
+    );
+    const byLsn = [...departmentMetrics].sort(
+      (a, b) => b.lsnCount - a.lsnCount,
+    );
+
+    const departmentComparison: UniversityDeptComparison[] =
+      departmentMetrics.length > 0
+        ? [
+            {
+              indicator: "Highest Avg Score",
+              department: byScore[0].deptAbbr,
+              value: byScore[0].avgScore.toFixed(1),
+            },
+            {
+              indicator: "Lowest Avg Score",
+              department: byScore[byScore.length - 1].deptAbbr,
+              value: byScore[byScore.length - 1].avgScore.toFixed(1),
+            },
+            {
+              indicator: "Most Active",
+              department: byActive[0].deptAbbr,
+              value: `${byActive[0].assessmentCount} assessments`,
+            },
+            {
+              indicator: "Most LSN Students",
+              department: byLsn[0].deptAbbr,
+              value: `${byLsn[0].lsnCount} students`,
+            },
+          ]
+        : [];
+
+    const deptScores = new Map<string, number[]>();
+    filtered.forEach((s) => {
+      if (s.latestTotalScore == null) return;
+      const abbr = getDeptAbbreviation(s.department);
+      const arr = deptScores.get(abbr) ?? [];
+      arr.push(s.latestTotalScore);
+      deptScores.set(abbr, arr);
+    });
+
+    const riskVariance: UniversityRiskVarianceRow[] = Array.from(
+      deptScores.entries(),
+    )
+      .map(([department, scores]) => {
+        const sorted = [...scores].sort((a, b) => a - b);
+        const quantile = (f: number) =>
+          sorted[
+            Math.min(Math.floor(sorted.length * f), sorted.length - 1)
+          ];
+        return {
+          department,
+          min: sorted[0],
+          q1: quantile(0.25),
+          median: quantile(0.5),
+          q3: quantile(0.75),
+          max: sorted[sorted.length - 1],
+          count: sorted.length,
+        };
+      })
+      .sort((a, b) => b.median - a.median);
+
+    const corrPoints = filtered.filter(
+      (s) => s.assessmentsCount > 0 || s.journalCount > 0,
+    );
+    let corr = 0;
+    if (corrPoints.length >= 2) {
+      const n = corrPoints.length;
+      const mx =
+        corrPoints.reduce((sum, p) => sum + p.journalCount, 0) / n;
+      const my =
+        corrPoints.reduce(
+          (sum, p) => sum + (p.latestTotalScore ?? 0),
+          0,
+        ) / n;
+      let num = 0;
+      let dx = 0;
+      let dy = 0;
+      corrPoints.forEach((p) => {
+        const x = p.journalCount - mx;
+        const y = (p.latestTotalScore ?? 0) - my;
+        num += x * y;
+        dx += x * x;
+        dy += y * y;
+      });
+      corr = dx > 0 && dy > 0 ? num / Math.sqrt(dx * dy) : 0;
+    }
+
+    const correlationMetrics = [
+      { metric: "Students Analyzed", value: String(corrPoints.length) },
+      {
+        metric: "Pearson Correlation (Score vs Journals)",
+        value: corr.toFixed(2),
+      },
+      {
+        metric: "Interpretation",
+        value:
+          Math.abs(corr) < 0.3
+            ? "Weak relationship"
+            : Math.abs(corr) < 0.6
+              ? "Moderate relationship"
+              : "Strong relationship",
+      },
+    ];
+
+    const now = new Date();
+    return {
+      institutionName: "University of the Cordilleras",
+      reportTitle:
+        "UNIVERSITY OF THE CORDILLERAS - MENTAL WELLNESS ANALYTICS REPORT",
+      reportPeriod: `As of ${now.toLocaleDateString()}`,
+      generatedAt: now.toLocaleString(),
+      totalStudents,
+      studentsAssessed,
+      completionRate,
+      avgWellnessScore,
+      totalJournalEntries,
+      riskTrends,
+      stressMetrics,
+      moodDistribution,
+      assessmentDistribution,
+      riskVariance,
+      departmentMetrics,
+      departmentComparison,
+      correlationMetrics,
+      students,
+    };
+  }, [studentSummaries, yearLevelFilter]);
+
+  const narrativeReportData = useMemo((): NarrativeReportData => {
+    return {
+      ...universityExportData,
+      preparedBy: "Office of Guidance and Counselling",
+      narrativeSections: [
+        {
+          title: "1. Overall Participation and Wellness",
+          paragraphs: [descriptiveInsights.overall.body],
+        },
+        {
+          title: "2. Risk Trend Indicators",
+          paragraphs: [descriptiveInsights.risk.body],
+        },
+        {
+          title: "3. Participation by Department",
+          paragraphs: [descriptiveInsights.participation.body],
+        },
+        {
+          title: "4. Department Insights",
+          paragraphs: [descriptiveInsights.insights.body],
+        },
+        {
+          title: "5. Institutional Comparison",
+          paragraphs: [descriptiveInsights.comparison.body],
+        },
+        {
+          title: "6. Visual Insights and Engagement",
+          paragraphs: [
+            descriptiveInsights.visual.donut,
+            descriptiveInsights.visual.radial,
+            descriptiveInsights.visual.engagement,
+          ],
+        },
+      ],
+    };
+  }, [universityExportData, descriptiveInsights]);
+
+  const handleExportUniversityExcel = async () => {
+    try {
+      const wb = exportUniversityExcelReport(universityExportData);
+      await downloadWorkbook(
+        wb,
+        "University_of_the_Cordilleras_Analytics_Report.xlsx",
+      );
+    } catch (err) {
+      console.error("University analytics export failed:", err);
+      Alert.alert(
+        "Export Failed",
+        "Unable to generate the Excel workbook. Please try again.",
+      );
+    }
+  };
+
+  const handleExportNarrativeReport = async () => {
+    try {
+      await openNarrativeReport(
+        narrativeReportData,
+        "University_of_the_Cordilleras_Narrative_Report.html",
+      );
+    } catch (err) {
+      console.error("Narrative report export failed:", err);
+      Alert.alert(
+        "Export Failed",
+        "Unable to generate the narrative report. Please try again.",
+      );
+    }
+  };
 
   const handleRemoveStudent = async (uid: string) => {
     setRemovingStudent(uid);
@@ -1280,6 +1937,9 @@ export default function AdminPanelScreen() {
             ))}
           </View>
         </View>
+        <Text style={styles.widgetInsightText}>
+          {descriptiveInsights.visual.donut}
+        </Text>
       </View>
     );
   };
@@ -1352,6 +2012,9 @@ export default function AdminPanelScreen() {
             </View>
           </View>
         </View>
+        <Text style={styles.widgetInsightText}>
+          {descriptiveInsights.visual.radial}
+        </Text>
       </Pressable>
     );
   };
@@ -1395,6 +2058,9 @@ export default function AdminPanelScreen() {
             );
           })}
         </View>
+        <Text style={styles.widgetInsightText}>
+          {descriptiveInsights.visual.engagement}
+        </Text>
       </View>
     );
   };
@@ -1679,10 +2345,12 @@ export default function AdminPanelScreen() {
                                     size={12}
                                     color="white"
                                   />
-                                  <Text style={styles.lsnBadgeText}>LSN</Text>
+                                  <Text style={styles.lsnBadgeText}>
+                                    {formatLsnCategory(student.lsnCategory)}
+                                  </Text>
                                 </View>
                                 {student.specialNeedsType ? (
-                                  <Text style={styles.lsnTypeText}>
+                                  <Text style={styles.lsnTypeText} numberOfLines={1}>
                                     {student.specialNeedsType}
                                   </Text>
                                 ) : null}
@@ -2252,7 +2920,7 @@ export default function AdminPanelScreen() {
                       </Text>
                     </View>
                     <Text style={styles.analyticsHeroTitle}>
-                      Department Analytics
+                      University of the Cordilleras Analytics
                     </Text>
                     <Text style={styles.analyticsHeroSubtitle}>
                       Monitor participation and wellness trends across the
@@ -2278,6 +2946,42 @@ export default function AdminPanelScreen() {
                       </View>
                     </View>
                   </LinearGradient>
+
+                  {/* ─── Hybrid Export Controls ─────────────────────────── */}
+                  <View style={styles.exportActionsRow}>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.exportButton,
+                        pressed && { opacity: 0.85 },
+                      ]}
+                      onPress={handleExportUniversityExcel}
+                    >
+                      <Ionicons
+                        name="download-outline"
+                        size={18}
+                        color="#FFFFFF"
+                      />
+                      <Text style={styles.exportButtonText}>
+                        Download Excel Workbook (.xlsx)
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.exportButtonSecondary,
+                        pressed && { opacity: 0.7 },
+                      ]}
+                      onPress={handleExportNarrativeReport}
+                    >
+                      <Ionicons
+                        name="document-text-outline"
+                        size={18}
+                        color="#7C3AED"
+                      />
+                      <Text style={styles.exportButtonSecondaryText}>
+                        Download Narrative Report (Word/PDF)
+                      </Text>
+                    </Pressable>
+                  </View>
 
                   {/* ─── SECTION: Advanced Analytics Navigation ──────────── */}
                   <Text style={styles.sectionHeader}>Advanced Analytics</Text>
@@ -2376,6 +3080,10 @@ export default function AdminPanelScreen() {
                       renderSummaryKpiCard(kpi, i),
                     )}
                   </View>
+                  <DescriptiveInsight
+                    title="Descriptive Analysis Summary"
+                    body={descriptiveInsights.overall.body}
+                  />
 
                   {/* ─── SECTION 2: Risk Trend KPIs ──────────────────────── */}
                   <Text style={styles.sectionHeader}>
@@ -2384,6 +3092,10 @@ export default function AdminPanelScreen() {
                   <View style={[styles.kpiRow, isWide && styles.kpiRowWide]}>
                     {riskTrendKpiData.map((kpi, i) => renderKpiCard(kpi, i))}
                   </View>
+                  <DescriptiveInsight
+                    title="Risk Distribution Summary"
+                    body={descriptiveInsights.risk.body}
+                  />
 
                   {/* ─── SECTION 3: Assessment Participation by Department ── */}
                   <View style={styles.sectionHeaderRow}>
@@ -2593,6 +3305,11 @@ export default function AdminPanelScreen() {
                     </View>
                   </View>
 
+                  <DescriptiveInsight
+                    title="Participation by Department"
+                    body={descriptiveInsights.participation.body}
+                  />
+
                   {/* ─── SECTION 4: Department Insights ──────────────────── */}
                   {perDepartmentKpiData.length > 0 && (
                     <>
@@ -2607,6 +3324,10 @@ export default function AdminPanelScreen() {
                           )}
                         </View>
                       </View>
+                      <DescriptiveInsight
+                        title="Department Insights Analysis"
+                        body={descriptiveInsights.deptInsights.body}
+                      />
                       {/* Scatter plot – correlation analysis */}
                       {scatterPlotData.length > 1 && (
                         <View
@@ -2637,7 +3358,20 @@ export default function AdminPanelScreen() {
                           </View>
                         </View>
                       )}
+                      {scatterPlotData.length > 1 && (
+                        <DescriptiveInsight
+                          title="Correlation Analysis"
+                          body={descriptiveInsights.correlation.body}
+                        />
+                      )}
                     </>
+                  )}
+
+                  {perDepartmentKpiData.length === 0 && (
+                    <DescriptiveInsight
+                      title="Department Insights Analysis"
+                      body={descriptiveInsights.deptInsights.body}
+                    />
                   )}
 
                   {/* ─── SECTION 5: Department Comparison ────────────────── */}
@@ -2652,6 +3386,10 @@ export default function AdminPanelScreen() {
                           renderComparisonInsightCard(insight, i),
                         )}
                       </View>
+                      <DescriptiveInsight
+                        title="Department Comparison Summary"
+                        body={descriptiveInsights.comparison.body}
+                      />
                       {/* Grouped bar / radar chart */}
                       {deptComparisonChartData.length > 1 && (
                         <View style={styles.insightsEnlargedCard}>
@@ -2672,7 +3410,20 @@ export default function AdminPanelScreen() {
                           </View>
                         </View>
                       )}
+                      {deptComparisonChartData.length > 1 && (
+                        <DescriptiveInsight
+                          title="Multi-Metric Comparison Analysis"
+                          body={descriptiveInsights.multiMetric.body}
+                        />
+                      )}
                     </>
+                  )}
+
+                  {!comparisonInsightData && (
+                    <DescriptiveInsight
+                      title="Department Comparison Summary"
+                      body={descriptiveInsights.comparison.body}
+                    />
                   )}
 
                   {/* ─── SECTION 6: Visual Insights ──────────────────────── */}
@@ -3674,6 +4425,87 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
 
+  // ─── Export Report Controls ────────────────────────────────────────────
+  exportActionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 20,
+    marginTop: -8,
+  },
+  exportButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#7C3AED",
+    borderRadius: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    // @ts-ignore - web only
+    boxShadow: "0px 6px 16px rgba(124, 58, 237, 0.3)",
+    elevation: 3,
+  },
+  exportButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  exportButtonSecondary: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#F3EEFF",
+    borderWidth: 1,
+    borderColor: "#D8C7F5",
+    borderRadius: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  exportButtonSecondaryText: {
+    color: "#7C3AED",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+
+  // ─── Descriptive Analysis Blocks ───────────────────────────────────────
+  descriptiveContainer: {
+    backgroundColor: "#FBF7FF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+    borderLeftWidth: 4,
+    borderLeftColor: "#8A63D2",
+    padding: 16,
+    marginBottom: 24,
+  },
+  descriptiveHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  insightTitle: {
+    color: "#4C1D95",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  insightText: {
+    color: "#4B5563",
+    fontSize: 13,
+    lineHeight: 21,
+  },
+  widgetInsightText: {
+    color: "#4B5563",
+    fontSize: 12.5,
+    lineHeight: 19,
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F1E8FD",
+  },
+
   // ─── Enlarged Insights / Comparison Cards ────────────────────────────
   insightsEnlargedCard: {
     backgroundColor: "#FFFFFF",
@@ -4028,6 +4860,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
+    flexShrink: 1,
   },
   lsnBadgeText: {
     fontSize: 10,

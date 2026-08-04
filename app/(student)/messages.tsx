@@ -8,7 +8,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -31,6 +31,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import EmojiPicker from "@/components/chat/EmojiPicker";
 
 import { useAuth } from "@/hooks/AuthContext";
+import { useStudentProfile } from "@/hooks/useStudentProfile";
 import {
   deleteMessage,
   fetchAllUsers,
@@ -108,6 +109,13 @@ export default function StudentMessagesScreen() {
     ...messages,
     ...optimistic.filter((o) => !messages.some((m) => m.id === o.id)),
   ];
+
+  // ── Live partner profile (name + avatar stay current when peer updates) ──
+  const partnerUid = useMemo(() => {
+    if (viewMode !== "chat" || !activeConversation) return undefined;
+    return activeConversation.participants?.find((u) => u !== user?.uid);
+  }, [viewMode, activeConversation, user?.uid]);
+  const liveProfile = useStudentProfile(partnerUid);
 
   // ── Filtered directory lists ──
   const filteredPeers = directoryFilter.trim()
@@ -745,11 +753,29 @@ export default function StudentMessagesScreen() {
               <Ionicons name="arrow-back" size={22} color="white" />
             </Pressable>
             <View style={styles.headerCenter}>
-              <Text style={styles.headerTitle}>
-                {viewMode === "chat"
-                  ? chatPartnerName || "Chat"
-                  : "Messages"}
-              </Text>
+              <View style={styles.headerTitleRow}>
+                {viewMode === "chat" &&
+                  (liveProfile?.profileImage ? (
+                    <Image
+                      source={{ uri: liveProfile.profileImage }}
+                      style={styles.headerAvatar}
+                    />
+                  ) : (
+                    <View
+                      style={[
+                        styles.headerAvatar,
+                        styles.headerAvatarFallback,
+                      ]}
+                    >
+                      <Ionicons name="person" size={14} color="white" />
+                    </View>
+                  ))}
+                <Text style={styles.headerTitle} numberOfLines={1}>
+                  {viewMode === "chat"
+                    ? liveProfile?.fullName || chatPartnerName || "Chat"
+                    : "Messages"}
+                </Text>
+              </View>
               {viewMode === "chat" && (
                 <View style={styles.headerMeta}>
                   <View style={styles.headerBadge}>
@@ -836,9 +862,22 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 18,
     fontWeight: "700",
-    flex: 1,
-    textAlign: "center",
+    flexShrink: 1,
   },
+  headerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    maxWidth: "100%",
+  },
+  headerAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#7A54C4",
+  },
+  headerAvatarFallback: { alignItems: "center", justifyContent: "center" },
   headerCenter: {
     flex: 1,
     alignItems: "center",

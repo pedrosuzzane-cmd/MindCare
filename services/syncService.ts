@@ -3,6 +3,7 @@ import {
     collection,
     doc,
     getDocs,
+    serverTimestamp,
     Timestamp,
     writeBatch,
 } from "firebase/firestore";
@@ -36,6 +37,9 @@ const syncJournals = async (userId: string): Promise<void> => {
         entryDate: Timestamp.fromDate(new Date(entry.entryDate)),
       });
     }
+
+    const userRef = doc(db, "users", userId);
+    batch.update(userRef, { lastJournalSyncAt: serverTimestamp() });
 
     try {
       await batch.commit();

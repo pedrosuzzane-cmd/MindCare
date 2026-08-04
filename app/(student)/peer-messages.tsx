@@ -7,7 +7,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -32,6 +32,7 @@ import {
 } from "@/services/contentModeration";
 
 import { useAuth } from "@/hooks/AuthContext";
+import { useStudentProfile } from "@/hooks/useStudentProfile";
 import {
   deleteMessage,
   getOrCreatePeerConversation,
@@ -611,9 +612,18 @@ export default function PeerMessagesScreen() {
   );
 
   // ─── Header title ──────────────────────────────────────────────────────────
+  // Live partner profile from the centralized users/admins collection keeps the
+  // header name/avatar current when a peer updates their profile.
+  const partnerUid = useMemo(() => {
+    if (viewMode !== "chat" || !activeConversation) return undefined;
+    return activeConversation.participants?.find((u) => u !== user?.uid);
+  }, [viewMode, activeConversation, user?.uid]);
+  const liveProfile = useStudentProfile(partnerUid);
+
   const headerTitle =
     viewMode === "chat"
-      ? headerName ||
+      ? liveProfile?.fullName ||
+        headerName ||
         (activeConversation
           ? getPeerName(activeConversation, user!.uid)
           : "Chat")
@@ -660,7 +670,27 @@ export default function PeerMessagesScreen() {
               <Ionicons name="arrow-back" size={22} color="white" />
             </Pressable>
             <View style={styles.headerCenter}>
-              <Text style={styles.headerTitle}>{headerTitle}</Text>
+              <View style={styles.headerTitleRow}>
+                {viewMode === "chat" &&
+                  (liveProfile?.profileImage ? (
+                    <Image
+                      source={{ uri: liveProfile.profileImage }}
+                      style={styles.headerAvatar}
+                    />
+                  ) : (
+                    <View
+                      style={[
+                        styles.headerAvatar,
+                        styles.headerAvatarFallback,
+                      ]}
+                    >
+                      <Ionicons name="person" size={14} color="white" />
+                    </View>
+                  ))}
+                <Text style={styles.headerTitle} numberOfLines={1}>
+                  {headerTitle}
+                </Text>
+              </View>
               {headerSubtitle && (
                 <View style={styles.headerBadge}>
                   <Ionicons
@@ -1007,9 +1037,22 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 18,
     fontWeight: "700",
-    flex: 1,
-    textAlign: "center",
+    flexShrink: 1,
   },
+  headerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    maxWidth: "100%",
+  },
+  headerAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#7A54C4",
+  },
+  headerAvatarFallback: { alignItems: "center", justifyContent: "center" },
   headerCenter: {
     flex: 1,
     alignItems: "center",

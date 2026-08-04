@@ -18,13 +18,16 @@ service cloud.firestore {
 
     // ─── USERS ───────────────────────────────────────────────
     match /users/{userId} {
-      // Only the owner or an admin can read a specific user document
-      allow get: if isOwner(userId) || isAdmin();
+      // Signed-in students can read any user doc so peer chats can
+      // refresh display names; list is already open to signed-in users
+      // for the messaging directory, so this exposes no new fields.
+      allow get: if isOwner(userId) || isAdmin() || signedIn();
       // Signed-in users can list users for the messaging directory
       allow list: if signedIn();
       // Owner can write their own doc; admins can update any user doc; role cannot be escalated
       allow create: if isOwner(userId)
-        && request.resource.data.keys().hasAll(['fullName', 'email']);
+        && request.resource.data.keys().hasAll(['fullName', 'email'])
+        && request.resource.data.role == 'student';
       allow update: if (isOwner(userId) || isAdmin())
         && (!request.resource.data.keys().hasAny(['role'])
             || request.resource.data.role == resource.data.role);
@@ -70,27 +73,58 @@ service cloud.firestore {
 
     // ─── CONVERSATIONS ───────────────────────────────────────
     match /conversations/{conversationId} {
-      allow get: if signedIn()
-        && request.auth.uid in resource.data.participants
-        || isAdmin();
+      // Participants can read/write their own conversations. Conversations that
+      // predate the `participants` field (legacy) are readable by their original
+      // participants — identified via studentId/adminId or participantNames —
+      // so the client can backfill `participants` and messaging keeps working.
+      function isParticipant() {
+        return signedIn() && resource.data.participants != null
+          && request.auth.uid in resource.data.participants;
+      }
 
-      allow list: if (signedIn() && request.auth.uid in resource.data.participants) || isAdmin();
+      function isLegacyParticipant() {
+        return resource.data.participants == null
+          && (request.auth.uid == resource.data.studentId
+              || request.auth.uid == resource.data.adminId
+              || (resource.data.participantNames != null
+                  && request.auth.uid in resource.data.participantNames));
+      }
+
+      allow get: if isParticipant() || isLegacyParticipant() || isAdmin();
+
+      allow list: if isParticipant() || isLegacyParticipant() || isAdmin();
 
       allow create: if signedIn() && request.auth.uid in request.resource.data.participants;
 
-      allow update: if (signedIn() && request.auth.uid in resource.data.participants) || isAdmin();
+      // Participants can update. Legacy conversations may ONLY be updated to
+      // add the missing `participants` field (client-side migration).
+      allow update: if isAdmin()
+        || isParticipant()
+        || (isLegacyParticipant()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants']));
 
       allow delete: if false;
 
       match /messages/{messageId} {
-        function isParticipant() {
-          return request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+        function isMsgParticipant() {
+          let convo = get(/databases/$(database)/documents/conversations/$(conversationId)).data;
+          return convo.participants != null
+            ? request.auth.uid in convo.participants
+            : (request.auth.uid == convo.studentId
+                || request.auth.uid == convo.adminId
+                || (convo.participantNames != null
+                    && request.auth.uid in convo.participantNames));
         }
 
-        allow read: if isParticipant() || isAdmin();
-        allow create: if isParticipant() && request.auth.uid == request.resource.data.senderId;
-        // Messages are immutable — no editing after sending
-        allow update: if false;
+        allow read: if isMsgParticipant() || isAdmin();
+        allow create: if isMsgParticipant() && request.auth.uid == request.resource.data.senderId;
+        // Messages are immutable except for soft-delete: the sender (or an
+        // admin) may only set the `deleted` flag to true, never edit content.
+        allow update: if (isMsgParticipant()
+            && request.auth.uid == resource.data.senderId
+            || isAdmin())
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted'])
+          && request.resource.data.deleted == true;
         allow delete: if false;
       }
     }
