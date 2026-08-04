@@ -1,9 +1,10 @@
-// 1. Load dotenv FIRST so environment variables are available immediately
-require("dotenv").config();
-
 const express = require("express");
 const bodyParser = require("body-parser");
+const dotenv = require("dotenv");
 const cors = require("cors"); // <--- 1. Import cors
+
+// 1. Load dotenv FIRST so environment variables are available immediately
+dotenv.config();
 
 const { Ollama } = require("ollama");
 const { Buffer } = require("buffer");
@@ -556,11 +557,33 @@ app.post("/api/delete-student", async (req, res) => {
 });
 
 // ── Forgot Password OTP (custom 6-digit code via Gmail SMTP) ──
+const nodemailer = require("nodemailer");
 const crypto = require("crypto");
-const { sendOtpEmail } = require("./services/emailService");
 
 const OTP_COLLECTION = "passwordResets";
 const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+
+let otpTransporter = null;
+try {
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    otpTransporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || "smtp.gmail.com",
+      port: parseInt(process.env.SMTP_PORT || "587", 10),
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+    console.log("OTP email transporter initialized.");
+  } else {
+    console.warn(
+      "SMTP not configured — OTP emails will be logged to console only."
+    );
+  }
+} catch (err) {
+  console.warn("Failed to create OTP transporter:", err.message);
+}
 
 function generateOtp() {
   return crypto.randomInt(100000, 999999).toString();
@@ -623,12 +646,8 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
       `,
     };
 
-    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-      await sendOtpEmail({
-        to: emailClean,
-        subject: mailOptions.subject,
-        html: mailOptions.html,
-      });
+    if (otpTransporter) {
+      await otpTransporter.sendMail(mailOptions);
       console.log(`OTP email sent to ${emailClean}`);
     } else {
       // Fallback: log OTP to console for testing
@@ -790,12 +809,8 @@ app.post("/api/auth/register-otp/request", async (req, res) => {
       `,
     };
 
-    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-      await sendOtpEmail({
-        to: emailClean,
-        subject: mailOptions.subject,
-        html: mailOptions.html,
-      });
+    if (otpTransporter) {
+      await otpTransporter.sendMail(mailOptions);
       console.log(`Registration OTP email sent to ${emailClean}`);
     } else {
       console.log(
