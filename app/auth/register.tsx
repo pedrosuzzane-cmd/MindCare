@@ -602,7 +602,13 @@ export default function RegisterScreen() {
   };
 
   const validatePassword = (pw: string) => {
-    return pw.length >= 8 && /[A-Za-z]/.test(pw) && /[0-9]/.test(pw);
+    return (
+      pw.length >= 8 &&
+      /[A-Z]/.test(pw) &&
+      /[a-z]/.test(pw) &&
+      /[0-9]/.test(pw) &&
+      /[^A-Za-z0-9]/.test(pw)
+    );
   };
 
   const sanitize = (value: string, maxLength = 256) => {
@@ -878,7 +884,7 @@ export default function RegisterScreen() {
     if (!validatePassword(password)) {
       Alert.alert(
         "Weak Password",
-        "Password must be at least 8 characters and include letters and numbers.",
+        "Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.",
       );
       return;
     }
@@ -2597,6 +2603,99 @@ export default function RegisterScreen() {
                   />
                 </View>
               </View>
+              <View style={styles.requirementsBox}>
+                <Text style={styles.requirementsTitle}>
+                  Password Requirements:
+                </Text>
+                <View style={styles.requirementItem}>
+                  <Ionicons
+                    name={
+                      password.length >= 8
+                        ? "checkmark-circle"
+                        : "close-circle"
+                    }
+                    size={16}
+                    color={password.length >= 8 ? "#8A63D2" : "#999"}
+                  />
+                  <Text style={styles.requirementText}>
+                    At least 8 characters
+                  </Text>
+                </View>
+                <View style={styles.requirementItem}>
+                  <Ionicons
+                    name={
+                      /[A-Z]/.test(password)
+                        ? "checkmark-circle"
+                        : "close-circle"
+                    }
+                    size={16}
+                    color={/[A-Z]/.test(password) ? "#8A63D2" : "#999"}
+                  />
+                  <Text style={styles.requirementText}>
+                    Contains an uppercase letter (A-Z)
+                  </Text>
+                </View>
+                <View style={styles.requirementItem}>
+                  <Ionicons
+                    name={
+                      /[a-z]/.test(password)
+                        ? "checkmark-circle"
+                        : "close-circle"
+                    }
+                    size={16}
+                    color={/[a-z]/.test(password) ? "#8A63D2" : "#999"}
+                  />
+                  <Text style={styles.requirementText}>
+                    Contains a lowercase letter (a-z)
+                  </Text>
+                </View>
+                <View style={styles.requirementItem}>
+                  <Ionicons
+                    name={
+                      /[0-9]/.test(password)
+                        ? "checkmark-circle"
+                        : "close-circle"
+                    }
+                    size={16}
+                    color={/[0-9]/.test(password) ? "#8A63D2" : "#999"}
+                  />
+                  <Text style={styles.requirementText}>
+                    Contains a number (0-9)
+                  </Text>
+                </View>
+                <View style={styles.requirementItem}>
+                  <Ionicons
+                    name={
+                      /[^A-Za-z0-9]/.test(password)
+                        ? "checkmark-circle"
+                        : "close-circle"
+                    }
+                    size={16}
+                    color={/[^A-Za-z0-9]/.test(password) ? "#8A63D2" : "#999"}
+                  />
+                  <Text style={styles.requirementText}>
+                    Contains a special character (!@#$%^&* etc.)
+                  </Text>
+                </View>
+                <View style={styles.requirementItem}>
+                  <Ionicons
+                    name={
+                      password === confirmPassword &&
+                      confirmPassword.length > 0
+                        ? "checkmark-circle"
+                        : "close-circle"
+                    }
+                    size={16}
+                    color={
+                      password === confirmPassword &&
+                      confirmPassword.length > 0
+                        ? "#8A63D2"
+                        : "#999"
+                    }
+                  />
+                  <Text style={styles.requirementText}>Passwords match</Text>
+                </View>
+              </View>
               <Pressable
                 style={styles.showPasswordRow}
                 onPress={() => setShowPasswords((p) => !p)}
@@ -2900,6 +2999,31 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#0F172A",
     fontWeight: "600",
+  },
+  requirementsBox: {
+    backgroundColor: "white",
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    // @ts-ignore - web only
+    boxShadow: "0px 1px 2px rgba(0,0,0,0.1)",
+    elevation: 2,
+  },
+  requirementsTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 12,
+  },
+  requirementItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  requirementText: {
+    fontSize: 14,
+    color: "#666",
+    marginLeft: 8,
   },
   eyeIconButton: {
     paddingHorizontal: 14,

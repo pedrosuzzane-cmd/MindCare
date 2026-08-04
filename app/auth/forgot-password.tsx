@@ -65,7 +65,13 @@ export default function ForgotPasswordScreen() {
   };
 
   const validatePassword = (pw: string) => {
-    return pw.length >= 8 && /[A-Za-z]/.test(pw) && /[0-9]/.test(pw);
+    return (
+      pw.length >= 8 &&
+      /[A-Z]/.test(pw) &&
+      /[a-z]/.test(pw) &&
+      /[0-9]/.test(pw) &&
+      /[^A-Za-z0-9]/.test(pw)
+    );
   };
 
   const handleBack = () => {
@@ -180,7 +186,7 @@ export default function ForgotPasswordScreen() {
 
     if (!validatePassword(newPassword)) {
       setError(
-        "Password must be at least 8 characters and include letters and numbers.",
+        "Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.",
       );
       return;
     }
@@ -531,17 +537,29 @@ export default function ForgotPasswordScreen() {
                       <View style={styles.requirementItem}>
                         <Ionicons
                           name={
-                            /[A-Za-z]/.test(newPassword)
+                            /[A-Z]/.test(newPassword)
                               ? "checkmark-circle"
                               : "close-circle"
                           }
                           size={16}
-                          color={
-                            /[A-Za-z]/.test(newPassword) ? "#8A63D2" : "#999"
-                          }
+                          color={/[A-Z]/.test(newPassword) ? "#8A63D2" : "#999"}
                         />
                         <Text style={styles.requirementText}>
-                          Contains letters (A-Z, a-z)
+                          Contains an uppercase letter (A-Z)
+                        </Text>
+                      </View>
+                      <View style={styles.requirementItem}>
+                        <Ionicons
+                          name={
+                            /[a-z]/.test(newPassword)
+                              ? "checkmark-circle"
+                              : "close-circle"
+                          }
+                          size={16}
+                          color={/[a-z]/.test(newPassword) ? "#8A63D2" : "#999"}
+                        />
+                        <Text style={styles.requirementText}>
+                          Contains a lowercase letter (a-z)
                         </Text>
                       </View>
                       <View style={styles.requirementItem}>
@@ -555,7 +573,25 @@ export default function ForgotPasswordScreen() {
                           color={/[0-9]/.test(newPassword) ? "#8A63D2" : "#999"}
                         />
                         <Text style={styles.requirementText}>
-                          Contains numbers (0-9)
+                          Contains a number (0-9)
+                        </Text>
+                      </View>
+                      <View style={styles.requirementItem}>
+                        <Ionicons
+                          name={
+                            /[^A-Za-z0-9]/.test(newPassword)
+                              ? "checkmark-circle"
+                              : "close-circle"
+                          }
+                          size={16}
+                          color={
+                            /[^A-Za-z0-9]/.test(newPassword)
+                              ? "#8A63D2"
+                              : "#999"
+                          }
+                        />
+                        <Text style={styles.requirementText}>
+                          Contains a special character (!@#$%^&* etc.)
                         </Text>
                       </View>
                       <View style={styles.requirementItem}>

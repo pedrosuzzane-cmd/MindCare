@@ -48,13 +48,18 @@ const ollama = new Ollama({
   host: process.env.OLLAMA_HOST || "http://127.0.0.1:11434",
 });
 
-// Initialize Firebase Admin (for auth user deletion)
+// Initialize Firebase Admin (for auth user deletion, OTP storage, admin ops)
 let admin;
 try {
   admin = require("firebase-admin");
-  const serviceAccount = require(
-    process.env.FIREBASE_SERVICE_ACCOUNT_PATH || "./service-account.json",
-  );
+  let serviceAccount;
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  } else {
+    serviceAccount = require(
+      process.env.FIREBASE_SERVICE_ACCOUNT_PATH || "./service-account.json",
+    );
+  }
 
   if (!admin.apps.length) {
     admin.initializeApp({
@@ -62,9 +67,12 @@ try {
       projectId: "mindcare-8801e",
     });
   }
+  console.log("Firebase Admin initialized.");
 } catch (err) {
   console.warn(
-    "firebase-admin not available. Auth user deletion will be skipped.",
+    "firebase-admin initialization failed. Endpoints that need it " +
+      "(OTP, delete-student, create-admin) will return errors.",
+    err.message,
   );
 }
 
