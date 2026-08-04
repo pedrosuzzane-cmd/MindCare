@@ -90,9 +90,30 @@ service cloud.firestore {
                   && request.auth.uid in resource.data.participantNames));
       }
 
-      allow get: if isParticipant() || isLegacyParticipant() || isAdmin();
+      // For list operations, `resource` is not available. Use get() to fetch
+      // each document and check participation.
+      function isParticipantViaGet() {
+        let convo = get(/databases/$(database)/documents/conversations/$(conversationId)).data;
+        return convo.participants != null && request.auth.uid in convo.participants;
+      }
 
-      allow list: if isParticipant() || isLegacyParticipant() || isAdmin();
+      function isLegacyParticipantViaGet() {
+        let convo = get(/databases/$(database)/documents/conversations/$(conversationId)).data;
+        return convo.participants == null
+          && (request.auth.uid == convo.studentId
+              || request.auth.uid == convo.adminId
+              || (convo.participantNames != null
+                  && request.auth.uid in convo.participantNames));
+      }
+
+      // Allow get on non-existent docs so clients can check existence
+      // before creating a conversation (getDoc returns null, not an error).
+      allow get: if !exists(/databases/$(database)/documents/conversations/$(conversationId))
+        || isParticipant()
+        || isLegacyParticipant()
+        || isAdmin();
+
+      allow list: if isAdmin() || isParticipantViaGet() || isLegacyParticipantViaGet();
 
       allow create: if signedIn() && request.auth.uid in request.resource.data.participants;
 
