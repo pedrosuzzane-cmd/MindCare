@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, sendEmailVerification } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -34,6 +34,8 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Record<string, any> | null>(null);
   const [uid, setUid] = useState<string | null>(null);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [verificationSending, setVerificationSending] = useState(false);
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -65,6 +67,7 @@ export default function ProfileScreen() {
       }
 
       setUid(user.uid);
+      setEmailVerified(user.emailVerified || false);
 
       try {
         const collectionName = role === "admin" ? "admins" : "users";
@@ -98,6 +101,28 @@ export default function ProfileScreen() {
   }, [role]);
 
   const handleBack = () => router.back();
+
+  const handleVerifyEmail = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+    if (verificationSending) return;
+    try {
+      setVerificationSending(true);
+      await sendEmailVerification(currentUser);
+      Alert.alert(
+        "Verification Sent",
+        "Please check your inbox for the verification link. You can continue using the app in the meantime.",
+      );
+    } catch (err: any) {
+      console.error("Error sending verification email:", err);
+      Alert.alert(
+        "Error",
+        err?.message || "Unable to send verification email. Please try again.",
+      );
+    } finally {
+      setVerificationSending(false);
+    }
+  };
 
   const handleAvatarPress = async () => {
     if (uploadingImage || !uid) return;
@@ -370,6 +395,39 @@ export default function ProfileScreen() {
               <Ionicons name="mail-open-outline" size={16} color="#94A3B8" />
               <Text style={s.fieldValue}>{profile?.email || "-"}</Text>
             </View>
+
+            {/* Email Verification Status */}
+            {emailVerified ? (
+              <View style={s.verifiedContainer}>
+                <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
+                <Text style={s.verifiedText}>Email Verified</Text>
+              </View>
+            ) : (
+              <View style={s.unverifiedContainer}>
+                <View style={s.unverifiedRow}>
+                  <Ionicons name="alert-circle" size={18} color="#B06000" />
+                  <Text style={s.warningText}>
+                    Your email is not verified yet.
+                  </Text>
+                </View>
+                <Pressable
+                  style={[
+                    s.verifyButton,
+                    verificationSending && { opacity: 0.6 },
+                  ]}
+                  onPress={handleVerifyEmail}
+                  disabled={verificationSending}
+                >
+                  {verificationSending ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text style={s.verifyButtonText}>
+                      Verify Email Now
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+            )}
           </View>
 
           {/* ── Phone Section ── */}
@@ -881,6 +939,51 @@ const s = StyleSheet.create({
     color: "#1E1B4B",
     fontWeight: "500",
     flex: 1,
+  },
+  verifiedContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#E6F4EA",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 10,
+  },
+  verifiedText: {
+    color: "#137333",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  unverifiedContainer: {
+    backgroundColor: "#FEF7E0",
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 10,
+    gap: 10,
+  },
+  unverifiedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  warningText: {
+    color: "#B06000",
+    fontSize: 13,
+    fontWeight: "600",
+    flex: 1,
+  },
+  verifyButton: {
+    backgroundColor: "#8A63D2",
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  verifyButtonText: {
+    color: "#FFF",
+    fontSize: 14,
+    fontWeight: "700",
   },
   input: {
     backgroundColor: "#FAF8FF",

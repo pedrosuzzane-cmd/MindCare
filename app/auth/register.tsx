@@ -1,8 +1,7 @@
-import { API_URL } from "@/backend/config";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -502,27 +501,13 @@ export default function RegisterScreen() {
   const [agreedToPolicy, setAgreedToPolicy] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
-  const [showOtpModal, setShowOtpModal] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [otpCode, setOtpCode] = useState("");
-  const [otpSending, setOtpSending] = useState(false);
-  const [otpVerifying, setOtpVerifying] = useState(false);
-  const [otpError, setOtpError] = useState<string | null>(null);
-  const [resendCooldown, setResendCooldown] = useState(0);
   const [finalizing, setFinalizing] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
   const [profileImageUploading, setProfileImageUploading] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
-
-  const resendTimer = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (resendTimer.current) clearInterval(resendTimer.current);
-    };
-  }, []);
 
   const formatSchoolId = (text: string) => {
     const cleaned = text.replace(/\D/g, "");
@@ -792,92 +777,6 @@ export default function RegisterScreen() {
     setShowConfirmModal(true);
   };
 
-  const startResendCooldown = () => {
-    setResendCooldown(45);
-    if (resendTimer.current) clearInterval(resendTimer.current);
-    resendTimer.current = setInterval(() => {
-      setResendCooldown((prev) => {
-        if (prev <= 1) {
-          if (resendTimer.current) clearInterval(resendTimer.current);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  const handleRequestOtp = async () => {
-    if (otpSending) return;
-    const emailClean = sanitize(formData.email.toLowerCase(), 256);
-    setOtpSending(true);
-    setOtpError(null);
-    try {
-      const response = await fetch(
-        `${API_URL}/api/auth/register-otp/request`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: emailClean }),
-        },
-      );
-      const data = await response.json();
-      if (!response.ok) {
-        setOtpError(data.error || "Unable to send verification code.");
-        Alert.alert(
-          "Verification Error",
-          data.error || "Unable to send verification code.",
-        );
-        return;
-      }
-      setShowConfirmModal(false);
-      setShowOtpModal(true);
-      startResendCooldown();
-      Alert.alert(
-        "Code Sent",
-        "We've sent a 6-digit verification code to your email.",
-      );
-    } catch (err: any) {
-      console.error("Request register OTP error:", err);
-      setOtpError("Network error. Please check your connection and try again.");
-      Alert.alert(
-        "Network Error",
-        "Unable to send verification code. Please check your connection.",
-      );
-    } finally {
-      setOtpSending(false);
-    }
-  };
-
-  const handleResendOtp = async () => {
-    if (resendCooldown > 0 || otpSending) return;
-    setOtpCode("");
-    setOtpError(null);
-    const emailClean = sanitize(formData.email.toLowerCase(), 256);
-    setOtpSending(true);
-    try {
-      const response = await fetch(
-        `${API_URL}/api/auth/register-otp/request`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: emailClean }),
-        },
-      );
-      const data = await response.json();
-      if (!response.ok) {
-        setOtpError(data.error || "Unable to resend code.");
-        return;
-      }
-      startResendCooldown();
-      Alert.alert("Code Resent", "A new verification code has been sent to your email.");
-    } catch (err: any) {
-      console.error("Resend register OTP error:", err);
-      setOtpError("Network error. Please try again.");
-    } finally {
-      setOtpSending(false);
-    }
-  };
-
   const handleConfirmPassword = async () => {
     if (!validateAllFields()) return;
 
@@ -897,41 +796,7 @@ export default function RegisterScreen() {
       return;
     }
 
-    await handleRequestOtp();
-  };
-
-  const handleVerifyOtp = async () => {
-    setOtpError(null);
-    const codeClean = otpCode.trim();
-    if (!/^\d{6}$/.test(codeClean)) {
-      setOtpError("Please enter the 6-digit code.");
-      return;
-    }
-    const emailClean = sanitize(formData.email.toLowerCase(), 256);
-    setOtpVerifying(true);
-    try {
-      const response = await fetch(
-        `${API_URL}/api/auth/register-otp/verify`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: emailClean, otp: codeClean }),
-        },
-      );
-      const data = await response.json();
-      if (!response.ok) {
-        setOtpError(data.error || "Unable to verify code.");
-        return;
-      }
-      setShowOtpModal(false);
-      setOtpCode("");
-      await handleFinalizeAccountCreation();
-    } catch (err: any) {
-      console.error("Verify register OTP error:", err);
-      setOtpError("Network error. Please try again.");
-    } finally {
-      setOtpVerifying(false);
-    }
+    await handleFinalizeAccountCreation();
   };
 
   const handleFinalizeAccountCreation = async () => {
@@ -1042,7 +907,6 @@ export default function RegisterScreen() {
 
       router.replace("/(student)/(tabs)/dashboard");
     } catch (err: any) {
-      setShowOtpModal(true);
       console.error("Registration error", err);
       let errorMessage = "An unexpected error occurred during registration.";
       if (err.code === "auth/email-already-in-use") {
@@ -2717,7 +2581,7 @@ export default function RegisterScreen() {
                     setPassword("");
                     setConfirmPassword("");
                   }}
-                  disabled={otpSending}
+                  disabled={finalizing}
                   android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
                 >
                   <Text style={styles.modalCancelText}>Cancel</Text>
@@ -2726,13 +2590,13 @@ export default function RegisterScreen() {
                   style={[
                     styles.modalButton,
                     styles.modalConfirmButton,
-                    otpSending && { opacity: 0.7 },
+                    finalizing && { opacity: 0.7 },
                   ]}
                   onPress={handleConfirmPassword}
-                  disabled={otpSending}
+                  disabled={finalizing}
                   android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
                 >
-                  {otpSending ? (
+                  {finalizing ? (
                     <ActivityIndicator color="white" />
                   ) : (
                     <Text style={styles.modalConfirmText}>Continue</Text>
@@ -2743,91 +2607,6 @@ export default function RegisterScreen() {
           </View>
         </Modal>
 
-        {/* OTP Verification Modal */}
-        <Modal
-          visible={showOtpModal}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setShowOtpModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-              <View style={styles.summaryIconContainer}>
-                <Ionicons name="mail-outline" size={28} color="#7C3AED" />
-              </View>
-              <Text style={styles.modalTitle}>Verify Your Email</Text>
-              <Text style={styles.modalSubtitle}>
-                We sent a 6-digit code to{"\n"}
-                <Text style={styles.modalSubtitleEmail}>
-                  {sanitize(formData.email.toLowerCase(), 256)}
-                </Text>
-              </Text>
-              <View style={styles.modalInputGroup}>
-                <Text style={styles.modalInputLabel}>Verification Code</Text>
-                <View style={styles.passwordInputContainer}>
-                  <TextInput
-                    style={styles.otpInput}
-                    placeholder="000000"
-                    placeholderTextColor="#94A3B8"
-                    value={otpCode}
-                    onChangeText={(text) =>
-                      setOtpCode(text.replace(/[^0-9]/g, "").slice(0, 6))
-                    }
-                    keyboardType="number-pad"
-                    maxLength={6}
-                    editable={!otpVerifying && !otpSending}
-                  />
-                </View>
-              </View>
-              {otpError ? (
-                <Text style={styles.otpErrorText}>{otpError}</Text>
-              ) : null}
-              <Pressable
-                style={styles.showPasswordRow}
-                onPress={handleResendOtp}
-                disabled={resendCooldown > 0 || otpSending || otpVerifying}
-              >
-                <Text
-                  style={[
-                    styles.resendText,
-                    (resendCooldown > 0 || otpSending || otpVerifying) &&
-                      styles.resendTextDisabled,
-                  ]}
-                >
-                  {resendCooldown > 0
-                    ? `Resend code in ${resendCooldown}s`
-                    : "Resend code"}
-                </Text>
-              </Pressable>
-              <View style={styles.modalActions}>
-                <Pressable
-                  style={[styles.modalButton, styles.modalCancelButton]}
-                  onPress={() => setShowOtpModal(false)}
-                  disabled={otpVerifying || otpSending}
-                  android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
-                >
-                  <Text style={styles.modalCancelText}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.modalButton,
-                    styles.modalConfirmButton,
-                    (otpVerifying || otpSending) && { opacity: 0.7 },
-                  ]}
-                  onPress={handleVerifyOtp}
-                  disabled={otpVerifying || otpSending}
-                  android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
-                >
-                  {otpVerifying ? (
-                    <ActivityIndicator color="white" />
-                  ) : (
-                    <Text style={styles.modalConfirmText}>Verify</Text>
-                  )}
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        </Modal>
       </View>
     </SafeAreaView>
     </KeyboardAvoidingView>
@@ -3565,32 +3344,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#7C3AED",
     fontWeight: "600",
-  },
-  otpInput: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#0F172A",
-    letterSpacing: 8,
-    textAlign: "center",
-  },
-  otpErrorText: {
-    color: "#DC2626",
-    fontSize: 13,
-    fontWeight: "500",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  resendText: {
-    fontSize: 14,
-    color: "#7C3AED",
-    fontWeight: "600",
-    padding: 6,
-  },
-  resendTextDisabled: {
-    color: "#94A3B8",
   },
   avatarSection: {
     alignItems: "center",
