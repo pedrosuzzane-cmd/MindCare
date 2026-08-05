@@ -1,8 +1,8 @@
+import { HapticTab } from "@/components/haptic-tab";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React from "react";
 import { Platform } from "react-native";
-import { HapticTab } from "@/components/haptic-tab";
 
 export default function TabLayout() {
   return (
@@ -28,7 +28,9 @@ export default function TabLayout() {
         options={{
           title: "Dashboard",
           tabBarButton: HapticTab,
-          tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -36,7 +38,9 @@ export default function TabLayout() {
         options={{
           title: "Announcements",
           tabBarButton: HapticTab,
-          tabBarIcon: ({ color, size }) => <Ionicons name="megaphone" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="megaphone" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -44,7 +48,9 @@ export default function TabLayout() {
         options={{
           title: "Breathe",
           tabBarButton: HapticTab,
-          tabBarIcon: ({ color, size }) => <Ionicons name="leaf" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="leaf" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -52,7 +58,9 @@ export default function TabLayout() {
         options={{
           title: "Inbox",
           tabBarButton: HapticTab,
-          tabBarIcon: ({ color, size }) => <Ionicons name="chatbubbles" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="chatbubbles" size={size} color={color} />
+          ),
         }}
       />
     </Tabs>
