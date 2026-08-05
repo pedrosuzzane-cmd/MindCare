@@ -735,7 +735,8 @@ try {
       });
   } else {
     console.warn(
-      "[SMTP] SMTP_USER/SMTP_PASS not set — OTP emails will be logged to console only (TEST MODE)."
+      "[SMTP] TEST MODE: SMTP_USER/SMTP_PASS not set on this server — OTP emails will be logged to console only and NOT delivered. " +
+        "Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM in the environment to enable email delivery."
     );
   }
 } catch (err) {
@@ -824,9 +825,14 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
   }
 
   const emailClean = normalizeEmail(email);
+  const ipAddress = getClientIp(req);
+  const userAgent = getUserAgent(req);
+  console.log(
+    `[FORGOT] Password reset requested. Student email received: ${emailClean} (ip=${ipAddress}).`
+  );
 
   // Coarse per-IP throttle to blunt OTP abuse / spam.
-  if (isOtpRateLimited(getClientIp(req))) {
+  if (isOtpRateLimited(ipAddress)) {
     return res.status(429).json({
       error: "Too many reset requests. Please try again later.",
     });
@@ -838,6 +844,9 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
     try {
       userRecord = await admin.auth().getUserByEmail(emailClean);
     } catch {
+      console.log(
+        `[FORGOT] No Firebase Auth account found for ${emailClean}; returning generic success (no email sent).`
+      );
       return res.json({
         success: true,
         message:
@@ -885,9 +894,9 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
     }
 
     const otp = generateOtp();
-    const ipAddress = getClientIp(req);
-    const userAgent = getUserAgent(req);
-    console.log(`[FORGOT] User found (uid=${userRecord.uid}); OTP generated for ${emailClean}.`);
+    console.log(
+      `[FORGOT] Student account found (uid=${userRecord.uid}). OTP generated + hashed (hash=${hashValue(otp).slice(0, 12)}...).`
+    );
 
     // Only one active code per email — invalidate any previous one.
     if (meta.currentOtpId) {
@@ -924,13 +933,22 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
     });
     console.log(`[FORGOT] OTP hash saved to Firestore (id=${otpRef.id}, expires in 5m).`);
 
+    // Stage log: explicit SMTP readiness check before sending.
+    if (otpTransporter) {
+      console.log(`[SMTP] Connecting to Gmail SMTP (${process.env.SMTP_HOST || "smtp.gmail.com"}:${process.env.SMTP_PORT || "587"}) to deliver OTP to ${emailClean}.`);
+    } else {
+      console.warn(
+        "[SMTP] TEST MODE: no transporter configured on this server. The OTP email will NOT be delivered; the code is logged to the console only. Set SMTP_USER/SMTP_PASS in this server's environment."
+      );
+    }
+
     await sendOtpEmail(emailClean, otp);
     await logSecurityEvent(userRecord.uid, "password_reset_requested", {
       ipAddress,
       userAgent,
     });
 
-    console.log(`Password reset OTP requested for ${emailClean}`);
+    console.log(`[FORGOT] Password reset request completed for ${emailClean}.`);
     return res.json({
       success: true,
       message:

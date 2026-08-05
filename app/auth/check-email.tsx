@@ -83,7 +83,7 @@ export default function CheckEmailScreen() {
   };
 
   const handleOpenEmailApp = () => {
-    Linking.openURL("mailto:").catch(() => {});
+    Linking.openURL("https://mail.google.com/").catch(() => {});
   };
 
   const handleChangeEmail = () => {
