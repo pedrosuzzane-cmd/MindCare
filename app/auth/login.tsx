@@ -274,18 +274,6 @@ export default function LoginScreen() {
               <Text style={styles.signupText}>Create an account</Text>
             </Pressable>
           </View>
-
-          <Pressable
-            onPress={() => router.push("/auth/admin-request-reset")}
-            style={styles.adminResetLink}
-            accessibilityRole="button"
-            accessibilityLabel="Administrator password reset"
-          >
-            <Ionicons name="shield-checkmark-outline" size={14} color={styles.icon.color} />
-            <Text style={styles.adminResetText}>
-              Administrator? Request a password reset
-            </Text>
-          </Pressable>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
