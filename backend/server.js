@@ -734,21 +734,78 @@ try {
         console.error(err.stack || err.message);
       });
   } else {
-    console.warn(
-      "[SMTP] TEST MODE: SMTP_USER/SMTP_PASS not set on this server — OTP emails will be logged to console only and NOT delivered. " +
-        "Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM in the environment to enable email delivery."
-    );
+    if (process.env.BREVO_API_KEY) {
+      console.log(
+        "[EMAIL] BREVO_API_KEY set — email will be delivered via the Brevo HTTPS API (port 443)."
+      );
+    } else {
+      console.warn(
+        "[SMTP] TEST MODE: neither SMTP_USER/SMTP_PASS nor BREVO_API_KEY are set on this server — email will be logged to console only and NOT delivered."
+      );
+    }
   }
 } catch (err) {
   console.warn("[SMTP] Failed to create transporter:", err.message);
 }
 
-// Sends mail via the configured transporter with stage logging.
-// Falls back to TEST MODE (console only) when SMTP is not configured.
-function sendMailWithLogging({ to, subject, html, label }) {
-  const mailOptions = { from: SMTP_FROM_ADDRESS, to, subject, html };
+// Render's free tier blocks outbound SMTP ports (25/465/587), so email must go
+// through an HTTPS API on port 443. When BREVO_API_KEY is set we use the Brevo
+// transactional API; otherwise we fall back to SMTP (local dev) or TEST MODE.
+const BREVO_API_KEY = process.env.BREVO_API_KEY || null;
+
+function parseFromAddress(fromAddress) {
+  const match = /^(.*?)\s*<([^>]+)>$/.exec(String(fromAddress).trim());
+  if (match) {
+    return { name: match[1].trim() || "MindCare", email: match[2].trim() };
+  }
+  return { name: "MindCare", email: String(fromAddress).trim() };
+}
+
+async function sendViaBrevoApi({ to, subject, html, text, label }) {
+  const sender = parseFromAddress(SMTP_FROM_ADDRESS);
+  const payload = {
+    sender,
+    to: [{ email: to }],
+    subject,
+    htmlContent: html,
+  };
+  if (text) payload.textContent = text;
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "api-key": BREVO_API_KEY,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const err = new Error(
+      `Brevo API error ${response.status}: ${JSON.stringify(data)}`
+    );
+    err.status = response.status;
+    throw err;
+  }
+  console.log(
+    `[EMAIL] ${label} → ${to} delivered via Brevo API. MessageId: ${data.messageId || "n/a"}`
+  );
+  return data;
+}
+
+// Unified mail delivery: Brevo HTTPS API > Nodemailer SMTP > TEST MODE.
+function deliverMail({ to, subject, html, text, label }) {
+  if (BREVO_API_KEY) {
+    console.log(`[EMAIL] ${label} → ${to} via Brevo API (HTTPS)...`);
+    return sendViaBrevoApi({ to, subject, html, text, label }).catch((err) => {
+      console.error(`[EMAIL] ${label} → ${to} FAILED (Brevo API).`);
+      console.error(err.stack || err.message);
+      throw err;
+    });
+  }
   if (otpTransporter) {
-    console.log(`[EMAIL] ${label} → ${to} ...`);
+    const mailOptions = { from: SMTP_FROM_ADDRESS, to, subject, html, text };
+    console.log(`[EMAIL] ${label} → ${to} via SMTP ...`);
     return otpTransporter
       .sendMail(mailOptions)
       .then((info) => {
@@ -758,13 +815,18 @@ function sendMailWithLogging({ to, subject, html, label }) {
         return info;
       })
       .catch((err) => {
-        console.error(`[EMAIL] ${label} → ${to} FAILED.`);
+        console.error(`[EMAIL] ${label} → ${to} FAILED (SMTP).`);
         console.error(err.stack || err.message);
         throw err;
       });
   }
-  console.log(`[TEST MODE] ${label} → ${to} (SMTP not configured)`);
+  console.log(`[TEST MODE] ${label} → ${to} (no mail transport configured)`);
   return Promise.resolve();
+}
+
+// Sends mail via the best available transport with stage logging.
+function sendMailWithLogging({ to, subject, html, label }) {
+  return deliverMail({ to, subject, html, label });
 }
 
 function sendOtpEmail(email, otp) {
@@ -789,30 +851,16 @@ function sendOtpEmail(email, otp) {
       <p style="color:#999;font-size:12px;">MindCare Security Team</p>
     </div>
   `;
-  const mailOptions = {
-    from: SMTP_FROM_ADDRESS,
+  if (!BREVO_API_KEY && !otpTransporter) {
+    console.log(`[OTP TEST MODE] Code for ${email}: ${otp}`);
+    return Promise.resolve();
+  }
+  return deliverMail({
     to: email,
     subject: "MindCare Password Reset Verification Code",
     html,
-  };
-  if (otpTransporter) {
-    console.log(`[EMAIL] Sending password reset email to ${email}...`);
-    return otpTransporter
-      .sendMail(mailOptions)
-      .then((info) => {
-        console.log(
-          `[EMAIL] Sent successfully to ${email}. MessageId: ${info.messageId}`
-        );
-        return info;
-      })
-      .catch((err) => {
-        console.error(`[EMAIL] Failed to send to ${email}.`);
-        console.error(err.stack || err.message);
-        throw err;
-      });
-  }
-  console.log(`[OTP TEST MODE] Code for ${email}: ${otp}`);
-  return Promise.resolve();
+    label: "Student OTP",
+  });
 }
 
 // POST /api/auth/forgot-password/request — generate OTP, store its hash, send email.
@@ -933,12 +981,14 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
     });
     console.log(`[FORGOT] OTP hash saved to Firestore (id=${otpRef.id}, expires in 5m).`);
 
-    // Stage log: explicit SMTP readiness check before sending.
-    if (otpTransporter) {
-      console.log(`[SMTP] Connecting to Gmail SMTP (${process.env.SMTP_HOST || "smtp.gmail.com"}:${process.env.SMTP_PORT || "587"}) to deliver OTP to ${emailClean}.`);
+    // Stage log: explicit delivery-mode readiness check before sending.
+    if (BREVO_API_KEY) {
+      console.log(`[EMAIL] Delivering OTP to ${emailClean} via Brevo HTTPS API (port 443).`);
+    } else if (otpTransporter) {
+      console.log(`[SMTP] Connecting to ${process.env.SMTP_HOST || "smtp.gmail.com"}:${process.env.SMTP_PORT || "587"} to deliver OTP to ${emailClean}.`);
     } else {
       console.warn(
-        "[SMTP] TEST MODE: no transporter configured on this server. The OTP email will NOT be delivered; the code is logged to the console only. Set SMTP_USER/SMTP_PASS in this server's environment."
+        "[SMTP] TEST MODE: no mail transport configured on this server. The OTP email will NOT be delivered; the code is logged to the console only. Set BREVO_API_KEY (HTTPS API) or SMTP_USER/SMTP_PASS in this server's environment."
       );
     }
 
