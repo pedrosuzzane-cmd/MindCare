@@ -1,7 +1,7 @@
 import { API_URL } from "@/backend/config";
 import AuthHeader from "@/components/auth/AuthHeader";
 import EmailInput from "@/components/auth/EmailInput";
-import { resetFlow } from "@/utils/resetFlow";
+import { adminResetFlow } from "@/utils/adminResetFlow";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -20,19 +20,17 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-export default function ForgotPasswordScreen() {
+export default function AdminRequestResetScreen() {
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
 
   const validateEmail = (val: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(val.toLowerCase());
 
   const handleSubmit = async () => {
     setError(null);
-    setInfo(null);
     const emailClean = email.trim().toLowerCase();
 
     if (!validateEmail(emailClean)) {
@@ -43,7 +41,7 @@ export default function ForgotPasswordScreen() {
     setLoading(true);
     try {
       const response = await fetch(
-        `${API_URL}/api/auth/forgot-password/request`,
+        `${API_URL}/api/admin/request-password-reset`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -53,21 +51,23 @@ export default function ForgotPasswordScreen() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Unable to send verification code.");
+        setError(data.error || "Unable to send the request.");
         return;
       }
 
-      // Administrator accounts must go through the Super Admin approval flow.
-      if (data.status === "admin") {
-        router.replace("/auth/admin-request-reset");
-        return;
+      adminResetFlow.setEmail(emailClean);
+      if (data.requestId) {
+        adminResetFlow.setRequestId(data.requestId);
+      }
+      if (data.otpExpiresAtMs) {
+        adminResetFlow.setOtpExpiresAt(data.otpExpiresAtMs);
       }
 
-      resetFlow.setEmail(emailClean);
-      setInfo(
-        "If an account with that email exists, a reset code has been sent.",
-      );
-      router.push("/auth/check-email");
+      if (data.status === "approved") {
+        router.replace("/auth/admin-verify-otp");
+        return;
+      }
+      router.replace("/auth/admin-request-submitted");
     } catch {
       setError("Network error. Please check your connection and try again.");
     } finally {
@@ -97,10 +97,10 @@ export default function ForgotPasswordScreen() {
             >
               <AuthHeader
                 onBack={() => router.back()}
-                icon="leaf-outline"
-                title="Forgot Password"
-                subtitle="Enter the email associated with your MindCare account."
-                reassurance="Don't worry, we'll help you regain access to your account securely."
+                icon="shield-outline"
+                title="Forgot Administrator Password"
+                subtitle="Enter your university email to request a password reset."
+                reassurance="Your request will be reviewed and approved by the Super Administrator."
               />
 
               <View style={styles.form}>
@@ -112,18 +112,12 @@ export default function ForgotPasswordScreen() {
                   onSubmit={handleSubmit}
                 />
 
-                {info ? (
-                  <Text style={styles.info} accessibilityRole="alert">
-                    {info}
-                  </Text>
-                ) : null}
-
                 <Pressable
                   style={[styles.button, loading && styles.buttonDisabled]}
                   onPress={handleSubmit}
                   disabled={loading}
                   accessibilityRole="button"
-                  accessibilityLabel="Send verification code"
+                  accessibilityLabel="Request password reset"
                 >
                   <LinearGradient
                     colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
@@ -134,16 +128,14 @@ export default function ForgotPasswordScreen() {
                     {loading ? (
                       <ActivityIndicator color="white" />
                     ) : (
-                      <Text style={styles.buttonText}>
-                        Send Verification Code
-                      </Text>
+                      <Text style={styles.buttonText}>Request Password Reset</Text>
                     )}
                   </LinearGradient>
                 </Pressable>
 
                 <Text style={styles.helper}>
-                  We'll send a 6-digit verification code that expires in 5
-                  minutes.
+                  No code is sent immediately. You'll receive an email once the
+                  Super Administrator approves your request.
                 </Text>
 
                 <Pressable
@@ -215,12 +207,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 28,
     paddingVertical: 8,
-  },
-  info: {
-    color: "#059669",
-    textAlign: "center",
-    fontSize: 14,
-    fontWeight: "500",
-    marginTop: 8,
   },
 });

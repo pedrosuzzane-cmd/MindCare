@@ -29,6 +29,7 @@ export default function RootLayout() {
             <Stack.Screen name="security-log" options={{ headerShown: false }} />
             <Stack.Screen name="(student)" options={{ headerShown: false }} />
             <Stack.Screen name="(admin)" options={{ headerShown: false }} />
+            <Stack.Screen name="(superadmin)" options={{ headerShown: false }} />
             <Stack.Screen
               name="modal"
               options={{ presentation: "modal", title: "Modal" }}

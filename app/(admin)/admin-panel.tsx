@@ -1,4 +1,4 @@
-import { API_URL } from "@/backend/config";
+import { API_URL, isSuperAdminEmail } from "@/backend/config";
 import type {
   DeptComparisonMetric,
   ScatterPoint,
@@ -300,6 +300,8 @@ export default function AdminPanelScreen() {
   const [newAdminCollege, setNewAdminCollege] = useState("");
   const [newAdminCollegeSearch, setNewAdminCollegeSearch] = useState("");
   const [adminCollege, setAdminCollege] = useState("");
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [pendingResetCount, setPendingResetCount] = useState(0);
   const [isSignOutConfirmVisible, setSignOutConfirmVisible] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
@@ -361,10 +363,54 @@ export default function AdminPanelScreen() {
       })
       .catch(() => {});
 
+    user
+      .getIdTokenResult()
+      .then((idTokenResult) => {
+        setIsSuperAdmin(
+          idTokenResult.claims.superAdmin === true ||
+            isSuperAdminEmail(user.email),
+        );
+      })
+      .catch(() => {});
+
     return () => {
       unsubData();
     };
   }, [user]);
+
+  useEffect(() => {
+    if (!isSuperAdmin || !user) {
+      setPendingResetCount(0);
+      return;
+    }
+    let cancelled = false;
+    const fetchPending = async () => {
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch(
+          `${API_URL}/api/superadmin/password-reset-requests`,
+          {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        const data = await response.json();
+        if (cancelled || !response.ok) return;
+        const count = (data.requests || []).filter(
+          (r: { status?: string }) => r.status === "pending",
+        ).length;
+        setPendingResetCount(count);
+      } catch {
+        // Background badge update — fail silently.
+      }
+    };
+    fetchPending();
+    const interval = setInterval(fetchPending, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isSuperAdmin, user]);
 
   useEffect(() => {
     const unsub = listenForAnnouncements((data) => setAnnouncements(data));
@@ -2144,6 +2190,41 @@ export default function AdminPanelScreen() {
               : "Analytics Overview"}
           </Text>
           <View style={styles.headerActions}>
+            {isSuperAdmin && (
+              <Pressable
+                style={styles.profileButton}
+                onPress={() => router.push("/(superadmin)/password-reset-requests")}
+                accessibilityRole="button"
+                accessibilityLabel="Password reset requests"
+              >
+                <Ionicons
+                  name="shield-checkmark-outline"
+                  size={20}
+                  color="#0F172A"
+                />
+                {pendingResetCount > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>
+                      {pendingResetCount > 99 ? "99+" : pendingResetCount}
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
+            )}
+            {isSuperAdmin && (
+              <Pressable
+                style={styles.profileButton}
+                onPress={() => router.push("/(superadmin)/admin-management")}
+                accessibilityRole="button"
+                accessibilityLabel="Manage administrators"
+              >
+                <Ionicons
+                  name="people-outline"
+                  size={20}
+                  color="#0F172A"
+                />
+              </Pressable>
+            )}
             <Pressable
               style={styles.profileButton}
               onPress={() => router.push("/(admin)/messages")}
@@ -3851,6 +3932,25 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 999,
     backgroundColor: "#F1F5F9",
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#EF4444",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF",
+  },
+  notificationBadgeText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "800",
   },
   signOutButton: {
     padding: 8,

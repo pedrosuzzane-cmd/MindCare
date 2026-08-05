@@ -1,4 +1,5 @@
 import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage";
+import { isSuperAdminEmail } from "@/backend/config";
 import { auth, db } from "@/constants/firebase";
 import { router } from "expo-router";
 import {
@@ -16,7 +17,7 @@ import React, {
   useState,
 } from "react";
 
-type UserRole = "student" | "admin" | null;
+type UserRole = "student" | "admin" | "superAdmin" | null;
 
 interface AuthContextType {
   user: User | null;
@@ -45,6 +46,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserRole = async (currentUser: User): Promise<UserRole> => {
     try {
+      // Super Admins are detected via the Firebase custom claim OR the
+      // configured Super Admin email list.
+      const idTokenResult = await currentUser.getIdTokenResult();
+      if (idTokenResult.claims.superAdmin === true) {
+        await ReactNativeAsyncStorage.setItem(CACHED_ROLE_KEY(currentUser.uid), "superAdmin");
+        return "superAdmin";
+      }
+      if (isSuperAdminEmail(currentUser.email)) {
+        await ReactNativeAsyncStorage.setItem(CACHED_ROLE_KEY(currentUser.uid), "superAdmin");
+        return "superAdmin";
+      }
+
       // Check if the user is an admin first
       const adminDocRef = doc(db, "admins", currentUser.uid);
       const adminDocSnap = await getDoc(adminDocRef);
@@ -72,7 +85,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.warn("Error fetching user role, using cached:", error);
       try {
         const cached = await ReactNativeAsyncStorage.getItem(CACHED_ROLE_KEY(currentUser.uid));
-        if (cached === "admin" || cached === "student") return cached;
+        if (
+          cached === "admin" ||
+          cached === "student" ||
+          cached === "superAdmin"
+        ) {
+          return cached;
+        }
       } catch {}
       return null;
     }

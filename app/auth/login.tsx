@@ -46,7 +46,9 @@ export default function LoginScreen() {
 
   useEffect(() => {
     if (authLoading || !user) return;
-    if (role === "admin") {
+    if (role === "superAdmin") {
+      router.replace("/(superadmin)/password-reset-requests");
+    } else if (role === "admin") {
       router.replace("/admin-panel");
     } else {
       // Default to student dashboard (works offline when role can't be fetched)
@@ -272,6 +274,18 @@ export default function LoginScreen() {
               <Text style={styles.signupText}>Create an account</Text>
             </Pressable>
           </View>
+
+          <Pressable
+            onPress={() => router.push("/auth/admin-request-reset")}
+            style={styles.adminResetLink}
+            accessibilityRole="button"
+            accessibilityLabel="Administrator password reset"
+          >
+            <Ionicons name="shield-checkmark-outline" size={14} color={styles.icon.color} />
+            <Text style={styles.adminResetText}>
+              Administrator? Request a password reset
+            </Text>
+          </Pressable>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -436,5 +450,7 @@ const createStyles = (isDark: boolean) => {
     footerContainer: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginTop: 24 },
     footerText: { color: colors.muted, fontSize: 13, fontWeight: "600" },
     signupText: { color: isDark ? "#C4B5FD" : "#6D28D9", fontSize: 13, fontWeight: "800" },
+    adminResetLink: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 16, paddingVertical: 6 },
+    adminResetText: { color: isDark ? "#C4B5FD" : "#6D28D9", fontSize: 12, fontWeight: "700" },
   });
 };

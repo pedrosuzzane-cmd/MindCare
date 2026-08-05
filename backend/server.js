@@ -99,8 +99,8 @@ const checkAdmin = async (req, res, next) => {
   }
 };
 
-// Endpoint to grant admin privileges to a user
-app.post("/api/grant-admin", checkAdmin, async (req, res) => {
+// Endpoint to grant admin privileges to a user (Super Admin only)
+app.post("/api/grant-admin", checkSuperAdmin, async (req, res) => {
   const { uid } = req.body;
   if (!uid) {
     return res.status(400).json({ error: "UID is required." });
@@ -682,26 +682,88 @@ async function logSecurityEvent(uid, type, details) {
   }
 }
 
+// Sender address used for all outgoing email (EMAIL_FROM takes precedence).
+const SMTP_FROM_ADDRESS =
+  process.env.EMAIL_FROM ||
+  process.env.SMTP_FROM ||
+  "MindCare <noreply@mindcare.app>";
+
 let otpTransporter = null;
 try {
   if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    const smtpPort = parseInt(process.env.SMTP_PORT || "587", 10);
+    // Gmail conventions: 465 = implicit TLS (secure:true), 587 = STARTTLS (secure:false).
+    let secure = smtpPort === 465;
+    if (process.env.SMTP_SECURE !== undefined) {
+      const envSecure = process.env.SMTP_SECURE === "true";
+      if (envSecure !== secure) {
+        console.warn(
+          `[SMTP] SMTP_SECURE=${process.env.SMTP_SECURE} conflicts with SMTP_PORT=${smtpPort}; ` +
+            `using secure=${secure} (Gmail 587 requires STARTTLS).`
+        );
+      }
+      // Only honor SMTP_SECURE when no port is given to force it.
+      if (process.env.SMTP_PORT === undefined) {
+        secure = envSecure;
+      }
+    }
     otpTransporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || "smtp.gmail.com",
-      port: parseInt(process.env.SMTP_PORT || "587", 10),
-      secure: false,
+      port: smtpPort,
+      secure,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
     });
-    console.log("OTP email transporter initialized.");
+    console.log(
+      `[SMTP] Transporter initialized for ${process.env.SMTP_USER} ` +
+        `(host=${process.env.SMTP_HOST || "smtp.gmail.com"}, port=${smtpPort}, secure=${secure}).`
+    );
+
+    // Verify the SMTP connection at startup (fails fast if App Password is wrong).
+    otpTransporter
+      .verify()
+      .then(() => {
+        console.log("[SMTP] Verified: connection to Gmail SMTP succeeded.");
+      })
+      .catch((err) => {
+        console.error(
+          "[SMTP] verify() failed. Check SMTP_HOST/PORT, SMTP_USER, and that the App Password is correct."
+        );
+        console.error(err.stack || err.message);
+      });
   } else {
     console.warn(
-      "SMTP not configured — OTP emails will be logged to console only."
+      "[SMTP] SMTP_USER/SMTP_PASS not set — OTP emails will be logged to console only (TEST MODE)."
     );
   }
 } catch (err) {
-  console.warn("Failed to create OTP transporter:", err.message);
+  console.warn("[SMTP] Failed to create transporter:", err.message);
+}
+
+// Sends mail via the configured transporter with stage logging.
+// Falls back to TEST MODE (console only) when SMTP is not configured.
+function sendMailWithLogging({ to, subject, html, label }) {
+  const mailOptions = { from: SMTP_FROM_ADDRESS, to, subject, html };
+  if (otpTransporter) {
+    console.log(`[EMAIL] ${label} → ${to} ...`);
+    return otpTransporter
+      .sendMail(mailOptions)
+      .then((info) => {
+        console.log(
+          `[EMAIL] ${label} → ${to} delivered. MessageId: ${info.messageId}`
+        );
+        return info;
+      })
+      .catch((err) => {
+        console.error(`[EMAIL] ${label} → ${to} FAILED.`);
+        console.error(err.stack || err.message);
+        throw err;
+      });
+  }
+  console.log(`[TEST MODE] ${label} → ${to} (SMTP not configured)`);
+  return Promise.resolve();
 }
 
 function sendOtpEmail(email, otp) {
@@ -727,13 +789,26 @@ function sendOtpEmail(email, otp) {
     </div>
   `;
   const mailOptions = {
-    from: process.env.SMTP_FROM || "MindCare <noreply@mindcare.app>",
+    from: SMTP_FROM_ADDRESS,
     to: email,
     subject: "MindCare Password Reset Verification Code",
     html,
   };
   if (otpTransporter) {
-    return otpTransporter.sendMail(mailOptions);
+    console.log(`[EMAIL] Sending password reset email to ${email}...`);
+    return otpTransporter
+      .sendMail(mailOptions)
+      .then((info) => {
+        console.log(
+          `[EMAIL] Sent successfully to ${email}. MessageId: ${info.messageId}`
+        );
+        return info;
+      })
+      .catch((err) => {
+        console.error(`[EMAIL] Failed to send to ${email}.`);
+        console.error(err.stack || err.message);
+        throw err;
+      });
   }
   console.log(`[OTP TEST MODE] Code for ${email}: ${otp}`);
   return Promise.resolve();
@@ -778,6 +853,17 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
     const metaSnap = await metaRef.get();
     const meta = metaSnap.exists ? metaSnap.data() : {};
 
+    // Administrator accounts must use the Super Admin approval workflow.
+    const adminDoc = await db.collection("admins").doc(userRecord.uid).get();
+    if (adminDoc.exists) {
+      return res.json({
+        success: true,
+        status: "admin",
+        message:
+          "Administrator accounts are reset through the Super Administrator approval flow.",
+      });
+    }
+
     // Resend cooldown — at least 60s between requests.
     if (meta.lastSentMs && now - meta.lastSentMs < OTP_RESEND_COOLDOWN_MS) {
       const waitSec = Math.ceil(
@@ -801,6 +887,7 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
     const otp = generateOtp();
     const ipAddress = getClientIp(req);
     const userAgent = getUserAgent(req);
+    console.log(`[FORGOT] User found (uid=${userRecord.uid}); OTP generated for ${emailClean}.`);
 
     // Only one active code per email — invalidate any previous one.
     if (meta.currentOtpId) {
@@ -809,6 +896,7 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
           .collection(PASSWORD_RESET_COLLECTION)
           .doc(meta.currentOtpId)
           .delete();
+        console.log(`[FORGOT] Invalidated previous OTP ${meta.currentOtpId}.`);
       } catch {}
     }
 
@@ -834,6 +922,7 @@ app.post("/api/auth/forgot-password/request", async (req, res) => {
       lastSentMs: now,
       requestTimes: [...requestTimes, now],
     });
+    console.log(`[FORGOT] OTP hash saved to Firestore (id=${otpRef.id}, expires in 5m).`);
 
     await sendOtpEmail(emailClean, otp);
     await logSecurityEvent(userRecord.uid, "password_reset_requested", {
@@ -1061,6 +1150,926 @@ app.post("/api/security/log", async (req, res) => {
   }
 });
 
+// ── Administrator Password Reset (Super Admin approval workflow) ──
+const ADMIN_RESET_REQUEST_COLLECTION = "adminPasswordResetRequests";
+const AUDIT_LOG_COLLECTION = "auditLogs";
+const ADMIN_OTP_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+const ADMIN_OTP_MAX_ATTEMPTS = 5;
+const ADMIN_OTP_LOCK_MS = 15 * 60 * 1000; // 15 minute lockout
+const ADMIN_RESET_SESSION_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+
+// Super Admins may also be granted via the custom claim `superAdmin: true`.
+// This env list is the bootstrap fallback so the first Super Admin can approve.
+const SUPER_ADMIN_EMAILS = (
+  process.env.SUPER_ADMIN_EMAILS || "mindcare932@gmail.com"
+)
+  .split(",")
+  .map((e) => normalizeEmail(e))
+  .filter(Boolean);
+
+// Middleware: only Super Admins (custom claim OR configured email list) may pass.
+async function checkSuperAdmin(req, res, next) {
+  const idToken = req.headers.authorization?.split("Bearer ")[1];
+  if (!idToken) {
+    return res.status(403).json({ error: "Unauthorized: No token provided." });
+  }
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const isClaimSuperAdmin = decodedToken.superAdmin === true;
+    const isListedSuperAdmin =
+      decodedToken.email && SUPER_ADMIN_EMAILS.includes(normalizeEmail(decodedToken.email));
+    if (isClaimSuperAdmin || isListedSuperAdmin) {
+      req.user = decodedToken;
+      return next();
+    }
+    return res.status(403).json({
+      error: "Only Super Admins can perform this action.",
+    });
+  } catch (error) {
+    return res.status(403).json({ error: "Unauthorized: Invalid token." });
+  }
+};
+
+// Appends an entry to the top-level auditLogs collection.
+async function logAuditEvent({ action, actor, target, req, status, requestId }) {
+  if (!admin) return;
+  try {
+    await admin.firestore().collection(AUDIT_LOG_COLLECTION).add({
+      action,
+      actorUid: actor?.uid || null,
+      actorEmail: actor?.email || null,
+      targetUid: target?.uid || null,
+      targetEmail: target?.email || null,
+      status: status || null,
+      requestId: requestId || null,
+      ipAddress: getClientIp(req),
+      device: getUserAgent(req),
+      createdAtMs: Date.now(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn("Failed to write audit log:", err.message);
+  }
+}
+
+function sendAdminApprovalEmail(email, otp) {
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;">
+      <h2 style="color:#8A63D2;">Your password reset request has been approved.</h2>
+      <div style="background:#F3EAFF;border-radius:12px;padding:24px;text-align:center;margin:24px 0;">
+        <p style="font-size:14px;color:#666;margin:0 0 8px;">Verification Code</p>
+        <p style="font-size:40px;font-weight:bold;color:#8A63D2;letter-spacing:10px;margin:0;">${otp}</p>
+      </div>
+      <p style="color:#666;font-size:14px;">Expires in <strong>5 minutes</strong>. Enter this code to create your new password.</p>
+      <p style="color:#666;font-size:14px;">If you did not request this reset, please contact the MindCare System Administrator.</p>
+      <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+      <p style="color:#999;font-size:12px;">MindCare Security Team</p>
+    </div>
+  `;
+  if (otpTransporter) {
+    return sendMailWithLogging({
+      to: email,
+      subject: "MindCare Password Reset Request Approved",
+      html,
+      label: "Admin OTP",
+    });
+  }
+  console.log(`[ADMIN OTP TEST MODE] Code for ${email}: ${otp}`);
+  return Promise.resolve();
+}
+
+function sendAdminRejectionEmail(email) {
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;">
+      <h2 style="color:#8A63D2;">MindCare Password Reset Request</h2>
+      <p>Hello,</p>
+      <p>Your administrator password reset request was <strong>not approved</strong>.</p>
+      <p>If you believe this is an error, please contact the MindCare System Administrator.</p>
+      <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+      <p style="color:#999;font-size:12px;">MindCare Security Team</p>
+    </div>
+  `;
+  if (otpTransporter) {
+    return sendMailWithLogging({
+      to: email,
+      subject: "MindCare Password Reset Request",
+      html,
+      label: "Admin Rejection",
+    });
+  }
+  console.log(`[ADMIN REJECT TEST MODE] Rejection email for ${email}`);
+  return Promise.resolve();
+}
+
+function notifySuperAdmins(adminEmail, adminName) {
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;">
+      <h2 style="color:#8A63D2;">MindCare Password Reset Request</h2>
+      <p>Hello,</p>
+      <p>An administrator has requested a password reset and is waiting for your approval.</p>
+      <div style="background:#F3EAFF;border-radius:12px;padding:20px;margin:24px 0;">
+        <p style="font-size:14px;color:#666;margin:0 0 4px;">Name</p>
+        <p style="font-size:18px;font-weight:bold;color:#24113F;margin:0 0 14px;">${adminName || "—"}</p>
+        <p style="font-size:14px;color:#666;margin:0 0 4px;">Email</p>
+        <p style="font-size:18px;font-weight:bold;color:#24113F;margin:0;">${adminEmail}</p>
+      </div>
+      <p style="color:#666;font-size:14px;">Log in to the MindCare admin dashboard to approve or reject this request.</p>
+      <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+      <p style="color:#999;font-size:12px;">MindCare Security Team</p>
+    </div>
+  `;
+  if (otpTransporter) {
+    return sendMailWithLogging({
+      to: SUPER_ADMIN_EMAILS.join(", "),
+      subject: "MindCare Password Reset Request",
+      html,
+      label: "SuperAdmin Notification",
+    });
+  }
+  console.log(`[ADMIN REQUEST TEST MODE] Notification for ${adminEmail}`);
+  return Promise.resolve();
+}
+
+// POST /api/admin/request-password-reset — create (or return) a pending request.
+app.post("/api/admin/request-password-reset", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email || !isValidEmail(email)) {
+    return res.status(400).json({ error: "Please enter a valid email address." });
+  }
+
+  const emailClean = normalizeEmail(email);
+
+  if (isOtpRateLimited(getClientIp(req))) {
+    return res.status(429).json({
+      error: "Too many reset requests. Please try again later.",
+    });
+  }
+
+  try {
+    // Do not reveal whether the account exists or is an admin.
+    let userRecord;
+    try {
+      userRecord = await admin.auth().getUserByEmail(emailClean);
+    } catch {
+      return res.json({
+        success: true,
+        status: "pending",
+        message:
+          "If an account with that email exists, your request has been sent.",
+      });
+    }
+
+    const db = admin.firestore();
+    const requestRef = db
+      .collection(ADMIN_RESET_REQUEST_COLLECTION)
+      .doc(emailKey(emailClean));
+    const requestSnap = await requestRef.get();
+    const existing = requestSnap.exists ? requestSnap.data() : null;
+
+    // An active request already exists — return it instead of creating a duplicate.
+    if (existing && existing.status === "pending") {
+      return res.json({
+        success: true,
+        requestId: requestRef.id,
+        status: existing.status,
+        otpExpiresAtMs: null,
+        message: "Your request is still pending approval.",
+      });
+    }
+
+    // An approved request whose OTP has expired must be re-approved.
+    if (
+      existing &&
+      existing.status === "approved" &&
+      !existing.completed &&
+      existing.otpExpiresAtMs &&
+      Date.now() > existing.otpExpiresAtMs
+    ) {
+      await requestRef.update({
+        status: "pending",
+        approvedBy: null,
+        approvedAtMs: null,
+        otpSent: false,
+        otpHash: null,
+        otpExpiresAtMs: null,
+        otpAttempts: 0,
+        otpLockedUntilMs: null,
+      });
+      await notifySuperAdmins(emailClean, existing.adminName || "");
+      await logAuditEvent({
+        action: "Admin Password Reset Re-Requested",
+        actor: null,
+        target: { uid: existing.adminUid, email: emailClean },
+        req,
+        status: "Pending",
+        requestId: requestRef.id,
+      });
+      return res.json({
+        success: true,
+        requestId: requestRef.id,
+        status: "pending",
+        message: "Your previous code expired. A new approval has been requested.",
+      });
+    }
+
+    // A still-valid approved request — send the admin straight to the OTP screen.
+    if (existing && existing.status === "approved" && !existing.completed) {
+      return res.json({
+        success: true,
+        requestId: requestRef.id,
+        status: "approved",
+        otpExpiresAtMs: existing.otpExpiresAtMs || null,
+        message: "Your request has been approved. Enter the code from your email.",
+      });
+    }
+
+    // Only university admins may request a reset.
+    const adminDoc = await db.collection("admins").doc(userRecord.uid).get();
+    if (!adminDoc.exists) {
+      return res.json({
+        success: true,
+        status: "pending",
+        message:
+          "If an account with that email exists, your request has been sent.",
+      });
+    }
+
+    const adminData = adminDoc.data();
+    const now = Date.now();
+
+    await requestRef.set({
+      adminUid: userRecord.uid,
+      email: emailClean,
+      adminName: adminData.displayName || userRecord.displayName || "",
+      status: "pending",
+      requestedAtMs: now,
+      requestedAt: admin.firestore.FieldValue.serverTimestamp(),
+      approvedBy: null,
+      approvedAtMs: null,
+      rejectedBy: null,
+      rejectedAtMs: null,
+      otpSent: false,
+      otpHash: null,
+      otpExpiresAtMs: null,
+      otpAttempts: 0,
+      otpLockedUntilMs: null,
+      completed: false,
+      completedAtMs: null,
+      requestedIp: getClientIp(req),
+      requestedDevice: getUserAgent(req),
+    });
+
+    await notifySuperAdmins(emailClean, adminData.displayName || "");
+    await logAuditEvent({
+      action: "Admin Password Reset Requested",
+      actor: null,
+      target: { uid: userRecord.uid, email: emailClean },
+      req,
+      status: "Pending",
+      requestId: requestRef.id,
+    });
+
+    console.log(`Admin password reset requested for ${emailClean}`);
+    return res.json({
+      success: true,
+      requestId: requestRef.id,
+      status: "pending",
+      message: "Your request has been sent to the Super Administrator.",
+    });
+  } catch (err) {
+    console.error("Admin password reset request error:", err);
+    return res.status(500).json({ error: "Unable to process the request." });
+  }
+});
+
+// GET /api/superadmin/password-reset-requests — list requests for the dashboard.
+app.get("/api/superadmin/password-reset-requests", checkSuperAdmin, async (req, res) => {
+  try {
+    const db = admin.firestore();
+    const snap = await db.collection(ADMIN_RESET_REQUEST_COLLECTION).get();
+    const requests = [];
+    snap.forEach((docSnap) => {
+      const data = docSnap.data();
+      requests.push({
+        requestId: docSnap.id,
+        adminUid: data.adminUid,
+        email: data.email,
+        adminName: data.adminName,
+        status: data.status,
+        requestedAtMs: data.requestedAtMs,
+        requestedAt: data.requestedAt?.toDate?.()?.toISOString() || null,
+        approvedBy: data.approvedBy,
+        approvedAtMs: data.approvedAtMs,
+        rejectedBy: data.rejectedBy,
+        rejectedAtMs: data.rejectedAtMs,
+        otpSent: data.otpSent,
+        otpExpiresAtMs: data.otpExpiresAtMs,
+        completed: data.completed,
+        completedAtMs: data.completedAtMs,
+      });
+    });
+    // Newest first.
+    requests.sort((a, b) => (b.requestedAtMs || 0) - (a.requestedAtMs || 0));
+    return res.json({ requests });
+  } catch (err) {
+    console.error("List password reset requests error:", err);
+    return res.status(500).json({ error: "Unable to load requests." });
+  }
+});
+
+// POST /api/superadmin/approve-password-reset — approve + generate/send OTP.
+app.post("/api/superadmin/approve-password-reset", checkSuperAdmin, async (req, res) => {
+  const { requestId } = req.body;
+  if (!requestId) {
+    return res.status(400).json({ error: "Request ID is required." });
+  }
+
+  try {
+    const db = admin.firestore();
+    const requestRef = db
+      .collection(ADMIN_RESET_REQUEST_COLLECTION)
+      .doc(String(requestId));
+    const requestSnap = await requestRef.get();
+
+    if (!requestSnap.exists) {
+      return res.status(404).json({ error: "Request not found." });
+    }
+
+    const requestData = requestSnap.data();
+    if (requestData.status !== "pending") {
+      return res.status(400).json({
+        error:
+          requestData.status === "approved"
+            ? "This request has already been approved."
+            : "This request can no longer be approved.",
+      });
+    }
+
+    const now = Date.now();
+    const otp = generateOtp();
+
+    await requestRef.update({
+      status: "approved",
+      approvedBy: req.user.uid,
+      approvedAtMs: now,
+      approvedAt: admin.firestore.FieldValue.serverTimestamp(),
+      otpSent: true,
+      otpHash: hashValue(otp),
+      otpExpiresAtMs: now + ADMIN_OTP_EXPIRY_MS,
+      otpAttempts: 0,
+      otpLockedUntilMs: null,
+    });
+
+    await sendAdminApprovalEmail(requestData.email, otp);
+    await logAuditEvent({
+      action: "Admin Password Reset Approved",
+      actor: req.user,
+      target: { uid: requestData.adminUid, email: requestData.email },
+      req,
+      status: "Approved",
+      requestId: requestRef.id,
+    });
+
+    console.log(`Admin password reset approved for ${requestData.email}`);
+    return res.json({
+      success: true,
+      status: "approved",
+      message: "Request approved. The OTP has been sent to the administrator.",
+    });
+  } catch (err) {
+    console.error("Approve password reset error:", err);
+    return res.status(500).json({ error: "Unable to approve the request." });
+  }
+});
+
+// POST /api/superadmin/reject-password-reset — reject a request.
+app.post("/api/superadmin/reject-password-reset", checkSuperAdmin, async (req, res) => {
+  const { requestId } = req.body;
+  if (!requestId) {
+    return res.status(400).json({ error: "Request ID is required." });
+  }
+
+  try {
+    const db = admin.firestore();
+    const requestRef = db
+      .collection(ADMIN_RESET_REQUEST_COLLECTION)
+      .doc(String(requestId));
+    const requestSnap = await requestRef.get();
+
+    if (!requestSnap.exists) {
+      return res.status(404).json({ error: "Request not found." });
+    }
+
+    const requestData = requestSnap.data();
+    if (requestData.status !== "pending") {
+      return res.status(400).json({
+        error:
+          requestData.status === "approved"
+            ? "This request has already been approved."
+            : "This request can no longer be rejected.",
+      });
+    }
+
+    const now = Date.now();
+    await requestRef.update({
+      status: "rejected",
+      rejectedBy: req.user.uid,
+      rejectedAtMs: now,
+      rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await sendAdminRejectionEmail(requestData.email);
+    await logAuditEvent({
+      action: "Admin Password Reset Rejected",
+      actor: req.user,
+      target: { uid: requestData.adminUid, email: requestData.email },
+      req,
+      status: "Rejected",
+      requestId: requestRef.id,
+    });
+
+    console.log(`Admin password reset rejected for ${requestData.email}`);
+    return res.json({
+      success: true,
+      status: "rejected",
+      message: "Request rejected. The administrator has been notified.",
+    });
+  } catch (err) {
+    console.error("Reject password reset error:", err);
+    return res.status(500).json({ error: "Unable to reject the request." });
+  }
+});
+
+// POST /api/admin/verify-reset-otp — verify the OTP for an approved request.
+app.post("/api/admin/verify-reset-otp", async (req, res) => {
+  const { requestId, otp } = req.body;
+
+  if (!requestId || !otp) {
+    return res.status(400).json({ error: "Request ID and code are required." });
+  }
+
+  const requestIdClean = String(requestId);
+  const otpClean = String(otp).trim();
+
+  try {
+    const db = admin.firestore();
+    const requestRef = db
+      .collection(ADMIN_RESET_REQUEST_COLLECTION)
+      .doc(requestIdClean);
+    const requestSnap = await requestRef.get();
+
+    if (!requestSnap.exists) {
+      return res.status(404).json({ error: "Request not found." });
+    }
+
+    const requestData = requestSnap.data();
+    const now = Date.now();
+
+    if (requestData.status !== "approved" || !requestData.otpHash) {
+      return res.status(400).json({
+        error: "This request has not been approved yet.",
+      });
+    }
+
+    if (requestData.completed) {
+      return res.status(400).json({
+        error: "This password reset has already been completed.",
+      });
+    }
+
+    if (now > requestData.otpExpiresAtMs) {
+      return res.status(400).json({
+        error: "This code has expired. Please request a new one.",
+      });
+    }
+
+    if (requestData.otpLockedUntilMs && now < requestData.otpLockedUntilMs) {
+      const lockMin = Math.ceil(
+        (requestData.otpLockedUntilMs - now) / 60000,
+      );
+      return res.status(429).json({
+        error: `Too many failed attempts. Try again in ${lockMin} minute(s).`,
+        attemptsRemaining: 0,
+      });
+    }
+
+    const attempts = requestData.otpAttempts || 0;
+    if (attempts >= ADMIN_OTP_MAX_ATTEMPTS) {
+      await requestRef.update({ otpLockedUntilMs: now + ADMIN_OTP_LOCK_MS });
+      return res.status(429).json({
+        error: "Too many failed attempts. Try again in 15 minutes.",
+        attemptsRemaining: 0,
+      });
+    }
+
+    if (hashValue(otpClean) !== requestData.otpHash) {
+      const newAttempts = attempts + 1;
+      const update = { otpAttempts: newAttempts };
+      if (newAttempts >= ADMIN_OTP_MAX_ATTEMPTS) {
+        update.otpLockedUntilMs = now + ADMIN_OTP_LOCK_MS;
+      }
+      await requestRef.update(update);
+      const remaining = Math.max(
+        0,
+        ADMIN_OTP_MAX_ATTEMPTS - newAttempts,
+      );
+      return res.status(400).json({
+        error:
+          remaining > 0
+            ? `Incorrect code. ${remaining} attempt(s) remaining.`
+            : "Too many failed attempts. Try again in 15 minutes.",
+        attemptsRemaining: remaining,
+      });
+    }
+
+    // Correct code — single use. Issue a short-lived reset session.
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    await db.collection(RESET_SESSION_COLLECTION).doc(hashValue(resetToken)).set({
+      uid: requestData.adminUid,
+      email: requestData.email,
+      requestId: requestRef.id,
+      expiresAt: now + ADMIN_RESET_SESSION_EXPIRY_MS,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      used: false,
+    });
+
+    // Invalidate the OTP so it cannot be reused.
+    await requestRef.update({
+      otpHash: null,
+      otpExpiresAtMs: null,
+    });
+
+    await logAuditEvent({
+      action: "Admin Password Reset Code Verified",
+      actor: null,
+      target: { uid: requestData.adminUid, email: requestData.email },
+      req,
+      status: "Verified",
+      requestId: requestRef.id,
+    });
+
+    return res.json({
+      success: true,
+      resetToken,
+      message: "Code verified. You can now create a new password.",
+    });
+  } catch (err) {
+    console.error("Admin verify OTP error:", err);
+    return res.status(500).json({ error: "Unable to verify code." });
+  }
+});
+
+// POST /api/admin/reset-password — validate reset session, update password, revoke sessions.
+app.post("/api/admin/reset-password", async (req, res) => {
+  const { resetToken, newPassword } = req.body;
+
+  if (!resetToken || !newPassword) {
+    return res
+      .status(400)
+      .json({ error: "Reset token and new password are required." });
+  }
+
+  const passwordCheck = validatePassword(newPassword);
+  if (!passwordCheck.ok) {
+    return res.status(400).json({ error: passwordCheck.reason });
+  }
+
+  try {
+    const db = admin.firestore();
+    const sessionRef = db
+      .collection(RESET_SESSION_COLLECTION)
+      .doc(hashValue(String(resetToken)));
+    const sessionSnap = await sessionRef.get();
+
+    if (!sessionSnap.exists) {
+      return res
+        .status(400)
+        .json({ error: "Invalid or expired reset session." });
+    }
+
+    const sessionData = sessionSnap.data();
+    const now = Date.now();
+
+    if (sessionData.used) {
+      return res
+        .status(400)
+        .json({ error: "This reset session has already been used." });
+    }
+
+    if (now > sessionData.expiresAt) {
+      await sessionRef.delete();
+      return res
+        .status(400)
+        .json({ error: "Reset session has expired. Please start over." });
+    }
+
+    await admin.auth().updateUser(sessionData.uid, { password: newPassword });
+    await admin.auth().revokeRefreshTokens(sessionData.uid);
+
+    if (sessionData.requestId) {
+      const requestRef = db
+        .collection(ADMIN_RESET_REQUEST_COLLECTION)
+        .doc(String(sessionData.requestId));
+      try {
+        const requestSnap = await requestRef.get();
+        if (requestSnap.exists) {
+          await requestRef.update({
+            status: "completed",
+            completed: true,
+            completedAtMs: now,
+            completedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (err) {
+        console.warn("Failed to mark request completed:", err.message);
+      }
+    }
+
+    await sessionRef.delete();
+    await logSecurityEvent(sessionData.uid, "admin_password_changed", {
+      ipAddress: getClientIp(req),
+      userAgent: getUserAgent(req),
+    });
+    await logAuditEvent({
+      action: "Admin Password Reset Completed",
+      actor: null,
+      target: { uid: sessionData.uid, email: sessionData.email },
+      req,
+      status: "Completed",
+      requestId: sessionData.requestId || null,
+    });
+
+    console.log(
+      `Admin password updated for ${sessionData.email} (all sessions revoked)`
+    );
+    return res.json({
+      success: true,
+      message: "Password updated. All administrator sessions have been signed out.",
+    });
+  } catch (err) {
+    console.error("Admin password reset error:", err);
+    return res.status(500).json({ error: "Unable to reset password." });
+  }
+});
+
+// POST /api/superadmin/promote — grant the superAdmin custom claim (bootstrap).
+app.post("/api/superadmin/promote", checkSuperAdmin, async (req, res) => {
+  const { email } = req.body;
+  if (!email || !isValidEmail(email)) {
+    return res.status(400).json({ error: "A valid email is required." });
+  }
+  const emailClean = normalizeEmail(email);
+  if (!SUPER_ADMIN_EMAILS.includes(emailClean)) {
+    return res.status(403).json({
+      error: "This email is not in the configured Super Admin list.",
+    });
+  }
+  try {
+    const userRecord = await admin.auth().getUserByEmail(emailClean);
+    await admin.auth().setCustomUserClaims(userRecord.uid, {
+      admin: true,
+      superAdmin: true,
+    });
+    await logAuditEvent({
+      action: "Super Admin Promoted",
+      actor: req.user,
+      target: { uid: userRecord.uid, email: emailClean },
+      req,
+      status: "Promoted",
+    });
+    return res.json({
+      success: true,
+      message: `Super Admin privileges granted to ${emailClean}.`,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: `Failed to grant Super Admin privileges: ${error.message}`,
+    });
+  }
+});
+
+// ── Super Admin: Administrator Management ──
+
+// GET /api/superadmin/admins — list all administrators with their role/claims.
+app.get("/api/superadmin/admins", checkSuperAdmin, async (req, res) => {
+  try {
+    const db = admin.firestore();
+    const snapshot = await db.collection("admins").get();
+    const docs = [];
+    snapshot.forEach((d) => docs.push({ uid: d.id, ...d.data() }));
+
+    // Enrich with Auth custom claims so role shown reflects reality.
+    let claims = {};
+    const uids = docs.map((d) => d.uid);
+    if (uids.length > 0) {
+      try {
+        const result = await admin.auth().getUsers(uids.map((uid) => ({ uid })));
+        result.users.forEach((u) => {
+          claims[u.uid] = u.customClaims || {};
+        });
+      } catch (err) {
+        console.warn("Failed to load admin claims:", err.message);
+      }
+    }
+
+    const admins = docs
+      .map((d) => {
+        const claim = claims[d.uid] || {};
+        const isSuperAdmin = claim.superAdmin === true;
+        return {
+          ...d,
+          role: d.role || (isSuperAdmin ? "superAdmin" : "admin"),
+          isSuperAdmin,
+          hasAdminClaim: claim.admin === true,
+          createdAtMs: d.createdAtMs || null,
+        };
+      })
+      .sort(
+        (a, b) =>
+          (b.createdAtMs || 0) - (a.createdAtMs || 0) ||
+          (a.email || "").localeCompare(b.email || ""),
+      );
+
+    return res.json({ success: true, admins });
+  } catch (err) {
+    console.error("List admins error:", err);
+    return res.status(500).json({ error: "Unable to load administrators." });
+  }
+});
+
+// POST /api/superadmin/update-admin — edit admin profile fields and/or Super Admin status.
+app.post("/api/superadmin/update-admin", checkSuperAdmin, async (req, res) => {
+  const { uid } = req.body;
+  if (!uid) {
+    return res.status(400).json({ error: "Admin UID is required." });
+  }
+  if (String(uid) === req.user.uid) {
+    return res.status(400).json({
+      error: "You cannot edit your own Super Admin account from this screen.",
+    });
+  }
+  try {
+    const db = admin.firestore();
+    const docRef = db.collection("admins").doc(String(uid));
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      return res.status(404).json({ error: "Administrator not found." });
+    }
+    const current = snap.data();
+
+    const profileUpdates = {};
+    for (const field of [
+      "displayName",
+      "position",
+      "contactNo",
+      "college",
+      "schoolId",
+      "genderIdentity",
+      "nationality",
+      "address",
+    ]) {
+      if (req.body[field] !== undefined) {
+        profileUpdates[field] = req.body[field];
+      }
+    }
+
+    let claimsChanged = false;
+    if (typeof req.body.isSuperAdmin === "boolean") {
+      if (req.body.isSuperAdmin) {
+        await admin.auth().setCustomUserClaims(uid, {
+          admin: true,
+          superAdmin: true,
+        });
+        profileUpdates.role = "superAdmin";
+        profileUpdates.isSuperAdmin = true;
+      } else {
+        await admin.auth().setCustomUserClaims(uid, { admin: true });
+        profileUpdates.role = "admin";
+        profileUpdates.isSuperAdmin = false;
+      }
+      claimsChanged = true;
+    }
+
+    if (Object.keys(profileUpdates).length > 0) {
+      await docRef.update(profileUpdates);
+    }
+
+    await logAuditEvent({
+      action: claimsChanged ? "Admin Updated" : "Admin Profile Updated",
+      actor: req.user,
+      target: { uid, email: current.email },
+      req,
+      status: "Updated",
+    });
+
+    return res.json({ success: true, message: "Administrator updated." });
+  } catch (err) {
+    console.error("Update admin error:", err);
+    return res.status(500).json({ error: "Unable to update the administrator." });
+  }
+});
+
+// POST /api/superadmin/revoke-admin — remove admin claims and the admins doc.
+app.post("/api/superadmin/revoke-admin", checkSuperAdmin, async (req, res) => {
+  const { uid } = req.body;
+  if (!uid) {
+    return res.status(400).json({ error: "Admin UID is required." });
+  }
+  if (String(uid) === req.user.uid) {
+    return res.status(400).json({ error: "You cannot revoke your own access." });
+  }
+  try {
+    const db = admin.firestore();
+    const docRef = db.collection("admins").doc(String(uid));
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      return res.status(404).json({ error: "Administrator not found." });
+    }
+    const email = snap.data().email;
+
+    await admin.auth().setCustomUserClaims(String(uid), {});
+    await docRef.delete();
+
+    // Clean up any pending reset request tied to this admin.
+    try {
+      const reqDoc = db
+        .collection(ADMIN_RESET_REQUEST_COLLECTION)
+        .doc(emailKey(email));
+      const rsnap = await reqDoc.get();
+      if (rsnap.exists && rsnap.data().status === "pending") {
+        await reqDoc.delete();
+      }
+    } catch {}
+
+    await logAuditEvent({
+      action: "Admin Revoked",
+      actor: req.user,
+      target: { uid, email },
+      req,
+      status: "Revoked",
+    });
+
+    return res.json({
+      success: true,
+      message: `Admin access revoked for ${email}.`,
+    });
+  } catch (err) {
+    console.error("Revoke admin error:", err);
+    return res.status(500).json({ error: "Unable to revoke the administrator." });
+  }
+});
+
+// POST /api/superadmin/delete-admin — permanently delete the admin account.
+app.post("/api/superadmin/delete-admin", checkSuperAdmin, async (req, res) => {
+  const { uid } = req.body;
+  if (!uid) {
+    return res.status(400).json({ error: "Admin UID is required." });
+  }
+  if (String(uid) === req.user.uid) {
+    return res.status(400).json({ error: "You cannot delete your own account." });
+  }
+  try {
+    const db = admin.firestore();
+    const docRef = db.collection("admins").doc(String(uid));
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      return res.status(404).json({ error: "Administrator not found." });
+    }
+    const email = snap.data().email;
+
+    await admin.auth().deleteUser(String(uid));
+    await docRef.delete();
+
+    // Clean up any reset request tied to this admin.
+    try {
+      const reqDoc = db
+        .collection(ADMIN_RESET_REQUEST_COLLECTION)
+        .doc(emailKey(email));
+      const rsnap = await reqDoc.get();
+      if (rsnap.exists) {
+        await reqDoc.delete();
+      }
+    } catch {}
+
+    await logAuditEvent({
+      action: "Admin Deleted",
+      actor: req.user,
+      target: { uid, email },
+      req,
+      status: "Deleted",
+    });
+
+    return res.json({
+      success: true,
+      message: `Administrator ${email} was deleted.`,
+    });
+  } catch (err) {
+    console.error("Delete admin error:", err);
+    return res.status(500).json({ error: "Unable to delete the administrator." });
+  }
+});
+
 // ── Registration OTP (email verification for new sign-ups) ──
 const REGISTRATION_OTP_COLLECTION = "registrationOtps";
 const REGISTRATION_OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
@@ -1107,28 +2116,25 @@ app.post("/api/auth/register-otp/request", async (req, res) => {
       verified: false,
     });
 
-    const mailOptions = {
-      from: process.env.SMTP_FROM || "MindCare <noreply@mindcare.app>",
-      to: emailClean,
-      subject: "MindCare — Verify Your Email",
-      html: `
-        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;">
-          <h2 style="color:#8A63D2;">Verify Your Email</h2>
-          <p>Welcome to MindCare! Use the code below to verify your email and finish creating your account.</p>
-          <div style="background:#F3EAFF;border-radius:12px;padding:24px;text-align:center;margin:24px 0;">
-            <p style="font-size:14px;color:#666;margin:0 0 8px;">Your 6-digit code:</p>
-            <p style="font-size:36px;font-weight:bold;color:#8A63D2;letter-spacing:8px;margin:0;">${otp}</p>
-          </div>
-          <p style="color:#666;font-size:14px;">This code expires in <strong>10 minutes</strong>. If you didn't request this, you can safely ignore this email.</p>
-          <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
-          <p style="color:#999;font-size:12px;">MindCare Student Wellness App</p>
-        </div>
-      `,
-    };
-
     if (otpTransporter) {
-      await otpTransporter.sendMail(mailOptions);
-      console.log(`Registration OTP email sent to ${emailClean}`);
+      await sendMailWithLogging({
+        to: emailClean,
+        subject: "MindCare — Verify Your Email",
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;">
+            <h2 style="color:#8A63D2;">Verify Your Email</h2>
+            <p>Welcome to MindCare! Use the code below to verify your email and finish creating your account.</p>
+            <div style="background:#F3EAFF;border-radius:12px;padding:24px;text-align:center;margin:24px 0;">
+              <p style="font-size:14px;color:#666;margin:0 0 8px;">Your 6-digit code:</p>
+              <p style="font-size:36px;font-weight:bold;color:#8A63D2;letter-spacing:8px;margin:0;">${otp}</p>
+            </div>
+            <p style="color:#666;font-size:14px;">This code expires in <strong>10 minutes</strong>. If you didn't request this, you can safely ignore this email.</p>
+            <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+            <p style="color:#999;font-size:12px;">MindCare Student Wellness App</p>
+          </div>
+        `,
+        label: "Registration OTP",
+      });
     } else {
       console.log(
         `[OTP TEST MODE] Registration code for ${emailClean}: ${otp}`

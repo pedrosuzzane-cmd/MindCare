@@ -235,6 +235,19 @@ The backend server starts on `http://localhost:3000` by default (configurable vi
 - `POST /api/security/log` — Record a security activity event (e.g. login)
 - `POST /api/send-otp` — Send OTP for password reset
 - `POST /api/verify-otp` — Verify OTP
+- `POST /api/admin/request-password-reset` — Request an admin password reset (notifies Super Admin)
+- `GET /api/superadmin/password-reset-requests` — List admin password reset requests (Super Admin only)
+- `POST /api/superadmin/approve-password-reset` — Approve a request + send OTP (Super Admin only)
+- `POST /api/superadmin/reject-password-reset` — Reject a request (Super Admin only)
+- `POST /api/admin/verify-reset-otp` — Verify the OTP for an approved admin reset
+- `POST /api/admin/reset-password` — Set the new admin password + revoke all sessions
+- `POST /api/superadmin/promote` — Grant the `superAdmin` custom claim (bootstrap)
+
+Super Admin role: grant the Firebase custom claim `{ admin: true, superAdmin: true }` (via the
+Firebase console or `/api/superadmin/promote`). As a bootstrap fallback, emails in the
+`SUPER_ADMIN_EMAILS` env var (comma-separated, default `mindcare932@gmail.com`) are also treated
+as Super Admins until the claim is set. Every request/approve/reject/reset writes an entry to the
+`auditLogs` collection.
 
 ---
 

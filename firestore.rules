@@ -1,4 +1,4 @@
-rules_version = '2';
+﻿rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -64,11 +64,18 @@ service cloud.firestore {
     // NOTE: `allow read: if signedIn()` is kept intentionally so students can
     // browse admins/counselors in the messaging directory. Admin docs should
     // avoid storing sensitive PII beyond what's needed for directory display.
+    // Writes are restricted to Super Admins (custom claim). An admin may still
+    // update their own profile, but never the privileged role fields.
     match /admins/{adminId} {
       allow read: if signedIn();
-      allow create: if isAdmin();
-      allow update: if isOwner(adminId);
-      allow delete: if false;
+      allow create: if signedIn() && request.auth.token.superAdmin == true;
+      allow update: if signedIn()
+        && (request.auth.token.superAdmin == true
+            || (isOwner(adminId)
+                && !request.resource.data.diff(resource.data)
+                     .affectedKeys()
+                     .hasAny(['role', 'isSuperAdmin', 'email'])));
+      allow delete: if signedIn() && request.auth.token.superAdmin == true;
     }
 
     // ─── CONVERSATIONS ───────────────────────────────────────
