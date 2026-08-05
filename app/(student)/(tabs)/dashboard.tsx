@@ -140,7 +140,7 @@ export default function DashboardScreen() {
             <View style={styles.logoContainer}>
               <View style={styles.logoIcon}>
                 <Image
-                  source={require("@/assets/images/applogo.png")}
+                  source={require("@/assets/images/appicon_circle.png")}
                   style={styles.logoIconImage}
                   resizeMode="contain"
                 />
