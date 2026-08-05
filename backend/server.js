@@ -2184,7 +2184,7 @@ app.post("/api/auth/register-otp/request", async (req, res) => {
       verified: false,
     });
 
-    if (otpTransporter) {
+    if (otpTransporter || BREVO_API_KEY) {
       await sendMailWithLogging({
         to: emailClean,
         subject: "MindCare — Verify Your Email",
