@@ -229,6 +229,10 @@ The backend server starts on `http://localhost:3000` by default (configurable vi
 **Available backend routes:**
 
 - `POST /api/chat` — AI chat endpoint (Gemini/GROQ)
+- `POST /api/auth/forgot-password/request` — Request password reset (hashed OTP via email)
+- `POST /api/auth/forgot-password/verify` — Verify OTP, issue short-lived reset session
+- `POST /api/auth/forgot-password/reset` — Reset password + revoke all sessions
+- `POST /api/security/log` — Record a security activity event (e.g. login)
 - `POST /api/send-otp` — Send OTP for password reset
 - `POST /api/verify-otp` — Verify OTP
 

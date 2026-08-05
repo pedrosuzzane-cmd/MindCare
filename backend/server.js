@@ -556,12 +556,131 @@ app.post("/api/delete-student", async (req, res) => {
   }
 });
 
-// ── Forgot Password OTP (custom 6-digit code via Gmail SMTP) ──
+// ── Forgot Password (secure OTP + reset session) ──
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 
-const OTP_COLLECTION = "passwordResets";
-const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+const PASSWORD_RESET_COLLECTION = "passwordReset";
+const PASSWORD_RESET_META_COLLECTION = "passwordResetMeta";
+const RESET_SESSION_COLLECTION = "passwordResetSessions";
+const OTP_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+const OTP_MAX_ATTEMPTS = 5; // max incorrect attempts before lockout
+const OTP_LOCK_MS = 15 * 60 * 1000; // 15 minute lockout
+const OTP_RESEND_COOLDOWN_MS = 60 * 1000; // 60 second resend cooldown
+const OTP_MAX_RESENDS_PER_HOUR = 3; // max resends per rolling hour
+const RESET_SESSION_EXPIRY_MS = 10 * 60 * 1000; // reset session: 10 minutes
+const PASSWORD_MIN_LENGTH = 12;
+
+// Common/weak passwords rejected outright.
+const COMMON_PASSWORDS = new Set([
+  "password", "password123", "password1234", "123456", "12345678",
+  "123456789", "1234567890", "qwerty", "qwerty123", "abc123",
+  "letmein", "admin", "admin123", "welcome", "welcome123", "iloveyou",
+  "monkey", "dragon", "football", "baseball", "111111", "000000",
+  "mindcare", "mindcare123",
+]);
+
+function normalizeEmail(email) {
+  return String(email).trim().toLowerCase();
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+}
+
+// Stable per-email key so we can look up OTPs without composite indexes.
+function emailKey(email) {
+  return crypto
+    .createHash("sha256")
+    .update(normalizeEmail(email))
+    .digest("hex")
+    .slice(0, 24);
+}
+
+function hashValue(value) {
+  return crypto.createHash("sha256").update(String(value)).digest("hex");
+}
+
+function generateOtp() {
+  return crypto.randomInt(100000, 999999).toString();
+}
+
+function validatePassword(password) {
+  if (typeof password !== "string" || password.length < PASSWORD_MIN_LENGTH) {
+    return {
+      ok: false,
+      reason: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`,
+    };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { ok: false, reason: "Password must include an uppercase letter." };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { ok: false, reason: "Password must include a lowercase letter." };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { ok: false, reason: "Password must include a number." };
+  }
+  if (!/[^A-Za-z0-9]/.test(password)) {
+    return {
+      ok: false,
+      reason: "Password must include a special character.",
+    };
+  }
+  if (COMMON_PASSWORDS.has(password.toLowerCase())) {
+    return {
+      ok: false,
+      reason: "This password is too common. Please choose a stronger one.",
+    };
+  }
+  return { ok: true };
+}
+
+function getClientIp(req) {
+  return (req.headers["x-forwarded-for"] || req.ip || "unknown")
+    .split(",")[0]
+    .trim();
+}
+
+function getUserAgent(req) {
+  return String(req.headers["user-agent"] || "unknown").slice(0, 200);
+}
+
+// In-memory sliding window: max 5 reset requests per IP per hour.
+const otpRequestTracker = new Map();
+function isOtpRateLimited(ip) {
+  const now = Date.now();
+  const windowStart = now - 60 * 60 * 1000;
+  const times = (otpRequestTracker.get(ip) || []).filter(
+    (t) => t > windowStart,
+  );
+  if (times.length >= 5) {
+    otpRequestTracker.set(ip, times);
+    return true;
+  }
+  times.push(now);
+  otpRequestTracker.set(ip, times);
+  return false;
+}
+
+// Appends a security event to the user's activity log (securityLogs/{uid}/events).
+async function logSecurityEvent(uid, type, details) {
+  if (!admin) return;
+  try {
+    await admin
+      .firestore()
+      .collection("securityLogs")
+      .doc(uid)
+      .collection("events")
+      .add({
+        type,
+        details: details || {},
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+  } catch (err) {
+    console.warn("Failed to log security event:", err.message);
+  }
+}
 
 let otpTransporter = null;
 try {
@@ -585,162 +704,360 @@ try {
   console.warn("Failed to create OTP transporter:", err.message);
 }
 
-function generateOtp() {
-  return crypto.randomInt(100000, 999999).toString();
+function sendOtpEmail(email, otp) {
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;">
+      <h2 style="color:#8A63D2;">MindCare Password Reset Verification Code</h2>
+      <p>Hello,</p>
+      <p>We received a request to reset your MindCare password.</p>
+      <div style="background:#F3EAFF;border-radius:12px;padding:24px;text-align:center;margin:24px 0;">
+        <p style="font-size:14px;color:#666;margin:0 0 8px;">Your verification code is</p>
+        <p style="font-size:40px;font-weight:bold;color:#8A63D2;letter-spacing:10px;margin:0;">${otp}</p>
+      </div>
+      <p style="color:#666;font-size:14px;">This code will expire in <strong>5 minutes</strong>.</p>
+      <p style="color:#666;font-size:14px;">If you did not request this reset, please ignore this email. Your account will remain secure.</p>
+      <p style="color:#666;font-size:14px;font-weight:600;">For security reasons:</p>
+      <ul style="color:#666;font-size:13px;line-height:20px;padding-left:20px;">
+        <li>Never share this code.</li>
+        <li>MindCare staff will never ask for it.</li>
+        <li>This code can only be used once.</li>
+      </ul>
+      <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+      <p style="color:#999;font-size:12px;">MindCare Security Team</p>
+    </div>
+  `;
+  const mailOptions = {
+    from: process.env.SMTP_FROM || "MindCare <noreply@mindcare.app>",
+    to: email,
+    subject: "MindCare Password Reset Verification Code",
+    html,
+  };
+  if (otpTransporter) {
+    return otpTransporter.sendMail(mailOptions);
+  }
+  console.log(`[OTP TEST MODE] Code for ${email}: ${otp}`);
+  return Promise.resolve();
 }
 
-// POST /api/auth/forgot-password/request — generate OTP, store in Firestore, send email
+// POST /api/auth/forgot-password/request — generate OTP, store its hash, send email.
+// Always returns the same response whether or not the email exists (no enumeration).
 app.post("/api/auth/forgot-password/request", async (req, res) => {
   const { email } = req.body;
 
-  if (!email || typeof email !== "string") {
-    return res.status(400).json({ error: "Email is required." });
+  if (!email || !isValidEmail(email)) {
+    return res.status(400).json({ error: "Please enter a valid email address." });
   }
 
-  const emailClean = email.trim().toLowerCase();
+  const emailClean = normalizeEmail(email);
+
+  // Coarse per-IP throttle to blunt OTP abuse / spam.
+  if (isOtpRateLimited(getClientIp(req))) {
+    return res.status(429).json({
+      error: "Too many reset requests. Please try again later.",
+    });
+  }
 
   try {
-    // Look up user by email
+    // Look up the user by email — do NOT reveal whether the account exists.
     let userRecord;
     try {
       userRecord = await admin.auth().getUserByEmail(emailClean);
     } catch {
-      // Don't reveal whether the email exists — pretend success
       return res.json({
         success: true,
         message:
-          "If an account exists, a reset code has been sent to that email.",
+          "If an account with that email exists, a reset code has been sent.",
+      });
+    }
+
+    const db = admin.firestore();
+    const now = Date.now();
+    const metaRef = db
+      .collection(PASSWORD_RESET_META_COLLECTION)
+      .doc(emailKey(emailClean));
+    const metaSnap = await metaRef.get();
+    const meta = metaSnap.exists ? metaSnap.data() : {};
+
+    // Resend cooldown — at least 60s between requests.
+    if (meta.lastSentMs && now - meta.lastSentMs < OTP_RESEND_COOLDOWN_MS) {
+      const waitSec = Math.ceil(
+        (OTP_RESEND_COOLDOWN_MS - (now - meta.lastSentMs)) / 1000,
+      );
+      return res.status(429).json({
+        error: `Please wait ${waitSec}s before requesting another code.`,
+      });
+    }
+
+    // Max resends per rolling hour (initial request + 3 resends).
+    const requestTimes = (meta.requestTimes || []).filter(
+      (t) => now - t < 60 * 60 * 1000,
+    );
+    if (requestTimes.length >= 1 + OTP_MAX_RESENDS_PER_HOUR) {
+      return res.status(429).json({
+        error: "Too many reset requests. Please try again in an hour.",
       });
     }
 
     const otp = generateOtp();
-    const expiresAt = Date.now() + OTP_EXPIRY_MS;
+    const ipAddress = getClientIp(req);
+    const userAgent = getUserAgent(req);
 
-    // Store OTP in Firestore
-    const db = admin.firestore();
-    await db.collection(OTP_COLLECTION).doc(userRecord.uid).set({
-      otp,
-      email: emailClean,
-      expiresAt,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      verified: false,
-    });
-
-    // Send OTP email
-    const mailOptions = {
-      from: process.env.SMTP_FROM || "MindCare <noreply@mindcare.app>",
-      to: emailClean,
-      subject: "MindCare — Password Reset Code",
-      html: `
-        <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;">
-          <h2 style="color:#8A63D2;">Password Reset Code</h2>
-          <p>You requested a password reset for your MindCare account.</p>
-          <div style="background:#F3EAFF;border-radius:12px;padding:24px;text-align:center;margin:24px 0;">
-            <p style="font-size:14px;color:#666;margin:0 0 8px;">Your 6-digit code:</p>
-            <p style="font-size:36px;font-weight:bold;color:#8A63D2;letter-spacing:8px;margin:0;">${otp}</p>
-          </div>
-          <p style="color:#666;font-size:14px;">This code expires in <strong>10 minutes</strong>. If you didn't request this, you can safely ignore this email.</p>
-          <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
-          <p style="color:#999;font-size:12px;">MindCare Student Wellness App</p>
-        </div>
-      `,
-    };
-
-    if (otpTransporter) {
-      await otpTransporter.sendMail(mailOptions);
-      console.log(`OTP email sent to ${emailClean}`);
-    } else {
-      // Fallback: log OTP to console for testing
-      console.log(`[OTP TEST MODE] Code for ${emailClean}: ${otp}`);
+    // Only one active code per email — invalidate any previous one.
+    if (meta.currentOtpId) {
+      try {
+        await db
+          .collection(PASSWORD_RESET_COLLECTION)
+          .doc(meta.currentOtpId)
+          .delete();
+      } catch {}
     }
 
+    // Store only the OTP hash (never plain text).
+    const otpRef = await db.collection(PASSWORD_RESET_COLLECTION).add({
+      email: emailClean,
+      uid: userRecord.uid,
+      otpHash: hashValue(otp),
+      expiresAt: now + OTP_EXPIRY_MS,
+      createdAtMs: now,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      attempts: 0,
+      maxAttempts: OTP_MAX_ATTEMPTS,
+      used: false,
+      lastSentMs: now,
+      lastSent: admin.firestore.FieldValue.serverTimestamp(),
+      ipAddress,
+      userAgent,
+    });
+
+    await metaRef.set({
+      currentOtpId: otpRef.id,
+      lastSentMs: now,
+      requestTimes: [...requestTimes, now],
+    });
+
+    await sendOtpEmail(emailClean, otp);
+    await logSecurityEvent(userRecord.uid, "password_reset_requested", {
+      ipAddress,
+      userAgent,
+    });
+
+    console.log(`Password reset OTP requested for ${emailClean}`);
     return res.json({
       success: true,
       message:
-        "If an account exists, a reset code has been sent to that email.",
+        "If an account with that email exists, a reset code has been sent.",
     });
   } catch (err) {
-    console.error("OTP request error:", err);
+    console.error("Password reset request error:", err);
     return res
       .status(500)
       .json({ error: "Unable to process password reset request." });
   }
 });
 
-// POST /api/auth/forgot-password/verify-and-reset — verify OTP + set new password
-app.post("/api/auth/forgot-password/verify-and-reset", async (req, res) => {
-  const { email, otp, newPassword } = req.body;
+// POST /api/auth/forgot-password/verify — verify OTP, then issue a short-lived reset session.
+app.post("/api/auth/forgot-password/verify", async (req, res) => {
+  const { email, otp } = req.body;
 
-  if (!email || !otp || !newPassword) {
+  if (!email || !otp) {
     return res
       .status(400)
-      .json({ error: "Email, OTP code, and new password are required." });
+      .json({ error: "Email and verification code are required." });
   }
 
-  if (typeof newPassword !== "string" || newPassword.length < 8) {
-    return res
-      .status(400)
-      .json({ error: "Password must be at least 8 characters." });
-  }
-
-  const emailClean = email.trim().toLowerCase();
-  const otpClean = otp.trim();
+  const emailClean = normalizeEmail(email);
+  const otpClean = String(otp).trim();
 
   try {
     const db = admin.firestore();
+    const metaSnap = await db
+      .collection(PASSWORD_RESET_META_COLLECTION)
+      .doc(emailKey(emailClean))
+      .get();
 
-    // Find user by email
-    let userRecord;
-    try {
-      userRecord = await admin.auth().getUserByEmail(emailClean);
-    } catch {
+    if (!metaSnap.exists || !metaSnap.data().currentOtpId) {
       return res.status(400).json({ error: "Invalid or expired reset code." });
     }
 
-    // Get stored OTP record
-    const otpDoc = await db.collection(OTP_COLLECTION).doc(userRecord.uid).get();
+    const otpDoc = await db
+      .collection(PASSWORD_RESET_COLLECTION)
+      .doc(metaSnap.data().currentOtpId)
+      .get();
 
     if (!otpDoc.exists) {
       return res.status(400).json({ error: "Invalid or expired reset code." });
     }
 
     const otpData = otpDoc.data();
+    const now = Date.now();
 
-    // Check if OTP was already used
-    if (otpData.verified) {
-      return res.status(400).json({ error: "Reset code has already been used." });
+    if (otpData.used) {
+      return res.status(400).json({ error: "This code has already been used." });
     }
 
-    // Check expiry
-    if (Date.now() > otpData.expiresAt) {
-      return res.status(400).json({ error: "Reset code has expired. Please request a new one." });
+    if (now > otpData.expiresAt) {
+      await otpDoc.ref.delete();
+      await metaSnap.ref.delete();
+      return res
+        .status(400)
+        .json({ error: "This code has expired. Please request a new one." });
     }
 
-    // Verify OTP
-    if (otpData.otp !== otpClean) {
-      return res.status(400).json({ error: "Incorrect reset code. Please try again." });
+    if (otpData.lockedUntil && now < otpData.lockedUntil) {
+      const lockMin = Math.ceil((otpData.lockedUntil - now) / 60000);
+      return res.status(429).json({
+        error: `Too many failed attempts. Try again in ${lockMin} minute(s).`,
+        attemptsRemaining: 0,
+      });
     }
 
-    // All checks passed — update password
-    await admin.auth().updateUser(userRecord.uid, {
-      password: newPassword,
+    const attempts = otpData.attempts || 0;
+    if (attempts >= OTP_MAX_ATTEMPTS) {
+      await otpDoc.ref.update({
+        lockedUntil: now + OTP_LOCK_MS,
+      });
+      return res.status(429).json({
+        error: "Too many failed attempts. Try again in 15 minutes.",
+        attemptsRemaining: 0,
+      });
+    }
+
+    // Wrong code — increment attempts and lock after the limit.
+    if (hashValue(otpClean) !== otpData.otpHash) {
+      const newAttempts = attempts + 1;
+      const update = { attempts: newAttempts };
+      if (newAttempts >= OTP_MAX_ATTEMPTS) {
+        update.lockedUntil = now + OTP_LOCK_MS;
+      }
+      await otpDoc.ref.update(update);
+      const remaining = Math.max(0, OTP_MAX_ATTEMPTS - newAttempts);
+      return res.status(400).json({
+        error:
+          remaining > 0
+            ? `Incorrect code. ${remaining} attempt(s) remaining.`
+            : "Too many failed attempts. Try again in 15 minutes.",
+        attemptsRemaining: remaining,
+      });
+    }
+
+    // Correct code — single use. Delete the OTP and issue a reset session.
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    await db.collection(RESET_SESSION_COLLECTION).doc(hashValue(resetToken)).set({
+      uid: otpData.uid,
+      email: emailClean,
+      expiresAt: now + RESET_SESSION_EXPIRY_MS,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      used: false,
     });
 
-    // Mark OTP as used
-    await db.collection(OTP_COLLECTION).doc(userRecord.uid).update({
-      verified: true,
-    });
+    await otpDoc.ref.delete();
+    await metaSnap.ref.delete();
 
-    console.log(`Password updated for ${emailClean}`);
     return res.json({
       success: true,
-      message: "Password updated successfully.",
+      resetToken,
+      message: "Code verified. You can now create a new password.",
     });
   } catch (err) {
-    console.error("OTP verify-and-reset error:", err);
+    console.error("Password reset verify error:", err);
+    return res
+      .status(500)
+      .json({ error: "Unable to verify code. Please try again." });
+  }
+});
+
+// POST /api/auth/forgot-password/reset — validate reset session, update password, revoke sessions.
+app.post("/api/auth/forgot-password/reset", async (req, res) => {
+  const { resetToken, newPassword } = req.body;
+
+  if (!resetToken || !newPassword) {
+    return res
+      .status(400)
+      .json({ error: "Reset token and new password are required." });
+  }
+
+  const passwordCheck = validatePassword(newPassword);
+  if (!passwordCheck.ok) {
+    return res.status(400).json({ error: passwordCheck.reason });
+  }
+
+  try {
+    const db = admin.firestore();
+    const sessionRef = db
+      .collection(RESET_SESSION_COLLECTION)
+      .doc(hashValue(String(resetToken)));
+    const sessionSnap = await sessionRef.get();
+
+    if (!sessionSnap.exists) {
+      return res
+        .status(400)
+        .json({ error: "Invalid or expired reset session." });
+    }
+
+    const sessionData = sessionSnap.data();
+    const now = Date.now();
+
+    if (sessionData.used) {
+      return res
+        .status(400)
+        .json({ error: "This reset session has already been used." });
+    }
+
+    if (now > sessionData.expiresAt) {
+      await sessionRef.delete();
+      return res
+        .status(400)
+        .json({ error: "Reset session has expired. Please start over." });
+    }
+
+    // Update the password and revoke all refresh tokens (signs out every device).
+    await admin.auth().updateUser(sessionData.uid, { password: newPassword });
+    await admin.auth().revokeRefreshTokens(sessionData.uid);
+
+    await sessionRef.delete();
+    await logSecurityEvent(sessionData.uid, "password_changed", {
+      ipAddress: getClientIp(req),
+      userAgent: getUserAgent(req),
+    });
+
+    console.log(
+      `Password updated for ${sessionData.email} (all sessions revoked)`
+    );
+    return res.json({
+      success: true,
+      message: "Password updated. All previous sessions have been signed out.",
+    });
+  } catch (err) {
+    console.error("Password reset error:", err);
     return res
       .status(500)
       .json({ error: "Unable to reset password. Please try again." });
+  }
+});
+
+// POST /api/security/log — record a security event for the authenticated user.
+app.post("/api/security/log", async (req, res) => {
+  const idToken = req.headers.authorization?.split("Bearer ")[1];
+  const { type, details } = req.body;
+
+  if (!idToken) {
+    return res.status(401).json({ error: "Unauthorized: No token provided." });
+  }
+  if (!type || typeof type !== "string") {
+    return res.status(400).json({ error: "Event type is required." });
+  }
+
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    await logSecurityEvent(decodedToken.uid, type, {
+      ipAddress: getClientIp(req),
+      userAgent: getUserAgent(req),
+      ...(details || {}),
+    });
+    return res.json({ success: true });
+  } catch (err) {
+    console.error("Security log error:", err.message);
+    return res.status(401).json({ error: "Invalid token." });
   }
 });
 

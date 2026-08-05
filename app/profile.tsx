@@ -621,6 +621,25 @@ export default function ProfileScreen() {
             </View>
           )}
 
+          {/* ── Security Activity ── */}
+          <View style={s.sectionCard}>
+            <View style={s.sectionHeader}>
+              <View style={[s.sectionIcon, { backgroundColor: "#EDE9FE" }]}>
+                <Ionicons name="shield-checkmark-outline" size={18} color="#7B2CBF" />
+              </View>
+              <Text style={s.sectionTitle}>Security Activity</Text>
+            </View>
+            <Pressable onPress={() => router.push("/security-log")}>
+              <View style={s.fieldRow}>
+                <Ionicons name="time-outline" size={16} color="#94A3B8" />
+                <Text style={s.fieldValue}>
+                  Review sign-ins and account security events
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color="#CBD5E1" style={{ marginLeft: "auto" }} />
+              </View>
+            </Pressable>
+          </View>
+
           {/* ── LSN Document Section (students only) ── */}
           {!isAdmin && (
             <View style={s.sectionCard}>

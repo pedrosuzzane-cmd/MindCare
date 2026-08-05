@@ -1,4 +1,5 @@
 import { auth } from "@/constants/firebase";
+import { API_URL } from "@/backend/config";
 import { useAuth } from "@/hooks/AuthContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -61,6 +62,23 @@ export default function LoginScreen() {
     );
   }
 
+  const logLoginEvent = async () => {
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) return;
+      await fetch(`${API_URL}/api/security/log`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ type: "login", details: { platform: Platform.OS } }),
+      });
+    } catch (err) {
+      console.warn("Failed to log login event:", err);
+    }
+  };
+
   const handleLogin = async () => {
     setEmailError("");
     setPasswordError("");
@@ -85,6 +103,7 @@ export default function LoginScreen() {
       } else {
         await AsyncStorage.removeItem(REMEMBER_EMAIL_KEY);
       }
+      logLoginEvent();
     } catch (err: any) {
       const code = err?.code || "";
       let message = "Login failed. Please try again.";
