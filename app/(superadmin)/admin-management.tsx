@@ -38,14 +38,27 @@ interface AdminEntry {
   createdAtMs?: number | null;
 }
 
-function formatDate(ms?: number | null): string {
+function timeAgo(ms?: number | null): string {
   if (!ms) return "—";
-  const d = new Date(ms);
-  return d.toLocaleDateString(undefined, {
-    year: "numeric",
+  const s = Math.floor((Date.now() - ms) / 1000);
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} hr${h === 1 ? "" : "s"} ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d} day${d === 1 ? "" : "s"} ago`;
+  return new Date(ms).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
+    year: "numeric",
   });
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+  const out = parts.map((p) => p[0]?.toUpperCase() || "").join("");
+  return out || "A";
 }
 
 function RoleBadge({ isSuper }: { isSuper: boolean }) {
@@ -62,6 +75,39 @@ function RoleBadge({ isSuper }: { isSuper: boolean }) {
   );
 }
 
+function StatTile({
+  label,
+  value,
+  color,
+  bg,
+  icon,
+  highlighted,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  bg: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  highlighted?: boolean;
+}) {
+  return (
+    <View
+      style={[
+        styles.statTile,
+        highlighted && { backgroundColor: "rgba(255,255,255,0.18)", borderColor: "rgba(255,255,255,0.45)" },
+      ]}
+    >
+      <View style={[styles.statIcon, { backgroundColor: bg }]}>
+        <Ionicons name={icon} size={14} color={color} />
+      </View>
+      <Text style={[styles.statValue, highlighted && { color: "white" }]}>{value}</Text>
+      <Text style={[styles.statLabel, highlighted && { color: "rgba(255,255,255,0.85)" }]}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 export default function AdminManagementScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -70,6 +116,7 @@ export default function AdminManagementScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actingUid, setActingUid] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   const [editing, setEditing] = useState<AdminEntry | null>(null);
   const [saving, setSaving] = useState(false);
@@ -236,12 +283,21 @@ export default function AdminManagementScreen() {
     );
   };
 
+  const superCount = admins.filter((a) => a.isSuperAdmin).length;
+  const standardCount = admins.length - superCount;
+
+  const q = query.trim().toLowerCase();
+  const visible = admins.filter(
+    (a) =>
+      !q ||
+      (a.displayName || "").toLowerCase().includes(q) ||
+      (a.email || "").toLowerCase().includes(q) ||
+      (a.position || "").toLowerCase().includes(q),
+  );
+
   return (
     <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
-      <LinearGradient
-        colors={["#E8E0F5", "#F4F2F8", "#E8E0F5"]}
-        style={styles.gradient}
-      >
+      <LinearGradient colors={["#7C3AED", "#9B6BF2"]} style={styles.headerBand}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <Pressable
@@ -251,147 +307,236 @@ export default function AdminManagementScreen() {
               accessibilityLabel="Back to admin panel"
               hitSlop={8}
             >
-              <Ionicons name="arrow-back" size={22} color="#4B5563" />
+              <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
             </Pressable>
-            <View>
+            <View style={styles.titleWrap}>
               <Text style={styles.headerTitle}>Administrators</Text>
               <Text style={styles.headerSubtitle}>
                 Manage admin accounts and permissions
               </Text>
             </View>
           </View>
-          <Pressable
-            style={styles.refreshButton}
-            onPress={handleRefresh}
-            accessibilityRole="button"
-            accessibilityLabel="Refresh administrators"
-          >
-            <Ionicons name="refresh" size={20} color="#7C3AED" />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              style={styles.iconButton}
+              onPress={() => router.push("/(superadmin)/password-reset-requests")}
+              accessibilityRole="button"
+              accessibilityLabel="Password reset requests"
+            >
+              <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" />
+            </Pressable>
+            <Pressable
+              style={styles.iconButton}
+              onPress={handleRefresh}
+              accessibilityRole="button"
+              accessibilityLabel="Refresh administrators"
+            >
+              <Ionicons name="refresh" size={20} color="#FFFFFF" />
+            </Pressable>
+          </View>
         </View>
 
-        {error ? (
-          <Text style={styles.errorText} accessibilityRole="alert">
-            {error}
-          </Text>
-        ) : null}
+        <View style={styles.statsRow}>
+          <StatTile
+            label="Total"
+            value={admins.length}
+            color="#B45309"
+            bg="#FDE68A"
+            icon="people-outline"
+            highlighted
+          />
+          <StatTile
+            label="Super Admins"
+            value={superCount}
+            color="#6D28D9"
+            bg="#DDD6FE"
+            icon="shield-checkmark-outline"
+          />
+          <StatTile
+            label="Admins"
+            value={standardCount}
+            color="#047857"
+            bg="#A7F3D0"
+            icon="shield-outline"
+          />
+        </View>
+      </LinearGradient>
 
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-          }
-        >
-          {loading ? (
-            <View style={styles.center}>
-              <ActivityIndicator size="large" color="#7C3AED" />
+      {error ? (
+        <Text style={styles.errorText} accessibilityRole="alert">
+          {error}
+        </Text>
+      ) : null}
+
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
+        {admins.length > 0 && (
+          <View style={styles.searchBox}>
+            <Ionicons name="search-outline" size={18} color="#9CA3AF" />
+            <TextInput
+              style={styles.searchInput}
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search by name, email, or position"
+              placeholderTextColor="#9CA3AF"
+              autoCapitalize="none"
+            />
+            {query.length > 0 && (
+              <Pressable onPress={() => setQuery("")} hitSlop={8}>
+                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+              </Pressable>
+            )}
+          </View>
+        )}
+
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color="#7C3AED" />
+          </View>
+        ) : admins.length === 0 ? (
+          <View style={styles.empty}>
+            <View style={styles.emptyIcon}>
+              <Ionicons name="people-circle-outline" size={40} color="#7C3AED" />
             </View>
-          ) : admins.length === 0 ? (
-            <View style={styles.empty}>
-              <Ionicons
-                name="people-circle-outline"
-                size={44}
-                color="#8A63D2"
-              />
-              <Text style={styles.emptyTitle}>No administrators yet</Text>
-              <Text style={styles.emptyText}>
-                Administrators created from the Admin Panel will appear here.
-              </Text>
+            <Text style={styles.emptyTitle}>No administrators yet</Text>
+            <Text style={styles.emptyText}>
+              Administrators created from the Admin Panel will appear here.
+            </Text>
+          </View>
+        ) : visible.length === 0 ? (
+          <View style={styles.empty}>
+            <View style={styles.emptyIcon}>
+              <Ionicons name="search-outline" size={40} color="#7C3AED" />
             </View>
-          ) : (
-            admins.map((admin) => {
-              const isSelf = admin.uid === user?.uid;
-              return (
-                <View key={admin.uid} style={styles.card}>
-                  <View style={styles.cardTop}>
-                    <View style={styles.avatar}>
-                      <Ionicons name="person-outline" size={20} color="#7C3AED" />
+            <Text style={styles.emptyTitle}>No results</Text>
+            <Text style={styles.emptyText}>
+              Nothing matches "{query}". Try a different search.
+            </Text>
+          </View>
+        ) : (
+          visible.map((admin) => {
+            const isSelf = admin.uid === user?.uid;
+            return (
+              <View key={admin.uid} style={styles.card}>
+                <View style={styles.cardTop}>
+                  <View
+                    style={[
+                      styles.avatar,
+                      { backgroundColor: admin.isSuperAdmin ? "#EDE9FE" : "#D1FAE5" },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.avatarText,
+                        { color: admin.isSuperAdmin ? "#6D28D9" : "#047857" },
+                      ]}
+                    >
+                      {initials(admin.displayName || "A")}
+                    </Text>
+                  </View>
+                  <View style={styles.cardInfo}>
+                    <View style={styles.nameRow}>
+                      <Text style={styles.cardName}>
+                        {admin.displayName || "Administrator"}
+                      </Text>
+                      {isSelf && <Text style={styles.youTag}>You</Text>}
                     </View>
-                    <View style={styles.cardInfo}>
-                      <View style={styles.nameRow}>
-                        <Text style={styles.cardName}>
-                          {admin.displayName || "Administrator"}
-                        </Text>
-                        {isSelf && <Text style={styles.youTag}>You</Text>}
-                      </View>
-                      <Text style={styles.cardEmail}>{admin.email || "—"}</Text>
-                      {admin.position ? (
+                    <Text style={styles.cardEmail}>{admin.email || "—"}</Text>
+                    {admin.position ? (
+                      <View style={styles.metaRow}>
+                        <Ionicons name="briefcase-outline" size={12} color="#9CA3AF" />
                         <Text style={styles.cardMeta}>{admin.position}</Text>
-                      ) : null}
+                      </View>
+                    ) : null}
+                    <View style={styles.metaRow}>
+                      <Ionicons name="calendar-outline" size={12} color="#9CA3AF" />
                       <Text style={styles.cardMeta}>
-                        Joined {formatDate(admin.createdAtMs)}
+                        Joined {timeAgo(admin.createdAtMs)}
                       </Text>
                     </View>
-                    <RoleBadge isSuper={!!admin.isSuperAdmin} />
                   </View>
-
-                  {!isSelf && (
-                    <View style={styles.cardActions}>
-                      <Pressable
-                        style={[styles.actionButton, styles.editButton]}
-                        onPress={() => openEdit(admin)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Edit ${admin.displayName || admin.email}`}
-                      >
-                        <Ionicons name="create-outline" size={16} color="#6D28D9" />
-                        <Text style={styles.editButtonText}>Edit</Text>
-                      </Pressable>
-                      <Pressable
-                        style={[styles.actionButton, styles.revokeButton]}
-                        onPress={() => confirmRevoke(admin)}
-                        disabled={actingUid === admin.uid}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Revoke ${admin.displayName || admin.email}`}
-                      >
-                        {actingUid === admin.uid ? (
-                          <ActivityIndicator size="small" color="#B45309" />
-                        ) : (
-                          <Ionicons
-                            name="shield-outline"
-                            size={16}
-                            color="#B45309"
-                          />
-                        )}
-                        <Text style={styles.revokeButtonText}>Revoke</Text>
-                      </Pressable>
-                      <Pressable
-                        style={[styles.actionButton, styles.deleteButton]}
-                        onPress={() => confirmDelete(admin)}
-                        disabled={actingUid === admin.uid}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Delete ${admin.displayName || admin.email}`}
-                      >
-                        {actingUid === admin.uid ? (
-                          <ActivityIndicator size="small" color="#B91C1C" />
-                        ) : (
-                          <Ionicons name="trash-outline" size={16} color="#B91C1C" />
-                        )}
-                        <Text style={styles.deleteButtonText}>Delete</Text>
-                      </Pressable>
-                    </View>
-                  )}
+                  <RoleBadge isSuper={!!admin.isSuperAdmin} />
                 </View>
-              );
-            })
-          )}
-        </ScrollView>
 
-        <Modal
-          visible={!!editing}
-          transparent
-          animationType="fade"
-          onRequestClose={closeEdit}
-        >
-          <View style={styles.modalBackdrop}>
-            <View style={styles.modal}>
-              <Text style={styles.modalTitle}>
-                Edit {editing?.displayName || "Administrator"}
-              </Text>
-              <Text style={styles.modalSubtitle}>
-                {editing?.email || ""}
-              </Text>
+                {!isSelf && (
+                  <View style={styles.cardActions}>
+                    <Pressable
+                      style={[styles.actionButton, styles.editButton]}
+                      onPress={() => openEdit(admin)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Edit ${admin.displayName || admin.email}`}
+                    >
+                      <Ionicons name="create-outline" size={16} color="#6D28D9" />
+                      <Text style={styles.editButtonText}>Edit</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.actionButton, styles.revokeButton]}
+                      onPress={() => confirmRevoke(admin)}
+                      disabled={actingUid === admin.uid}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Revoke ${admin.displayName || admin.email}`}
+                    >
+                      {actingUid === admin.uid ? (
+                        <ActivityIndicator size="small" color="#B45309" />
+                      ) : (
+                        <Ionicons name="shield-outline" size={16} color="#B45309" />
+                      )}
+                      <Text style={styles.revokeButtonText}>Revoke</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.actionButton, styles.deleteButton]}
+                      onPress={() => confirmDelete(admin)}
+                      disabled={actingUid === admin.uid}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Delete ${admin.displayName || admin.email}`}
+                    >
+                      {actingUid === admin.uid ? (
+                        <ActivityIndicator size="small" color="#B91C1C" />
+                      ) : (
+                        <Ionicons name="trash-outline" size={16} color="#B91C1C" />
+                      )}
+                      <Text style={styles.deleteButtonText}>Delete</Text>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+            );
+          })
+        )}
+      </ScrollView>
 
+      <Modal
+        visible={!!editing}
+        transparent
+        animationType="fade"
+        onRequestClose={closeEdit}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modal}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderIcon}>
+                <Ionicons name="create-outline" size={20} color="#7C3AED" />
+              </View>
+              <View style={styles.modalHeaderText}>
+                <Text style={styles.modalTitle}>
+                  Edit {editing?.displayName || "Administrator"}
+                </Text>
+                <Text style={styles.modalSubtitle}>{editing?.email || ""}</Text>
+              </View>
+            </View>
+
+            <ScrollView
+              contentContainerStyle={styles.modalBody}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
               <Text style={styles.label}>Full name</Text>
               <TextInput
                 style={styles.input}
@@ -449,33 +594,33 @@ export default function AdminManagementScreen() {
                   thumbColor={form.isSuperAdmin ? "#7C3AED" : "#F4F4F5"}
                 />
               </View>
+            </ScrollView>
 
-              <View style={styles.modalActions}>
-                <Pressable
-                  style={styles.modalCancel}
-                  onPress={closeEdit}
-                  disabled={saving}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.modalCancelText}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.modalSave, saving && styles.buttonDisabled]}
-                  onPress={handleSave}
-                  disabled={saving}
-                  accessibilityRole="button"
-                >
-                  {saving ? (
-                    <ActivityIndicator size="small" color="white" />
-                  ) : (
-                    <Text style={styles.modalSaveText}>Save</Text>
-                  )}
-                </Pressable>
-              </View>
+            <View style={styles.modalActions}>
+              <Pressable
+                style={styles.modalCancel}
+                onPress={closeEdit}
+                disabled={saving}
+                accessibilityRole="button"
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalSave, saving && styles.buttonDisabled]}
+                onPress={handleSave}
+                disabled={saving}
+                accessibilityRole="button"
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text style={styles.modalSaveText}>Save</Text>
+                )}
+              </Pressable>
             </View>
           </View>
-        </Modal>
-      </LinearGradient>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -483,18 +628,17 @@ export default function AdminManagementScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F4F2F8",
+    backgroundColor: "#7C3AED",
   },
-  gradient: {
-    flex: 1,
+  headerBand: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 12,
   },
   headerLeft: {
     flexDirection: "row",
@@ -503,49 +647,110 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "white",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.22)",
     justifyContent: "center",
     alignItems: "center",
-    // @ts-ignore - web only
-    boxShadow: "0px 2px 4px rgba(0,0,0,0.08)",
-    elevation: 3,
+  },
+  titleWrap: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#5B21B6",
+    color: "#FFFFFF",
   },
   headerSubtitle: {
     fontSize: 12,
-    color: "#6B7280",
+    color: "rgba(255,255,255,0.85)",
     marginTop: 2,
   },
-  refreshButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: "white",
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.22)",
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 8,
-    // @ts-ignore - web only
-    boxShadow: "0px 2px 4px rgba(0,0,0,0.08)",
-    elevation: 3,
+  },
+  statsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 16,
+  },
+  statTile: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    alignItems: "center",
+  },
+  statIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.8)",
+    marginTop: 1,
   },
   errorText: {
-    color: "#EF4444",
+    color: "#DC2626",
     fontSize: 14,
-    fontWeight: "500",
+    fontWeight: "600",
     textAlign: "center",
-    paddingHorizontal: 24,
-    marginBottom: 8,
+    backgroundColor: "#FEE2E2",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  content: {
+    flex: 1,
+    backgroundColor: "#F8F7FB",
   },
   scroll: {
     paddingHorizontal: 20,
+    paddingTop: 16,
     paddingBottom: 48,
+  },
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 46,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#F1F0F6",
+    // @ts-ignore - web only
+    boxShadow: "0px 2px 8px rgba(91,33,182,0.08)",
+    elevation: 2,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: "#1F2937",
   },
   center: {
     paddingVertical: 80,
@@ -553,12 +758,20 @@ const styles = StyleSheet.create({
   },
   empty: {
     alignItems: "center",
-    paddingVertical: 80,
-    gap: 8,
+    paddingVertical: 64,
+    gap: 10,
+  },
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#EDE9FE",
+    justifyContent: "center",
+    alignItems: "center",
   },
   emptyTitle: {
     fontSize: 17,
-    fontWeight: "700",
+    fontWeight: "800",
     color: "#374151",
   },
   emptyText: {
@@ -570,11 +783,14 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: "#F1F0F6",
+    // @ts-ignore - web only
+    boxShadow: "0px 4px 14px rgba(91,33,182,0.08)",
+    elevation: 3,
   },
   cardTop: {
     flexDirection: "row",
@@ -582,12 +798,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#F3F0FF",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
+  },
+  avatarText: {
+    fontSize: 15,
+    fontWeight: "800",
   },
   cardInfo: {
     flex: 1,
@@ -617,10 +836,15 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     marginTop: 2,
   },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+  },
   cardMeta: {
     fontSize: 12,
     color: "#9CA3AF",
-    marginTop: 4,
   },
   badge: {
     flexDirection: "row",
@@ -689,14 +913,34 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(30,20,50,0.5)",
+    backgroundColor: "rgba(30,20,50,0.55)",
     justifyContent: "center",
-    padding: 24,
+    padding: 20,
   },
   modal: {
     backgroundColor: "white",
-    borderRadius: 20,
+    borderRadius: 22,
     padding: 20,
+    maxHeight: "88%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F0F6",
+  },
+  modalHeaderIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#EDE9FE",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalHeaderText: {
+    flex: 1,
   },
   modalTitle: {
     fontSize: 17,
@@ -707,7 +951,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#6B7280",
     marginTop: 2,
-    marginBottom: 8,
+  },
+  modalBody: {
+    paddingTop: 4,
+    paddingBottom: 4,
   },
   label: {
     fontSize: 12,
@@ -752,7 +999,7 @@ const styles = StyleSheet.create({
   modalActions: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 20,
+    marginTop: 16,
   },
   modalCancel: {
     flex: 1,
