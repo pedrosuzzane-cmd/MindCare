@@ -19,7 +19,6 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "icon": "./assets/images/appicon.png",
-      "predictiveBackGestureEnabled": false,
       "package": "com.nervachan.MindCareV2"
     },
     "web": {
