@@ -86,6 +86,17 @@ const syncJournals = async (userId: string): Promise<void> => {
           thoughts: remoteEntryData.thoughts || "",
           mood: remoteEntryData.mood || "neutral",
           category: remoteEntryData.category || "general",
+          reflection:
+            remoteEntryData.reflection ||
+            remoteEntryData.aiInsight ||
+            undefined,
+          reflectionLocal: remoteEntryData.reflectionLocal || undefined,
+          reflectionAI: remoteEntryData.reflectionAI || undefined,
+          reflectionStatus:
+            remoteEntryData.reflectionStatus || remoteEntryData.reflectionSource || undefined,
+          reflectionSource: remoteEntryData.reflectionSource || undefined,
+          generatedAt: remoteEntryData.generatedAt || undefined,
+          wellnessTips: remoteEntryData.wellnessTips || undefined,
           createdAt: (remoteEntryData.createdAt as Timestamp)
             .toDate()
             .toISOString(),
@@ -107,6 +118,24 @@ const syncJournals = async (userId: string): Promise<void> => {
           localEntry.thoughts = remoteEntryData.thoughts;
           localEntry.mood = remoteEntryData.mood;
           localEntry.category = remoteEntryData.category;
+          localEntry.reflection =
+            remoteEntryData.reflection ||
+            remoteEntryData.aiInsight ||
+            localEntry.reflection;
+          localEntry.reflectionLocal =
+            remoteEntryData.reflectionLocal || localEntry.reflectionLocal;
+          localEntry.reflectionAI =
+            remoteEntryData.reflectionAI || localEntry.reflectionAI;
+          localEntry.reflectionStatus =
+            remoteEntryData.reflectionStatus ||
+            remoteEntryData.reflectionSource ||
+            localEntry.reflectionStatus;
+          localEntry.reflectionSource =
+            remoteEntryData.reflectionSource || localEntry.reflectionSource;
+          localEntry.generatedAt =
+            remoteEntryData.generatedAt || localEntry.generatedAt;
+          localEntry.wellnessTips =
+            remoteEntryData.wellnessTips || localEntry.wellnessTips;
           localEntry.updatedAt = remoteUpdatedAt.toISOString();
           localEntry.syncStatus = "synced";
           entriesToUpdateLocally.push(localEntry);

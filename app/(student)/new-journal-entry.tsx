@@ -2,6 +2,7 @@ import { shadows } from "@/utils/shadows";
 import { useJournal } from "@/hooks/useJournal";
 import { useNetwork } from "@/contexts/NetworkContext";
 import { CATEGORIES, MOODS, getMood } from "@/utils/journalOptions";
+import { generateLocalReflection } from "@/utils/journalReflection";
 import { journalDraftStorage } from "@/storage/journalDraftStorage";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -186,11 +187,30 @@ export default function NewJournalEntryScreen() {
     try {
       const sanitize = (s: string, max: number) => s.trim().slice(0, max);
       const now = new Date().toISOString();
+      const localReflection = generateLocalReflection({
+        mood: selectedMood,
+        category: selectedCategory,
+        title: entryTitle,
+        thoughts,
+      });
       const data = {
         category: selectedCategory,
         mood: selectedMood,
         title: sanitize(entryTitle, TITLE_LIMIT),
         thoughts: sanitize(thoughts, THOUGHT_LIMIT),
+        reflection: [
+          localReflection.sections.summary,
+          localReflection.sections.positive,
+          localReflection.sections.suggestion,
+          localReflection.sections.encouragement,
+        ]
+          .filter(Boolean)
+          .join(" "),
+        reflectionLocal: localReflection.sections,
+        reflectionStatus: "local" as const,
+        reflectionSource: "local" as const,
+        generatedAt: now,
+        wellnessTips: localReflection.wellnessTips,
         entryDate: entryDate.toISOString(),
         createdAt: now,
         updatedAt: now,

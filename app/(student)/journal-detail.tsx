@@ -1,4 +1,8 @@
 import { useJournal } from "@/hooks/useJournal";
+import {
+  getActiveReflection,
+  getReflectionStatusLabel,
+} from "@/utils/journalReflection";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -30,6 +34,8 @@ export default function JournalDetailScreen() {
   }, [id]);
 
   const handleBack = () => router.back();
+
+  const reflection = entry ? getActiveReflection(entry) : null;
 
   if (loading) {
     return (
@@ -83,6 +89,74 @@ export default function JournalDetailScreen() {
           <View style={{ height: 12 }} />
           <Text style={styles.body}>{entry.thoughts}</Text>
         </View>
+
+        {reflection ? (
+          <View style={[styles.card, styles.reflectionCard]}>
+            <View style={styles.reflectionHeader}>
+              <Text style={styles.reflectionLabel}>🧠 Your Reflection</Text>
+              {getReflectionStatusLabel(entry.reflectionSource) ? (
+                <View style={styles.statusBadge}>
+                  <Text style={styles.statusBadgeText}>
+                    {getReflectionStatusLabel(entry.reflectionSource)}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+            {reflection.summary ? (
+              <View style={styles.sectionBlock}>
+                <Text style={styles.sectionEmoji}>😊</Text>
+                <View style={styles.sectionBody}>
+                  <Text style={styles.sectionTitle}>Mood Summary</Text>
+                  <Text style={styles.sectionText}>{reflection.summary}</Text>
+                </View>
+              </View>
+            ) : null}
+            {reflection.positive ? (
+              <View style={styles.sectionBlock}>
+                <Text style={styles.sectionEmoji}>💡</Text>
+                <View style={styles.sectionBody}>
+                  <Text style={styles.sectionTitle}>Positive Observation</Text>
+                  <Text style={styles.sectionText}>{reflection.positive}</Text>
+                </View>
+              </View>
+            ) : null}
+            {reflection.suggestion ? (
+              <View style={styles.sectionBlock}>
+                <Text style={styles.sectionEmoji}>🌿</Text>
+                <View style={styles.sectionBody}>
+                  <Text style={styles.sectionTitle}>Gentle Suggestion</Text>
+                  <Text style={styles.sectionText}>{reflection.suggestion}</Text>
+                </View>
+              </View>
+            ) : null}
+            {reflection.encouragement ? (
+              <View style={styles.sectionBlock}>
+                <Text style={styles.sectionEmoji}>⭐</Text>
+                <View style={styles.sectionBody}>
+                  <Text style={styles.sectionTitle}>Encouragement</Text>
+                  <Text style={styles.sectionText}>
+                    {reflection.encouragement}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+            {entry.wellnessTips?.length ? (
+              <View style={styles.tipsWrap}>
+                <Text style={styles.tipsLabel}>💜 Suggested Wellness</Text>
+                {entry.wellnessTips.map((tip, idx) => (
+                  <View key={idx} style={styles.tipRow}>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={16}
+                      color="#8A63D2"
+                    />
+                    <Text style={styles.tipText}>{tip}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
         <Pressable
           style={styles.editButton}
@@ -163,5 +237,79 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 10,
     fontWeight: "600",
+  },
+  reflectionCard: {
+    marginTop: 16,
+    backgroundColor: "#F9F4FF",
+    borderColor: "#E9D5FF",
+  },
+  reflectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  reflectionLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#8B7FA8",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  statusBadge: {
+    backgroundColor: "#EDE6F7",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#8A63D2",
+  },
+  sectionBlock: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 12,
+  },
+  sectionEmoji: { fontSize: 18, marginTop: 1 },
+  sectionBody: { flex: 1 },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#8A63D2",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+    marginBottom: 3,
+  },
+  sectionText: {
+    fontSize: 14,
+    color: "#4B4453",
+    lineHeight: 21,
+  },
+  tipsWrap: {
+    borderTopWidth: 1,
+    borderTopColor: "rgba(138, 99, 210, 0.12)",
+    paddingTop: 12,
+    marginTop: 4,
+  },
+  tipsLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#8A63D2",
+    marginBottom: 8,
+  },
+  tipRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginBottom: 6,
+  },
+  tipText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#4B4453",
+    lineHeight: 19,
   },
 });

@@ -1,6 +1,9 @@
 import { useJournal } from "@/hooks/useJournal";
 import { getCategory, getMood } from "@/utils/journalOptions";
-import { generateLocalReflection } from "@/utils/journalReflection";
+import {
+  getActiveReflection,
+  getReflectionStatusLabel,
+} from "@/utils/journalReflection";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -31,7 +34,7 @@ export default function JournalSavedScreen() {
     : undefined;
 
   const reflection = useMemo(
-    () => (entry ? generateLocalReflection(entry) : null),
+    () => (entry ? getActiveReflection(entry) : null),
     [entry],
   );
 
@@ -143,23 +146,82 @@ export default function JournalSavedScreen() {
             {/* Reflection Insight */}
             <View style={[styles.card, styles.reflectionCard]}>
               <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardLabel}>🧠 Reflection Insights</Text>
+                <Text style={styles.cardLabel}>🧠 Your Reflection</Text>
                 <View style={styles.localBadge}>
-                  <Text style={styles.localBadgeText}>Generated locally</Text>
+                  <Text style={styles.localBadgeText}>
+                    {getReflectionStatusLabel(entry.reflectionSource) ||
+                      "Generated locally"}
+                  </Text>
                 </View>
               </View>
-              <Text style={styles.reflectionText}>{reflection.insight}</Text>
+              {reflection.summary ? (
+                <View style={styles.sectionBlock}>
+                  <Text style={styles.sectionEmoji}>😊</Text>
+                  <View style={styles.sectionBody}>
+                    <Text style={styles.sectionTitle}>Mood Summary</Text>
+                    <Text style={styles.reflectionText}>
+                      {reflection.summary}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+              {reflection.positive ? (
+                <View style={styles.sectionBlock}>
+                  <Text style={styles.sectionEmoji}>💡</Text>
+                  <View style={styles.sectionBody}>
+                    <Text style={styles.sectionTitle}>Positive Observation</Text>
+                    <Text style={styles.reflectionText}>
+                      {reflection.positive}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+              {reflection.suggestion ? (
+                <View style={styles.sectionBlock}>
+                  <Text style={styles.sectionEmoji}>🌿</Text>
+                  <View style={styles.sectionBody}>
+                    <Text style={styles.sectionTitle}>Gentle Suggestion</Text>
+                    <Text style={styles.reflectionText}>
+                      {reflection.suggestion}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+              {reflection.encouragement ? (
+                <View style={styles.sectionBlock}>
+                  <Text style={styles.sectionEmoji}>⭐</Text>
+                  <View style={styles.sectionBody}>
+                    <Text style={styles.sectionTitle}>Encouragement</Text>
+                    <Text style={styles.reflectionText}>
+                      {reflection.encouragement}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
             </View>
 
             {/* Wellness Tips */}
             <View style={styles.card}>
               <Text style={styles.cardLabel}>💜 Suggested Wellness Activity</Text>
-              {reflection.wellnessTips.map((tip, idx) => (
-                <View key={idx} style={styles.tipRow}>
-                  <Ionicons name="checkmark-circle" size={18} color="#8A63D2" />
-                  <Text style={styles.tipText}>{tip}</Text>
+              {entry.wellnessTips?.length ? (
+                entry.wellnessTips.map((tip, idx) => (
+                  <View key={idx} style={styles.tipRow}>
+                    <Ionicons name="checkmark-circle" size={18} color="#8A63D2" />
+                    <Text style={styles.tipText}>{tip}</Text>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.tipRow}>
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={18}
+                    color="#8A63D2"
+                  />
+                  <Text style={styles.tipText}>
+                    Take a short walk to reset your mind.
+                  </Text>
                 </View>
-              ))}
+              )}
             </View>
 
             <Pressable
@@ -309,6 +371,27 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#4B4453",
     lineHeight: 24,
+  },
+  sectionBlock: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 14,
+  },
+  sectionEmoji: {
+    fontSize: 20,
+    marginTop: 1,
+  },
+  sectionBody: {
+    flex: 1,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#8A63D2",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+    marginBottom: 3,
   },
   entryHeader: {
     flexDirection: "row",
