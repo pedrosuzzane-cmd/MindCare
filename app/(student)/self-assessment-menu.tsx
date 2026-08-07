@@ -25,7 +25,7 @@ import {
 const DISCLAIMER =
   "This assessment is intended for educational and self-awareness purposes only. It does not diagnose mental health conditions or replace evaluation by a licensed mental health professional. If your responses indicate higher levels of emotional distress, or if you feel unable to cope, please consider reaching out to a trusted adult, school guidance counselor, psychologist, or other qualified mental health professional.";
 
-const COOLDOWN_DAYS = 14;
+const COOLDOWN_DAYS = 30;
 
 export default function SelfAssessmentMenuScreen() {
   const [loading, setLoading] = useState(true);
@@ -132,9 +132,9 @@ export default function SelfAssessmentMenuScreen() {
                   Assessment Locked
                 </Text>
                 <Text style={styles.cooldownText}>
-                  Your next wellness assessment will be available after{" "}
-                  <Text style={styles.cooldownBold}>{COOLDOWN_DAYS} days</Text>.
-                  Come back in{" "}
+                  Your next wellness assessment will be available{" "}
+                  <Text style={styles.cooldownBold}>once a month</Text> (
+                  {COOLDOWN_DAYS} days). Come back in{" "}
                   <Text style={styles.cooldownBold}>{daysRemaining} day{daysRemaining !== 1 ? "s" : ""}</Text>.
                 </Text>
                 <Text style={styles.cooldownSuggestion}>

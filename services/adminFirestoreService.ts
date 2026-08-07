@@ -1,5 +1,6 @@
 import { db } from "@/constants/firebase";
 import { collection, getDocs, onSnapshot, query, orderBy } from "firebase/firestore";
+import { ASSESSMENT_INTERVAL_DAYS, bucketAssessments, riskFromScore } from "@/utils/assessmentTrend";
 
 // --- TYPE DEFINITIONS ---
 type RiskLevel = "low" | "normal" | "high";
@@ -170,7 +171,9 @@ export function listenForAdminDashboardData(
           studentStats.set(uid, studentSummary);
         });
 
-        const processedData = processAnalytics(allAssessments);
+        const processedData = processAnalytics(
+          reduceToIntervalAssessments(allAssessments),
+        );
 
         onDataUpdate({
           studentSummaries: Array.from(studentStats.values()),
@@ -190,6 +193,54 @@ export function listenForAdminDashboardData(
   );
 
   return unsubscribe;
+}
+
+/**
+ * Reduces assessment records into one representative record per student per
+ * assessment interval (monthly by default). This keeps the department and
+ * category analytics consistent with the student detail "Assessment Trend"
+ * chart, which shows a single monthly bucket per student, and prevents
+ * duplicate submissions within the same interval from inflating totals.
+ */
+function reduceToIntervalAssessments(
+  assessments: AssessmentRecord[],
+): AssessmentRecord[] {
+  const byStudent = new Map<string, AssessmentRecord[]>();
+  for (const a of assessments) {
+    const arr = byStudent.get(a.uid) ?? [];
+    arr.push(a);
+    byStudent.set(a.uid, arr);
+  }
+
+  const reduced: AssessmentRecord[] = [];
+  for (const records of byStudent.values()) {
+    const buckets = bucketAssessments(
+      records.map((r) => ({
+        createdAt: r.createdAt,
+        totalScore: r.totalScore,
+        riskLevel: r.riskLevel,
+        uid: r.uid,
+      })),
+      ASSESSMENT_INTERVAL_DAYS,
+    );
+    for (const bucket of buckets) {
+      const representative = records.find(
+        (r) => r.createdAt >= bucket.startDate && r.createdAt <= bucket.endDate,
+      ) ?? records[0];
+      reduced.push({
+        id: `${representative.uid}-${bucket.startDate.getTime()}`,
+        uid: representative.uid,
+        riskLevel: riskFromScore(bucket.avgScore),
+        totalScore: bucket.avgScore,
+        createdAt: bucket.startDate,
+        department: representative.department,
+        age: representative.age,
+        gender: representative.gender,
+        yearLevel: representative.yearLevel,
+      });
+    }
+  }
+  return reduced;
 }
 
 /**

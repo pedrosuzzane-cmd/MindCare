@@ -27,6 +27,10 @@ import {
   query,
 } from "firebase/firestore";
 import { changeProfileImage, uploadProfileImageFromFile } from "@/services/userService";
+import {
+  ASSESSMENT_INTERVAL_LABEL,
+  bucketAssessments,
+} from "@/utils/assessmentTrend";
 
 interface JournalEntry {
   id: string;
@@ -506,7 +510,7 @@ export default function StudentDetailScreen() {
                   color="#6366F1"
                 />
                 <Text style={styles.sectionTitle}>
-                  Assessment Trend (14-Day Intervals)
+                  Assessment Trend ({ASSESSMENT_INTERVAL_LABEL} Intervals)
                 </Text>
               </View>
               <View style={styles.divider} />
@@ -529,44 +533,8 @@ export default function StudentDetailScreen() {
               ) : (
                 <>
                   {(() => {
-                    const buckets: {
-                      label: string;
-                      scores: number[];
-                      riskLevels: string[];
-                    }[] = [];
-                    if (assessments.length === 0) return null;
-
-                    const firstDate = assessments[0].createdAt;
-                    const lastDate =
-                      assessments[assessments.length - 1].createdAt;
-                    const bucketStart = new Date(firstDate);
-                    const bucketEnd = new Date(bucketStart);
-                    bucketEnd.setDate(bucketEnd.getDate() + 13);
-
-                    let currentBucket: {
-                      label: string;
-                      scores: number[];
-                      riskLevels: string[];
-                    } | null = null;
-
-                    for (const a of assessments) {
-                      while (a.createdAt > bucketEnd) {
-                        if (currentBucket) buckets.push(currentBucket);
-                        bucketStart.setDate(bucketStart.getDate() + 14);
-                        bucketEnd.setDate(bucketEnd.getDate() + 14);
-                        currentBucket = null;
-                      }
-                      if (!currentBucket) {
-                        currentBucket = {
-                          label: `${bucketStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`,
-                          scores: [],
-                          riskLevels: [],
-                        };
-                      }
-                      currentBucket.scores.push(a.totalScore);
-                      currentBucket.riskLevels.push(a.riskLevel);
-                    }
-                    if (currentBucket) buckets.push(currentBucket);
+                    const buckets = bucketAssessments(assessments);
+                    if (buckets.length === 0) return null;
 
                     return (
                       <>
@@ -577,10 +545,7 @@ export default function StudentDetailScreen() {
                         >
                           {buckets.map((bucket, idx) => {
                             const isLatest = idx === buckets.length - 1;
-                            const avgScore = Math.round(
-                              bucket.scores.reduce((s, v) => s + v, 0) /
-                                bucket.scores.length,
-                            );
+                            const avgScore = bucket.avgScore;
                             const barHeight = Math.max(
                               (avgScore / 80) * 120,
                               4,
