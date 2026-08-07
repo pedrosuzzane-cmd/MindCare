@@ -2227,6 +2227,14 @@ export default function AdminPanelScreen() {
             )}
             <Pressable
               style={styles.profileButton}
+              onPress={() => router.push("/(admin)/risk-monitor")}
+              accessibilityRole="button"
+              accessibilityLabel="Risk monitor"
+            >
+              <Ionicons name="warning-outline" size={20} color="#DC2626" />
+            </Pressable>
+            <Pressable
+              style={styles.profileButton}
               onPress={() => router.push("/(admin)/messages")}
             >
               <Ionicons

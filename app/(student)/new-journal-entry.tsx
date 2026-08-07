@@ -2,7 +2,7 @@ import { shadows } from "@/utils/shadows";
 import { useJournal } from "@/hooks/useJournal";
 import { useNetwork } from "@/contexts/NetworkContext";
 import { CATEGORIES, MOODS, getMood } from "@/utils/journalOptions";
-import { generateLocalReflection } from "@/utils/journalReflection";
+import { generateLocalReflection, detectRisk } from "@/utils/journalReflection";
 import { journalDraftStorage } from "@/storage/journalDraftStorage";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -34,7 +34,8 @@ const DRAFT_INTERVAL_MS = 30_000;
 
 export default function NewJournalEntryScreen() {
   const params = useLocalSearchParams<{ date?: string; entryId?: string }>();
-  const { addJournalEntry, updateJournalEntry, getJournalEntry } = useJournal();
+  const { addJournalEntry, updateJournalEntry, getJournalEntry, entries } =
+    useJournal();
   const { isConnected } = useNetwork();
   const [entryDate, setEntryDate] = useState<Date>(new Date());
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -187,30 +188,45 @@ export default function NewJournalEntryScreen() {
     try {
       const sanitize = (s: string, max: number) => s.trim().slice(0, max);
       const now = new Date().toISOString();
-      const localReflection = generateLocalReflection({
-        mood: selectedMood,
-        category: selectedCategory,
-        title: entryTitle,
-        thoughts,
-      });
+      const risk = detectRisk(thoughts);
+
+      // High-risk entries are always saved, but a casual wellness reflection
+      // is intentionally NOT generated for them — the saved screen routes the
+      // student toward crisis support instead.
+      const isHighRiskEntry = risk.riskLevel === "high";
+      const localReflection = isHighRiskEntry
+        ? null
+        : generateLocalReflection({
+            mood: selectedMood,
+            category: selectedCategory,
+            title: entryTitle,
+            thoughts,
+            history: entries.filter((e) => e.id !== editEntryId),
+          });
       const data = {
         category: selectedCategory,
         mood: selectedMood,
         title: sanitize(entryTitle, TITLE_LIMIT),
         thoughts: sanitize(thoughts, THOUGHT_LIMIT),
-        reflection: [
-          localReflection.sections.summary,
-          localReflection.sections.positive,
-          localReflection.sections.suggestion,
-          localReflection.sections.encouragement,
-        ]
-          .filter(Boolean)
-          .join(" "),
-        reflectionLocal: localReflection.sections,
-        reflectionStatus: "local" as const,
-        reflectionSource: "local" as const,
-        generatedAt: now,
-        wellnessTips: localReflection.wellnessTips,
+        reflection: localReflection
+          ? [
+              localReflection.sections.summary,
+              localReflection.sections.positive,
+              localReflection.sections.suggestion,
+              localReflection.sections.encouragement,
+            ]
+              .filter(Boolean)
+              .join(" ")
+          : "",
+        reflectionLocal: localReflection ? localReflection.sections : undefined,
+        reflectionStatus: localReflection ? ("local" as const) : undefined,
+        reflectionSource: localReflection ? ("local" as const) : undefined,
+        generatedAt: localReflection ? now : undefined,
+        wellnessTips: localReflection ? localReflection.wellnessTips : undefined,
+        riskLevel: risk.riskLevel,
+        riskScore: risk.riskScore,
+        riskDetected: risk.riskDetected,
+        riskKeywords: risk.riskKeywords,
         entryDate: entryDate.toISOString(),
         createdAt: now,
         updatedAt: now,

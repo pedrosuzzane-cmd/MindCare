@@ -4,6 +4,13 @@ import {
   getActiveReflection,
   getReflectionStatusLabel,
 } from "@/utils/journalReflection";
+import {
+  HIGH_RISK_SAVED_NOTE,
+  HIGH_RISK_SUPPORT_MESSAGE,
+  HIGH_RISK_TITLE,
+  MODERATE_SUPPORT_MESSAGE,
+  MODERATE_SUPPORT_TITLE,
+} from "@/constants/crisisSupport";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -40,6 +47,8 @@ export default function JournalSavedScreen() {
 
   const mood = getMood(entry?.mood);
   const category = getCategory(entry?.category);
+  const isHighRisk = entry?.riskLevel === "high";
+  const isModerate = entry?.riskLevel === "moderate";
 
   if (loading) {
     return (
@@ -51,7 +60,7 @@ export default function JournalSavedScreen() {
     );
   }
 
-  if (!entry || !reflection) {
+  if (!entry) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.center}>
@@ -60,6 +69,51 @@ export default function JournalSavedScreen() {
             <Text style={styles.backLink}>Back to Journal</Text>
           </Pressable>
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  // High-risk entries skip the casual reflection flow entirely and route the
+  // student toward crisis support. The journal itself is always saved.
+  if (isHighRisk) {
+    return (
+      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          <CrisisSupportView />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  if (!reflection) {
+    return (
+      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.title}>Journal Saved!</Text>
+          <Text style={styles.subtitle}>
+            Great job taking time to reflect today.
+          </Text>
+          <Pressable
+            style={styles.primaryButton}
+            onPress={() => router.replace("/daily-journal")}
+          >
+            <LinearGradient
+              colors={["#9C7EEB", "#8A63D2"]}
+              style={styles.primaryGradient}
+            >
+              <Ionicons name="book-outline" size={20} color="white" />
+              <Text style={styles.primaryButtonText}>Back to Journal</Text>
+            </LinearGradient>
+          </Pressable>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -80,6 +134,30 @@ export default function JournalSavedScreen() {
           Great job taking time to reflect today.{"\n"}Your reflection is now
           ready.
         </Text>
+
+        {isModerate && (
+          <Animated.View entering={FadeIn.duration(400)}>
+            <View style={styles.moderateCard}>
+              <View style={styles.moderateHeader}>
+                <Text style={styles.moderateEmoji}>💜</Text>
+                <Text style={styles.moderateTitle}>
+                  {MODERATE_SUPPORT_TITLE}
+                </Text>
+              </View>
+              <Text style={styles.moderateMessage}>
+                {MODERATE_SUPPORT_MESSAGE}
+              </Text>
+              <Pressable
+                onPress={() => router.push("/support-hotlines")}
+                hitSlop={6}
+              >
+                <Text style={styles.moderateLink}>
+                  View support contacts →
+                </Text>
+              </Pressable>
+            </View>
+          </Animated.View>
+        )}
 
         {!showReflection ? (
           <Animated.View entering={FadeInDown.delay(150).duration(450)}>
@@ -154,6 +232,52 @@ export default function JournalSavedScreen() {
                   </Text>
                 </View>
               </View>
+              {(reflection.topicLabel || reflection.emotion) ? (
+                <View style={styles.metaRow}>
+                  {reflection.topicLabel ? (
+                    <View style={styles.metaBadge}>
+                      <Text style={styles.metaBadgeText}>
+                        📍 {reflection.topicLabel}
+                        {typeof reflection.topicConfidence === "number"
+                          ? ` · ${reflection.topicConfidence}%`
+                          : ""}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {reflection.emotion ? (
+                    <View style={styles.metaBadge}>
+                      <Text style={styles.metaBadgeText}>
+                        💭 {reflection.emotion}
+                        {reflection.emotionIntensity
+                          ? ` · ${reflection.emotionIntensity}`
+                          : ""}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {reflection.sentiment ? (
+                    <View style={styles.metaBadge}>
+                      <Text style={styles.metaBadgeText}>
+                        {reflection.sentiment === "positive"
+                          ? "☀️"
+                          : reflection.sentiment === "negative"
+                            ? "🌧️"
+                            : "⛅"}{" "}
+                        {reflection.sentiment[0].toUpperCase() +
+                          reflection.sentiment.slice(1)}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {reflection.stressLevel ? (
+                    <View style={styles.metaBadge}>
+                      <Text style={styles.metaBadgeText}>
+                        ⚠️ Stress:{" "}
+                        {reflection.stressLevel[0].toUpperCase() +
+                          reflection.stressLevel.slice(1)}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
               {reflection.summary ? (
                 <View style={styles.sectionBlock}>
                   <Text style={styles.sectionEmoji}>😊</Text>
@@ -245,6 +369,55 @@ export default function JournalSavedScreen() {
   );
 }
 
+function CrisisSupportView() {
+  return (
+    <>
+      <Animated.View entering={ZoomIn.duration(500)} style={styles.supportHeartWrap}>
+        <Text style={styles.supportHeart}>💜</Text>
+      </Animated.View>
+
+      <Text style={styles.supportTitle}>{HIGH_RISK_TITLE}</Text>
+      <Text style={styles.supportMessage}>{HIGH_RISK_SUPPORT_MESSAGE}</Text>
+
+      <Animated.View entering={FadeInDown.delay(150).duration(450)} style={styles.supportActions}>
+        <Pressable
+          style={styles.emergencyButton}
+          onPress={() => router.push("/support-hotlines")}
+        >
+          <LinearGradient
+            colors={["#EF4444", "#DC2626"]}
+            style={styles.primaryGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            <Ionicons name="call" size={20} color="white" />
+            <Text style={styles.primaryButtonText}>Emergency Contacts</Text>
+          </LinearGradient>
+        </Pressable>
+
+        <Pressable
+          style={styles.secondaryButton}
+          onPress={() => router.push("/support-hotlines")}
+        >
+          <Ionicons name="business-outline" size={18} color="#8A63D2" />
+          <Text style={styles.secondaryButtonText}>
+            Campus Guidance Information
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={styles.continueButton}
+          onPress={() => router.replace("/daily-journal")}
+        >
+          <Text style={styles.continueButtonText}>Continue to Journal</Text>
+        </Pressable>
+      </Animated.View>
+
+      <Text style={styles.supportNote}>{HIGH_RISK_SAVED_NOTE}</Text>
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -329,6 +502,97 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  // ── Crisis support view ──────────────────────────────────────────────
+  supportHeartWrap: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: "#F3E8FF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  supportHeart: {
+    fontSize: 48,
+  },
+  supportTitle: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#2D2640",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  supportMessage: {
+    fontSize: 15,
+    color: "#4B4453",
+    textAlign: "center",
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  supportActions: {
+    alignSelf: "stretch",
+  },
+  emergencyButton: {
+    borderRadius: 25,
+    overflow: "hidden",
+    marginBottom: 12,
+  },
+  continueButton: {
+    alignSelf: "stretch",
+    alignItems: "center",
+    paddingVertical: 14,
+    borderRadius: 25,
+    marginBottom: 16,
+  },
+  continueButtonText: {
+    color: "#8A63D2",
+    fontSize: 16,
+    fontWeight: "700",
+    textDecorationLine: "underline",
+  },
+  supportNote: {
+    fontSize: 13,
+    color: "#8B7FA8",
+    textAlign: "center",
+    lineHeight: 19,
+  },
+  // ── Moderate support banner ──────────────────────────────────────────
+  moderateCard: {
+    alignSelf: "stretch",
+    backgroundColor: "#F3E8FF",
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 16,
+    ...(shadows.sm("#000") as any),
+  },
+  moderateHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  moderateEmoji: {
+    fontSize: 20,
+  },
+  moderateTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#6D28D9",
+  },
+  moderateMessage: {
+    fontSize: 14,
+    color: "#4B4453",
+    lineHeight: 21,
+    marginBottom: 10,
+  },
+  moderateLink: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#8A63D2",
+  },
   card: {
     alignSelf: "stretch",
     backgroundColor: "white",
@@ -392,6 +656,23 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.3,
     marginBottom: 3,
+  },
+  metaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 14,
+  },
+  metaBadge: {
+    backgroundColor: "#EDE6F7",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  metaBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#8A63D2",
   },
   entryHeader: {
     flexDirection: "row",

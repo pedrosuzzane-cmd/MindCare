@@ -102,6 +102,52 @@ export default function JournalDetailScreen() {
                 </View>
               ) : null}
             </View>
+            {(reflection.topicLabel || reflection.emotion) ? (
+              <View style={styles.metaRow}>
+                {reflection.topicLabel ? (
+                  <View style={styles.metaBadge}>
+                    <Text style={styles.metaBadgeText}>
+                      📍 {reflection.topicLabel}
+                      {typeof reflection.topicConfidence === "number"
+                        ? ` · ${reflection.topicConfidence}%`
+                        : ""}
+                    </Text>
+                  </View>
+                ) : null}
+                {reflection.emotion ? (
+                  <View style={styles.metaBadge}>
+                    <Text style={styles.metaBadgeText}>
+                      💭 {reflection.emotion}
+                      {reflection.emotionIntensity
+                        ? ` · ${reflection.emotionIntensity}`
+                        : ""}
+                    </Text>
+                  </View>
+                ) : null}
+                {reflection.sentiment ? (
+                  <View style={styles.metaBadge}>
+                    <Text style={styles.metaBadgeText}>
+                      {reflection.sentiment === "positive"
+                        ? "☀️"
+                        : reflection.sentiment === "negative"
+                          ? "🌧️"
+                          : "⛅"}{" "}
+                      {reflection.sentiment[0].toUpperCase() +
+                        reflection.sentiment.slice(1)}
+                    </Text>
+                  </View>
+                ) : null}
+                {reflection.stressLevel ? (
+                  <View style={styles.metaBadge}>
+                    <Text style={styles.metaBadgeText}>
+                      ⚠️ Stress:{" "}
+                      {reflection.stressLevel[0].toUpperCase() +
+                        reflection.stressLevel.slice(1)}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
             {reflection.summary ? (
               <View style={styles.sectionBlock}>
                 <Text style={styles.sectionEmoji}>😊</Text>
@@ -264,6 +310,23 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: {
     fontSize: 11,
+    fontWeight: "700",
+    color: "#8A63D2",
+  },
+  metaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 14,
+  },
+  metaBadge: {
+    backgroundColor: "#EDE6F7",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  metaBadgeText: {
+    fontSize: 12,
     fontWeight: "700",
     color: "#8A63D2",
   },

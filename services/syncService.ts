@@ -97,6 +97,10 @@ const syncJournals = async (userId: string): Promise<void> => {
           reflectionSource: remoteEntryData.reflectionSource || undefined,
           generatedAt: remoteEntryData.generatedAt || undefined,
           wellnessTips: remoteEntryData.wellnessTips || undefined,
+          riskLevel: remoteEntryData.riskLevel || undefined,
+          riskScore: remoteEntryData.riskScore || undefined,
+          riskDetected: remoteEntryData.riskDetected || undefined,
+          riskKeywords: remoteEntryData.riskKeywords || undefined,
           createdAt: (remoteEntryData.createdAt as Timestamp)
             .toDate()
             .toISOString(),
@@ -136,6 +140,12 @@ const syncJournals = async (userId: string): Promise<void> => {
             remoteEntryData.generatedAt || localEntry.generatedAt;
           localEntry.wellnessTips =
             remoteEntryData.wellnessTips || localEntry.wellnessTips;
+          localEntry.riskLevel = remoteEntryData.riskLevel || localEntry.riskLevel;
+          localEntry.riskScore = remoteEntryData.riskScore ?? localEntry.riskScore;
+          localEntry.riskDetected =
+            remoteEntryData.riskDetected ?? localEntry.riskDetected;
+          localEntry.riskKeywords =
+            remoteEntryData.riskKeywords || localEntry.riskKeywords;
           localEntry.updatedAt = remoteUpdatedAt.toISOString();
           localEntry.syncStatus = "synced";
           entriesToUpdateLocally.push(localEntry);

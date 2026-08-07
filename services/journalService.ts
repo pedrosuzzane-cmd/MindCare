@@ -1,18 +1,32 @@
 import { journalStorage } from "@/storage/journalStorage";
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
+import type { JournalRiskLevel } from "./reflection/riskDetection";
 
 export type SyncStatus = "synced" | "pending" | "syncing" | "failed";
 
 /**
  * Structured reflection with four sections. Each section is a short,
  * human-friendly paragraph. Empty strings mean "no content" for that section.
+ * Topic/emotion fields describe what the engine detected, so each reflection
+ * version is self-describing.
  */
 export interface ReflectionSections {
   summary: string;
   positive: string;
   suggestion: string;
   encouragement: string;
+  topic?: string;
+  topicLabel?: string;
+  topicConfidence?: number; // 0..100
+  secondaryTopic?: string;
+  secondaryTopicLabel?: string;
+  secondaryTopicConfidence?: number; // 0..100
+  emotion?: string;
+  emotionIntensity?: "low" | "medium" | "high";
+  sentiment?: "positive" | "negative" | "neutral";
+  stressLevel?: "low" | "medium" | "high";
+  patterns?: string[]; // long-term personalization sentences from history
 }
 
 export type ReflectionSource = "local" | "gemini" | "none";
@@ -32,6 +46,11 @@ export interface JournalEntry {
   reflectionSource?: ReflectionSource; // Where the active reflection came from
   generatedAt?: string; // ISO 8601 string of when the reflection was generated
   wellnessTips?: string[]; // Suggested activities paired with the reflection
+  // ── Safety scanner metadata (computed locally on save) ─────────────────
+  riskLevel?: JournalRiskLevel; // "low" | "moderate" | "high"
+  riskScore?: number; // weighted count of risk phrases matched
+  riskDetected?: boolean; // true when any risk phrase matched
+  riskKeywords?: string[]; // matched phrases (never shown to admins as content)
   createdAt: string; // ISO 8601 string
   updatedAt: string; // ISO 8601 string
   entryDate: string; // ISO 8601 string

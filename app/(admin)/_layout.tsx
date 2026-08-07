@@ -7,6 +7,7 @@ export default function AdminLayout() {
       <Stack.Screen name="messages" />
       <Stack.Screen name="student-detail" />
       <Stack.Screen name="student-journals" />
+      <Stack.Screen name="risk-monitor" />
       <Stack.Screen name="analytics/stress-heatmap" />
       <Stack.Screen name="analytics/mood-analytics" />
       <Stack.Screen name="analytics/risk-variance" />
