@@ -1,29 +1,35 @@
 import { shadows } from "@/utils/shadows";
 import { useJournal } from "@/hooks/useJournal";
 import { useNetwork } from "@/contexts/NetworkContext";
+import { CATEGORIES, MOODS, getMood } from "@/utils/journalOptions";
+import { journalDraftStorage } from "@/storage/journalDraftStorage";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import Animated, {
+  FadeIn,
+  FadeInDown,
+} from "react-native-reanimated";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-interface Category {
-  id: string;
-  name: string;
-  color: string;
-}
+const THOUGHT_LIMIT = 3000;
+const TITLE_LIMIT = 200;
+const GOAL_WORDS = 50;
+const DRAFT_INTERVAL_MS = 30_000;
 
 export default function NewJournalEntryScreen() {
   const params = useLocalSearchParams<{ date?: string; entryId?: string }>();
@@ -32,28 +38,21 @@ export default function NewJournalEntryScreen() {
   const [entryDate, setEntryDate] = useState<Date>(new Date());
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [entryTitle, setEntryTitle] = useState<string>("");
-
   const [selectedMood, setSelectedMood] = useState<string>("");
+  const [thoughts, setThoughts] = useState<string>("");
+  const [saving, setSaving] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
+
   const editEntryId = params.entryId;
   const isEditing = !!editEntryId;
 
-  const moods = [
-    { id: "happy", emoji: "😄", label: "Happy" },
-    { id: "calm", emoji: "😊", label: "Calm" },
-    { id: "relaxed", emoji: "😌", label: "Relaxed" },
-    { id: "good", emoji: "🙂", label: "Good" },
-    { id: "neutral", emoji: "😐", label: "Neutral" },
-    { id: "worried", emoji: "😟", label: "Worried" },
-    { id: "sad", emoji: "😞", label: "Sad" },
-    { id: "overwhelmed", emoji: "😣", label: "Overwhelmed" },
-    { id: "exhausted", emoji: "😫", label: "Exhausted" },
-    { id: "stressed", emoji: "😓", label: "Stressed" },
-    { id: "burnout", emoji: "😤", label: "Burnout" },
-    { id: "very-upset", emoji: "😢", label: "Very Upset" },
-  ];
-
-  const [thoughts, setThoughts] = useState<string>("");
-  const [saving, setSaving] = useState(false);
+  const draftRef = useRef({ title: "", thoughts: "", mood: "", category: "" });
+  draftRef.current = {
+    title: entryTitle,
+    thoughts,
+    mood: selectedMood,
+    category: selectedCategory,
+  };
 
   const isFutureDate = (date: Date): boolean => {
     const today = new Date();
@@ -89,27 +88,69 @@ export default function NewJournalEntryScreen() {
     }
   }, [params.date, editEntryId]);
 
-  const categories: Category[] = [
-    { id: "personal", name: "Personal", color: "#9C7EEB" },
-    { id: "academic", name: "Academic", color: "#8A63D2" },
-    { id: "wellness", name: "Wellness", color: "#9C27B0" },
-    { id: "social", name: "Social", color: "#E91E63" },
-    { id: "goals", name: "Goals", color: "#FF9800" },
-    { id: "gratitude", name: "Gratitude", color: "#7C5AC8" },
-    { id: "work", name: "Work", color: "#FF5722" },
-    { id: "spiritual", name: "Spiritual", color: "#7B1FA2" },
-  ];
+  // Restore an auto-saved draft for new entries
+  useEffect(() => {
+    if (isEditing) return;
+    let mounted = true;
+    journalDraftStorage.getDraft().then((draft) => {
+      if (!mounted || !draft) return;
+      if (draft.title || draft.thoughts || draft.mood || draft.category) {
+        setEntryTitle(draft.title || "");
+        setThoughts(draft.thoughts || "");
+        setSelectedMood(draft.mood || "");
+        setSelectedCategory(draft.category || "");
+        setDraftRestored(true);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [isEditing]);
+
+  // Auto-save the draft every 30 seconds and when the app backgrounds
+  useEffect(() => {
+    if (isEditing) return;
+    const saveDraftNow = () => {
+      const d = draftRef.current;
+      if (d.mood || d.category || d.title.trim() || d.thoughts.trim()) {
+        journalDraftStorage.saveDraft({
+          title: d.title,
+          thoughts: d.thoughts,
+          mood: d.mood,
+          category: d.category,
+          savedAt: new Date().toISOString(),
+        });
+      }
+    };
+    const interval = setInterval(saveDraftNow, DRAFT_INTERVAL_MS);
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "background") saveDraftNow();
+    });
+    return () => {
+      clearInterval(interval);
+      sub.remove();
+      saveDraftNow();
+    };
+  }, [isEditing]);
+
+  const wordCount = useMemo(() => {
+    const trimmed = thoughts.trim();
+    return trimmed ? trimmed.split(/\s+/).length : 0;
+  }, [thoughts]);
+
+  const goalPct = Math.min(1, wordCount / GOAL_WORDS);
+
+  const formatLongDate = (date: Date) =>
+    date.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
 
   const handleBack = () => {
     router.back();
   };
-
-  const formatDate = (date: Date) =>
-    date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
 
   const handleSaveEntry = async () => {
     if (isFutureDate(entryDate)) {
@@ -143,26 +184,31 @@ export default function NewJournalEntryScreen() {
 
     setSaving(true);
     try {
-      const sanitize = (s: string, max = 2000) => s.trim().slice(0, max);
+      const sanitize = (s: string, max: number) => s.trim().slice(0, max);
       const now = new Date().toISOString();
       const data = {
         category: selectedCategory,
         mood: selectedMood,
-        title: sanitize(entryTitle, 200),
-        thoughts: sanitize(thoughts, 2000),
+        title: sanitize(entryTitle, TITLE_LIMIT),
+        thoughts: sanitize(thoughts, THOUGHT_LIMIT),
         entryDate: entryDate.toISOString(),
         createdAt: now,
         updatedAt: now,
       };
 
+      let savedId = editEntryId;
       if (isEditing && editEntryId) {
         await updateJournalEntry({ id: editEntryId, ...data });
       } else {
-        await addJournalEntry(data);
+        const created = await addJournalEntry(data);
+        savedId = created.id;
       }
 
-      // Navigate back to daily journal
-      router.replace("/daily-journal");
+      await journalDraftStorage.clearDraft();
+      router.replace({
+        pathname: "/journal-saved",
+        params: { id: savedId },
+      });
     } catch (err) {
       console.error("Error saving journal entry", err);
       Alert.alert("Error", "Unable to save entry. Please try again.");
@@ -171,161 +217,253 @@ export default function NewJournalEntryScreen() {
     }
   };
 
-  const handleCategorySelect = (categoryId: string) => {
-    setSelectedCategory(categoryId);
-  };
+  const canSave = Boolean(
+    selectedCategory && selectedMood && entryTitle.trim() && thoughts.trim(),
+  );
+
+  const selectedMoodOption = getMood(selectedMood);
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={{ flex: 1 }}
-    >
-    <SafeAreaView style={styles.container}>
-      <LinearGradient
-        colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
-        style={styles.headerGradient}
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.flex}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </Pressable>
-          <Text style={styles.headerTitle}>{isEditing ? "Edit Entry" : "New Entry"}</Text>
-          <View style={styles.placeholder} />
-        </View>
-
-        {/* Subtitle */}
-        <View style={styles.subtitleContainer}>
-          <Text style={styles.subtitle}>
-            Journal for {formatDate(entryDate)}
-          </Text>
-        </View>
-      </LinearGradient>
-
-      <ScrollView
-        style={styles.scrollContainer}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        {isConnected === false && (
-          <View style={styles.offlineBanner}>
-            <Ionicons name="cloud-offline-outline" size={18} color="#B45309" />
-            <Text style={styles.offlineBannerText}>
-              You're offline — entry will sync when connected
+        <LinearGradient
+          colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
+          style={styles.headerGradient}
+        >
+          <View style={styles.header}>
+            <Pressable style={styles.backButton} onPress={handleBack}>
+              <Ionicons name="arrow-back" size={24} color="white" />
+            </Pressable>
+            <Text style={styles.headerTitle}>
+              {isEditing ? "📖 Edit Entry" : "📖 New Journal Entry"}
             </Text>
+            <View style={styles.placeholder} />
           </View>
-        )}
+          <View style={styles.subtitleContainer}>
+            <Text style={styles.subtitle}>{formatLongDate(entryDate)}</Text>
+          </View>
+        </LinearGradient>
 
-        {/* Category Selection */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Select a Category</Text>
-          <View style={styles.categoryGrid}>
-            {categories.map((category) => (
+        <ScrollView
+          style={styles.scrollContainer}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {isConnected === false && (
+            <View style={styles.offlineBanner}>
+              <Ionicons name="cloud-offline-outline" size={18} color="#B45309" />
+              <Text style={styles.offlineBannerText}>
+                You're offline — entry will sync when connected
+              </Text>
+            </View>
+          )}
+
+          {draftRestored && (
+            <View style={styles.draftBanner}>
+              <Ionicons name="save-outline" size={18} color="#6D28D9" />
+              <Text style={styles.draftBannerText}>
+                Draft restored — your writing is saved automatically every 30s
+              </Text>
               <Pressable
-                key={category.id}
-                style={styles.categoryItem}
-                onPress={() => handleCategorySelect(category.id)}
+                onPress={() => {
+                  journalDraftStorage.clearDraft();
+                  setDraftRestored(false);
+                }}
+                hitSlop={8}
               >
-                <View
-                  style={[
-                    styles.categoryCircle,
-                    { backgroundColor: category.color },
-                    selectedCategory === category.id && styles.selectedCategory,
-                  ]}
+                <Ionicons name="close" size={18} color="#6D28D9" />
+              </Pressable>
+            </View>
+          )}
+
+          {/* Mood Selection */}
+          <Animated.View entering={FadeIn.duration(350)}>
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>How are you feeling today?</Text>
+              <Text style={styles.sectionHint}>
+                Pick the mood that matches how you feel right now.
+              </Text>
+              <View style={styles.moodCard}>
+                <View style={styles.moodGrid}>
+                  {MOODS.map((mood) => {
+                    const isSelected = selectedMood === mood.id;
+                    return (
+                      <Pressable
+                        key={mood.id}
+                        style={styles.moodItem}
+                        onPress={() => setSelectedMood(mood.id)}
+                      >
+                        <View
+                          style={[
+                            styles.moodCircle,
+                            isSelected && styles.moodCircleSelected,
+                          ]}
+                        >
+                          <Text style={styles.moodEmoji}>{mood.emoji}</Text>
+                        </View>
+                        <Text
+                          style={[
+                            styles.moodLabel,
+                            isSelected && styles.moodLabelSelected,
+                          ]}
+                        >
+                          {mood.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {selectedMoodOption && (
+                  <View style={styles.selectedMoodRow}>
+                    <Text style={styles.selectedMoodLabel}>Selected: </Text>
+                    <Text style={styles.selectedMoodValue}>
+                      💜 {selectedMoodOption.label}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </Animated.View>
+
+          {/* Category Selection */}
+          <Animated.View entering={FadeInDown.delay(80).duration(350)}>
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>Category</Text>
+              <Text style={styles.sectionHint}>
+                Choose the area of your life this entry is about.
+              </Text>
+              <View style={styles.pillWrap}>
+                {CATEGORIES.map((category) => {
+                  const isSelected = selectedCategory === category.id;
+                  return (
+                    <Pressable
+                      key={category.id}
+                      onPress={() => setSelectedCategory(category.id)}
+                      style={[
+                        styles.pill,
+                        { borderColor: category.color },
+                        isSelected && {
+                          backgroundColor: category.color,
+                          borderColor: category.color,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.pillText,
+                          { color: category.color },
+                          isSelected && styles.pillTextSelected,
+                        ]}
+                      >
+                        {isSelected ? "✓ " : ""}
+                        {category.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          </Animated.View>
+
+          {/* Entry Title */}
+          <Animated.View entering={FadeInDown.delay(160).duration(350)}>
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>Entry Title</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.titleInput}
+                  placeholder="Give your entry a title..."
+                  placeholderTextColor="#999"
+                  value={entryTitle}
+                  onChangeText={setEntryTitle}
+                  maxLength={TITLE_LIMIT}
                 />
-                <Text style={styles.categoryName}>{category.name}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
+              </View>
+            </View>
+          </Animated.View>
 
-        {/* Mood Selection */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>How are you feeling?</Text>
-          <View style={styles.moodGrid}>
-            {moods.map((mood) => (
-              <Pressable
-                key={mood.id}
-                style={[
-                  styles.moodItem,
-                  selectedMood === mood.id && styles.selectedMoodItem,
-                ]}
-                onPress={() => setSelectedMood(mood.id)}
-              >
-                <Text style={styles.moodEmoji}>{mood.emoji}</Text>
-                <Text style={styles.moodLabel}>{mood.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
+          {/* Your Thoughts */}
+          <Animated.View entering={FadeInDown.delay(240).duration(350)}>
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Tell us about your day</Text>
+                {thoughts.length > 0 && (
+                  <Pressable
+                    style={styles.clearButton}
+                    onPress={() => setThoughts("")}
+                  >
+                    <Ionicons name="close-circle-outline" size={16} color="#999" />
+                    <Text style={styles.clearButtonText}>Clear</Text>
+                  </Pressable>
+                )}
+              </View>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.thoughtsInput}
+                  placeholder="Today I felt..."
+                  placeholderTextColor="#999"
+                  value={thoughts}
+                  onChangeText={setThoughts}
+                  maxLength={THOUGHT_LIMIT}
+                  multiline
+                  textAlignVertical="top"
+                />
+                <View style={styles.counterRow}>
+                  <Text
+                    style={[
+                      styles.charCounter,
+                      thoughts.length >= THOUGHT_LIMIT - 200 &&
+                        styles.charCounterWarning,
+                    ]}
+                  >
+                    Characters: {thoughts.length}/{THOUGHT_LIMIT}
+                  </Text>
+                  <Text style={styles.charCounter}>
+                    {wordCount} {wordCount === 1 ? "word" : "words"}
+                  </Text>
+                </View>
+                <View style={styles.goalSection}>
+                  <View style={styles.goalBar}>
+                    <View style={[styles.goalFill, { width: `${goalPct * 100}%` }]} />
+                  </View>
+                  <Text style={styles.goalText}>
+                    {wordCount >= GOAL_WORDS
+                      ? `Goal reached — nice writing! 🎉`
+                      : `${wordCount} / ${GOAL_WORDS} words written`}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </Animated.View>
 
-        {/* Entry Title */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Entry Title</Text>
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.titleInput}
-              placeholder="Give your entry a title..."
-              placeholderTextColor="#999"
-              value={entryTitle}
-              onChangeText={setEntryTitle}
-            />
-          </View>
-        </View>
+          {/* Reflection Preview */}
+          <Animated.View entering={FadeInDown.delay(320).duration(450)}>
+            <View style={styles.previewCard}>
+              <Text style={styles.previewEmoji}>🌸</Text>
+              <View style={styles.previewContent}>
+                <Text style={styles.previewTitle}>Reflection Preview</Text>
+                <Text style={styles.previewText}>
+                  Your reflection will appear after saving today's journal.
+                </Text>
+              </View>
+            </View>
+          </Animated.View>
+        </ScrollView>
 
-        {/* Your Thoughts */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Your Thoughts</Text>
-            {thoughts.length > 0 && (
-              <Pressable
-                style={styles.clearButton}
-                onPress={() => setThoughts("")}
-              >
-                <Ionicons name="close-circle-outline" size={16} color="#999" />
-                <Text style={styles.clearButtonText}>Clear</Text>
-              </Pressable>
-            )}
-          </View>
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.thoughtsInput}
-              placeholder="Write about your day, feelings, or thoughts..."
-              placeholderTextColor="#999"
-              value={thoughts}
-              onChangeText={setThoughts}
-              maxLength={2000}
-              multiline
-              numberOfLines={8}
-              textAlignVertical="top"
-            />
-            <Text
-              style={[
-                styles.charCounter,
-                thoughts.length >= 1800 && styles.charCounterWarning,
-              ]}
-            >{`${thoughts.length} / 2000`}</Text>
-          </View>
-        </View>
-
-        {/* Save Button */}
-        <View style={styles.buttonContainer}>
+        {/* Sticky Save Footer */}
+        <View style={styles.footer}>
           <Pressable
             onPress={handleSaveEntry}
-            disabled={
-              saving ||
-              !selectedCategory ||
-              !entryTitle.trim() ||
-              !thoughts.trim()
-            }
+            disabled={saving || !canSave}
+            style={styles.saveButton}
           >
             <LinearGradient
               colors={
-                saving ||
-                !selectedCategory ||
-                !entryTitle.trim() ||
-                !thoughts.trim()
+                saving || !canSave
                   ? ["#C4B5D9", "#B09FD0"]
                   : ["#9C7EEB", "#8A63D2"]
               }
@@ -338,21 +476,28 @@ export default function NewJournalEntryScreen() {
               ) : (
                 <View style={styles.saveButtonContent}>
                   <Ionicons
-                    name={isConnected === false ? "cloud-upload-outline" : "checkmark-circle"}
+                    name={
+                      isConnected === false
+                        ? "cloud-upload-outline"
+                        : "checkmark-circle"
+                    }
                     size={20}
                     color="white"
                   />
                   <Text style={styles.saveButtonText}>
-                    {isConnected === false ? "Save Offline" : isEditing ? "Update Entry" : "Save Entry"}
+                    {isConnected === false
+                      ? "Save Offline"
+                      : isEditing
+                        ? "Update Entry"
+                        : "Save Today's Journal"}
                   </Text>
                 </View>
               )}
             </LinearGradient>
           </Pressable>
         </View>
-      </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
-    </KeyboardAvoidingView>
   );
 }
 
@@ -360,6 +505,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F4F2F8",
+  },
+  flex: {
+    flex: 1,
   },
   headerGradient: {
     paddingBottom: 20,
@@ -391,9 +539,10 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
     color: "rgba(255, 255, 255, 0.9)",
     textAlign: "center",
+    fontWeight: "600",
   },
   scrollContainer: {
     flex: 1,
@@ -401,7 +550,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 40,
+    paddingBottom: 24,
   },
   offlineBanner: {
     flexDirection: "row",
@@ -413,7 +562,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   offlineBannerText: {
     flex: 1,
@@ -421,87 +570,129 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#92400E",
   },
+  draftBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#F3E8FF",
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  draftBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#6D28D9",
+  },
   sectionContainer: {
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 16,
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#2D2640",
+    marginBottom: 4,
+  },
+  sectionHint: {
+    fontSize: 13,
+    color: "#8B7FA8",
+    marginBottom: 14,
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
   },
-  categoryGrid: {
+  // Mood chips
+  moodCard: {
     backgroundColor: "white",
-    borderRadius: 20,
-    padding: 20,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-around",
+    borderRadius: 24,
+    paddingVertical: 20,
+    paddingHorizontal: 12,
     ...(shadows.sm("#000") as any),
     borderWidth: 1,
     borderColor: "rgba(156, 126, 235, 0.06)",
   },
-  categoryItem: {
+  moodGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  moodItem: {
     alignItems: "center",
-    marginBottom: 20,
-    width: "25%",
+    width: "33.33%",
+    paddingVertical: 10,
   },
-  categoryCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginBottom: 8,
+  moodCircle: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: "#F5F3F8",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "transparent",
   },
-  selectedCategory: {
-    borderWidth: 3,
-    borderColor: "#333",
+  moodCircleSelected: {
+    backgroundColor: "#8A63D2",
+    borderColor: "#6D28D9",
   },
-  categoryName: {
+  moodEmoji: {
+    fontSize: 28,
+  },
+  moodLabel: {
     fontSize: 12,
     color: "#666",
     textAlign: "center",
     fontWeight: "500",
+    marginTop: 6,
   },
-  moodGrid: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 16,
+  moodLabelSelected: {
+    color: "#8A63D2",
+    fontWeight: "700",
+  },
+  selectedMoodRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 6,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F0ECF6",
+  },
+  selectedMoodLabel: {
+    fontSize: 13,
+    color: "#8B7FA8",
+  },
+  selectedMoodValue: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#8A63D2",
+  },
+  // Category pills
+  pillWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
-    ...(shadows.sm("#000") as any),
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
+    gap: 10,
   },
-  moodItem: {
-    alignItems: "center",
-    width: "23%",
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: "#F5F5F5",
-    marginBottom: 8,
+  pill: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    backgroundColor: "white",
   },
-  selectedMoodItem: {
-    backgroundColor: "#8A63D2",
-    borderWidth: 2,
-    borderColor: "#1976D2",
+  pillText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
-  moodEmoji: {
-    fontSize: 24,
-    marginBottom: 4,
+  pillTextSelected: {
+    color: "white",
   },
-  moodLabel: {
-    fontSize: 11,
-    color: "#666",
-    textAlign: "center",
-    fontWeight: "500",
-  },
+  // Inputs
   inputContainer: {
     backgroundColor: "white",
     borderRadius: 20,
@@ -522,18 +713,44 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     borderRadius: 16,
-    minHeight: 120,
+    minHeight: 180,
+    lineHeight: 24,
+  },
+  counterRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingBottom: 10,
   },
   charCounter: {
-    textAlign: "right",
     fontSize: 12,
     color: "#999",
-    paddingHorizontal: 20,
-    paddingBottom: 12,
+    fontWeight: "500",
   },
   charCounterWarning: {
     color: "#D32F2F",
     fontWeight: "600",
+  },
+  goalSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+  },
+  goalBar: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#F0ECF6",
+    overflow: "hidden",
+    marginBottom: 6,
+  },
+  goalFill: {
+    height: "100%",
+    borderRadius: 3,
+    backgroundColor: "#8A63D2",
+  },
+  goalText: {
+    fontSize: 12,
+    color: "#8B7FA8",
+    fontWeight: "500",
   },
   clearButton: {
     flexDirection: "row",
@@ -547,8 +764,45 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
   },
-  buttonContainer: {
-    marginTop: 20,
+  // Reflection preview
+  previewCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: "#F3E8FF",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+    padding: 18,
+    marginBottom: 8,
+  },
+  previewEmoji: {
+    fontSize: 30,
+  },
+  previewContent: {
+    flex: 1,
+  },
+  previewTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#6D28D9",
+    marginBottom: 2,
+  },
+  previewText: {
+    fontSize: 13,
+    color: "#7C5AC8",
+    lineHeight: 18,
+  },
+  // Sticky footer
+  footer: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 12,
+    backgroundColor: "#F4F2F8",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(156, 126, 235, 0.12)",
+  },
+  saveButton: {
     borderRadius: 25,
     overflow: "hidden",
   },
@@ -564,7 +818,7 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "white",
   },
 });

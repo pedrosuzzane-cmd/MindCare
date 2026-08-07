@@ -15,6 +15,7 @@ export default function StudentLayout() {
           <Stack.Screen name="daily-journal" />
           <Stack.Screen name="daily-reminders" />
           <Stack.Screen name="journal-detail" />
+          <Stack.Screen name="journal-saved" />
           <Stack.Screen name="journal-suggestions" />
           <Stack.Screen name="messages" />
           <Stack.Screen name="mood-calendar" />

@@ -52,6 +52,33 @@ export default function DailyJournalScreen() {
     return d.getTime() > today.getTime();
   };
 
+  const getLast7Days = () => {
+    const days: { date: Date; label: string }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - i);
+      days.push({
+        date: d,
+        label: d.toLocaleDateString("en-US", { weekday: "short" }),
+      });
+    }
+    return days;
+  };
+
+  const formatEntryDate = (iso: string) =>
+    new Date(iso).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+
+  const recentEntries = [...journalEntries]
+    .sort(
+      (a, b) =>
+        new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime(),
+    )
+    .slice(0, 4);
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -176,19 +203,118 @@ export default function DailyJournalScreen() {
           </LinearGradient>
         </Pressable>
 
-        {/* Emotional Wellness Chart */}
-        <View style={styles.wellnessCard}>
-          <View style={styles.wellnessHeader}>
-            <Text style={styles.wellnessTitle}>🌱 My Emotional Journey</Text>
+        {/* Weekly Mood */}
+        <View style={styles.weeklyCard}>
+          <Text style={styles.sectionTitle}>Your Mood This Week</Text>
+          <View style={styles.weeklyRow}>
+            {getLast7Days().map((day) => {
+              const entry = getEntryForDate(day.date);
+              const emoji = entry ? getMoodEmoji(entry.mood) : "·";
+              const isToday = sameDay(day.date, new Date());
+              return (
+                <View key={day.date.toISOString()} style={styles.weeklyItem}>
+                  <Text style={styles.weeklyEmoji}>{emoji}</Text>
+                  <Text
+                    style={[
+                      styles.weeklyDay,
+                      isToday && styles.weeklyDayToday,
+                    ]}
+                  >
+                    {day.label}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
-          <Text style={styles.wellnessSubtitle}>
-            Every journal entry is a step toward understanding yourself.
-          </Text>
-          <WellnessChart
-            journalEntries={journalEntries}
-            currentMonth={currentMonth}
-          />
         </View>
+
+        {/* Recent Journals */}
+        {recentEntries.length > 0 && (
+          <View style={styles.recentCard}>
+            <View style={styles.recentHeader}>
+              <Text style={styles.sectionTitle}>Recent Journals</Text>
+              <Pressable
+                onPress={() => router.push("/mood-calendar")}
+                hitSlop={8}
+              >
+                <Text style={styles.seeAllText}>See All →</Text>
+              </Pressable>
+            </View>
+            {recentEntries.map((entry) => (
+              <Pressable
+                key={entry.id}
+                style={styles.recentRow}
+                onPress={() =>
+                  router.push({
+                    pathname: "/journal-detail",
+                    params: { id: entry.id },
+                  })
+                }
+              >
+                <Ionicons name="book-outline" size={18} color="#8A63D2" />
+                <View style={styles.recentInfo}>
+                  <Text style={styles.recentTitle} numberOfLines={1}>
+                    {entry.title || "Untitled"}
+                  </Text>
+                  <Text style={styles.recentDate}>
+                    {formatEntryDate(entry.entryDate)}
+                  </Text>
+                </View>
+                <Text style={styles.recentMood}>
+                  {getMoodEmoji(entry.mood)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {/* Emotional Wellness Chart */}
+        {journalEntries.length === 0 ? (
+          <View style={styles.wellnessCard}>
+            <Text style={styles.emptyJourneyEmoji}>🌱</Text>
+            <Text style={styles.emptyJourneyTitle}>
+              Your Emotional Journey starts with your first journal.
+            </Text>
+            <Text style={styles.emptyJourneyText}>
+              Every entry helps you understand your emotional well-being.
+              Write your first journal today.
+            </Text>
+            <Pressable
+              style={styles.writeJournalBtn}
+              onPress={() =>
+                router.push({
+                  pathname: "/new-journal-entry",
+                  params: { date: new Date().toISOString() },
+                })
+              }
+            >
+              <LinearGradient
+                colors={["#9C7EEB", "#8A63D2"]}
+                style={styles.writeJournalGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Ionicons name="create-outline" size={20} color="white" />
+                <Text style={styles.writeJournalBtnText}>
+                  Write Today's Journal
+                </Text>
+              </LinearGradient>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.wellnessCard}>
+            <View style={styles.wellnessHeader}>
+              <Text style={styles.wellnessTitle}>🌱 My Emotional Journey</Text>
+            </View>
+            <Text style={styles.wellnessSubtitle}>
+              Every journal entry is a step toward understanding yourself.
+            </Text>
+            <WellnessChart
+              journalEntries={journalEntries}
+              currentMonth={currentMonth}
+            />
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -304,5 +430,107 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 16,
     fontWeight: "600",
+  },
+  // Weekly mood strip
+  weeklyCard: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 20,
+    ...(shadows.sm("#000") as any),
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#2D2640",
+    marginBottom: 14,
+  },
+  weeklyRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  weeklyItem: {
+    alignItems: "center",
+    flex: 1,
+  },
+  weeklyEmoji: {
+    fontSize: 22,
+    marginBottom: 4,
+  },
+  weeklyDay: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#8B7FA8",
+    textTransform: "uppercase",
+  },
+  weeklyDayToday: {
+    color: "#8A63D2",
+    fontWeight: "800",
+  },
+  // Recent journals
+  recentCard: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 20,
+    ...(shadows.sm("#000") as any),
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
+  },
+  recentHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  seeAllText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#8A63D2",
+  },
+  recentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0ECF6",
+  },
+  recentInfo: {
+    flex: 1,
+  },
+  recentTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#2D2640",
+  },
+  recentDate: {
+    fontSize: 12,
+    color: "#8B7FA8",
+    marginTop: 2,
+  },
+  recentMood: {
+    fontSize: 20,
+  },
+  // Empty journey state
+  emptyJourneyEmoji: {
+    fontSize: 44,
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  emptyJourneyTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#2D2640",
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  emptyJourneyText: {
+    fontSize: 14,
+    color: "#8B7FA8",
+    textAlign: "center",
+    lineHeight: 21,
+    marginBottom: 16,
   },
 });
