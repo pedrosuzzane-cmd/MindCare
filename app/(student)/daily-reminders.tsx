@@ -14,6 +14,7 @@ import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
+  Modal,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -58,6 +59,81 @@ const REMINDER_META: Record<
   },
 };
 
+/**
+ * Quick-add wellness templates. These configure one of the existing four
+ * reminder types (no new data model / scheduling changes).
+ */
+const WELLNESS_TEMPLATES: {
+  id: string;
+  icon: string;
+  color: string;
+  name: string;
+  desc: string;
+  target: keyof ReminderState;
+  preset: Record<string, any>;
+}[] = [
+  {
+    id: "morning-checkin",
+    icon: "sunny-outline",
+    color: "#F5A623",
+    name: "Morning Check-in",
+    desc: "A gentle nudge to start the day",
+    target: "breakTime",
+    preset: {
+      time: { hour: 8, minute: 0, period: "AM" },
+      note: "Good morning! Take a moment to set an intention for today.",
+    },
+  },
+  {
+    id: "breathing",
+    icon: "flower-outline",
+    color: "#4CAF50",
+    name: "Breathing Break",
+    desc: "Pause and take a few deep breaths",
+    target: "breakTime",
+    preset: {
+      time: { hour: 11, minute: 0, period: "AM" },
+      note: "Breathe in for 4, hold for 4, out for 6.",
+    },
+  },
+  {
+    id: "mindful-pause",
+    icon: "leaf-outline",
+    color: "#66BB6A",
+    name: "Mindful Pause",
+    desc: "Step away and ground yourself",
+    target: "breakTime",
+    preset: {
+      time: { hour: 3, minute: 0, period: "PM" },
+      note: "Notice your surroundings. Five slow breaths.",
+    },
+  },
+  {
+    id: "movement",
+    icon: "walk-outline",
+    color: "#FF9800",
+    name: "Movement Break",
+    desc: "Stand up, stretch, and move a little",
+    target: "breakTime",
+    preset: {
+      time: { hour: 5, minute: 0, period: "PM" },
+      note: "Stretch or take a short walk to reset.",
+    },
+  },
+  {
+    id: "sleep-winddown",
+    icon: "moon-outline",
+    color: "#7B2CBF",
+    name: "Wind-Down Reminder",
+    desc: "Start relaxing before bedtime",
+    target: "sleep",
+    preset: {
+      time: { hour: 9, minute: 30, period: "PM" },
+      note: "Dim the lights and put screens away.",
+    },
+  },
+];
+
 // ── Helpers ──
 function getRepeatLabel(
   repeat: string = "every-day",
@@ -86,6 +162,113 @@ function fmt(t?: { hour: number; minute: number; period: string }): string {
   const hour = t.hour || 12;
   const minute = t.minute || 0;
   return `${hour}:${String(minute).padStart(2, "0")} ${t.period || "AM"}`;
+}
+
+function to24h(t?: { hour: number; minute: number; period: string }): number {
+  if (!t) return 0;
+  let h = t.hour % 12;
+  if (t.period === "PM") h += 12;
+  return h * 60 + (t.minute || 0);
+}
+
+/** Map a RepeatSchedule + custom days to JS getDay() values (0=Sun ... 6=Sat). */
+function repeatWeekdays(
+  repeat: string = "every-day",
+  customDays: number[] = [],
+): number[] {
+  switch (repeat) {
+    case "every-day":
+      return [0, 1, 2, 3, 4, 5, 6];
+    case "weekdays":
+      return [1, 2, 3, 4, 5];
+    case "weekends":
+      return [0, 6];
+    case "custom":
+      return (customDays || []).length > 0 ? customDays : [0, 1, 2, 3, 4, 5, 6];
+    default:
+      return [0, 1, 2, 3, 4, 5, 6];
+  }
+}
+
+interface NextReminder {
+  id: string;
+  icon: string;
+  color: string;
+  label: string;
+  time: string;
+  dayLabel: string;
+  minutes: number;
+}
+
+/** Returns epoch-ms of the next occurrence of this reminder within 7 days, or null. */
+function nextOccurrenceMs(
+  repeat: string = "every-day",
+  customDays: number[] = [],
+  time?: { hour: number; minute: number; period: string },
+): number | null {
+  if (!time) return null;
+  const days = repeatWeekdays(repeat, customDays);
+  const now = new Date();
+  const hour24 = Math.floor(to24h(time) / 60);
+  const minute = time.minute || 0;
+  for (let offset = 0; offset < 7; offset++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+    if (!days.includes(d.getDay())) continue;
+    const candidate = new Date(
+      d.getFullYear(),
+      d.getMonth(),
+      d.getDate(),
+      hour24,
+      minute,
+      0,
+      0,
+    );
+    if (candidate.getTime() > now.getTime()) return candidate.getTime();
+  }
+  return null;
+}
+
+function dayLabelFromMs(ms: number): string {
+  const diff = Math.round((ms - Date.now()) / 86400000);
+  if (diff <= 0) return "Today";
+  if (diff === 1) return "Tomorrow";
+  return ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][new Date(ms).getDay()];
+}
+
+/** Compute the single next upcoming reminder across all enabled reminders. */
+function getNextReminder(reminders: ReminderState): NextReminder | null {
+  const entries: {
+    id: string;
+    state: { enabled: boolean; repeat: RepeatSchedule; customDays: number[] };
+    time?: { hour: number; minute: number; period: string };
+  }[] = [
+    { id: "hydration", state: reminders.hydration, time: reminders.hydration.startTime },
+    { id: "sleep", state: reminders.sleep, time: reminders.sleep.time },
+    { id: "breakTime", state: reminders.breakTime, time: reminders.breakTime.time },
+    { id: "task", state: reminders.task, time: reminders.task.time },
+  ];
+
+  let best: NextReminder | null = null;
+  let bestMs = Number.POSITIVE_INFINITY;
+
+  for (const entry of entries) {
+    if (!entry.state.enabled || !entry.time) continue;
+    const ms = nextOccurrenceMs(entry.state.repeat, entry.state.customDays, entry.time);
+    if (ms === null || ms >= bestMs) continue;
+    const meta = REMINDER_META[entry.id] || { icon: "ellipse", color: "#888", label: entry.id };
+    bestMs = ms;
+    best = {
+      id: entry.id,
+      icon: meta.icon,
+      color: meta.color,
+      label: meta.label,
+      time: fmt(entry.time),
+      dayLabel: dayLabelFromMs(ms),
+      minutes: to24h(entry.time),
+    };
+  }
+
+  return best;
 }
 
 /** Tappable time field that opens the native OS time dialog. */
@@ -485,6 +668,7 @@ function StandardCard({
 // ── Main Screen ──
 export default function DailyRemindersScreen() {
   const { reminders, loading, updateReminder: update } = useReminderSettings();
+  const [customOpen, setCustomOpen] = useState(false);
 
   const toggle = async (id: string) => {
     const r = reminders[id as keyof ReminderState] as any;
@@ -534,6 +718,28 @@ export default function DailyRemindersScreen() {
     }
   };
 
+  // Applies a wellness template to its target reminder (no new data model).
+  const applyTemplate = async (
+    tpl: (typeof WELLNESS_TEMPLATES)[number],
+  ) => {
+    const key = tpl.target;
+    if (!reminders[key]?.enabled) {
+      const permitted = await requestNotificationPermissions();
+      if (!permitted) {
+        Alert.alert(
+          "Permissions Required",
+          "Please enable notification permissions in your device settings.",
+        );
+        return;
+      }
+    }
+    const newSettings = {
+      ...reminders,
+      [key]: { ...reminders[key], ...tpl.preset, enabled: true },
+    } as ReminderState;
+    await update(newSettings);
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={s.container}>
@@ -548,6 +754,7 @@ export default function DailyRemindersScreen() {
   const sl = reminders.sleep;
   const br = reminders.breakTime;
   const ts = reminders.task;
+  const next = getNextReminder(reminders);
 
   return (
     <SafeAreaView style={s.container}>
@@ -572,6 +779,90 @@ export default function DailyRemindersScreen() {
         contentContainerStyle={s.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* ── Summary ── */}
+        <View style={s.summaryCard}>
+          <View style={s.summaryHeader}>
+            <Ionicons name="today-outline" size={20} color="#8A63D2" />
+            <Text style={s.summaryTitle}>Today's Routine</Text>
+            <View style={s.summaryCountPill}>
+              <Text style={s.summaryCountText}>
+                {[
+                  reminders.hydration,
+                  reminders.sleep,
+                  reminders.breakTime,
+                  reminders.task,
+                ].filter((r) => r.enabled).length}{" "}
+                active
+              </Text>
+            </View>
+          </View>
+          {next ? (
+            <View style={s.nextRow}>
+              <View
+                style={[s.nextIcon, { backgroundColor: next.color }]}
+              >
+                <Ionicons name={next.icon as any} size={18} color="white" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.nextLabel}>Next up</Text>
+                <Text style={s.nextName}>{next.label}</Text>
+              </View>
+              <View style={s.nextTimeWrap}>
+                <Text style={s.nextTime}>{next.time}</Text>
+                <Text style={s.nextDay}>{next.dayLabel}</Text>
+              </View>
+            </View>
+          ) : (
+            <Text style={s.summaryEmpty}>
+              No reminders active yet. Tap a quick add below or switch one on.
+            </Text>
+          )}
+        </View>
+
+        {/* ── Quick Add ── */}
+        <Text style={s.sectionTitle}>Quick Add</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.tplRow}
+        >
+          {WELLNESS_TEMPLATES.map((t) => {
+            const active = reminders[t.target].enabled;
+            return (
+              <Pressable
+                key={t.id}
+                style={[s.tplChip, active && s.tplChipActive]}
+                onPress={() => applyTemplate(t)}
+              >
+                <View style={[s.tplChipIcon, { backgroundColor: t.color }]}>
+                  <Ionicons name={t.icon as any} size={18} color="white" />
+                </View>
+                <View>
+                  <Text style={[s.tplChipName, active && s.tplChipNameActive]}>
+                    {t.name}
+                  </Text>
+                  <Text
+                    style={[s.tplChipDesc, active && s.tplChipDescActive]}
+                    numberOfLines={1}
+                  >
+                    {t.desc}
+                  </Text>
+                </View>
+                {active && (
+                  <Ionicons name="checkmark-circle" size={16} color="#8A63D2" />
+                )}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        <Pressable style={s.customBtn} onPress={() => setCustomOpen(true)}>
+          <Ionicons name="add-circle-outline" size={20} color="#8A63D2" />
+          <Text style={s.customBtnText}>Create Custom Reminder</Text>
+        </Pressable>
+
+        {/* ── Wellness ── */}
+        <Text style={s.sectionTitle}>Wellness</Text>
         <HydrationCard
           r={h}
           onToggle={() => toggle("hydration")}
@@ -589,6 +880,9 @@ export default function DailyRemindersScreen() {
           onToggle={() => toggle("breakTime")}
           onUpdate={(u) => handleUpdate("breakTime", u)}
         />
+
+        {/* ── Academic ── */}
+        <Text style={s.sectionTitle}>Academic</Text>
         <StandardCard
           id="task"
           r={ts}
@@ -596,6 +890,7 @@ export default function DailyRemindersScreen() {
           onToggle={() => toggle("task")}
           onUpdate={(u) => handleUpdate("task", u)}
         />
+
         <View style={s.infoCard}>
           <Ionicons
             name="information-circle-outline"
@@ -608,6 +903,71 @@ export default function DailyRemindersScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* ── Custom Reminder Modal ── */}
+      <Modal
+        visible={customOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCustomOpen(false)}
+      >
+        <Pressable style={s.modalBackdrop} onPress={() => setCustomOpen(false)} />
+        <View style={s.modalSheet}>
+          <View style={s.modalHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.modalTitle}>Create Custom Reminder</Text>
+              <Text style={s.modalSubtitle}>
+                Pick a template to build a routine.
+              </Text>
+            </View>
+            <Pressable
+              style={s.modalClose}
+              onPress={() => setCustomOpen(false)}
+            >
+              <Ionicons name="close" size={22} color="#888" />
+            </Pressable>
+          </View>
+          <ScrollView
+            contentContainerStyle={s.modalContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {WELLNESS_TEMPLATES.map((t) => {
+              const active = reminders[t.target].enabled;
+              return (
+                <Pressable
+                  key={t.id}
+                  style={s.modalItem}
+                  onPress={() => {
+                    applyTemplate(t);
+                    setCustomOpen(false);
+                  }}
+                >
+                  <View style={[s.tplChipIcon, { backgroundColor: t.color }]}>
+                    <Ionicons name={t.icon as any} size={18} color="white" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.modalItemName}>{t.name}</Text>
+                    <Text style={s.modalItemDesc}>{t.desc}</Text>
+                  </View>
+                  {active ? (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={22}
+                      color="#4CAF50"
+                    />
+                  ) : (
+                    <Ionicons
+                      name="add-circle"
+                      size={22}
+                      color="#8A63D2"
+                    />
+                  )}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -861,4 +1221,159 @@ const s = StyleSheet.create({
     color: "#333",
     fontVariant: ["tabular-nums"],
   },
+
+  /* ── Summary ── */
+  summaryCard: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 20,
+    // @ts-ignore — web-only shadow property
+    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
+    gap: 14,
+  },
+  summaryHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#333",
+    flex: 1,
+  },
+  summaryCountPill: {
+    backgroundColor: "rgba(138, 99, 210, 0.12)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  summaryCountText: { fontSize: 12, fontWeight: "700", color: "#8A63D2" },
+  nextRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#F0EAF8",
+  },
+  nextIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  nextLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#999",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  nextName: { fontSize: 15, fontWeight: "700", color: "#333", marginTop: 2 },
+  nextTimeWrap: { alignItems: "flex-end" },
+  nextTime: { fontSize: 15, fontWeight: "800", color: "#8A63D2" },
+  nextDay: { fontSize: 12, color: "#999", marginTop: 2 },
+  summaryEmpty: { fontSize: 13, color: "#888", lineHeight: 20 },
+
+  /* ── Sections + Templates ── */
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#333",
+    marginTop: 6,
+  },
+  tplRow: { gap: 10, paddingVertical: 4, paddingRight: 8 },
+  tplChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "white",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.1)",
+    maxWidth: 240,
+    // @ts-ignore — web-only shadow property
+    boxShadow: "0px 2px 10px rgba(138, 99, 210, 0.06)",
+    elevation: 2,
+  },
+  tplChipActive: {
+    backgroundColor: "rgba(138, 99, 210, 0.08)",
+    borderColor: "#8A63D2",
+  },
+  tplChipIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  tplChipName: { fontSize: 13, fontWeight: "700", color: "#333" },
+  tplChipNameActive: { color: "#8A63D2" },
+  tplChipDesc: { fontSize: 11, color: "#888", marginTop: 1 },
+  tplChipDescActive: { color: "#9C7EEB" },
+  customBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "rgba(138, 99, 210, 0.1)",
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "#8A63D2",
+    borderRadius: 16,
+    paddingVertical: 14,
+  },
+  customBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#8A63D2",
+  },
+
+  /* ── Custom Reminder Modal ── */
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
+  modalSheet: {
+    backgroundColor: "white",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 20,
+    paddingBottom: 40,
+    maxHeight: "70%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  modalTitle: { fontSize: 18, fontWeight: "700", color: "#333" },
+  modalSubtitle: { fontSize: 13, color: "#888", marginTop: 2 },
+  modalClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#F4F2F8",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: { padding: 20, gap: 10 },
+  modalItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#F0EAF8",
+  },
+  modalItemName: { fontSize: 14, fontWeight: "700", color: "#333" },
+  modalItemDesc: { fontSize: 12, color: "#888", marginTop: 2 },
 });

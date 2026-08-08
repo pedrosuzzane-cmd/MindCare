@@ -30,6 +30,21 @@ export interface Conversation {
   type?: "admin" | "peer"; // Conversation type — defaults to "admin" for existing docs
   participants?: string[]; // [uidA, uidB] — for peer conversations
   participantNames?: Record<string, string>; // { [uid]: name } — for peer conversations
+  pinnedBy?: string[]; // UIDs who pinned this conversation (presentation only)
+  hiddenBy?: string[]; // UIDs who hid/deleted this conversation for themselves
+  createdAt?: number; // Conversation creation timestamp (ms)
+}
+
+/** A user-reported conversation for moderation. */
+export interface ConversationReport {
+  id: string;
+  conversationId: string;
+  reporterUid: string;
+  reportedUid: string;
+  type: "peer" | "admin";
+  reason: string;
+  status: "pending" | "reviewed" | "dismissed";
+  createdAt: number;
 }
 
 /** Moderation result returned by contentModeration service. */

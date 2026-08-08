@@ -529,6 +529,103 @@ export async function fetchAllUsers(
   }
 }
 
+// ── Conversation support actions (pinning, hide, block, report) ─────────────
+
+/**
+ * Toggles whether a user has pinned a conversation.
+ * Pure presentation state stored on the conversation doc; does not affect chat flow.
+ */
+export async function togglePinConversation(
+  conversationId: string,
+  uid: string,
+): Promise<void> {
+  const conversationRef = doc(db, "conversations", conversationId);
+  const snap = await getDoc(conversationRef);
+  if (!snap.exists()) return;
+  const data = snap.data();
+  const pinnedBy: string[] = data.pinnedBy || [];
+  const next = pinnedBy.includes(uid)
+    ? pinnedBy.filter((u: string) => u !== uid)
+    : [...pinnedBy, uid];
+  await setDoc(conversationRef, { pinnedBy: next }, { merge: true });
+}
+
+/**
+ * Marks a conversation as hidden for a specific user.
+ * The conversation still exists for the other participant; it just disappears
+ * from this user's inbox (soft-delete).
+ */
+export async function hideConversation(
+  conversationId: string,
+  uid: string,
+): Promise<void> {
+  const conversationRef = doc(db, "conversations", conversationId);
+  const snap = await getDoc(conversationRef);
+  if (!snap.exists()) return;
+  const data = snap.data();
+  const hiddenBy: string[] = data.hiddenBy || [];
+  if (!hiddenBy.includes(uid)) {
+    await setDoc(
+      conversationRef,
+      { hiddenBy: [...hiddenBy, uid] },
+      { merge: true },
+    );
+  }
+}
+
+/**
+ * Records a user report for a conversation.
+ * Stores in the top-level "reports" collection for admin moderation.
+ */
+export async function reportConversation(input: {
+  conversationId: string;
+  reporterUid: string;
+  reportedUid: string;
+  type: "peer" | "admin";
+  reason: string;
+}): Promise<string> {
+  const reportRef = doc(collection(db, "reports"));
+  await setDoc(reportRef, {
+    conversationId: input.conversationId,
+    reporterUid: input.reporterUid,
+    reportedUid: input.reportedUid,
+    type: input.type,
+    reason: input.reason,
+    status: "pending",
+    createdAt: Date.now(),
+  });
+  return reportRef.id;
+}
+
+/**
+ * Blocks a user by adding their UID to the blocker's `blockedUsers` list.
+ * The blocker's inbox will filter out conversations with blocked users.
+ */
+export async function blockUser(
+  blockerUid: string,
+  blockedUid: string,
+): Promise<void> {
+  const userRef = doc(db, "users", blockerUid);
+  const snap = await getDoc(userRef);
+  const data = snap.exists() ? snap.data() : {};
+  const blocked: string[] = data.blockedUsers || [];
+  if (!blocked.includes(blockedUid)) {
+    await setDoc(userRef, { blockedUsers: [...blocked, blockedUid] }, { merge: true });
+  }
+}
+
+/**
+ * Returns the list of UIDs blocked by the given user.
+ */
+export async function getBlockedUsers(uid: string): Promise<string[]> {
+  try {
+    const snap = await getDoc(doc(db, "users", uid));
+    return snap.exists() ? snap.data().blockedUsers || [] : [];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Gets the other participant's name from a peer conversation.
  * Uses participantNames from the conversation doc if available, falls back to DB lookup.

@@ -1,16 +1,22 @@
 import { auth, db } from "@/constants/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
-    collection,
-    doc,
-    getDoc,
-    getDocs,
-    onSnapshot,
-    query,
-    setDoc,
-    Timestamp,
+  collection,
+  doc,
+  getDocs,
+  onSnapshot,
+  query,
+  setDoc,
+  Timestamp,
 } from "firebase/firestore";
 import { useCallback, useEffect, useRef, useState } from "react";
+
+export type AchievementCategory =
+  | "reflection"
+  | "selfcare"
+  | "consistency"
+  | "wellness"
+  | "growth";
 
 export interface Achievement {
   id: string;
@@ -18,163 +24,287 @@ export interface Achievement {
   title: string;
   description: string;
   requirement: string;
+  category: AchievementCategory;
+  target: number;
+  reward: string;
 }
 
 export interface AchievementWithStatus extends Achievement {
   unlocked: boolean;
   unlockedAt?: Date;
-  progress?: number; // 0-100 percentage
+  current: number; // count toward the target
 }
 
+export interface AchievementCategoryMeta {
+  id: AchievementCategory | "all";
+  label: string;
+  emoji: string;
+}
+
+export const ACHIEVEMENT_CATEGORIES: AchievementCategoryMeta[] = [
+  { id: "all", label: "All", emoji: "✨" },
+  { id: "reflection", label: "Reflection", emoji: "📔" },
+  { id: "selfcare", label: "Self-Care", emoji: "💜" },
+  { id: "consistency", label: "Consistency", emoji: "🌱" },
+  { id: "wellness", label: "Wellness", emoji: "🧘" },
+  { id: "growth", label: "Growth", emoji: "🎯" },
+];
+
+/**
+ * Journal-first achievement set. Every metric below is derived from the
+ * student's own journal entries and self-assessments, and no achievement
+ * rewards a "positive" mood over any other mood. Streak-style achievements
+ * count total days journaled — a missed day never resets progress.
+ */
 const ALL_ACHIEVEMENTS: Achievement[] = [
+  // 📔 Reflection — number of journal entries
   {
     id: "first-reflection",
     emoji: "🌱",
     title: "First Reflection",
     description: "You wrote your very first journal entry",
     requirement: "Write your first journal entry",
+    category: "reflection",
+    target: 1,
+    reward: "🌰 Garden Seed",
   },
   {
     id: "journal-explorer",
     emoji: "📖",
     title: "Journal Explorer",
-    description: "You've written 7 journal entries",
-    requirement: "Write 7 journal entries",
+    description: "You wrote 5 journal entries",
+    requirement: "Write 5 journal entries",
+    category: "reflection",
+    target: 5,
+    reward: "🌱 Sprout",
   },
   {
-    id: "seven-day-streak",
-    emoji: "🔥",
-    title: "7-Day Journal Streak",
-    description: "You journaled for 7 days in a row",
-    requirement: "Journal 7 consecutive days",
+    id: "reflective-mind",
+    emoji: "🌿",
+    title: "Reflective Mind",
+    description: "You wrote 10 journal entries",
+    requirement: "Write 10 journal entries",
+    category: "reflection",
+    target: 10,
+    reward: "🌼 Wildflower",
   },
   {
-    id: "positive-outlook",
-    emoji: "🌞",
-    title: "Positive Outlook",
-    description: "You had 7 days with mostly positive moods",
-    requirement: "7 days with positive moods (happy, calm, relaxed, good)",
+    id: "deep-reflection",
+    emoji: "🌳",
+    title: "Deep Reflection",
+    description: "You wrote 25 journal entries",
+    requirement: "Write 25 journal entries",
+    category: "reflection",
+    target: 25,
+    reward: "🌳 Tree",
   },
+  {
+    id: "reflection-journey",
+    emoji: "🌸",
+    title: "Reflection Journey",
+    description: "You wrote 50 journal entries",
+    requirement: "Write 50 journal entries",
+    category: "reflection",
+    target: 50,
+    reward: "🪷 Lotus Pond",
+  },
+
+  // 💜 Self-Care — check-ins and returning gently
   {
     id: "self-care-champion",
     emoji: "💚",
     title: "Self-Care Champion",
     description: "You completed a self-assessment check-in",
     requirement: "Complete a self-assessment",
+    category: "selfcare",
+    target: 1,
+    reward: "💧 Watering Can",
   },
   {
-    id: "one-month-reflection",
-    emoji: "🌸",
-    title: "One Month of Reflection",
-    description: "You've journaled on 30 different days",
-    requirement: "Journal on 30 different days",
-  },
-  {
-    id: "consistency-award",
-    emoji: "⭐",
-    title: "Consistency Award",
-    description: "You wrote entries on at least 20 different days",
-    requirement: "Journal on 20 different days",
-  },
-  {
-    id: "wellness-goal-achieved",
-    emoji: "🎯",
-    title: "Wellness Goal Achieved",
-    description: "You set and pursued a wellness goal",
-    requirement: "Set a wellness goal in your profile survey",
-  },
-  {
-    id: "first-step-forward",
-    emoji: "🌱",
-    title: "First Step Forward",
-    description: "You wrote your very first daily journal entry",
-    requirement: "Complete your first daily journal entry",
-  },
-  {
-    id: "consistent-reflector",
-    emoji: "🌿",
-    title: "Consistent Reflector",
-    description: "You completed journal entries for 3 consecutive days",
-    requirement: "Journal for 3 consecutive days",
-  },
-  {
-    id: "mindfulness-master",
-    emoji: "🌳",
-    title: "Mindfulness Master",
-    description: "You maintained a 7-day journaling streak",
-    requirement: "Maintain a 7-day journaling streak",
-  },
-  {
-    id: "emotional-explorer",
-    emoji: "🧭",
-    title: "Emotional Explorer",
-    description: "You logged entries covering 5 different moods",
-    requirement: "Log entries with 5 different moods",
+    id: "calm-moment",
+    emoji: "🧘",
+    title: "Calm Moment",
+    description: "You completed 3 self-assessment check-ins",
+    requirement: "Complete 3 self-assessments",
+    category: "selfcare",
+    target: 3,
+    reward: "🪷 Lotus Bloom",
   },
   {
     id: "guardian-of-wellness",
-    emoji: "🛡️",
-    title: "Self-Care Champion",
-    description: "You completed both a journal entry and a self-assessment on the same day",
-    requirement: "Complete a journal entry and self-assessment on the same day",
+    emoji: "💧",
+    title: "Checked In With Myself",
+    description: "You journaled and self-assessed on the same day",
+    requirement: "Journal and self-assess on the same day",
+    category: "selfcare",
+    target: 1,
+    reward: "🌤️ Sunny Day",
+  },
+  {
+    id: "took-a-break",
+    emoji: "🌤️",
+    title: "Took a Break",
+    description: "You came back to journaling after a week away",
+    requirement: "Return to journaling after a 7+ day break",
+    category: "selfcare",
+    target: 1,
+    reward: "🦋 Butterfly",
+  },
+
+  // 🌱 Consistency — total days journaled (no streaks, no resets)
+  {
+    id: "three-day-journey",
+    emoji: "🌱",
+    title: "3-Day Reflection Journey",
+    description: "You journaled on 3 different days",
+    requirement: "Journal on 3 different days",
+    category: "consistency",
+    target: 3,
+    reward: "🌰 Seed Packet",
+  },
+  {
+    id: "seven-day-journey",
+    emoji: "🌿",
+    title: "7-Day Reflection Journey",
+    description: "You journaled on 7 different days",
+    requirement: "Journal on 7 different days",
+    category: "consistency",
+    target: 7,
+    reward: "🌱 Young Sprout",
+  },
+  {
+    id: "fourteen-day-journey",
+    emoji: "🌻",
+    title: "14-Day Reflection Journey",
+    description: "You journaled on 14 different days",
+    requirement: "Journal on 14 different days",
+    category: "consistency",
+    target: 14,
+    reward: "🌻 Sunflower",
+  },
+  {
+    id: "one-month-reflection",
+    emoji: "🌟",
+    title: "30-Day Reflection Journey",
+    description: "You journaled on 30 different days",
+    requirement: "Journal on 30 different days",
+    category: "consistency",
+    target: 30,
+    reward: "🌳 Blooming Tree",
+  },
+
+  // 🧘 Wellness — mindful habits and self-awareness
+  {
+    id: "emotional-explorer",
+    emoji: "🌈",
+    title: "Emotional Explorer",
+    description: "You recorded 5 different moods",
+    requirement: "Record 5 different moods",
+    category: "wellness",
+    target: 5,
+    reward: "🌈 Rainbow Bridge",
+  },
+  {
+    id: "monthly-reflection",
+    emoji: "📅",
+    title: "Monthly Reflection",
+    description: "You journaled on 15 days in a single month",
+    requirement: "Journal on 15 days in one month",
+    category: "wellness",
+    target: 15,
+    reward: "🌙 Moon Gate",
   },
   {
     id: "night-owl-reflector",
     emoji: "🌙",
-    title: "Night Owl Reflector",
-    description: "You submitted a journal entry past 9:00 PM to unwind before sleep",
+    title: "Quiet Evening",
+    description: "You submitted a journal entry after 9:00 PM",
     requirement: "Submit a journal entry after 9:00 PM",
+    category: "wellness",
+    target: 1,
+    reward: "🌙 Night Lantern",
   },
   {
     id: "early-bird-growth",
     emoji: "☀️",
-    title: "Early Bird Growth",
-    description: "You submitted a morning journal entry before 8:00 AM",
+    title: "Morning Reflection",
+    description: "You submitted a journal entry before 8:00 AM",
     requirement: "Submit a journal entry before 8:00 AM",
+    category: "wellness",
+    target: 1,
+    reward: "🌅 Sunrise",
+  },
+
+  // 🎯 Personal Growth — exploring different parts of your life
+  {
+    id: "category-explorer",
+    emoji: "🧭",
+    title: "Category Explorer",
+    description: "You journaled about 3 different parts of your life",
+    requirement: "Journal in 3 different categories",
+    category: "growth",
+    target: 3,
+    reward: "🧭 Compass",
+  },
+  {
+    id: "honest-reflection",
+    emoji: "💜",
+    title: "Honest Reflection",
+    description: "You journaled about 5 different parts of your life",
+    requirement: "Journal in 5 different categories",
+    category: "growth",
+    target: 5,
+    reward: "🗝️ Golden Key",
+  },
+  {
+    id: "goal-starter",
+    emoji: "🎯",
+    title: "Goal Starter",
+    description: "You journaled about your goals on 3 different days",
+    requirement: "Journal in the Goals category on 3 days",
+    category: "growth",
+    target: 3,
+    reward: "🎯 Target Stone",
   },
 ];
 
-const POSITIVE_MOODS = ["happy", "calm", "relaxed", "good"];
+function parseDate(value: any): Date | null {
+  if (!value) return null;
+  try {
+    if (typeof value.toDate === "function") {
+      const d = value.toDate();
+      return isNaN(d.getTime()) ? null : d;
+    }
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  } catch {
+    return null;
+  }
+}
 
 export function useAchievements() {
   const [achievements, setAchievements] = useState<AchievementWithStatus[]>(
-    ALL_ACHIEVEMENTS.map((a) => ({ ...a, unlocked: false, progress: 0 })),
+    ALL_ACHIEVEMENTS.map((a) => ({ ...a, unlocked: false, current: 0 })),
   );
   const [totalEarned, setTotalEarned] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
-  const unsubSnapshotRef = useRef<(() => void) | null>(null);
-  const unsubAuthRef = useRef<(() => void) | null>(null);
-
-  // Track which achievements have been stored to firestore already
+  const unsubRefs = useRef<(() => void)[]>([]);
   const storedRef = useRef<Set<string>>(new Set());
 
   const computeAndUpdate = useCallback(async (uid: string) => {
     try {
-      // Get user's journal entries (with fallback on permission error)
+      // Journal entries (with fallback on permission error)
       let entries: any[] = [];
       try {
         const entriesSnap = await getDocs(
           collection(db, "users", uid, "journalEntries"),
         );
-        entries = entriesSnap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as any),
-        }));
+        entries = entriesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
       } catch (readErr) {
         console.warn("Could not read journalEntries for achievements:", readErr);
       }
 
-      // Get user's profile/hasWellnessGoal flag (with fallback)
-      let userData: Record<string, any> = {};
-      try {
-        const userDoc = await getDoc(doc(db, "users", uid));
-        userData = userDoc.exists() ? userDoc.data() : {};
-      } catch (readErr) {
-        console.warn("Could not read user doc for achievements:", readErr);
-      }
-
-      // Check if user completed a self-assessment (with fallback)
+      // Self-assessments (with fallback on permission error)
       let assessmentCount = 0;
       const assessmentDates = new Set<string>();
       try {
@@ -184,18 +314,17 @@ export function useAchievements() {
         assessmentCount = assessmentsSnap.size;
         assessmentsSnap.forEach((d) => {
           const data = d.data();
-          const ts = data.createdAt || data.date;
-          if (ts && typeof ts.toDate === "function") {
-            assessmentDates.add(ts.toDate().toISOString().slice(0, 10));
-          } else if (ts) {
-            assessmentDates.add(new Date(ts).toISOString().slice(0, 10));
+          const ts = data.createdAt || data.date || data.completedAt;
+          const date = parseDate(ts);
+          if (date) {
+            assessmentDates.add(date.toISOString().slice(0, 10));
           }
         });
       } catch (readErr) {
         console.warn("Could not read selfAssessments for achievements:", readErr);
       }
 
-      // Get existing unlocked achievements from Firestore (with fallback)
+      // Already-unlocked achievements from Firestore (preserve history)
       const existingBadges = new Map<string, Date>();
       try {
         const existingBadgesSnap = await getDocs(
@@ -203,179 +332,113 @@ export function useAchievements() {
         );
         existingBadgesSnap.forEach((d) => {
           const data = d.data();
-          existingBadges.set(d.id, data.unlockedAt?.toDate() || new Date());
+          const date = parseDate(data.unlockedAt);
+          existingBadges.set(d.id, date || new Date());
         });
       } catch (readErr) {
         console.warn("Could not read achievements subcollection:", readErr);
       }
 
-      // --- Compute metrics ---
+      // ── Metrics from journal entries ────────────────────────────────────
       const totalEntries = entries.length;
 
-      // Positive mood days
-      const daysWithPositiveMood = new Set<string>();
       const daysWithEntries = new Set<string>();
-      const datesSorted: Date[] = [];
+      const monthsToDays = new Map<string, Set<string>>();
       const distinctMoods = new Set<string>();
+      const distinctCategories = new Set<string>();
+      const goalsDays = new Set<string>();
       let nightEntryCount = 0;
       let morningEntryCount = 0;
 
       entries.forEach((e: any) => {
-        let date: Date;
-        const ts = e.entryDate || e.createdAt;
-        if (ts && typeof ts.toDate === "function") {
-          date = ts.toDate();
-        } else if (ts) {
-          date = new Date(ts);
-        } else {
-          return;
-        }
+        const date = parseDate(e.entryDate || e.createdAt);
+        if (!date) return;
 
-        const dateKey = date.toISOString().slice(0, 10);
-        daysWithEntries.add(dateKey);
-        datesSorted.push(date);
+        const dayKey = date.toISOString().slice(0, 10);
+        const monthKey = dayKey.slice(0, 7);
+        daysWithEntries.add(dayKey);
+        if (!monthsToDays.has(monthKey)) monthsToDays.set(monthKey, new Set());
+        monthsToDays.get(monthKey)!.add(dayKey);
 
         if (e.mood) distinctMoods.add(e.mood);
+        if (e.category) distinctCategories.add(e.category);
+        if (e.category === "goals") goalsDays.add(dayKey);
 
         const hours = date.getHours();
         if (hours >= 21) nightEntryCount++;
         if (hours < 8) morningEntryCount++;
-
-        if (POSITIVE_MOODS.includes(e.mood)) {
-          daysWithPositiveMood.add(dateKey);
-        }
       });
 
-      // Sort dates for streak calculation
-      datesSorted.sort((a, b) => a.getTime() - b.getTime());
+      const uniqueDays = daysWithEntries.size;
+      const maxMonthDays = Array.from(monthsToDays.values()).reduce(
+        (max, set) => Math.max(max, set.size),
+        0,
+      );
 
-      // Compute longest streak
-      let currentStreak = 0;
-      let longestStreak = 0;
-      if (datesSorted.length > 0) {
-        const uniqueDays = Array.from(daysWithEntries).sort();
-        currentStreak = 1;
-        longestStreak = 1;
-        for (let i = 1; i < uniqueDays.length; i++) {
-          const prev = new Date(uniqueDays[i - 1]);
-          const curr = new Date(uniqueDays[i]);
-          const diffDays =
-            (curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24);
-          if (Math.round(diffDays) === 1) {
-            currentStreak++;
-            longestStreak = Math.max(longestStreak, currentStreak);
-          } else {
-            currentStreak = 1;
-          }
-        }
+      // A "break" is a gap of 7+ days between two journal days.
+      let breakReturns = 0;
+      const sortedDays = Array.from(daysWithEntries).sort();
+      for (let i = 1; i < sortedDays.length; i++) {
+        const diff =
+          (new Date(sortedDays[i]).getTime() -
+            new Date(sortedDays[i - 1]).getTime()) /
+          (1000 * 60 * 60 * 24);
+        if (diff > 7) breakReturns++;
       }
 
-      const uniqueDayCount = daysWithEntries.size;
-      const positiveDayCount = daysWithPositiveMood.size;
-      const distinctMoodCount = distinctMoods.size;
-
-      // Count days with both a journal entry and a self-assessment
       let sameDayJournalAndAssessment = 0;
       for (const dayKey of daysWithEntries) {
         if (assessmentDates.has(dayKey)) sameDayJournalAndAssessment++;
       }
 
-      // Has wellness goal from profile survey
-      const hasWellnessGoal = Boolean(
-        userData?.wellnessGoal || userData?.goals,
-      );
-
-      // --- Evaluate each achievement ---
-      const results: AchievementWithStatus[] = ALL_ACHIEVEMENTS.map((a) => {
-        let unlocked = false;
-        let progress = 0;
-
-        switch (a.id) {
+      // ── Evaluate each achievement ───────────────────────────────────────
+      const currentFor = (id: string): number => {
+        switch (id) {
           case "first-reflection":
-            progress = Math.min(100, totalEntries * 100);
-            unlocked = totalEntries >= 1;
-            break;
-
           case "journal-explorer":
-            progress = Math.min(100, (totalEntries / 7) * 100);
-            unlocked = totalEntries >= 7;
-            break;
-
-          case "seven-day-streak":
-            progress = Math.min(100, (longestStreak / 7) * 100);
-            unlocked = longestStreak >= 7;
-            break;
-
-          case "positive-outlook":
-            progress = Math.min(100, (positiveDayCount / 7) * 100);
-            unlocked = positiveDayCount >= 7;
-            break;
-
+          case "reflective-mind":
+          case "deep-reflection":
+          case "reflection-journey":
+            return totalEntries;
           case "self-care-champion":
-            progress = Math.min(100, assessmentCount * 100);
-            unlocked = assessmentCount >= 1;
-            break;
-
-          case "one-month-reflection":
-            progress = Math.min(100, (uniqueDayCount / 30) * 100);
-            unlocked = uniqueDayCount >= 30;
-            break;
-
-          case "consistency-award":
-            progress = Math.min(100, (uniqueDayCount / 20) * 100);
-            unlocked = uniqueDayCount >= 20;
-            break;
-
-          case "wellness-goal-achieved":
-            unlocked = hasWellnessGoal;
-            progress = hasWellnessGoal ? 100 : 0;
-            break;
-
-          case "first-step-forward":
-            progress = Math.min(100, totalEntries * 100);
-            unlocked = totalEntries >= 1;
-            break;
-
-          case "consistent-reflector":
-            progress = Math.min(100, (longestStreak / 3) * 100);
-            unlocked = longestStreak >= 3;
-            break;
-
-          case "mindfulness-master":
-            progress = Math.min(100, (longestStreak / 7) * 100);
-            unlocked = longestStreak >= 7;
-            break;
-
-          case "emotional-explorer":
-            progress = Math.min(100, (distinctMoodCount / 5) * 100);
-            unlocked = distinctMoodCount >= 5;
-            break;
-
+          case "calm-moment":
+            return assessmentCount;
           case "guardian-of-wellness":
-            progress = Math.min(100, sameDayJournalAndAssessment * 100);
-            unlocked = sameDayJournalAndAssessment >= 1;
-            break;
-
+            return sameDayJournalAndAssessment;
+          case "took-a-break":
+            return breakReturns;
+          case "three-day-journey":
+          case "seven-day-journey":
+          case "fourteen-day-journey":
+          case "one-month-reflection":
+            return uniqueDays;
+          case "emotional-explorer":
+            return distinctMoods.size;
+          case "monthly-reflection":
+            return maxMonthDays;
           case "night-owl-reflector":
-            progress = Math.min(100, nightEntryCount * 100);
-            unlocked = nightEntryCount >= 1;
-            break;
-
+            return nightEntryCount;
           case "early-bird-growth":
-            progress = Math.min(100, morningEntryCount * 100);
-            unlocked = morningEntryCount >= 1;
-            break;
-
+            return morningEntryCount;
+          case "category-explorer":
+          case "honest-reflection":
+            return distinctCategories.size;
+          case "goal-starter":
+            return goalsDays.size;
           default:
-            break;
+            return 0;
         }
+      };
 
+      const results: AchievementWithStatus[] = ALL_ACHIEVEMENTS.map((a) => {
+        const current = currentFor(a.id);
+        const unlocked = current >= a.target;
         const existing = existingBadges.get(a.id);
         return {
           ...a,
+          current,
           unlocked: unlocked || existing !== undefined,
           unlockedAt: existing || (unlocked ? new Date() : undefined),
-          progress: Math.round(progress),
         };
       });
 
@@ -383,7 +446,7 @@ export function useAchievements() {
       setTotalEarned(results.filter((r) => r.unlocked).length);
       setLoading(false);
 
-      // Store newly unlocked achievements to Firestore
+      // Persist newly unlocked achievements so they survive across devices
       for (const ach of results) {
         if (ach.unlocked && !storedRef.current.has(ach.id) && uid) {
           try {
@@ -393,6 +456,7 @@ export function useAchievements() {
                 title: ach.title,
                 emoji: ach.emoji,
                 description: ach.description,
+                category: ach.category,
                 unlockedAt: existingBadges.has(ach.id)
                   ? Timestamp.fromDate(existingBadges.get(ach.id)!)
                   : Timestamp.fromDate(new Date()),
@@ -413,48 +477,43 @@ export function useAchievements() {
 
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (user) => {
+      // Clean up listeners from any previous signed-in user
+      unsubRefs.current.forEach((unsub) => unsub());
+      unsubRefs.current = [];
+
       if (!user) {
         setAchievements(
-          ALL_ACHIEVEMENTS.map((a) => ({ ...a, unlocked: false, progress: 0 })),
+          ALL_ACHIEVEMENTS.map((a) => ({ ...a, unlocked: false, current: 0 })),
         );
         setTotalEarned(0);
         setLoading(false);
         return;
       }
 
-      setUserId(user.uid);
       storedRef.current.clear();
-
-      // Compute on mount
       computeAndUpdate(user.uid);
 
-      // Listen for changes to journal entries and re-compute
-      const q = query(collection(db, "users", user.uid, "journalEntries"));
-      const unsubSnapshot = onSnapshot(
-        q,
-        () => {
-          computeAndUpdate(user.uid);
-        },
-        (snapshotErr) => {
-          // Silently handle permissions errors so the achievements screen still works
-          console.warn("onSnapshot error (journalEntries listener):", snapshotErr);
-        },
+      // Recompute live when journal entries change
+      const unsubEntries = onSnapshot(
+        query(collection(db, "users", user.uid, "journalEntries")),
+        () => computeAndUpdate(user.uid),
+        () => {},
+      );
+      // Recompute live when self-assessments change
+      const unsubAssessments = onSnapshot(
+        query(collection(db, "users", user.uid, "selfAssessments")),
+        () => computeAndUpdate(user.uid),
+        () => {},
       );
 
-      unsubSnapshotRef.current = unsubSnapshot;
+      unsubRefs.current = [unsubEntries, unsubAssessments];
     });
 
-    unsubAuthRef.current = unsubAuth;
-
     return () => {
-      if (unsubSnapshotRef.current) {
-        unsubSnapshotRef.current();
-      }
-      if (unsubAuthRef.current) {
-        unsubAuthRef.current();
-      }
+      unsubAuth();
+      unsubRefs.current.forEach((unsub) => unsub());
     };
   }, [computeAndUpdate]);
 
-  return { achievements, totalEarned, loading, userId };
+  return { achievements, totalEarned, loading };
 }

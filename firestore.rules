@@ -157,6 +157,18 @@ service cloud.firestore {
       }
     }
 
+    // ─── REPORTS ──────────────────────────────────────────────
+    // Student-reported conversations for admin moderation.
+    // Students can only create reports; only admins can read/list them.
+    match /reports/{reportId} {
+      allow create: if signedIn()
+        && request.resource.data.reporterUid == request.auth.uid
+        && request.resource.data.status == 'pending';
+      allow read, list: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
     // ─── ANNOUNCEMENTS ───────────────────────────────────────
     match /announcements/{announcementId} {
       allow read: if signedIn();
