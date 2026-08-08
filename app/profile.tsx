@@ -30,7 +30,7 @@ const HEADER_HEIGHT = 280;
 
 export default function ProfileScreen() {
   const { role } = useAuth();
-  const isAdmin = role === "admin";
+  const isAdmin = role === "admin" || role === "superAdmin";
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Record<string, any> | null>(null);
   const [uid, setUid] = useState<string | null>(null);
@@ -70,7 +70,7 @@ export default function ProfileScreen() {
       setEmailVerified(user.emailVerified || false);
 
       try {
-        const collectionName = role === "admin" ? "admins" : "users";
+        const collectionName = isAdmin ? "admins" : "users";
         const ref = doc(db, collectionName, user.uid);
         const snap = await getDoc(ref);
         if (snap.exists()) {
@@ -131,7 +131,7 @@ export default function ProfileScreen() {
     } else {
       setUploadingImage(true);
       try {
-        const collectionName = role === "admin" ? "admins" : "users";
+        const collectionName = isAdmin ? "admins" : "users";
         const newUrl = await changeProfileImage(uid, collectionName);
         if (newUrl) {
           setProfile((p) => ({ ...(p || {}), profileImage: newUrl }));
@@ -255,7 +255,7 @@ export default function ProfileScreen() {
         data.provincialAddress = sanitize(address, 500);
       }
 
-      const collectionName = role === "admin" ? "admins" : "users";
+      const collectionName = isAdmin ? "admins" : "users";
       await setDoc(doc(db, collectionName, uid), data, { merge: true });
       setProfile((p) => ({ ...(p || {}), ...data }));
       setEditing(false);
@@ -274,7 +274,8 @@ export default function ProfileScreen() {
     return parts[0].slice(0, 2).toUpperCase();
   };
 
-  const roleLabel = isAdmin ? "Administrator" : "Student";
+  const roleLabel =
+    role === "superAdmin" ? "Super Administrator" : isAdmin ? "Administrator" : "Student";
   const deptLabel = isAdmin
     ? profile?.college || profile?.position || "MindCare Staff"
     : profile?.academicProgram || "MindCare Student";
@@ -329,7 +330,7 @@ export default function ProfileScreen() {
                   if (!file || !uid) return;
                   setUploadingImage(true);
                   try {
-                    const collectionName = role === "admin" ? "admins" : "users";
+                    const collectionName = isAdmin ? "admins" : "users";
                     const newUrl = await uploadProfileImageFromFile(file, uid, collectionName);
                     if (newUrl) {
                       setProfile((p) => ({ ...(p || {}), profileImage: newUrl }));

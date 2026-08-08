@@ -20,7 +20,14 @@ import {
   Text,
   View,
 } from "react-native";
-import Svg, { Circle, Line, Polyline } from "react-native-svg";
+import Svg, {
+  Circle,
+  G,
+  Line,
+  Polyline,
+  Rect,
+  Text as SvgText,
+} from "react-native-svg";
 
 import { auth, db } from "@/constants/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -168,6 +175,16 @@ const formatRelativeTime = (date?: Date): string => {
   const months = Math.floor(days / 30);
   return `${months} mo ago`;
 };
+
+const formatFullDate = (date: Date): string =>
+  date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
+const formatShortDate = (date: Date): string =>
+  date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
 // ─── Registration info grouped for better hierarchy ──────────────────────────
 const REGISTRATION_GROUPS: {
@@ -372,6 +389,7 @@ export default function StudentDetailScreen() {
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [moodCounts, setMoodCounts] = useState<Record<string, number>>({});
   const [assessments, setAssessments] = useState<AssessmentRecord[]>([]);
+  const [hoveredTrendIdx, setHoveredTrendIdx] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -463,10 +481,26 @@ export default function StudentDetailScreen() {
   const maxCount = Math.max(...Object.values(moodCounts), 1);
   const screenWidth = Dimensions.get("window").width;
   const barMaxWidth = screenWidth * 0.45;
+  const trendChartWidth = Math.min(340, screenWidth - 96);
 
   // ─── Derived presentation values (existing data only) ───────────────────
   const latestScore = latestAssessment?.totalScore;
   const latestRisk = riskFromLatestScore(latestScore);
+  const prevAssessment =
+    assessments.length >= 2 ? assessments[assessments.length - 2] : undefined;
+  const prevScore = prevAssessment?.totalScore;
+  const scoreDelta =
+    latestScore !== undefined && prevScore !== undefined
+      ? latestScore - prevScore
+      : undefined;
+  const changeLabel =
+    scoreDelta === undefined
+      ? "First assessment"
+      : scoreDelta > 0
+        ? `↑ +${scoreDelta}`
+        : scoreDelta < 0
+          ? `↓ ${scoreDelta}`
+          : "± 0";
   const latestJournal = journalEntries.length > 0 ? journalEntries[0] : undefined;
   const latestMoodId = latestJournal?.mood;
   const latestMoodLabel = latestMoodId ? MOOD_LABELS[latestMoodId] || latestMoodId : "None";
@@ -568,112 +602,352 @@ export default function StudentDetailScreen() {
     if (buckets.length === 0) return null;
 
     const scoreMax = 80;
-    const chartH = 150;
-    const chartTop = 22;
-    const chartBottom = chartH - 22;
+    const chartW = trendChartWidth;
+    const chartH = 170;
+    const yAxisX = 34;
+    const plotLeft = 42;
+    const plotRight = chartW - 10;
+    const plotWidth = plotRight - plotLeft;
+    const chartTop = 10;
+    const chartBottom = chartH - 6;
+
     const yFor = (score: number) =>
-      chartTop + (1 - Math.min(Math.max(score, 0), scoreMax) / scoreMax) * (chartBottom - chartTop);
+      chartTop +
+      (1 - Math.min(Math.max(score, 0), scoreMax) / scoreMax) *
+        (chartBottom - chartTop);
 
-    // Single data point — intentional early-data state
-    if (buckets.length === 1) {
-      const b = buckets[0];
-      const risk = riskFromLatestScore(b.avgScore) ?? "low";
-      const y = yFor(b.avgScore);
-      return (
-        <View>
-          <View style={styles.trendSingle}>
-            <View style={[styles.trendDot, { top: y, backgroundColor: RISK_META[risk].dot }]} />
-            <View style={styles.trendGuide} />
-            <Text style={[styles.trendScoreLabel, { top: y - 20 }]}>{b.avgScore}</Text>
-          </View>
-          <Text style={styles.trendFirstTitle}>First assessment recorded</Text>
-          <Text style={styles.trendFirstSub}>
-            More assessments will appear here as the student continues using
-            MindCare.
-          </Text>
-          <View style={styles.totalMoodsRow}>
-            <Ionicons
-              name="clipboard-outline"
-              size={16}
-              color={DETAIL_COLORS.textMuted}
-            />
-            <Text style={styles.totalMoodsText}>
-              1 assessment total • {b.label}
-            </Text>
-          </View>
-        </View>
-      );
-    }
+    const xStart = plotLeft;
+    const xSpacing =
+      buckets.length > 1 ? plotWidth / (buckets.length - 1) : plotWidth;
 
-    // Multiple data points — SVG line chart
-    const xStart = 40;
-    const xSpacing = 260 / (buckets.length - 1);
-    const pts = buckets.map((b, i) => ({
-      x: xStart + i * xSpacing,
-      y: yFor(b.avgScore),
-      label: b.label,
-      score: b.avgScore,
-    }));
+    const intervalMs = 30 * 24 * 60 * 60 * 1000;
+    const pts = buckets.map((b, i) => {
+      const inBucket = assessments.filter((a) => {
+        const t = a.createdAt.getTime();
+        return (
+          t >= b.startDate.getTime() && t < b.startDate.getTime() + intervalMs
+        );
+      });
+      const first = inBucket[0];
+      const last = inBucket[inBucket.length - 1];
+      const concern = riskFromLatestScore(b.avgScore) ?? "low";
+      const meta = RISK_META[concern];
+      return {
+        x: xStart + i * xSpacing,
+        y: yFor(b.avgScore),
+        score: b.avgScore,
+        label: b.label,
+        dateLabel:
+          inBucket.length === 1 && first
+            ? formatFullDate(first.createdAt)
+            : `${formatShortDate(first.createdAt)} – ${formatShortDate(last.createdAt)}`,
+        concernLabel: meta.label,
+        concernDot: meta.dot,
+      };
+    });
     const polyPoints = pts.map((p) => `${p.x},${p.y}`).join(" ");
+
+    const yTicks = [0, 20, 40, 60, 80];
+    const highLineY = yFor(51);
+    const modLineY = yFor(21);
+    const tooltipW = 220;
+    const hoveredPt = hoveredTrendIdx !== null ? pts[hoveredTrendIdx] : null;
+    const riskMeta = RISK_META[latestRisk ?? "low"];
+
     return (
       <View>
-        <View style={styles.trendChartWrap}>
-          <Svg width={340} height={chartH}>
-            {[0, 1, 2, 3, 4].map((k) => {
-              const gy = chartTop + (k / 4) * (chartBottom - chartTop);
+        <View style={[styles.trendChartWrap, { width: chartW }]}>
+          <Svg width={chartW} height={chartH}>
+            <Rect
+              x={plotLeft}
+              y={chartTop}
+              width={plotWidth}
+              height={highLineY - chartTop}
+              fill="#FDE8E8"
+              fillOpacity={0.5}
+            />
+            <Rect
+              x={plotLeft}
+              y={highLineY}
+              width={plotWidth}
+              height={modLineY - highLineY}
+              fill="#FDF3E3"
+              fillOpacity={0.5}
+            />
+            <Rect
+              x={plotLeft}
+              y={modLineY}
+              width={plotWidth}
+              height={chartBottom - modLineY}
+              fill="#E7F7F0"
+              fillOpacity={0.5}
+            />
+
+            {yTicks.map((t) => {
+              const gy = yFor(t);
               return (
                 <Line
-                  key={k}
-                  x1={xStart - 8}
+                  key={t}
+                  x1={plotLeft}
                   y1={gy}
-                  x2={xStart + 260}
+                  x2={plotRight}
                   y2={gy}
-                  stroke="#F0EBFB"
+                  stroke="#EFEBFA"
                   strokeWidth={1}
                 />
               );
             })}
-            <Polyline
-              points={polyPoints}
-              fill="none"
-              stroke={DETAIL_COLORS.purple}
-              strokeWidth={2}
-              strokeLinejoin="round"
-              strokeLinecap="round"
+
+            <Line
+              x1={yAxisX}
+              y1={chartTop}
+              x2={yAxisX}
+              y2={chartBottom}
+              stroke="#E8DFF6"
+              strokeWidth={1}
             />
-            {pts.map((p) => {
-              const color =
-                RISK_META[riskFromLatestScore(p.score) ?? "low"].dot;
+            {yTicks.map((t) => (
+              <Line
+                key={t}
+                x1={yAxisX - 4}
+                y1={yFor(t)}
+                x2={yAxisX}
+                y2={yFor(t)}
+                stroke="#D9CFF0"
+                strokeWidth={1}
+              />
+            ))}
+            {yTicks.map((t) => (
+              <SvgText
+                key={t}
+                x={yAxisX - 8}
+                y={yFor(t) + 3}
+                fontSize={9}
+                fontWeight="600"
+                fill={DETAIL_COLORS.textFaint}
+                textAnchor="end"
+              >
+                {t}
+              </SvgText>
+            ))}
+
+            <Line
+              x1={plotLeft}
+              y1={highLineY}
+              x2={plotRight}
+              y2={highLineY}
+              stroke="#EF4444"
+              strokeOpacity={0.3}
+              strokeWidth={1}
+              strokeDasharray="5 4"
+            />
+            <Line
+              x1={plotLeft}
+              y1={modLineY}
+              x2={plotRight}
+              y2={modLineY}
+              stroke="#F59E0B"
+              strokeOpacity={0.35}
+              strokeWidth={1}
+              strokeDasharray="5 4"
+            />
+
+            <SvgText
+              x={plotRight - 6}
+              y={chartTop + (highLineY - chartTop) / 2 + 3}
+              fontSize={9}
+              fontWeight="700"
+              fill="#DC2626"
+              fillOpacity={0.6}
+              textAnchor="end"
+            >
+              High
+            </SvgText>
+            <SvgText
+              x={plotRight - 6}
+              y={highLineY + (modLineY - highLineY) / 2 + 3}
+              fontSize={9}
+              fontWeight="700"
+              fill="#B45309"
+              fillOpacity={0.6}
+              textAnchor="end"
+            >
+              Moderate
+            </SvgText>
+            <SvgText
+              x={plotRight - 6}
+              y={modLineY + (chartBottom - modLineY) / 2 + 3}
+              fontSize={9}
+              fontWeight="700"
+              fill="#0E9F6E"
+              fillOpacity={0.65}
+              textAnchor="end"
+            >
+              Low
+            </SvgText>
+
+            {pts.length >= 2 && (
+              <Polyline
+                points={polyPoints}
+                fill="none"
+                stroke={DETAIL_COLORS.purple}
+                strokeWidth={2}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            )}
+
+            {pts.map((p, i) => {
+              const isLatest = i === pts.length - 1;
               return (
-                <Circle
-                  key={p.label}
-                  cx={p.x}
-                  cy={p.y}
-                  r={5}
-                  fill={color}
-                  stroke="#FFFFFF"
-                  strokeWidth={2}
-                />
+                <G key={`pt-${i}`}>
+                  <Circle
+                    cx={p.x}
+                    cy={p.y}
+                    r={9}
+                    fill={p.concernDot}
+                    fillOpacity={0.15}
+                  />
+                  <Circle
+                    cx={p.x}
+                    cy={p.y}
+                    r={5}
+                    fill={p.concernDot}
+                    stroke="#FFFFFF"
+                    strokeWidth={2}
+                  />
+                  {isLatest && (
+                    <SvgText
+                      x={p.x}
+                      y={Math.max(p.y - 10, 9)}
+                      fontSize={10}
+                      fontWeight="800"
+                      fill={DETAIL_COLORS.text}
+                      textAnchor="middle"
+                    >
+                      {p.score}
+                    </SvgText>
+                  )}
+                </G>
               );
             })}
           </Svg>
-          <View
-            style={[
-              styles.trendLabelsRow,
-              { paddingLeft: xStart - xSpacing / 2 },
-            ]}
-          >
-            {pts.map((p) => (
-              <Text
-                key={p.label}
-                style={[styles.trendXLabel, { width: xSpacing }]}
-                numberOfLines={1}
-              >
-                {p.label}
+
+          {pts.map((p, i) => (
+            <View
+              key={`hotspot-${i}`}
+              style={[styles.trendPointHotspot, { left: p.x - 12, top: p.y - 12 }]}
+            >
+              <Pressable
+                onHoverIn={() => setHoveredTrendIdx(i)}
+                onHoverOut={() => setHoveredTrendIdx(null)}
+                onFocus={() => setHoveredTrendIdx(i)}
+                onBlur={() => setHoveredTrendIdx(null)}
+                accessibilityRole="button"
+                accessibilityLabel={`Assessment on ${p.dateLabel}: score ${p.score} of 80, ${p.concernLabel}`}
+                style={styles.trendPointHitbox}
+              />
+            </View>
+          ))}
+
+          {hoveredPt && (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.trendTooltip,
+                {
+                  left: Math.min(
+                    Math.max(hoveredPt.x - tooltipW / 2, 0),
+                    chartW - tooltipW,
+                  ),
+                  top:
+                    hoveredPt.y > 80
+                      ? Math.max(hoveredPt.y - 80, 4)
+                      : hoveredPt.y + 18,
+                },
+              ]}
+            >
+              <Text style={styles.trendTooltipDate}>{hoveredPt.dateLabel}</Text>
+              <Text style={styles.trendTooltipScore}>
+                Assessment Score: {hoveredPt.score} / 80
               </Text>
-            ))}
+              <View style={styles.trendTooltipConcernRow}>
+                <View
+                  style={[
+                    styles.trendTooltipDot,
+                    { backgroundColor: hoveredPt.concernDot },
+                  ]}
+                />
+                <Text style={styles.trendTooltipConcern}>
+                  Concern Level: {hoveredPt.concernLabel}
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+
+        <View
+          style={[
+            styles.trendLabelsRow,
+            { width: chartW, paddingLeft: xStart - xSpacing / 2 },
+          ]}
+        >
+          {pts.map((p, i) => (
+            <Text
+              key={`xl-${i}`}
+              style={[styles.trendXLabel, { width: xSpacing }]}
+              numberOfLines={1}
+            >
+              {p.label}
+            </Text>
+          ))}
+        </View>
+
+        <View style={styles.trendSummary}>
+          <View style={styles.trendSummaryCell}>
+            <Text style={styles.trendSummaryLabel}>Current</Text>
+            <Text style={styles.trendSummaryValue}>
+              {latestScore !== undefined ? `${latestScore} / 80` : "—"}
+            </Text>
+          </View>
+          <View style={styles.trendSummaryCell}>
+            <Text style={styles.trendSummaryLabel}>Previous</Text>
+            <Text style={styles.trendSummaryValue}>
+              {prevScore !== undefined ? `${prevScore} / 80` : "—"}
+            </Text>
+          </View>
+          <View style={styles.trendSummaryCell}>
+            <Text style={styles.trendSummaryLabel}>Change</Text>
+            <Text style={styles.trendSummaryValue}>{changeLabel}</Text>
+          </View>
+          <View style={styles.trendSummaryCell}>
+            <Text style={styles.trendSummaryLabel}>Status</Text>
+            <View style={styles.trendSummaryStatusRow}>
+              <View
+                style={[
+                  styles.trendSummaryStatusDot,
+                  { backgroundColor: riskMeta.dot },
+                ]}
+              />
+              <Text
+                style={[styles.trendSummaryValue, { color: riskMeta.color }]}
+              >
+                {riskMeta.label}
+              </Text>
+            </View>
           </View>
         </View>
+
+        {assessments.length === 1 && (
+          <View style={styles.trendFirstBlock}>
+            <Text style={styles.trendFirstTitle}>First assessment recorded</Text>
+            <Text style={styles.trendFirstSub}>
+              More assessments will appear here as the student continues using
+              MindCare.
+            </Text>
+          </View>
+        )}
+
         <View style={styles.totalMoodsRow}>
           <Ionicons
             name="clipboard-outline"
@@ -683,6 +957,9 @@ export default function StudentDetailScreen() {
           <Text style={styles.totalMoodsText}>
             {assessments.length} assessment
             {assessments.length !== 1 ? "s" : ""} total
+            {buckets.length > 1
+              ? ` • ${buckets.length} periods`
+              : ` • ${buckets[0].label}`}
           </Text>
         </View>
       </View>
@@ -1759,40 +2036,10 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontStyle: "italic",
   },
-  trendSingle: {
-    position: "relative",
-    height: 150,
-    marginBottom: 8,
-  },
-  trendDot: {
-    position: "absolute",
-    left: 40,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginLeft: -5,
-    zIndex: 2,
-  },
-  trendGuide: {
-    position: "absolute",
-    left: 40,
-    right: 0,
-    bottom: 0,
-    height: 1,
-    backgroundColor: "#EFEBFA",
-  },
-  trendScoreLabel: {
-    position: "absolute",
-    left: 54,
-    fontSize: 12,
-    fontWeight: "800",
-    color: DETAIL_COLORS.text,
-  },
   trendFirstTitle: {
     fontSize: 15,
     fontWeight: "800",
     color: DETAIL_COLORS.text,
-    marginTop: 16,
   },
   trendFirstSub: {
     fontSize: 12,
@@ -1800,14 +2047,17 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 4,
   },
+  trendFirstBlock: {
+    marginTop: 14,
+  },
   trendChartWrap: {
-    width: "100%",
+    position: "relative",
+    alignSelf: "center",
     alignItems: "center",
-    overflow: "hidden",
   },
   trendLabelsRow: {
     flexDirection: "row",
-    width: 340,
+    alignSelf: "center",
     marginTop: 6,
   },
   trendXLabel: {
@@ -1816,6 +2066,99 @@ const styles = StyleSheet.create({
     color: DETAIL_COLORS.textFaint,
     textAlign: "center",
     overflow: "hidden",
+  },
+  trendPointHotspot: {
+    position: "absolute",
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 20,
+  },
+  trendPointHitbox: {
+    width: 24,
+    height: 24,
+  },
+  trendTooltip: {
+    position: "absolute",
+    width: 220,
+    backgroundColor: "#2A2547",
+    borderRadius: 12,
+    padding: 10,
+    zIndex: 40,
+    elevation: 6,
+    // @ts-ignore - web only
+    boxShadow: "0px 8px 24px rgba(31, 36, 64, 0.25)",
+  },
+  trendTooltipDate: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+    opacity: 0.85,
+  },
+  trendTooltipScore: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 4,
+  },
+  trendTooltipConcernRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 4,
+  },
+  trendTooltipDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  trendTooltipConcern: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "600",
+    opacity: 0.9,
+  },
+  trendSummary: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 14,
+    padding: 12,
+    backgroundColor: "#FAF8FE",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: DETAIL_COLORS.border,
+  },
+  trendSummaryCell: {
+    flexGrow: 1,
+    flexBasis: "45%",
+    minWidth: 110,
+  },
+  trendSummaryLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: DETAIL_COLORS.textFaint,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  trendSummaryValue: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: DETAIL_COLORS.text,
+    marginTop: 3,
+  },
+  trendSummaryStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 3,
+  },
+  trendSummaryStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   emptyMoodEmoji: {
     fontSize: 40,
