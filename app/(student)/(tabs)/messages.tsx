@@ -14,7 +14,6 @@
  */
 
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { doc, getDoc } from "firebase/firestore";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -1237,17 +1236,13 @@ export default function InboxTab() {
         behavior="padding"
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
-        <LinearGradient
-          colors={["#8A63D2", "#B794F6"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
+        <View style={styles.headerGradient}>
           <View style={styles.header}>
             {viewMode === "inbox" ? (
               <View style={{ width: 40 }} />
             ) : (
               <Pressable style={styles.backBtn} onPress={handleBack}>
-                <Ionicons name="arrow-back" size={22} color="white" />
+                <Ionicons name="arrow-back" size={22} color="#7C4DCC" />
               </Pressable>
             )}
             <View style={styles.headerTitleWrap}>
@@ -1277,7 +1272,7 @@ export default function InboxTab() {
                     </Text>
                     {chatMeta.verified && (
                       <View style={styles.headerVerifiedPill}>
-                        <Ionicons name="shield-checkmark" size={10} color="white" />
+                        <Ionicons name="shield-checkmark" size={10} color="#7C4DCC" />
                         <Text style={styles.headerVerifiedText}>Verified</Text>
                       </View>
                     )}
@@ -1293,7 +1288,7 @@ export default function InboxTab() {
                   setViewMode("directory");
                 }}
               >
-                <Ionicons name="create-outline" size={22} color="white" />
+                <Ionicons name="create-outline" size={22} color="#7C4DCC" />
               </Pressable>
             ) : viewMode === "chat" ? (
               <View style={styles.headerActions}>
@@ -1302,14 +1297,14 @@ export default function InboxTab() {
                   onPress={() => setInfoVisible(true)}
                   hitSlop={8}
                 >
-                  <Ionicons name="information-circle-outline" size={22} color="white" />
+                  <Ionicons name="information-circle-outline" size={22} color="#7C4DCC" />
                 </Pressable>
                 <Pressable
                   style={styles.backBtn}
                   onPress={() => setMenuVisible(true)}
                   hitSlop={8}
                 >
-                  <Ionicons name="ellipsis-vertical" size={22} color="white" />
+                  <Ionicons name="ellipsis-vertical" size={22} color="#7C4DCC" />
                 </Pressable>
               </View>
             ) : (
@@ -1334,7 +1329,7 @@ export default function InboxTab() {
               </View>
             </View>
           )}
-        </LinearGradient>
+        </View>
 
         {viewMode === "inbox"
           ? renderInbox()
@@ -1583,9 +1578,14 @@ export default function InboxTab() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F2F8" },
+  container: { flex: 1, backgroundColor: "#F7F5FC" },
 
   // Header
+  headerGradient: {
+    backgroundColor: "#F0EBFB",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E6DCF7",
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -1602,7 +1602,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 12,
-    color: "rgba(255,255,255,0.9)",
+    color: "#6B7280",
     textAlign: "center",
   },
   headerStats: {
@@ -1614,9 +1614,9 @@ const styles = StyleSheet.create({
   headerStatsText: {
     fontSize: 11,
     fontWeight: "700",
-    color: "white",
+    color: "#7C4DCC",
   },
-  headerStatsDot: { fontSize: 11, color: "rgba(255,255,255,0.7)" },
+  headerStatsDot: { fontSize: 11, color: "#9CA3AF" },
   backBtn: { width: 40, height: 40, justifyContent: "center", alignItems: "center" },
   headerTitleWrap: {
     flex: 1,
@@ -1634,23 +1634,23 @@ const styles = StyleSheet.create({
   },
   headerSub: {
     fontSize: 11,
-    color: "rgba(255,255,255,0.85)",
+    color: "#6B7280",
     maxWidth: 180,
   },
   headerVerifiedPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
-    backgroundColor: "rgba(255,255,255,0.25)",
+    backgroundColor: "#EFE7FB",
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 8,
   },
-  headerVerifiedText: { fontSize: 9, fontWeight: "700", color: "white" },
+  headerVerifiedText: { fontSize: 9, fontWeight: "700", color: "#7C4DCC" },
   headerActions: { flexDirection: "row", alignItems: "center" },
   headerAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#7A54C4" },
   headerAvatarFallback: { alignItems: "center", justifyContent: "center" },
-  headerTitle: { color: "white", fontSize: 18, fontWeight: "700", flexShrink: 1 },
+  headerTitle: { color: "#2D1B69", fontSize: 18, fontWeight: "800", flexShrink: 1 },
 
   // Search + filters
   searchBar: {

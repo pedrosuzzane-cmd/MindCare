@@ -8,7 +8,6 @@ import {
 } from "@/services/announcementService";
 import type { Announcement } from "@/types/announcement";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { doc, getDoc } from "firebase/firestore";
 import React, { useEffect, useState } from "react";
 import {
@@ -50,15 +49,10 @@ export default function AnnouncementsTab() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient
-        colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Announcements</Text>
-        </View>
-      </LinearGradient>
+      <View style={styles.header}>
+        <Text style={styles.headerEmoji}>📢</Text>
+        <Text style={styles.headerTitle}>Announcements</Text>
+      </View>
       <ScrollView
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
@@ -138,16 +132,22 @@ export default function AnnouncementsTab() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F2F8" },
+  container: { flex: 1, backgroundColor: "#F7F5FC" },
   header: {
-    paddingHorizontal: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 24,
     paddingTop: 16,
     paddingBottom: 18,
   },
+  headerEmoji: {
+    fontSize: 24,
+  },
   headerTitle: {
     fontSize: 22,
-    fontWeight: "700",
-    color: "white",
+    fontWeight: "800",
+    color: "#2D1B69",
   },
   list: {
     padding: 20,
@@ -156,11 +156,13 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: "white",
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 18,
-    elevation: 3,
+    elevation: 2,
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.08)",
+    borderColor: "#EDE9FE",
+    // @ts-ignore — web-only shadow property
+    boxShadow: "0px 2px 12px rgba(124, 77, 204, 0.06)",
   },
   cardTitle: {
     fontSize: 16,

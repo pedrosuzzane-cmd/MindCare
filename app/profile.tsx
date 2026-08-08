@@ -279,6 +279,13 @@ export default function ProfileScreen() {
     ? profile?.college || profile?.position || "MindCare Staff"
     : profile?.academicProgram || "MindCare Student";
 
+  const memberSince = profile?.createdAt
+    ? new Date(profile.createdAt).toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      })
+    : null;
+
   if (loading) {
     return (
       <SafeAreaView style={s.container}>
@@ -362,6 +369,9 @@ export default function ProfileScreen() {
           <Text style={s.userRole}>
             {roleLabel} / {deptLabel}
           </Text>
+          {memberSince && (
+            <Text style={s.memberSince}>Member since {memberSince}</Text>
+          )}
 
           {/* Quick action buttons */}
           <View style={s.quickActions}>
@@ -870,13 +880,20 @@ const s = StyleSheet.create({
   },
   userName: {
     color: "white",
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "800",
     textAlign: "center",
     letterSpacing: 0.3,
   },
   userRole: {
-    color: "rgba(255,255,255,0.85)",
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
+    marginTop: 4,
+  },
+  memberSince: {
+    color: "rgba(255,255,255,0.7)",
     fontSize: 13,
     fontWeight: "500",
     textAlign: "center",
@@ -930,14 +947,14 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   sectionTitle: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: "700",
     color: "#1E1B4B",
   },
 
   /* ── Fields ───────────────────────────────────────────────────────── */
   fieldLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "700",
     color: "#94A3B8",
     textTransform: "uppercase",
@@ -954,7 +971,7 @@ const s = StyleSheet.create({
     borderBottomColor: "rgba(156, 126, 235, 0.06)",
   },
   fieldValue: {
-    fontSize: 15,
+    fontSize: 16,
     color: "#1E1B4B",
     fontWeight: "500",
     flex: 1,

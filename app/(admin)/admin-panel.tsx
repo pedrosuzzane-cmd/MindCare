@@ -48,7 +48,13 @@ import {
   getDocs,
   writeBatch
 } from "firebase/firestore";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -241,6 +247,126 @@ function DescriptiveInsight({ title, body }: { title: string; body: string }) {
         <Text style={styles.insightTitle}>{title}</Text>
       </View>
       <Text style={styles.insightText}>{body}</Text>
+    </View>
+  );
+}
+
+// ─── Shared Admin Design Tokens ──────────────────────────────────────────────
+const ADMIN_COLORS = {
+  bg: "#F8F7FC",
+  surface: "#FFFFFF",
+  border: "#EDE9FE",
+  borderStrong: "#E6DCF7",
+  purple: "#7C4DCC",
+  purpleDeep: "#5B3FA8",
+  purpleSoft: "#F0EBFB",
+  textPrimary: "#1E1B4B",
+  textMuted: "#6B7280",
+  textFaint: "#94A3B8",
+} as const;
+
+const TABS: {
+  key: "students" | "analytics" | "announcements";
+  label: string;
+}[] = [
+  { key: "students", label: "Student Lookup" },
+  { key: "analytics", label: "Department Analytics" },
+  { key: "announcements", label: "Announcements" },
+];
+
+// ─── Pressable state that also exposes web hover/focus states ───────────────
+type WebPressableState = {
+  pressed: boolean;
+  hovered?: boolean;
+};
+
+// ─── Accessible header icon with hover/focus tooltip ─────────────────────────
+function HeaderIconButton({
+  label,
+  icon,
+  color = ADMIN_COLORS.purpleDeep,
+  variant = "neutral",
+  badge,
+  accessibilityLabel,
+  alignRight = false,
+  onPress,
+}: {
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color?: string;
+  variant?: "neutral" | "alert" | "messages";
+  badge?: ReactNode;
+  accessibilityLabel?: string;
+  alignRight?: boolean;
+  onPress: () => void;
+}) {
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+  const [interacting, setInteracting] = useState(false);
+  const showTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearShowTimer = () => {
+    if (showTimer.current) {
+      clearTimeout(showTimer.current);
+      showTimer.current = null;
+    }
+  };
+
+  const showTooltip = () => {
+    clearShowTimer();
+    showTimer.current = setTimeout(() => setTooltipVisible(true), 250);
+  };
+
+  const hideTooltip = () => {
+    clearShowTimer();
+    setTooltipVisible(false);
+  };
+
+  return (
+    <View style={styles.tooltipAnchor}>
+      <Pressable
+        onPress={onPress}
+        onHoverIn={() => {
+          setInteracting(true);
+          showTooltip();
+        }}
+        onHoverOut={() => {
+          setInteracting(false);
+          hideTooltip();
+        }}
+        onFocus={() => {
+          setInteracting(true);
+          showTooltip();
+        }}
+        onBlur={() => {
+          setInteracting(false);
+          hideTooltip();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel || label}
+        style={({ pressed }) => [
+          variant === "alert"
+            ? styles.headerIconButtonAlert
+            : variant === "messages"
+              ? styles.headerIconButtonMessages
+              : styles.headerIconButton,
+          interacting && styles.headerIconButtonHover,
+          pressed && styles.headerIconButtonPressed,
+        ]}
+      >
+        <Ionicons name={icon} size={20} color={color} />
+        {badge}
+      </Pressable>
+      {tooltipVisible && (
+        <View
+          style={[styles.tooltip, alignRight && styles.tooltipRight]}
+          pointerEvents="none"
+        >
+          <View
+            style={[styles.tooltipArrow, alignRight && styles.tooltipArrowRight]}
+          />
+          <Text style={styles.tooltipText}>{label}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -2191,77 +2317,61 @@ export default function AdminPanelScreen() {
           </Text>
           <View style={styles.headerActions}>
             {isSuperAdmin && (
-              <Pressable
-                style={styles.profileButton}
-                onPress={() => router.push("/(superadmin)/password-reset-requests")}
-                accessibilityRole="button"
-                accessibilityLabel="Password reset requests"
-              >
-                <Ionicons
-                  name="shield-checkmark-outline"
-                  size={20}
-                  color="#0F172A"
-                />
-                {pendingResetCount > 0 && (
-                  <View style={styles.notificationBadge}>
-                    <Text style={styles.notificationBadgeText}>
-                      {pendingResetCount > 99 ? "99+" : pendingResetCount}
-                    </Text>
-                  </View>
-                )}
-              </Pressable>
+              <HeaderIconButton
+                label="Security / Admin Management"
+                icon="shield-checkmark-outline"
+                onPress={() =>
+                  router.push("/(superadmin)/password-reset-requests")
+                }
+                badge={
+                  pendingResetCount > 0 ? (
+                    <View style={styles.notificationBadge}>
+                      <Text style={styles.notificationBadgeText}>
+                        {pendingResetCount > 99 ? "99+" : pendingResetCount}
+                      </Text>
+                    </View>
+                  ) : undefined
+                }
+              />
             )}
             {isSuperAdmin && (
-              <Pressable
-                style={styles.profileButton}
+              <HeaderIconButton
+                label="Student Management"
+                icon="people-outline"
                 onPress={() => router.push("/(superadmin)/admin-management")}
-                accessibilityRole="button"
-                accessibilityLabel="Manage administrators"
-              >
-                <Ionicons
-                  name="people-outline"
-                  size={20}
-                  color="#0F172A"
-                />
-              </Pressable>
+              />
             )}
-            <Pressable
-              style={styles.profileButton}
+            <HeaderIconButton
+              label="Alerts / High Concern Students"
+              icon="warning-outline"
+              variant="alert"
+              color="#DC2626"
               onPress={() => router.push("/(admin)/risk-monitor")}
-              accessibilityRole="button"
-              accessibilityLabel="Risk monitor"
-            >
-              <Ionicons name="warning-outline" size={20} color="#DC2626" />
-            </Pressable>
-            <Pressable
-              style={styles.profileButton}
+            />
+            <HeaderIconButton
+              label="Messages / Inbox"
+              icon="chatbubble-ellipses-outline"
+              variant="messages"
+              color={ADMIN_COLORS.purple}
+              alignRight
               onPress={() => router.push("/(admin)/messages")}
-            >
-              <Ionicons
-                name="chatbubble-ellipses-outline"
-                size={20}
-                color="#0F172A"
-              />
-            </Pressable>
-            <Pressable
-              style={styles.profileButton}
+            />
+            <HeaderIconButton
+              label="My Profile"
+              icon="person-circle-outline"
+              alignRight
               onPress={() => router.push("/profile")}
-            >
-              <Ionicons
-                name="person-circle-outline"
-                size={20}
-                color="#0F172A"
-              />
-            </Pressable>
-            <Pressable
-              style={styles.signOutButton}
+            />
+            <HeaderIconButton
+              label="Sign Out"
+              icon="log-out-outline"
+              color="#DC2626"
+              alignRight
               onPress={() => {
                 setSignOutError(null);
                 setSignOutConfirmVisible(true);
               }}
-            >
-              <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-            </Pressable>
+            />
           </View>
         </View>
 
@@ -2281,60 +2391,34 @@ export default function AdminPanelScreen() {
           scrollEventThrottle={50}
         >
           <View style={styles.tabBar}>
-            <Pressable
-              style={
-                activeTab === "students"
-                  ? [styles.tabButton, styles.tabButtonActive]
-                  : styles.tabButton
-              }
-              onPress={() => setActiveTab("students")}
-            >
-              <Text
-                style={
-                  activeTab === "students"
-                    ? [styles.tabLabel, styles.tabLabelActive]
-                    : styles.tabLabel
-                }
-              >
-                Student Lookup
-              </Text>
-            </Pressable>
-            <Pressable
-              style={
-                activeTab === "analytics"
-                  ? [styles.tabButton, styles.tabButtonActive]
-                  : styles.tabButton
-              }
-              onPress={() => setActiveTab("analytics")}
-            >
-              <Text
-                style={
-                  activeTab === "analytics"
-                    ? [styles.tabLabel, styles.tabLabelActive]
-                    : styles.tabLabel
-                }
-              >
-                Department Analytics
-              </Text>
-            </Pressable>
-            <Pressable
-              style={
-                activeTab === "announcements"
-                  ? [styles.tabButton, styles.tabButtonActive]
-                  : styles.tabButton
-              }
-              onPress={() => setActiveTab("announcements")}
-            >
-              <Text
-                style={
-                  activeTab === "announcements"
-                    ? [styles.tabLabel, styles.tabLabelActive]
-                    : styles.tabLabel
-                }
-              >
-                Announcements
-              </Text>
-            </Pressable>
+            {TABS.map((tab) => {
+              const active = activeTab === tab.key;
+              return (
+                <Pressable
+                  key={tab.key}
+                  style={({
+                    pressed,
+                    hovered,
+                  }: WebPressableState) => [
+                    styles.tabButton,
+                    active && styles.tabButtonActive,
+                    !active && (hovered || pressed) && styles.tabButtonHover,
+                  ]}
+                  onPress={() => setActiveTab(tab.key)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                >
+                  <Text
+                    style={[
+                      styles.tabLabel,
+                      active && styles.tabLabelActive,
+                    ]}
+                  >
+                    {tab.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           {loading ? (
@@ -2352,10 +2436,24 @@ export default function AdminPanelScreen() {
                 <>
                   <View style={styles.lookupCard}>
                     <View style={styles.lookupHeader}>
-                      <Text style={styles.sectionTitle}>Student Lookup</Text>
+                      <View style={styles.lookupTitleBlock}>
+                        <Text style={styles.sectionTitle}>Student Lookup</Text>
+                        <Text style={styles.sectionSubtitle}>
+                          Search students
+                        </Text>
+                      </View>
                       <Pressable
-                        style={styles.createAdminButton}
+                        style={({
+                          pressed,
+                          hovered,
+                        }: WebPressableState) => [
+                          styles.createAdminButton,
+                          hovered && styles.createAdminButtonHover,
+                          pressed && styles.createAdminButtonPressed,
+                        ]}
                         onPress={() => setCreateAdminModalVisible(true)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Create admin account"
                       >
                         <Ionicons name="person-add" size={16} color="white" />
                         <Text style={styles.createAdminButtonText}>
@@ -2363,15 +2461,33 @@ export default function AdminPanelScreen() {
                         </Text>
                       </Pressable>
                     </View>
-                    <TextInput
-                      style={styles.searchInput}
-                      placeholder="Search by name, ID, year, or department"
-                      placeholderTextColor="#94A3B8"
-                      value={searchTerm}
-                      onChangeText={handleSearchChange}
-                    />
+                    <View style={styles.searchWrap}>
+                      <Ionicons name="search" size={18} color="#94A3B8" />
+                      <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search by name, ID, year, or department..."
+                        placeholderTextColor="#94A3B8"
+                        value={searchTerm}
+                        onChangeText={handleSearchChange}
+                      />
+                      {searchTerm.length > 0 && (
+                        <Pressable
+                          style={styles.searchClear}
+                          onPress={() => handleSearchChange("")}
+                          accessibilityRole="button"
+                          accessibilityLabel="Clear search"
+                        >
+                          <Ionicons
+                            name="close-circle"
+                            size={18}
+                            color="#94A3B8"
+                          />
+                        </Pressable>
+                      )}
+                    </View>
                   </View>
 
+                  <Text style={styles.resultsLabel}>Students</Text>
                   {paginatedStudents.length === 0 ? (
                     <View style={styles.stateCard}>
                       <Text style={styles.stateText}>
@@ -2387,12 +2503,15 @@ export default function AdminPanelScreen() {
                           .slice(0, 3)
                           .join(", ");
 
+                        const risk = student.latestRiskLevel;
+
                         return (
                           <Pressable
                             key={student.uid}
-                            style={[
+                            style={({ hovered }: WebPressableState) => [
                               styles.studentCard,
                               isWide && styles.studentCardWide,
+                              hovered && styles.studentCardHover,
                             ]}
                             onPress={() =>
                               router.push({
@@ -2410,7 +2529,7 @@ export default function AdminPanelScreen() {
                                   <Ionicons
                                     name="chevron-forward"
                                     size={14}
-                                    color="#8A63D2"
+                                    color={ADMIN_COLORS.purple}
                                   />
                                 </View>
                                 <Text style={styles.studentMeta}>
@@ -2432,23 +2551,20 @@ export default function AdminPanelScreen() {
                                   <Ionicons
                                     name="accessibility"
                                     size={12}
-                                    color="white"
+                                    color={ADMIN_COLORS.purple}
                                   />
-                                  <Text style={styles.lsnBadgeText}>
-                                    {formatLsnCategory(student.lsnCategory)}
-                                  </Text>
+                                  <Text style={styles.lsnBadgeText}>LSN</Text>
                                 </View>
-                                {student.specialNeedsType ? (
-                                  <Text style={styles.lsnTypeText} numberOfLines={1}>
-                                    {student.specialNeedsType}
-                                  </Text>
-                                ) : null}
+                                <Text style={styles.lsnTypeText} numberOfLines={1}>
+                                  {student.specialNeedsType ||
+                                    formatLsnCategory(student.lsnCategory)}
+                                </Text>
                                 {student.lsnDocument?.secureUrl ? (
                                   <View style={styles.lsnDocIndicator}>
                                     <Ionicons
                                       name="document-attach"
                                       size={11}
-                                      color="#8A63D2"
+                                      color={ADMIN_COLORS.purple}
                                     />
                                     <Text style={styles.lsnDocText}>
                                       Doc attached
@@ -2457,8 +2573,8 @@ export default function AdminPanelScreen() {
                                 ) : null}
                               </View>
                             )}
-                            <View style={styles.studentStatsRow}>
-                              <View style={styles.statItem}>
+                            <View style={styles.studentStatsGrid}>
+                              <View style={styles.statCell}>
                                 <Text style={styles.statLabel}>
                                   Assessments
                                 </Text>
@@ -2466,38 +2582,60 @@ export default function AdminPanelScreen() {
                                   {student.assessmentsCount}
                                 </Text>
                               </View>
-                              <View style={styles.statItem}>
+                              <View style={styles.statCell}>
                                 <Text style={styles.statLabel}>Journals</Text>
                                 <Text style={styles.statValue}>
                                   {student.journalCount}
                                 </Text>
                               </View>
-                            </View>
-                            <View style={styles.studentStatsRow}>
-                              <View style={styles.statItemWide}>
+                              <View style={styles.statDivider} />
+                              <View style={styles.statCell}>
                                 <Text style={styles.statLabel}>
                                   Latest Concern
                                 </Text>
-                                <Text
-                                  style={[
-                                    styles.statValueHighlight,
-                                    student.latestRiskLevel === "low"
-                                      ? styles.riskLow
-                                      : student.latestRiskLevel === "high"
-                                        ? styles.riskHigh
-                                        : styles.riskModerate,
-                                  ]}
-                                >
-                                  {student.latestRiskLevel === "low"
-                                    ? "Low"
-                                    : student.latestRiskLevel === "high"
-                                      ? "High"
-                                      : student.latestRiskLevel
-                                        ? "Moderate"
-                                        : "N/A"}
-                                </Text>
+                                {risk ? (
+                                  <View
+                                    style={[
+                                      styles.riskBadge,
+                                      risk === "low"
+                                        ? styles.riskBadgeLow
+                                        : risk === "high"
+                                          ? styles.riskBadgeHigh
+                                          : styles.riskBadgeModerate,
+                                    ]}
+                                  >
+                                    <View
+                                      style={[
+                                        styles.riskDot,
+                                        risk === "low"
+                                          ? styles.riskDotLow
+                                          : risk === "high"
+                                            ? styles.riskDotHigh
+                                            : styles.riskDotModerate,
+                                      ]}
+                                    />
+                                    <Text
+                                      style={[
+                                        styles.riskBadgeText,
+                                        risk === "low"
+                                          ? styles.riskLow
+                                          : risk === "high"
+                                            ? styles.riskHigh
+                                            : styles.riskModerate,
+                                      ]}
+                                    >
+                                      {risk === "low"
+                                        ? "Low"
+                                        : risk === "high"
+                                          ? "High"
+                                          : "Moderate"}
+                                    </Text>
+                                  </View>
+                                ) : (
+                                  <Text style={styles.statValue}>N/A</Text>
+                                )}
                               </View>
-                              <View style={styles.statItemWide}>
+                              <View style={styles.statCell}>
                                 <Text style={styles.statLabel}>
                                   Latest Score
                                 </Text>
@@ -2505,9 +2643,8 @@ export default function AdminPanelScreen() {
                                   {student.latestTotalScore ?? "N/A"}
                                 </Text>
                               </View>
-                            </View>
-                            <View style={styles.studentStatsRow}>
-                              <View style={styles.statItemWide}>
+                              <View style={styles.statDivider} />
+                              <View style={styles.statCell}>
                                 <Text style={styles.statLabel}>
                                   Last Assessment
                                 </Text>
@@ -2517,7 +2654,7 @@ export default function AdminPanelScreen() {
                                     : "N/A"}
                                 </Text>
                               </View>
-                              <View style={styles.statItemWide}>
+                              <View style={styles.statCell}>
                                 <Text style={styles.statLabel}>
                                   Recent Mood
                                 </Text>
@@ -2532,16 +2669,25 @@ export default function AdminPanelScreen() {
                               </Text>
                             ) : null}
                             <Pressable
-                              style={styles.removeButton}
+                              style={({
+                                pressed,
+                                hovered,
+                              }: WebPressableState) => [
+                                styles.removeButton,
+                                (hovered || pressed) &&
+                                  styles.removeButtonHover,
+                              ]}
                               onPress={() => {
                                 setConfirmRemoveUid(student.uid);
                                 setConfirmRemoveName(student.name);
                               }}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Remove ${student.name}`}
                             >
                               <Ionicons
                                 name="trash-outline"
                                 size={16}
-                                color="#EF4444"
+                                color="#DC2626"
                               />
                               <Text style={styles.removeButtonText}>
                                 Remove Student
@@ -3917,36 +4063,131 @@ export default function AdminPanelScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F2F8" },
-  mainLayout: { flex: 1, backgroundColor: "#F4F2F8", position: "relative" },
+  container: { flex: 1, backgroundColor: ADMIN_COLORS.bg },
+  mainLayout: {
+    flex: 1,
+    backgroundColor: ADMIN_COLORS.bg,
+    position: "relative",
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 16,
-    backgroundColor: "#FFFFFF",
+    paddingTop: 18,
+    paddingBottom: 18,
+    backgroundColor: ADMIN_COLORS.surface,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: ADMIN_COLORS.border,
+    zIndex: 20,
   },
-  headerTitle: { color: "#0F172A", fontSize: 20, fontWeight: "800" },
+  headerTitle: {
+    color: "#2D1B69",
+    fontSize: 24,
+    fontWeight: "800",
+    letterSpacing: -0.3,
+  },
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
   },
-  profileButton: {
-    padding: 8,
-    borderRadius: 999,
-    backgroundColor: "#F1F5F9",
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#F7F5FC",
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    alignItems: "center",
+    justifyContent: "center",
+    // @ts-ignore - web only
+    transition: "background-color 0.18s ease, border-color 0.18s ease",
+  },
+  headerIconButtonAlert: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FEE2E2",
+    alignItems: "center",
+    justifyContent: "center",
+    // @ts-ignore - web only
+    transition: "background-color 0.18s ease, border-color 0.18s ease",
+  },
+  headerIconButtonMessages: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: ADMIN_COLORS.purpleSoft,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.borderStrong,
+    alignItems: "center",
+    justifyContent: "center",
+    // @ts-ignore - web only
+    transition: "background-color 0.18s ease, border-color 0.18s ease",
+  },
+  headerIconButtonHover: {
+    backgroundColor: "#EFE7FB",
+    borderColor: ADMIN_COLORS.borderStrong,
+  },
+  headerIconButtonPressed: {
+    backgroundColor: "#E6DCF7",
+    transform: [{ scale: 0.94 }],
+  },
+  tooltipAnchor: {
+    position: "relative",
+  },
+  tooltip: {
+    position: "absolute",
+    top: "100%",
+    left: "50%",
+    marginTop: 10,
+    transform: [{ translateX: -100 }],
+    backgroundColor: "#3B3054",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    width: 200,
+    alignItems: "center",
+    // @ts-ignore - web only
+    boxShadow: "0px 6px 18px rgba(20, 10, 40, 0.25)",
+    elevation: 6,
+    zIndex: 1000,
+  },
+  tooltipRight: {
+    left: "auto",
+    right: 0,
+    transform: [{ translateX: 0 }],
+  },
+  tooltipArrow: {
+    position: "absolute",
+    top: -5,
+    left: "50%",
+    marginLeft: -5,
+    width: 10,
+    height: 10,
+    backgroundColor: "#3B3054",
+    transform: [{ rotate: "45deg" }],
+  },
+  tooltipArrowRight: {
+    left: "auto",
+    right: 14,
+    marginLeft: 0,
+  },
+  tooltipText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+    textAlign: "center",
   },
   notificationBadge: {
     position: "absolute",
-    top: 2,
-    right: 2,
-    minWidth: 18,
-    height: 18,
+    top: 1,
+    right: 1,
+    minWidth: 17,
+    height: 17,
     borderRadius: 9,
     backgroundColor: "#EF4444",
     justifyContent: "center",
@@ -3957,13 +4198,8 @@ const styles = StyleSheet.create({
   },
   notificationBadgeText: {
     color: "white",
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "800",
-  },
-  signOutButton: {
-    padding: 8,
-    borderRadius: 999,
-    backgroundColor: "#FEF2F2",
   },
   content: { padding: 24, paddingBottom: 40 },
   analyticsHero: {
@@ -4036,30 +4272,38 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: "row",
-    backgroundColor: "#EDE9FE",
-    borderRadius: 16,
+    backgroundColor: ADMIN_COLORS.purpleSoft,
+    borderRadius: 14,
     padding: 4,
     marginBottom: 24,
+    gap: 4,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 11,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
+    // @ts-ignore - web only
+    transition: "background-color 0.18s ease, box-shadow 0.18s ease",
   },
   tabButtonActive: {
-    backgroundColor: "#8A63D2",
+    backgroundColor: ADMIN_COLORS.purple,
     // @ts-ignore - web only
-    boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.25)",
+    boxShadow: "0px 2px 8px rgba(124, 77, 204, 0.28)",
+    elevation: 2,
+  },
+  tabButtonHover: {
+    backgroundColor: "#EDE4F9",
   },
   tabLabel: {
-    color: "#64748B",
+    color: "#5B5878",
     fontWeight: "700",
     fontSize: 13,
   },
   tabLabelActive: {
     color: "#FFFFFF",
+    fontWeight: "800",
   },
   stateCard: {
     backgroundColor: "#FFFFFF",
@@ -4073,12 +4317,12 @@ const styles = StyleSheet.create({
   },
   stateText: { marginTop: 12, color: "#334155", fontSize: 14 },
   sectionHeader: {
-    color: "#4C1D95",
-    fontSize: 16,
-    fontWeight: "800",
-    marginBottom: 14,
-    marginTop: 12,
-    letterSpacing: 0.3,
+    color: "#2D1B69",
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 16,
+    marginTop: 14,
+    letterSpacing: 0.2,
   },
   sectionHeaderRow: {
     flexDirection: "row",
@@ -4145,8 +4389,8 @@ const styles = StyleSheet.create({
     minWidth: "47%",
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#E9D5FF", // @ts-ignore - web only
-    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.10)",
+    borderColor: "#EDE9FE", // @ts-ignore - web only
+    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.06)",
   },
   kpiHeader: {
     flexDirection: "row",
@@ -4255,8 +4499,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 18,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
-    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.10)",
+    borderColor: "#EDE9FE",
+    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.06)",
     gap: 8,
   },
   analyticsNavIcon: {
@@ -4285,9 +4529,9 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#E9D5FF",
+    borderColor: "#EDE9FE",
     // @ts-ignore
-    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.10)",
+    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.06)",
     gap: 6,
   },
   summaryKpiTopRow: {
@@ -4323,9 +4567,9 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
+    borderColor: "#EDE9FE",
     // @ts-ignore
-    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.08)",
+    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.05)",
   },
   deptKpiGrid: {
     flexDirection: "row",
@@ -4408,9 +4652,9 @@ const styles = StyleSheet.create({
     padding: 18,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#E9D5FF",
+    borderColor: "#EDE9FE",
     // @ts-ignore
-    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.10)",
+    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.06)",
     gap: 6,
   },
   comparisonInsightHeader: {
@@ -4449,9 +4693,9 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
+    borderColor: "#EDE9FE",
     // @ts-ignore
-    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.08)",
+    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.05)",
   },
   barLegend: {
     flexDirection: "row",
@@ -4506,7 +4750,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "#E9D5FF",
+    borderColor: "#EDE9FE",
   },
   barFill: {
     width: "100%",
@@ -4582,7 +4826,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FBF7FF",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
+    borderColor: "#EDE9FE",
     borderLeftWidth: 4,
     borderLeftColor: "#8A63D2",
     padding: 16,
@@ -4621,9 +4865,9 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
+    borderColor: "#EDE9FE",
     // @ts-ignore
-    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.10)",
+    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.06)",
     elevation: 4,
   },
   insightsEnlargedHeader: {
@@ -4654,8 +4898,8 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 220,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
-    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.10)",
+    borderColor: "#EDE9FE",
+    boxShadow: "0px 8px 22px rgba(109, 40, 217, 0.06)",
     elevation: 4,
   },
   bottomWidgetTitle: {
@@ -4869,43 +5113,85 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   lookupCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: ADMIN_COLORS.surface,
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: "#F3EAFF", // @ts-ignore - web only
-    boxShadow: "0px 6px 20px rgba(138, 99, 210, 0.08)",
+    borderColor: ADMIN_COLORS.border, // @ts-ignore - web only
+    boxShadow: "0px 2px 12px rgba(124, 77, 204, 0.05)",
+    elevation: 1,
   },
   lookupHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 14,
+  },
+  lookupTitleBlock: {
+    flexDirection: "column",
+    gap: 2,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#0F172A",
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1E1B4B",
   },
-  searchInput: {
+  sectionSubtitle: {
+    fontSize: 13,
+    color: "#6B7280",
+  },
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     backgroundColor: "#FAF8FF",
     borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.border,
+    // @ts-ignore - web only
+    transition: "border-color 0.18s ease, background-color 0.18s ease",
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 13,
     color: "#1E1B4B",
     fontSize: 14,
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
+  },
+  searchClear: {
+    padding: 4,
+  },
+  resultsLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#94A3B8",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 12,
   },
   createAdminButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#8A63D2",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    backgroundColor: ADMIN_COLORS.purple,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 12,
+    // @ts-ignore - web only
+    boxShadow: "0px 3px 10px rgba(124, 77, 204, 0.25)",
+    elevation: 2,
+    // @ts-ignore - web only
+    transition: "background-color 0.18s ease, box-shadow 0.18s ease",
+  },
+  createAdminButtonHover: {
+    backgroundColor: ADMIN_COLORS.purpleDeep,
+    // @ts-ignore - web only
+    boxShadow: "0px 5px 14px rgba(124, 77, 204, 0.32)",
+  },
+  createAdminButtonPressed: {
+    backgroundColor: ADMIN_COLORS.purpleDeep,
+    transform: [{ scale: 0.97 }],
   },
   createAdminButtonText: {
     color: "white",
@@ -4913,19 +5199,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   studentCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: ADMIN_COLORS.surface,
     borderRadius: 20,
     padding: 20,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#F3EAFF", // @ts-ignore - web only
-    boxShadow: "0px 6px 20px rgba(138, 99, 210, 0.08)",
+    borderColor: ADMIN_COLORS.border, // @ts-ignore - web only
+    boxShadow: "0px 2px 12px rgba(124, 77, 204, 0.05)",
+    elevation: 1,
+    // @ts-ignore - web only
+    transition:
+      "box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease",
+  },
+  studentCardHover: {
+    // @ts-ignore - web only
+    boxShadow: "0px 10px 28px rgba(124, 77, 204, 0.12)",
+    elevation: 4,
+    borderColor: ADMIN_COLORS.borderStrong,
+    transform: [{ translateY: -2 }],
   },
   studentHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 12,
+    marginBottom: 14,
   },
   studentIdentityBlock: {
     flex: 1,
@@ -4935,49 +5232,51 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     maxWidth: "45%",
   },
-  studentName: { fontSize: 16, fontWeight: "800", color: "#8A63D2" },
+  studentName: { fontSize: 17, fontWeight: "800", color: "#2D1B69" },
   studentNameRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   studentId: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "800",
-    color: "#8A63D2",
+    color: ADMIN_COLORS.purple,
     textAlign: "right",
   },
   studentCourse: {
     fontSize: 12,
-    fontWeight: "700",
-    color: "#334155",
+    fontWeight: "600",
+    color: "#475569",
     marginTop: 2,
     textAlign: "right",
   },
-  studentMeta: { fontSize: 12, color: "#64748B", marginTop: 2 },
+  studentMeta: { fontSize: 12.5, color: "#6B7280", marginTop: 3 },
   lsnBadgeRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginBottom: 10,
-    paddingBottom: 10,
+    marginBottom: 8,
+    paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#F3EAFF",
+    borderBottomColor: ADMIN_COLORS.border,
   },
   lsnBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#8A63D2",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    backgroundColor: ADMIN_COLORS.purpleSoft,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: ADMIN_COLORS.borderStrong,
     flexShrink: 1,
   },
   lsnBadgeText: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "white",
+    fontSize: 11,
+    fontWeight: "800",
+    color: ADMIN_COLORS.purple,
   },
   lsnTypeText: {
-    fontSize: 11,
-    color: "#64748B",
+    fontSize: 12,
+    color: "#6B7280",
     flex: 1,
   },
   lsnDocIndicator: {
@@ -4986,30 +5285,56 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   lsnDocText: {
-    fontSize: 10,
-    color: "#8A63D2",
+    fontSize: 11,
+    color: ADMIN_COLORS.purple,
     fontWeight: "600",
   },
-  studentStatsRow: {
+  studentStatsGrid: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 10,
+    flexWrap: "wrap",
+    marginBottom: 6,
   },
-  statItem: { width: "48%" },
-  statItemWide: { width: "48%" },
+  statCell: {
+    width: "50%",
+    paddingVertical: 10,
+    paddingRight: 8,
+  },
+  statDivider: {
+    width: "100%",
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: ADMIN_COLORS.border,
+  },
   statLabel: {
     fontSize: 11,
-    color: "#64748B",
-    marginBottom: 4,
+    color: "#94A3B8",
+    marginBottom: 5,
     textTransform: "uppercase",
     fontWeight: "700",
+    letterSpacing: 0.4,
   },
-  statValue: { fontSize: 15, fontWeight: "700", color: "#0F172A" },
-  statValueHighlight: { fontSize: 15, fontWeight: "800", color: "#8A63D2" },
-  moodSummary: { color: "#334155", fontSize: 13, marginTop: 6 },
-  riskLow: { color: "#16A34A", fontWeight: "800" },
-  riskModerate: { color: "#D97706", fontWeight: "800" },
-  riskHigh: { color: "#EF4444", fontWeight: "800" },
+  statValue: { fontSize: 16, fontWeight: "800", color: "#1E1B4B" },
+  statValueHighlight: { fontSize: 16, fontWeight: "800", color: ADMIN_COLORS.purple },
+  moodSummary: { color: "#64748B", fontSize: 13, marginTop: 8 },
+  riskBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  riskBadgeLow: { backgroundColor: "#ECFDF5" },
+  riskBadgeModerate: { backgroundColor: "#FFFBEB" },
+  riskBadgeHigh: { backgroundColor: "#FEF2F2" },
+  riskDot: { width: 8, height: 8, borderRadius: 4 },
+  riskDotLow: { backgroundColor: "#10B981" },
+  riskDotModerate: { backgroundColor: "#F59E0B" },
+  riskDotHigh: { backgroundColor: "#EF4444" },
+  riskBadgeText: { fontSize: 12, fontWeight: "700" },
+  riskLow: { color: "#047857", fontWeight: "800" },
+  riskModerate: { color: "#B45309", fontWeight: "800" },
+  riskHigh: { color: "#DC2626", fontWeight: "800" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -5053,16 +5378,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 14,
+    marginTop: 10,
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#FEE2E2",
     backgroundColor: "#FEF2F2",
     gap: 6,
+    // @ts-ignore - web only
+    transition: "background-color 0.18s ease",
+  },
+  removeButtonHover: {
+    backgroundColor: "#FEE2E2",
   },
   removeButtonText: {
-    color: "#EF4444",
+    color: "#DC2626",
     fontWeight: "700",
     fontSize: 13,
   },
@@ -5146,7 +5476,7 @@ const styles = StyleSheet.create({
     color: "#1E1B4B",
     fontSize: 14,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
+    borderColor: "#EDE9FE",
   },
   formHelpText: {
     fontSize: 12,
@@ -5206,14 +5536,14 @@ const styles = StyleSheet.create({
   },
   postButtonText: { color: "white", fontWeight: "700", fontSize: 15 },
   announcementCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: ADMIN_COLORS.surface,
     borderRadius: 20,
     padding: 20,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#F3EAFF",
+    borderColor: ADMIN_COLORS.border,
     // @ts-ignore - web only
-    boxShadow: "0px 6px 20px rgba(138, 99, 210, 0.08)",
+    boxShadow: "0px 2px 12px rgba(124, 77, 204, 0.05)",
   },
   announcementCardHeader: {
     flexDirection: "row",
@@ -5240,7 +5570,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     borderTopWidth: 1,
-    borderTopColor: "#F3EAFF",
+    borderTopColor: ADMIN_COLORS.border,
     paddingTop: 12,
   },
   announcementAuthorRow: {
@@ -5347,10 +5677,10 @@ const styles = StyleSheet.create({
 
   // ─── Wide screen (desktop) overrides ──────────────────────────
   containerWide: {
-    backgroundColor: "#E8E4F0",
+    backgroundColor: "#F3F1F9",
   },
   mainLayoutWide: {
-    backgroundColor: "#F4F2F8",
+    backgroundColor: ADMIN_COLORS.bg,
   },
   kpiRowWide: { gap: 20 },
   kpiCardWide: {

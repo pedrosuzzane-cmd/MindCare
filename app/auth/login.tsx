@@ -46,9 +46,7 @@ export default function LoginScreen() {
 
   useEffect(() => {
     if (authLoading || !user) return;
-    if (role === "superAdmin") {
-      router.replace("/(superadmin)/password-reset-requests");
-    } else if (role === "admin") {
+    if (role === "admin" || role === "superAdmin") {
       router.replace("/admin-panel");
     } else {
       // Default to student dashboard (works offline when role can't be fetched)

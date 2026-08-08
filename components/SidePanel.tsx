@@ -27,19 +27,39 @@ const PANEL_WIDTH = Math.min(Dimensions.get("window").width * 0.75, 300);
 interface MenuEntry {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
-  route: string;
+  route?: string;
+  action?: "terms" | "about" | "privacy";
 }
 
-const MENU_ITEMS: MenuEntry[] = [
-  { label: "Profile", icon: "person-circle-outline", route: "/profile" },
-  { label: "Achievements", icon: "trophy-outline", route: "/achievements" },
-  { label: "Daily Journal", icon: "book-outline", route: "/daily-journal" },
-  { label: "Mood Calendar", icon: "calendar-outline", route: "/mood-calendar" },
-  { label: "Daily Reminders", icon: "notifications-outline", route: "/daily-reminders" },
-  { label: "Self-Assessment", icon: "clipboard-outline", route: "/self-assessment-menu" },
-  { label: "Support Hotlines", icon: "call-outline", route: "/support-hotlines" },
-  { label: "AI Helper", icon: "bulb-outline", route: "/ai-helper" },
-  { label: "Wellness Suggestions", icon: "sparkles-outline", route: "/journal-suggestions" },
+const MENU_SECTIONS: { title: string; items: MenuEntry[] }[] = [
+  {
+    title: "My Wellness",
+    items: [
+      { label: "Profile", icon: "person-circle-outline", route: "/profile" },
+      { label: "Achievements", icon: "trophy-outline", route: "/achievements" },
+      { label: "Daily Journal", icon: "book-outline", route: "/daily-journal" },
+      { label: "Mood Calendar", icon: "calendar-outline", route: "/mood-calendar" },
+      { label: "Daily Reminders", icon: "notifications-outline", route: "/daily-reminders" },
+      { label: "Self-Assessment", icon: "clipboard-outline", route: "/self-assessment-menu" },
+    ],
+  },
+  {
+    title: "Support",
+    items: [
+      { label: "AI Helper", icon: "bulb-outline", route: "/ai-helper" },
+      { label: "Support Hotlines", icon: "call-outline", route: "/support-hotlines" },
+      { label: "Help & Support", icon: "help-circle-outline", route: "/help-and-support" },
+    ],
+  },
+  {
+    title: "Information",
+    items: [
+      { label: "Wellness Suggestions", icon: "sparkles-outline", route: "/journal-suggestions" },
+      { label: "Terms of Service", icon: "document-text-outline", action: "terms" },
+      { label: "About MindCare", icon: "information-circle-outline", action: "about" },
+      { label: "Privacy Policy", icon: "lock-closed-outline", action: "privacy" },
+    ],
+  },
 ];
 
 export default function SidePanel() {
@@ -155,35 +175,31 @@ export default function SidePanel() {
           <View style={styles.divider} />
 
           <ScrollView style={styles.menuSection} contentContainerStyle={styles.menuSectionContent} showsVerticalScrollIndicator={false}>
-            {MENU_ITEMS.map((item) => (
-              <Pressable
-                key={item.route}
-                style={styles.menuItem}
-                onPress={() => navigate(item.route)}
-              >
-                <Ionicons name={item.icon} size={22} color="#4B5563" />
-                <Text style={styles.menuLabel}>{item.label}</Text>
-              </Pressable>
+            {MENU_SECTIONS.map((section) => (
+              <View key={section.title} style={styles.menuSectionGroup}>
+                <Text style={styles.sectionHeader}>{section.title}</Text>
+                {section.items.map((item) => (
+                  <Pressable
+                    key={item.label}
+                    style={({ pressed }) => [
+                      styles.menuItem,
+                      pressed && styles.menuItemPressed,
+                    ]}
+                    onPress={() => {
+                      if (item.route) {
+                        navigate(item.route);
+                      } else if (item.action) {
+                        setLegalModalType(item.action);
+                        setLegalModalVisible(true);
+                      }
+                    }}
+                  >
+                    <Ionicons name={item.icon} size={22} color="#4B5563" />
+                    <Text style={styles.menuLabel}>{item.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
             ))}
-
-            <View style={styles.divider} />
-
-            <Pressable style={styles.menuItem} onPress={() => navigate("/help-and-support")}>
-              <Ionicons name="help-circle-outline" size={22} color="#4B5563" />
-              <Text style={styles.menuLabel}>Help & Support</Text>
-            </Pressable>
-            <Pressable style={styles.menuItem} onPress={() => { setLegalModalType("terms"); setLegalModalVisible(true); }}>
-              <Ionicons name="document-text-outline" size={22} color="#4B5563" />
-              <Text style={styles.menuLabel}>Terms of Service</Text>
-            </Pressable>
-            <Pressable style={styles.menuItem} onPress={() => { setLegalModalType("about"); setLegalModalVisible(true); }}>
-              <Ionicons name="information-circle-outline" size={22} color="#4B5563" />
-              <Text style={styles.menuLabel}>About MindCare</Text>
-            </Pressable>
-            <Pressable style={styles.menuItem} onPress={() => { setLegalModalType("privacy"); setLegalModalVisible(true); }}>
-              <Ionicons name="lock-closed-outline" size={22} color="#4B5563" />
-              <Text style={styles.menuLabel}>Privacy Policy</Text>
-            </Pressable>
 
             <View style={styles.divider} />
 
@@ -414,12 +430,30 @@ const styles = StyleSheet.create({
   menuSectionContent: {
     paddingVertical: 12,
   },
+  menuSectionGroup: {
+    marginBottom: 6,
+  },
+  sectionHeader: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#9CA3AF",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 6,
+  },
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: 24,
     gap: 14,
+    borderRadius: 12,
+    marginHorizontal: 12,
+  },
+  menuItemPressed: {
+    backgroundColor: "#F3F0FF",
   },
   menuLabel: {
     fontSize: 15,
