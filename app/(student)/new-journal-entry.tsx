@@ -150,10 +150,6 @@ export default function NewJournalEntryScreen() {
       year: "numeric",
     });
 
-  const handleBack = () => {
-    router.back();
-  };
-
   const handleSaveEntry = async () => {
     if (isFutureDate(entryDate)) {
       Alert.alert(
@@ -270,9 +266,7 @@ export default function NewJournalEntryScreen() {
           style={styles.headerGradient}
         >
           <View style={styles.header}>
-            <Pressable style={styles.backButton} onPress={handleBack}>
-              <Ionicons name="arrow-back" size={24} color="white" />
-            </Pressable>
+            <View style={{ width: 40 }} />
             <Text style={styles.headerTitle}>
               {isEditing ? "📖 Edit Entry" : "📖 New Journal Entry"}
             </Text>

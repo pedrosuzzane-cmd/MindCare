@@ -1,12 +1,9 @@
 import { HapticTab } from "@/components/haptic-tab";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import React from "react";
-import { Platform, StyleSheet, Text, View } from "react-native";
-
-const ACTIVE = "#7C4DCC";
-const INACTIVE = "#9CA3AF";
-const PILL_BG = "rgba(124, 77, 204, 0.10)";
+import React, { useEffect, useRef } from "react";
+import { Animated, Platform, StyleSheet, Text, View } from "react-native";
 
 function TabIcon({
   name,
@@ -19,19 +16,41 @@ function TabIcon({
   size: number;
   focused: boolean;
 }) {
+  const { theme } = useMindCareTheme();
+  const scale = useRef(new Animated.Value(focused ? 1 : 0.9)).current;
+
+  useEffect(() => {
+    Animated.spring(scale, {
+      toValue: focused ? 1 : 0.9,
+      speed: 24,
+      bounciness: 6,
+      useNativeDriver: true,
+    }).start();
+  }, [focused, scale]);
+
   return (
-    <View style={[styles.pill, focused && styles.pillActive]}>
-      <Ionicons name={name} size={size} color={color} />
+    <View
+      style={[
+        styles.pill,
+        focused && {
+          backgroundColor: theme.softPurple,
+        },
+      ]}
+    >
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Ionicons name={name} size={focused ? size + 2 : size} color={color} />
+      </Animated.View>
     </View>
   );
 }
 
 function TabLabel({ label, focused }: { label: string; focused: boolean }) {
+  const { theme } = useMindCareTheme();
   return (
     <Text
       style={[
         styles.label,
-        { color: focused ? ACTIVE : INACTIVE },
+        { color: focused ? theme.tabIconSelected : theme.tabIconDefault },
         focused && styles.labelActive,
       ]}
     >
@@ -41,15 +60,17 @@ function TabLabel({ label, focused }: { label: string; focused: boolean }) {
 }
 
 export default function TabLayout() {
+  const { theme } = useMindCareTheme();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: ACTIVE,
-        tabBarInactiveTintColor: INACTIVE,
+        tabBarActiveTintColor: theme.tabIconSelected,
+        tabBarInactiveTintColor: theme.tabIconDefault,
         tabBarStyle: {
-          backgroundColor: "white",
-          borderTopColor: "#F3F0FF",
+          backgroundColor: theme.tabBar,
+          borderTopColor: theme.tabBarBorder,
           paddingBottom: Platform.OS === "android" ? 8 : 0,
           paddingTop: 6,
           height: Platform.OS === "android" ? 68 : 54,
@@ -129,9 +150,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-  },
-  pillActive: {
-    backgroundColor: PILL_BG,
   },
   label: {
     fontSize: 11,

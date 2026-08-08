@@ -82,10 +82,6 @@ export default function SelfAssessmentMenuScreen() {
     };
   }, []);
 
-  const handleBack = () => {
-    router.back();
-  };
-
   const handleSurveyProper = () => {
     router.push("/self-assessment");
   };
@@ -98,9 +94,7 @@ export default function SelfAssessmentMenuScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </Pressable>
+          <View style={{ width: 40 }} />
           <Text style={styles.headerTitle}>Self-Assessment</Text>
           <View style={styles.placeholder} />
         </View>

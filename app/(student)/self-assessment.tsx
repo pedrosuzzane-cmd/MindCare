@@ -283,8 +283,6 @@ export default function SelfAssessmentScreen() {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleBack = () => router.replace("/dashboard");
-
   const handleRatingSelect = (rating: number) => {
     setAnswers((prev) => ({ ...prev, [currentQuestion.id]: rating }));
   };
@@ -373,9 +371,7 @@ export default function SelfAssessmentScreen() {
         style={styles.headerGradient}
       >
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </Pressable>
+          <View style={{ width: 40 }} />
           <Text style={styles.headerTitle}>MindCare Assessment</Text>
           <View style={styles.placeholder} />
         </View>

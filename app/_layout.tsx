@@ -1,22 +1,31 @@
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native";
+import { ThemeProvider as NavigationThemeProvider } from "@react-navigation/native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 
+import { navThemes } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { AuthProvider } from "@/hooks/AuthContext";
 import { NetworkProvider } from "@/contexts/NetworkContext";
+import { ThemeProvider, useMindCareTheme } from "@/contexts/ThemeContext";
 import "@/hooks/useReminderNotifications";
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const initialMode = colorScheme === "dark" ? "dark" : "light";
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+    <ThemeProvider initialMode={initialMode}>
+      <InnerRoot />
+    </ThemeProvider>
+  );
+}
+
+function InnerRoot() {
+  const { mode } = useMindCareTheme();
+
+  return (
+    <NavigationThemeProvider value={navThemes[mode]}>
       <AuthProvider>
         <NetworkProvider>
           <Stack>
@@ -35,9 +44,9 @@ export default function RootLayout() {
               options={{ presentation: "modal", title: "Modal" }}
             />
           </Stack>
-          <StatusBar style="auto" />
+          <StatusBar style={mode === "dark" ? "light" : "dark"} />
         </NetworkProvider>
       </AuthProvider>
-    </ThemeProvider>
+    </NavigationThemeProvider>
   );
 }

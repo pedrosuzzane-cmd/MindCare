@@ -11,11 +11,13 @@ import {
   View,
 } from "react-native";
 import { shadows } from "@/utils/shadows";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 
 import { auth } from "@/constants/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
 export default function AIHelperScreen() {
+  const { theme } = useMindCareTheme();
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (!user) {
@@ -28,13 +30,11 @@ export default function AIHelperScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#E8E0F5", "#F4F2F8", "#E8E0F5"]}
+        colors={theme.softGradient}
         style={styles.gradient}
       >
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#666" />
-          </Pressable>
+          <View style={{ width: 40 }} />
         </View>
 
         <ScrollView
@@ -42,9 +42,9 @@ export default function AIHelperScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.introCard}>
-            <Text style={styles.introTitle}>AI Support Helper</Text>
-            <Text style={styles.introText}>
+          <View style={[styles.introCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Text style={[styles.introTitle, { color: theme.text }]}>AI Support Helper</Text>
+            <Text style={[styles.introText, { color: theme.secondaryText }]}>
               Chat with our AI helper for support, coping ideas, and gentle
               guidance whenever you need a moment to talk things through.
             </Text>

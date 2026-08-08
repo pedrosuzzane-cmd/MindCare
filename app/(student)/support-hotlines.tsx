@@ -100,10 +100,6 @@ export default function SupportHotlinesScreen() {
     },
   ];
 
-  const handleBack = () => {
-    router.replace("/dashboard");
-  };
-
   const handleContact = async (hotline: SupportHotline) => {
     try {
       if (hotline.contactType === "call") {
@@ -209,9 +205,7 @@ export default function SupportHotlinesScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </Pressable>
+          <View style={{ width: 40 }} />
           <Text style={styles.headerTitle}>Support Hotlines</Text>
           <View style={styles.placeholder} />
         </View>

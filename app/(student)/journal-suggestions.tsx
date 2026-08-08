@@ -13,6 +13,7 @@ import {
 } from "react-native";
 
 import { useJournal } from "@/hooks/useJournal";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 
 interface Suggestion {
   title: string;
@@ -163,6 +164,7 @@ function detectDominantMood(moods: string[]): MoodKey {
 }
 
 export default function JournalSuggestionsScreen() {
+  const { theme } = useMindCareTheme();
   const { entries: journalEntries, loading: entriesLoading } = useJournal();
   const [seed, setSeed] = useState(0);
 
@@ -181,7 +183,7 @@ export default function JournalSuggestionsScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#8A63D2" />
-          <Text style={styles.loadingText}>Loading your entries...</Text>
+          <Text style={[styles.loadingText, { color: theme.secondaryText }]}>Loading your entries...</Text>
         </View>
       </SafeAreaView>
     );
@@ -190,14 +192,12 @@ export default function JournalSuggestionsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#E8E0F5", "#F4F2F8", "#E8E0F5"]}
+        colors={theme.softGradient}
         style={styles.gradient}
       >
         {/* Header */}
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#666" />
-          </Pressable>
+          <View style={{ width: 40 }} />
           <Text style={styles.headerTitle}>Wellness Suggestions</Text>
           <View style={styles.placeholder} />
         </View>
@@ -208,9 +208,9 @@ export default function JournalSuggestionsScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Intro */}
-          <View style={styles.introContainer}>
-            <Text style={styles.introTitle}>Personalized for You</Text>
-            <Text style={styles.introText}>
+          <View style={[styles.introContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Text style={[styles.introTitle, { color: theme.primary }]}>Personalized for You</Text>
+            <Text style={[styles.introText, { color: theme.secondaryText }]}>
               Suggestions tailored to your most frequent mood. Each one is
               designed to support your well-being — try one that resonates.
             </Text>
@@ -219,13 +219,13 @@ export default function JournalSuggestionsScreen() {
           {/* Suggestions List */}
           <View style={styles.suggestionsContainer}>
             {suggestions.map((suggestion, idx) => (
-              <View key={idx} style={styles.suggestionCard}>
-                <View style={styles.suggestionIcon}>
+              <View key={idx} style={[styles.suggestionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <View style={[styles.suggestionIcon, { backgroundColor: theme.softPurple }]}>
                   <Text style={styles.iconText}>{suggestion.icon}</Text>
                 </View>
                 <View style={styles.suggestionContent}>
-                  <Text style={styles.suggestionTitle}>{suggestion.title}</Text>
-                  <Text style={styles.suggestionDescription}>
+                  <Text style={[styles.suggestionTitle, { color: theme.text }]}>{suggestion.title}</Text>
+                  <Text style={[styles.suggestionDescription, { color: theme.secondaryText }]}>
                     {suggestion.description}
                   </Text>
                 </View>
@@ -235,13 +235,13 @@ export default function JournalSuggestionsScreen() {
 
           {/* Mood stats */}
           <View style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Total Entries</Text>
-              <Text style={styles.statValue}>{journalEntries.length}</Text>
+            <View style={[styles.statCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <Text style={[styles.statLabel, { color: theme.secondaryText }]}>Total Entries</Text>
+              <Text style={[styles.statValue, { color: theme.primary }]}>{journalEntries.length}</Text>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>This Month</Text>
-              <Text style={styles.statValue}>
+            <View style={[styles.statCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <Text style={[styles.statLabel, { color: theme.secondaryText }]}>This Month</Text>
+              <Text style={[styles.statValue, { color: theme.primary }]}>
                 {
                   journalEntries.filter((e) => {
                     const now = new Date();

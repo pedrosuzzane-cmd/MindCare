@@ -14,6 +14,7 @@ import {
 
 import { shadows } from "@/utils/shadows";
 import { auth, db } from "@/constants/firebase";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 
@@ -27,6 +28,7 @@ interface JournalEntry {
 }
 
 export default function MoodCalendarScreen() {
+  const { theme } = useMindCareTheme();
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -46,10 +48,6 @@ export default function MoodCalendarScreen() {
     { id: "burnout", emoji: "😤", color: "#800020" },
     { id: "very-upset", emoji: "😢", color: "#000080" },
   ];
-
-  const handleBack = () => {
-    router.replace("/dashboard");
-  };
 
   const handleAddEntry = () => {
     router.push("/new-journal-entry");
@@ -193,14 +191,12 @@ export default function MoodCalendarScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#E8E0F5", "#F4F2F8", "#E8E0F5"]}
+        colors={theme.softGradient}
         style={styles.gradient}
       >
         {/* Header */}
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color="#666" />
-          </Pressable>
+          <View style={{ width: 40 }} />
           <Text style={styles.headerTitle}>Mood Calendar</Text>
           <Pressable onPress={handleAddEntry}>
             <Ionicons name="add-circle-outline" size={28} color="#8A63D2" />
@@ -217,18 +213,18 @@ export default function MoodCalendarScreen() {
             <Pressable onPress={prevMonth}>
               <Ionicons name="chevron-back" size={24} color="#8A63D2" />
             </Pressable>
-            <Text style={styles.monthText}>{monthName}</Text>
+            <Text style={[styles.monthText, { color: theme.text }]}>{monthName}</Text>
             <Pressable onPress={nextMonth}>
               <Ionicons name="chevron-forward" size={24} color="#8A63D2" />
             </Pressable>
           </View>
 
           {/* Calendar Grid */}
-          <View style={styles.calendarContainer}>
+          <View style={[styles.calendarContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
             {/* Day headers */}
             <View style={styles.dayHeaderRow}>
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                <Text key={day} style={styles.dayHeader}>
+                <Text key={day} style={[styles.dayHeader, { color: theme.secondaryText }]}>
                   {day}
                 </Text>
               ))}
@@ -248,10 +244,13 @@ export default function MoodCalendarScreen() {
                     key={idx}
                     style={[
                       styles.dayCell,
+                      { backgroundColor: theme.inputBg },
                       dayObj.isCurrentMonth && mood && moodColor
                         ? { backgroundColor: moodColor }
                         : undefined,
-                      !dayObj.isCurrentMonth && styles.otherMonthDay,
+                      !dayObj.isCurrentMonth && {
+                        backgroundColor: theme.secondaryCard,
+                      },
                     ]}
                     onPress={() => {
                       if (dayObj.isCurrentMonth) {
@@ -261,7 +260,7 @@ export default function MoodCalendarScreen() {
                   >
                     {dayObj.isCurrentMonth && (
                       <>
-                        <Text style={styles.dayNumber}>{dayObj.day}</Text>
+                        <Text style={[styles.dayNumber, { color: theme.text }]}>{dayObj.day}</Text>
                         {moodEmoji && (
                           <Text style={styles.moodEmoji}>{moodEmoji}</Text>
                         )}
@@ -275,8 +274,8 @@ export default function MoodCalendarScreen() {
 
           {/* Mood Legend */}
           <View style={styles.legendContainer}>
-            <Text style={styles.legendTitle}>Mood Legend</Text>
-            <View style={styles.legendGrid}>
+            <Text style={[styles.legendTitle, { color: theme.text }]}>Mood Legend</Text>
+            <View style={[styles.legendGrid, { backgroundColor: theme.card, borderColor: theme.border }]}>
               {moods.map((mood) => (
                 <View key={mood.id} style={styles.legendItem}>
                   <View
@@ -312,7 +311,7 @@ export default function MoodCalendarScreen() {
           {/* Selected Date Entry Preview */}
           {selectedDate && (
             <View style={styles.entryPreviewContainer}>
-              <Text style={styles.previewTitle}>Entry for {selectedDate}</Text>
+              <Text style={[styles.previewTitle, { color: theme.text }]}>Entry for {selectedDate}</Text>
               {journalEntries
                 .filter(
                   (e) => e.date.toISOString().split("T")[0] === selectedDate,
@@ -320,18 +319,21 @@ export default function MoodCalendarScreen() {
                 .map((entry) => (
                   <Pressable
                     key={entry.id}
-                    style={styles.previewCard}
+                    style={[
+                      styles.previewCard,
+                      { backgroundColor: theme.card, borderColor: theme.border },
+                    ]}
                     onPress={() => handleViewEntry(entry.id)}
                   >
                     <View style={styles.previewHeader}>
-                      <Text style={styles.previewEntryTitle}>
+                      <Text style={[styles.previewEntryTitle, { color: theme.text }]}>
                         {entry.title}
                       </Text>
                       <Text style={styles.previewMood}>
                         {getMoodEmoji(entry.mood)}
                       </Text>
                     </View>
-                    <Text style={styles.previewThoughts} numberOfLines={2}>
+                    <Text style={[styles.previewThoughts, { color: theme.secondaryText }]} numberOfLines={2}>
                       {entry.thoughts}
                     </Text>
                     <Text style={styles.tapToViewText}>

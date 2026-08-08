@@ -1,5 +1,6 @@
 import { auth, db } from "@/constants/firebase";
 import { useAuth } from "@/hooks/AuthContext";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 import { changeProfileImage, uploadProfileImageFromFile } from "@/services/userService";
 import { uploadDocumentToCloudinary } from "@/services/cloudinaryUpload";
 import { Ionicons } from "@expo/vector-icons";
@@ -30,6 +31,7 @@ const HEADER_HEIGHT = 280;
 
 export default function ProfileScreen() {
   const { role } = useAuth();
+  const { theme } = useMindCareTheme();
   const isAdmin = role === "admin" || role === "superAdmin";
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Record<string, any> | null>(null);
@@ -289,7 +291,7 @@ export default function ProfileScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={s.container}>
+      <SafeAreaView style={[s.container, { backgroundColor: theme.background }]}>
         <ActivityIndicator style={{ marginTop: 60 }} color="#8A63D2" />
       </SafeAreaView>
     );
@@ -300,7 +302,7 @@ export default function ProfileScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={{ flex: 1 }}
     >
-      <SafeAreaView style={s.container}>
+      <SafeAreaView style={[s.container, { backgroundColor: theme.background }]}>
         {/* ─── Purple Header Banner ──────────────────────────────────── */}
         <LinearGradient
           colors={["#7B2CBF", "#9C27B0", "#AB47BC"]}
@@ -395,16 +397,16 @@ export default function ProfileScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* ── Email Section ── */}
-          <View style={s.sectionCard}>
+          <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <View style={s.sectionHeader}>
               <View style={[s.sectionIcon, { backgroundColor: "#EDE9FE" }]}>
                 <Ionicons name="mail-outline" size={18} color="#7B2CBF" />
               </View>
-              <Text style={s.sectionTitle}>Email</Text>
+              <Text style={[s.sectionTitle, { color: theme.text }]}>Email</Text>
             </View>
             <View style={s.fieldRow}>
               <Ionicons name="mail-open-outline" size={16} color="#94A3B8" />
-              <Text style={s.fieldValue}>{profile?.email || "-"}</Text>
+              <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.email || "-"}</Text>
             </View>
 
             {/* Email Verification Status */}
@@ -442,16 +444,16 @@ export default function ProfileScreen() {
           </View>
 
           {/* ── Phone Section ── */}
-          <View style={s.sectionCard}>
+          <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <View style={s.sectionHeader}>
               <View style={[s.sectionIcon, { backgroundColor: "#DBEAFE" }]}>
                 <Ionicons name="call-outline" size={18} color="#2563EB" />
               </View>
-              <Text style={s.sectionTitle}>Phone Number</Text>
+              <Text style={[s.sectionTitle, { color: theme.text }]}>Phone Number</Text>
             </View>
             {editing ? (
               <TextInput
-                style={s.input}
+                style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
                 value={contactNo}
                 onChangeText={(t) => setContactNo(t.replace(/[^0-9+\-() ]/g, ""))}
                 keyboardType="phone-pad"
@@ -461,82 +463,82 @@ export default function ProfileScreen() {
             ) : (
               <View style={s.fieldRow}>
                 <Ionicons name="phone-portrait-outline" size={16} color="#94A3B8" />
-                <Text style={s.fieldValue}>{profile?.contactNo || "-"}</Text>
+                <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.contactNo || "-"}</Text>
               </View>
             )}
           </View>
 
           {/* ── Team / Department Section ── */}
-          <View style={s.sectionCard}>
+          <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <View style={s.sectionHeader}>
               <View style={[s.sectionIcon, { backgroundColor: "#D1FAE5" }]}>
                 <Ionicons name="people-outline" size={18} color="#059669" />
               </View>
-              <Text style={s.sectionTitle}>Department</Text>
+              <Text style={[s.sectionTitle, { color: theme.text }]}>Department</Text>
             </View>
             <View style={s.fieldRow}>
               <Ionicons name="school-outline" size={16} color="#94A3B8" />
-              <Text style={s.fieldValue}>{deptLabel}</Text>
+              <Text style={[s.fieldValue, { color: theme.text }]}>{deptLabel}</Text>
               <Ionicons name="chevron-forward" size={16} color="#CBD5E1" style={{ marginLeft: "auto" }} />
             </View>
           </View>
 
           {/* ── Identity Section ── */}
-          <View style={s.sectionCard}>
+          <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <View style={s.sectionHeader}>
               <View style={[s.sectionIcon, { backgroundColor: "#FEF3C7" }]}>
                 <Ionicons name="person-outline" size={18} color="#D97706" />
               </View>
-              <Text style={s.sectionTitle}>Personal Information</Text>
+              <Text style={[s.sectionTitle, { color: theme.text }]}>Personal Information</Text>
             </View>
 
             {/* Full Name */}
-            <Text style={s.fieldLabel}>Full Name</Text>
+            <Text style={[s.fieldLabel, { color: theme.secondaryText }]}>Full Name</Text>
             {editing && isAdmin ? (
               <TextInput
-                style={s.input}
+                style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
                 value={fullName}
                 onChangeText={setFullName}
               />
             ) : (
               <View style={s.fieldRow}>
-                <Text style={s.fieldValue}>{profile?.fullName || "-"}</Text>
+                <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.fullName || "-"}</Text>
               </View>
             )}
 
             {/* Gender Identity */}
-            <Text style={s.fieldLabel}>Gender Identity</Text>
+            <Text style={[s.fieldLabel, { color: theme.secondaryText }]}>Gender Identity</Text>
             {editing && isAdmin ? (
               <TextInput
-                style={s.input}
+                style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
                 value={genderIdentity}
                 onChangeText={setGenderIdentity}
               />
             ) : (
               <View style={s.fieldRow}>
-                <Text style={s.fieldValue}>{profile?.genderIdentity || "-"}</Text>
+                <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.genderIdentity || "-"}</Text>
               </View>
             )}
 
             {/* Nationality */}
-            <Text style={s.fieldLabel}>Nationality</Text>
+            <Text style={[s.fieldLabel, { color: theme.secondaryText }]}>Nationality</Text>
             {editing && isAdmin ? (
               <TextInput
-                style={s.input}
+                style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
                 value={nationality}
                 onChangeText={setNationality}
               />
             ) : (
               <View style={s.fieldRow}>
-                <Text style={s.fieldValue}>{profile?.nationality || "-"}</Text>
+                <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.nationality || "-"}</Text>
               </View>
             )}
 
             {/* Address */}
-            <Text style={s.fieldLabel}>Address</Text>
+            <Text style={[s.fieldLabel, { color: theme.secondaryText }]}>Address</Text>
             {editing ? (
               <TextInput
-                style={[s.input, { minHeight: 80 }]}
+                style={[s.input, { minHeight: 80, backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
                 value={address}
                 onChangeText={setAddress}
                 multiline
@@ -545,25 +547,25 @@ export default function ProfileScreen() {
               />
             ) : (
               <View style={s.fieldRow}>
-                <Text style={s.fieldValue}>{address || "-"}</Text>
+                <Text style={[s.fieldValue, { color: theme.text }]}>{address || "-"}</Text>
               </View>
             )}
           </View>
 
           {/* ── Academic / Admin Info ── */}
           {isAdmin ? (
-            <View style={s.sectionCard}>
+            <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
               <View style={s.sectionHeader}>
                 <View style={[s.sectionIcon, { backgroundColor: "#E0E7FF" }]}>
                   <Ionicons name="briefcase-outline" size={18} color="#4F46E5" />
                 </View>
-                <Text style={s.sectionTitle}>Admin Details</Text>
+                <Text style={[s.sectionTitle, { color: theme.text }]}>Admin Details</Text>
               </View>
 
-              <Text style={s.fieldLabel}>ID No.</Text>
+              <Text style={[s.fieldLabel, { color: theme.secondaryText }]}>ID No.</Text>
               {editing ? (
                 <TextInput
-                  style={s.input}
+                  style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
                   value={schoolId}
                   onChangeText={(t) => setSchoolId(formatSchoolId(t))}
                   placeholder="XX-XXXX-XXX"
@@ -572,16 +574,16 @@ export default function ProfileScreen() {
                 />
               ) : (
                 <View style={s.fieldRow}>
-                  <Text style={s.fieldValue}>
+                  <Text style={[s.fieldValue, { color: theme.text }]}>
                     {formatSchoolId(profile?.schoolId || "") || "-"}
                   </Text>
                 </View>
               )}
 
-              <Text style={s.fieldLabel}>College / University</Text>
+              <Text style={[s.fieldLabel, { color: theme.secondaryText }]}>College / University</Text>
               {editing ? (
                 <TextInput
-                  style={s.input}
+                  style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
                   value={college}
                   onChangeText={setCollege}
                   placeholder="e.g. University of the Cordilleras (UC)"
@@ -589,61 +591,61 @@ export default function ProfileScreen() {
                 />
               ) : (
                 <View style={s.fieldRow}>
-                  <Text style={s.fieldValue}>{profile?.college || "-"}</Text>
+                  <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.college || "-"}</Text>
                 </View>
               )}
 
-              <Text style={s.fieldLabel}>Position</Text>
+              <Text style={[s.fieldLabel, { color: theme.secondaryText }]}>Position</Text>
               {editing ? (
                 <TextInput
-                  style={s.input}
+                  style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
                   value={position}
                   onChangeText={setPosition}
                 />
               ) : (
                 <View style={s.fieldRow}>
-                  <Text style={s.fieldValue}>{profile?.position || "-"}</Text>
+                  <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.position || "-"}</Text>
                 </View>
               )}
             </View>
           ) : (
-            <View style={s.sectionCard}>
+            <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
               <View style={s.sectionHeader}>
                 <View style={[s.sectionIcon, { backgroundColor: "#E0E7FF" }]}>
                   <Ionicons name="book-outline" size={18} color="#4F46E5" />
                 </View>
-                <Text style={s.sectionTitle}>Academic Information</Text>
+                <Text style={[s.sectionTitle, { color: theme.text }]}>Academic Information</Text>
               </View>
 
               <View style={s.fieldRow}>
                 <Ionicons name="card-outline" size={16} color="#94A3B8" />
-                <Text style={s.fieldValue}>{profile?.schoolId || "-"}</Text>
+                <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.schoolId || "-"}</Text>
               </View>
 
               <View style={s.fieldRow}>
                 <Ionicons name="library-outline" size={16} color="#94A3B8" />
-                <Text style={s.fieldValue}>{profile?.academicProgram || "-"}</Text>
+                <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.academicProgram || "-"}</Text>
               </View>
 
               <View style={s.fieldRow}>
                 <Ionicons name="layers-outline" size={16} color="#94A3B8" />
-                <Text style={s.fieldValue}>{profile?.yearLevel || "-"}</Text>
+                <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.yearLevel || "-"}</Text>
               </View>
             </View>
           )}
 
           {/* ── Security Activity ── */}
-          <View style={s.sectionCard}>
+          <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <View style={s.sectionHeader}>
               <View style={[s.sectionIcon, { backgroundColor: "#EDE9FE" }]}>
                 <Ionicons name="shield-checkmark-outline" size={18} color="#7B2CBF" />
               </View>
-              <Text style={s.sectionTitle}>Security Activity</Text>
+              <Text style={[s.sectionTitle, { color: theme.text }]}>Security Activity</Text>
             </View>
             <Pressable onPress={() => router.push("/security-log")}>
               <View style={s.fieldRow}>
                 <Ionicons name="time-outline" size={16} color="#94A3B8" />
-                <Text style={s.fieldValue}>
+                <Text style={[s.fieldValue, { color: theme.text }]}>
                   Review sign-ins and account security events
                 </Text>
                 <Ionicons name="chevron-forward" size={16} color="#CBD5E1" style={{ marginLeft: "auto" }} />
@@ -653,12 +655,12 @@ export default function ProfileScreen() {
 
           {/* ── LSN Document Section (students only) ── */}
           {!isAdmin && (
-            <View style={s.sectionCard}>
+            <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
               <View style={s.sectionHeader}>
                 <View style={[s.sectionIcon, { backgroundColor: "#FCE7F3" }]}>
                   <Ionicons name="document-text-outline" size={18} color="#DB2777" />
                 </View>
-                <Text style={s.sectionTitle}>LSN Document</Text>
+                <Text style={[s.sectionTitle, { color: theme.text }]}>LSN Document</Text>
               </View>
 
               {profile?.lsnDocument ? (

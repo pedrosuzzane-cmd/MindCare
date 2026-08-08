@@ -15,6 +15,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSidePanel } from "@/contexts/SidePanelContext";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import { MindCareTheme } from "@/constants/theme";
 import GeminiChat from "@/components/GeminiChat";
 import { auth, db } from "@/constants/firebase";
 import { useAchievements } from "@/hooks/useAchievements";
@@ -29,6 +31,19 @@ import {
   query,
 } from "firebase/firestore";
 
+type CategoryId = "activity" | "mood" | "food" | "sleep";
+
+const CATEGORIES: {
+  id: CategoryId;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  { id: "activity", label: "Activity", icon: "heart" },
+  { id: "mood", label: "Mood", icon: "happy-outline" },
+  { id: "food", label: "Food", icon: "restaurant" },
+  { id: "sleep", label: "Sleep", icon: "moon" },
+];
+
 const FEATURES = [
   {
     title: "Daily Journal",
@@ -36,6 +51,7 @@ const FEATURES = [
     emoji: "📔",
     color: "#8A63D2",
     route: "/daily-journal",
+    categories: ["activity", "mood"] as CategoryId[],
   },
   {
     title: "Self-Assessment",
@@ -43,6 +59,7 @@ const FEATURES = [
     emoji: "🌱",
     color: "#10B981",
     route: "/self-assessment-menu",
+    categories: ["mood"] as CategoryId[],
   },
   {
     title: "Achievements",
@@ -50,6 +67,7 @@ const FEATURES = [
     emoji: "🏆",
     color: "#D97706",
     route: "/achievements",
+    categories: ["activity", "sleep"] as CategoryId[],
   },
   {
     title: "Wellness Suggestions",
@@ -57,6 +75,7 @@ const FEATURES = [
     emoji: "💡",
     color: "#0F766E",
     route: "/journal-suggestions",
+    categories: ["mood"] as CategoryId[],
   },
   {
     title: "Daily Reminders",
@@ -64,6 +83,7 @@ const FEATURES = [
     emoji: "💧",
     color: "#7C4DCC",
     route: "/daily-reminders",
+    categories: ["activity", "food", "sleep"] as CategoryId[],
   },
   {
     title: "Support",
@@ -71,8 +91,9 @@ const FEATURES = [
     emoji: "🤝",
     color: "#B56576",
     route: "/support-hotlines",
+    categories: ["activity", "food"] as CategoryId[],
   },
- ] as const;
+] as const;
 
 const CHECKIN_MOODS = [
   { emoji: "😄", label: "Happy" },
@@ -91,9 +112,188 @@ const WELLNESS_MESSAGES = [
   "One breath at a time. You've got this.",
 ];
 
+function CategoryTab({
+  id,
+  label,
+  icon,
+  active,
+  theme,
+  onPress,
+}: {
+  id: CategoryId;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  active: boolean;
+  theme: MindCareTheme;
+  onPress: () => void;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const overlay = useRef(new Animated.Value(active ? 1 : 0)).current;
+  const iconScale = useRef(new Animated.Value(1)).current;
+  const iconRotate = useRef(new Animated.Value(0)).current;
+  const iconFloat = useRef(new Animated.Value(0)).current;
+
+  const rotate = iconRotate.interpolate({
+    inputRange: [0, 1, 2, 3],
+    outputRange: ["0deg", "-3deg", "3deg", "0deg"],
+  });
+  const float = iconFloat.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -2],
+  });
+
+  useEffect(() => {
+    if (!active) {
+      Animated.timing(overlay, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }).start();
+      return;
+    }
+
+    Animated.parallel([
+      Animated.timing(overlay, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.sequence([
+        Animated.timing(scale, {
+          toValue: 1.07,
+          duration: 90,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale, {
+          toValue: 1,
+          duration: 110,
+          useNativeDriver: true,
+        }),
+      ]),
+      (() => {
+        if (id === "food") {
+          return Animated.sequence([
+            Animated.timing(iconRotate, {
+              toValue: 1,
+              duration: 70,
+              useNativeDriver: true,
+            }),
+            Animated.timing(iconRotate, {
+              toValue: 2,
+              duration: 70,
+              useNativeDriver: true,
+            }),
+            Animated.timing(iconRotate, {
+              toValue: 3,
+              duration: 70,
+              useNativeDriver: true,
+            }),
+          ]);
+        }
+        if (id === "sleep") {
+          return Animated.sequence([
+            Animated.timing(iconFloat, {
+              toValue: 1,
+              duration: 120,
+              useNativeDriver: true,
+            }),
+            Animated.timing(iconFloat, {
+              toValue: 0,
+              duration: 120,
+              useNativeDriver: true,
+            }),
+          ]);
+        }
+        return Animated.sequence([
+          Animated.timing(iconScale, {
+            toValue: 1.12,
+            duration: 90,
+            useNativeDriver: true,
+          }),
+          ...(id === "mood"
+            ? [
+                Animated.timing(iconScale, {
+                  toValue: 0.96,
+                  duration: 60,
+                  useNativeDriver: true,
+                }),
+                Animated.timing(iconScale, {
+                  toValue: 1.06,
+                  duration: 60,
+                  useNativeDriver: true,
+                }),
+              ]
+            : []),
+          Animated.timing(iconScale, {
+            toValue: 1,
+            duration: 70,
+            useNativeDriver: true,
+          }),
+        ]);
+      })(),
+    ]).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+
+  const iconStyle = [
+    id === "food" ? { transform: [{ rotate }] } : undefined,
+    id === "sleep" ? { transform: [{ translateY: float }] } : undefined,
+    id === "activity" || id === "mood"
+      ? { transform: [{ scale: iconScale }] }
+      : undefined,
+  ];
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Show ${label} options`}
+        accessibilityState={{ selected: active }}
+        style={[
+          styles.categoryPill,
+          {
+            backgroundColor: theme.card,
+            borderColor: active ? theme.primary : theme.border,
+          },
+        ]}
+        onPress={onPress}
+      >
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFillObject,
+            styles.categoryPillOverlay,
+            { backgroundColor: theme.softPurple, opacity: overlay },
+          ]}
+        />
+        <Animated.View style={iconStyle}>
+          <Ionicons
+            name={icon}
+            size={17}
+            color={active ? theme.primary : theme.secondaryText}
+          />
+        </Animated.View>
+        <Text
+          style={[
+            styles.categoryPillLabel,
+            {
+              color: active ? theme.primary : theme.secondaryText,
+              fontWeight: active ? "700" : "600",
+            },
+          ]}
+        >
+          {label}
+        </Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 export default function DashboardScreen() {
   const { user, role } = useAuth();
   const { toggle: toggleSidePanel } = useSidePanel();
+  const { theme } = useMindCareTheme();
+  const [activeCategory, setActiveCategory] = useState<CategoryId>("activity");
+  const contentOpacity = useRef(new Animated.Value(1)).current;
 
   const { achievements, totalEarned } = useAchievements();
   const { entries } = useJournal();
@@ -174,6 +374,22 @@ export default function DashboardScreen() {
     [],
   );
 
+  const filteredFeatures = useMemo(
+    () => FEATURES.filter((f) => f.categories.includes(activeCategory)),
+    [activeCategory],
+  );
+
+  const selectCategory = (category: CategoryId) => {
+    if (category === activeCategory) return;
+    setActiveCategory(category);
+    contentOpacity.setValue(0.5);
+    Animated.timing(contentOpacity, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  };
+
   // Safety check: If an admin somehow lands here, redirect them.
   if (role === "admin") {
     return <Redirect href="/admin-panel" />;
@@ -203,19 +419,33 @@ export default function DashboardScreen() {
 
     return (
       <Animated.View
-        style={[{ transform: [{ scale: scaleAnim }], flex: 1 }]}
+        style={[{ transform: [{ scale: scaleAnim }], flex: 1, minWidth: 0 }]}
       >
         <Pressable
-          style={styles.card}
+          style={[
+            styles.card,
+            { backgroundColor: theme.card, borderColor: theme.border },
+          ]}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           onPress={() => router.push(feature.route as Href)}
         >
-          <View style={[styles.cardEmoji, { backgroundColor: `${feature.color}1F` }]}>
+          <View
+            style={[
+              styles.cardEmoji,
+              { backgroundColor: `${feature.color}1F` },
+            ]}
+          >
             <Text style={styles.cardEmojiText}>{feature.emoji}</Text>
           </View>
-          <Text style={styles.cardTitle}>{feature.title}</Text>
-          <Text style={styles.cardDescription}>{feature.description}</Text>
+          <Text style={[styles.cardTitle, { color: theme.text }]}>
+            {feature.title}
+          </Text>
+          <Text
+            style={[styles.cardDescription, { color: theme.secondaryText }]}
+          >
+            {feature.description}
+          </Text>
         </Pressable>
       </Animated.View>
     );
@@ -232,12 +462,20 @@ export default function DashboardScreen() {
       <Pressable
         style={({ pressed }) => [
           styles.moodChip,
-          pressed && styles.moodChipPressed,
+          {
+            backgroundColor: theme.inputBg,
+            borderColor: theme.borderSoft,
+          },
+          pressed && {
+            backgroundColor: theme.softPurple,
+          },
         ]}
         onPress={() => router.push("/daily-journal" as Href)}
       >
         <Text style={styles.moodChipEmoji}>{emoji}</Text>
-        <Text style={styles.moodChipText}>{label}</Text>
+        <Text style={[styles.moodChipText, { color: theme.text }]}>
+          {label}
+        </Text>
       </Pressable>
     );
   }
@@ -254,20 +492,27 @@ export default function DashboardScreen() {
     tint: string;
   }) {
     return (
-      <View style={styles.microStat}>
-        <View style={[styles.microIcon, { backgroundColor: `${tint}1A` }]}>
+      <View
+        style={[
+          styles.microStat,
+          { backgroundColor: theme.card, borderColor: theme.border },
+        ]}
+      >
+        <View style={[styles.microIcon, { backgroundColor: `${tint}1F` }]}>
           <Ionicons name={icon} size={16} color={tint} />
         </View>
         <View style={styles.microText}>
-          <Text style={styles.microValue}>{value}</Text>
-          <Text style={styles.microLabel}>{label}</Text>
+          <Text style={[styles.microValue, { color: tint }]}>{value}</Text>
+          <Text style={[styles.microLabel, { color: theme.secondaryText }]}>
+            {label}
+          </Text>
         </View>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.background}>
         <ScrollView
           style={styles.scrollContainer}
@@ -281,46 +526,82 @@ export default function DashboardScreen() {
             {/* Header */}
             <View style={styles.header}>
               <View style={styles.logoContainer}>
-                <View style={styles.logoIcon}>
+                <View
+                  style={[
+                    styles.logoIcon,
+                    { backgroundColor: theme.softPurple },
+                  ]}
+                >
                   <Image
                     source={require("@/assets/images/appicon_circle.png")}
                     style={styles.logoIconImage}
                     resizeMode="contain"
                   />
                 </View>
-                <Text style={styles.logoText}>MindCare</Text>
+                <Text style={[styles.logoText, { color: theme.primary }]}>
+                  MindCare
+                </Text>
               </View>
               <View style={styles.rightButtons}>
                 <Pressable
                   style={({ pressed }) => [
                     styles.menuButton,
-                    pressed && styles.menuButtonPressed,
+                    { backgroundColor: theme.softPurple },
+                    pressed && { backgroundColor: theme.border },
                   ]}
                   onPress={toggleSidePanel}
                 >
-                  <Ionicons name="menu" size={24} color="#7C4DCC" />
+                  <Ionicons name="menu" size={24} color={theme.primary} />
                 </Pressable>
               </View>
             </View>
 
             {/* Greeting Section */}
             <View style={styles.greetingSection}>
-              <Text style={styles.greeting}>
+              <Text style={[styles.greeting, { color: theme.text }]}>
                 {getGreeting()}, {user?.displayName?.split(" ")[0] || "there"}{" "}
                 {getGreetingEmoji()}
               </Text>
-              <Text style={styles.subtitle}>
+              <Text style={[styles.subtitle, { color: theme.secondaryText }]}>
                 How are you feeling today? Take a moment for yourself.
               </Text>
             </View>
 
+            {/* Category Tabs */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryRow}
+            >
+              {CATEGORIES.map((category) => (
+                <CategoryTab
+                  key={category.id}
+                  id={category.id}
+                  label={category.label}
+                  icon={category.icon}
+                  active={activeCategory === category.id}
+                  theme={theme}
+                  onPress={() => selectCategory(category.id)}
+                />
+              ))}
+            </ScrollView>
+
             {/* Today's Check-in */}
-            <View style={styles.checkinCard}>
+            <View
+              style={[
+                styles.checkinCard,
+                { backgroundColor: theme.card, borderColor: theme.border },
+              ]}
+            >
               <View style={styles.checkinHeader}>
-                <Text style={styles.checkinTitle}>Today's Check-in</Text>
+                <Text style={[styles.checkinTitle, { color: theme.text }]}>
+                  Today's Check-in
+                </Text>
                 <Text style={styles.checkinEmoji}>😊</Text>
               </View>
-              <Text style={styles.checkinSubtitle}>
+              <Text
+                style={[styles.checkinSubtitle, { color: theme.secondaryText }]}
+              >
                 How are you feeling today?
               </Text>
               <View style={styles.moodRow}>
@@ -336,19 +617,19 @@ export default function DashboardScreen() {
                 icon="book"
                 value={String(weekJournalCount)}
                 label="Reflections this week"
-                tint="#7C4DCC"
+                tint={theme.accent.purple}
               />
               <MicroStat
                 icon="trophy"
                 value={`${totalEarned}/${totalAchievements}`}
                 label="Achievements unlocked"
-                tint="#D97706"
+                tint={theme.accent.amber}
               />
               <MicroStat
                 icon="notifications"
                 value={String(activeReminderCount)}
                 label="Active reminders"
-                tint="#0F766E"
+                tint={theme.accent.teal}
               />
               <MicroStat
                 icon="clipboard"
@@ -360,15 +641,17 @@ export default function DashboardScreen() {
                       : `${daysSinceAssessment}d ago`
                 }
                 label="Last check-in"
-                tint="#B56576"
+                tint={theme.accent.rose}
               />
             </View>
 
-            {/* Feature Cards */}
-            <View style={styles.cardsContainer}>
-              {Array.from({ length: Math.ceil(FEATURES.length / numColumns) }).map(
-                (_, rowIdx) => {
-                  const rowFeatures = FEATURES.slice(
+            {/* Feature Cards (filtered by category) */}
+            <Animated.View style={{ opacity: contentOpacity }}>
+              <View style={styles.cardsContainer}>
+                {Array.from({
+                  length: Math.ceil(filteredFeatures.length / numColumns),
+                }).map((_, rowIdx) => {
+                  const rowFeatures = filteredFeatures.slice(
                     rowIdx * numColumns,
                     rowIdx * numColumns + numColumns,
                   );
@@ -379,16 +662,31 @@ export default function DashboardScreen() {
                       ))}
                     </View>
                   );
-                },
-              )}
-            </View>
+                })}
+              </View>
+            </Animated.View>
 
             {/* Wellness Message */}
-            <View style={styles.quoteContainer}>
-              <View style={styles.quoteIcon}>
-                <Ionicons name="leaf" size={18} color="#7C4DCC" />
+            <View
+              style={[
+                styles.quoteContainer,
+                {
+                  backgroundColor: theme.softPurple,
+                  borderColor: theme.borderSoft,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.quoteIcon,
+                  { backgroundColor: theme.card },
+                ]}
+              >
+                <Ionicons name="leaf" size={18} color={theme.primary} />
               </View>
-              <Text style={styles.quote}>{dailyMessage}</Text>
+              <Text style={[styles.quote, { color: theme.primaryDeep }]}>
+                {dailyMessage}
+              </Text>
             </View>
           </View>
         </ScrollView>
@@ -406,13 +704,12 @@ const styles = StyleSheet.create({
   },
   background: {
     flex: 1,
-    backgroundColor: "#F7F5FC",
   },
   scrollContainer: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingBottom: 40,
     alignItems: "center",
   },
@@ -441,7 +738,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#F0EBFB",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 8,
@@ -454,7 +750,6 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#7C4DCC",
   },
   rightButtons: {
     flexDirection: "row",
@@ -465,12 +760,8 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#F0EBFB",
     justifyContent: "center",
     alignItems: "center",
-  },
-  menuButtonPressed: {
-    backgroundColor: "#E6DCF7",
   },
   greetingSection: {
     marginBottom: 22,
@@ -478,20 +769,37 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 28,
     fontWeight: "700",
-    color: "#2D1B69",
     marginBottom: 6,
   },
   subtitle: {
     fontSize: 15,
-    color: "#6B7280",
     lineHeight: 22,
   },
+  categoryRow: {
+    flexDirection: "row",
+    gap: 10,
+    paddingBottom: 22,
+  },
+  categoryPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    overflow: "hidden",
+  },
+  categoryPillOverlay: {
+    borderRadius: 999,
+  },
+  categoryPillLabel: {
+    fontSize: 14,
+  },
   checkinCard: {
-    backgroundColor: "white",
     borderRadius: 22,
     padding: 20,
     borderWidth: 1,
-    borderColor: "#EDE9FE",
     // @ts-ignore — web-only shadow property
     boxShadow: "0px 2px 12px rgba(124, 77, 204, 0.06)",
     elevation: 2,
@@ -506,14 +814,12 @@ const styles = StyleSheet.create({
   checkinTitle: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#1E1B4B",
   },
   checkinEmoji: {
     fontSize: 24,
   },
   checkinSubtitle: {
     fontSize: 14,
-    color: "#6B7280",
     marginBottom: 14,
   },
   moodRow: {
@@ -524,16 +830,11 @@ const styles = StyleSheet.create({
   moodChip: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F7F4FC",
     borderRadius: 22,
     paddingVertical: 10,
     paddingHorizontal: 16,
     gap: 8,
     borderWidth: 1,
-    borderColor: "#EEE6FB",
-  },
-  moodChipPressed: {
-    backgroundColor: "#EFE7FB",
   },
   moodChipEmoji: {
     fontSize: 18,
@@ -541,7 +842,6 @@ const styles = StyleSheet.create({
   moodChipText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#4B5563",
   },
   microRow: {
     flexDirection: "row",
@@ -552,14 +852,12 @@ const styles = StyleSheet.create({
   microStat: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "white",
     borderRadius: 16,
     paddingVertical: 10,
     paddingHorizontal: 14,
     gap: 10,
     minWidth: 0,
     borderWidth: 1,
-    borderColor: "#EDE9FE",
     // @ts-ignore — web-only shadow property
     boxShadow: "0px 1px 6px rgba(124, 77, 204, 0.05)",
     elevation: 1,
@@ -577,11 +875,9 @@ const styles = StyleSheet.create({
   microValue: {
     fontSize: 15,
     fontWeight: "800",
-    color: "#7C4DCC",
   },
   microLabel: {
     fontSize: 12,
-    color: "#6B7280",
   },
   cardsContainer: {
     gap: 16,
@@ -589,12 +885,12 @@ const styles = StyleSheet.create({
   },
   cardRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "stretch",
     gap: 16,
   },
   card: {
     flex: 1,
-    backgroundColor: "white",
+    minWidth: 0,
     borderRadius: 22,
     padding: 20,
     // @ts-ignore — web-only shadow property
@@ -602,7 +898,6 @@ const styles = StyleSheet.create({
     elevation: 2,
     gap: 12,
     borderWidth: 1,
-    borderColor: "#EDE9FE",
   },
   cardEmoji: {
     width: 48,
@@ -618,28 +913,25 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#1E1B4B",
+    flexShrink: 1,
   },
   cardDescription: {
     fontSize: 14,
-    color: "#6B7280",
     lineHeight: 20,
+    flexShrink: 1,
   },
   quoteContainer: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
-    backgroundColor: "#F0EBFB",
     borderRadius: 22,
     padding: 20,
     borderWidth: 1,
-    borderColor: "#E6DCF7",
   },
   quoteIcon: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "white",
     justifyContent: "center",
     alignItems: "center",
     marginTop: 2,
@@ -647,7 +939,6 @@ const styles = StyleSheet.create({
   quote: {
     flex: 1,
     fontSize: 15,
-    color: "#5B3FA8",
     lineHeight: 23,
   },
 });

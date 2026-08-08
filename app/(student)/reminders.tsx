@@ -117,12 +117,7 @@ export default function RemindersScreen() {
         style={s.headerGradient}
       >
         <View style={s.header}>
-          <Pressable
-            style={s.backBtn}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </Pressable>
+          <View style={{ width: 40 }} />
           <Text style={s.headerTitle}>Reminders</Text>
           <Pressable
             style={s.addBtn}

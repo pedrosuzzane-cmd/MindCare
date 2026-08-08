@@ -760,12 +760,7 @@ export default function DailyRemindersScreen() {
     <SafeAreaView style={s.container}>
       <LinearGradient colors={["#8A63D2", "#7C5AC8"]} style={s.headerBg}>
         <View style={s.header}>
-          <Pressable
-            style={s.backBtn}
-            onPress={() => router.replace("/dashboard")}
-          >
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </Pressable>
+          <View style={{ width: 40 }} />
           <View>
             <Text style={s.headerTitle}>Daily Reminders</Text>
             <Text style={s.subtitle}>Build healthy routines</Text>

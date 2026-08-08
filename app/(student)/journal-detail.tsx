@@ -33,8 +33,6 @@ export default function JournalDetailScreen() {
     }
   }, [id]);
 
-  const handleBack = () => router.back();
-
   const reflection = entry ? getActiveReflection(entry) : null;
 
   if (loading) {
@@ -64,9 +62,7 @@ export default function JournalDetailScreen() {
     <SafeAreaView style={styles.container}>
       <LinearGradient colors={["#8A63D2", "#7C5AC8"]} style={styles.header}>
         <View style={styles.headerRow}>
-          <Pressable onPress={handleBack} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </Pressable>
+          <View style={{ width: 40 }} />
           <Text style={styles.headerTitle}>Journal Entry</Text>
           <View style={{ width: 40 }} />
         </View>

@@ -143,8 +143,6 @@ export default function AchievementsScreen() {
     (c) => c.id === activeCategory,
   )!;
 
-  const handleBack = () => router.back();
-
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
@@ -153,9 +151,7 @@ export default function AchievementsScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </Pressable>
+          <View style={{ width: 40 }} />
           <Text style={styles.headerTitle}>Achievements</Text>
           <View style={styles.placeholder} />
         </View>

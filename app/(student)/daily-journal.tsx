@@ -31,10 +31,6 @@ export default function DailyJournalScreen() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
 
-  const handleBack = () => {
-    router.replace("/dashboard");
-  };
-
   const onRefresh = useCallback(() => {
     manualSync();
   }, [manualSync]);
@@ -106,9 +102,7 @@ export default function DailyJournalScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </Pressable>
+          <View style={{ width: 40 }} />
           <View style={styles.headerTitleContainer}>
             <Text style={styles.headerTitle}>Daily Journal</Text>
             {syncing && <Text style={styles.syncingText}>(Syncing...)</Text>}
