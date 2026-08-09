@@ -12,6 +12,17 @@ import { ConstellationStarView } from "./ConstellationStar";
 
 const LINE_THICKNESS = 1.2;
 const LINE_GLOW_THICKNESS = 4;
+const LINE_COLOR = "#A78BFA";
+const LINE_OPACITY = 0.25;
+const LINE_ACTIVE_OPACITY = 0.6;
+const LINE_ACTIVE_THICKNESS = 1.7;
+
+/**
+ * Only the most recent stars are connected with constellation lines. Once the
+ * sky grows past this many journals, older stars stay visible but the path
+ * stays readable and never turns into a spider web.
+ */
+const CONNECTED_LINE_LIMIT = 40;
 
 interface ConstellationSkyProps {
   stars: ConstellationStar[];
@@ -21,6 +32,8 @@ interface ConstellationSkyProps {
   selectedId?: string | null;
   /** Latest journal mood color; tints the sky when present. */
   moodColor?: string;
+  /** Number of most-recent stars to connect with constellation lines. */
+  lineLimit?: number;
 }
 
 interface SkyLine {
@@ -29,6 +42,8 @@ interface SkyLine {
   y1: number;
   x2: number;
   y2: number;
+  /** Touches the currently selected star, so it renders a little brighter. */
+  active: boolean;
 }
 
 /** Dim, non-interactive backdrop dots for atmosphere. */
@@ -44,6 +59,7 @@ export function ConstellationSky({
   onPressStar,
   selectedId,
   moodColor,
+  lineLimit = CONNECTED_LINE_LIMIT,
 }: ConstellationSkyProps) {
   const [layout, setLayout] = useState({ width: 0, height: 0 });
 
@@ -59,32 +75,50 @@ export function ConstellationSky({
 
   const season = useMemo(() => currentSeason(), []);
 
-  const lineColor = theme.mode === "dark" ? "#E9DFFF" : "#F4EEFF";
-
   /**
-   * Connect consecutive stars in chronological order (oldest → newest). The
-   * lines are quiet, low-opacity strokes so the sky stays calm and clean.
+   * The newest `lineLimit` stars (chronologically) form the connected path;
+   * older stars render without lines once the sky grows large.
    */
-  const lines = useMemo<SkyLine[]>(() => {
-    if (layout.width === 0 || layout.height === 0) return [];
-    if (stars.length < 2) return [];
+  const connectedStars = useMemo(() => {
     const sorted = [...stars].sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
     );
+    const windowStart = Math.max(0, sorted.length - lineLimit);
+    return sorted.slice(windowStart);
+  }, [stars, lineLimit]);
+
+  const connectedIds = useMemo(
+    () => new Set(connectedStars.map((s) => s.journalId)),
+    [connectedStars],
+  );
+
+  /**
+   * Connect consecutive stars in chronological order (oldest → newest). The
+   * lines are quiet, low-opacity strokes so the sky stays calm and clean. The
+   * two segments immediately before/after the selected star brighten slightly
+   * to show where it sits in the path.
+   */
+  const lines = useMemo<SkyLine[]>(() => {
+    if (layout.width === 0 || layout.height === 0) return [];
+    if (connectedStars.length < 2) return [];
     const result: SkyLine[] = [];
-    for (let i = 1; i < sorted.length; i++) {
-      const a = sorted[i - 1];
-      const b = sorted[i];
+    for (let i = 1; i < connectedStars.length; i++) {
+      const a = connectedStars[i - 1];
+      const b = connectedStars[i];
+      const active =
+        selectedId != null &&
+        (a.journalId === selectedId || b.journalId === selectedId);
       result.push({
         key: `${a.journalId}_${b.journalId}`,
         x1: a.position.x * layout.width,
         y1: a.position.y * layout.height,
         x2: b.position.x * layout.width,
         y2: b.position.y * layout.height,
+        active,
       });
     }
     return result;
-  }, [stars, layout]);
+  }, [connectedStars, layout, selectedId]);
 
   const handleLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -130,9 +164,9 @@ export function ConstellationSky({
               y1={line.y1}
               x2={line.x2}
               y2={line.y2}
-              stroke={lineColor}
+              stroke={LINE_COLOR}
               strokeWidth={LINE_GLOW_THICKNESS}
-              strokeOpacity={0.07}
+              strokeOpacity={line.active ? 0.16 : 0.05}
               strokeLinecap="round"
             />
             <Line
@@ -140,9 +174,9 @@ export function ConstellationSky({
               y1={line.y1}
               x2={line.x2}
               y2={line.y2}
-              stroke={lineColor}
-              strokeWidth={LINE_THICKNESS}
-              strokeOpacity={0.38}
+              stroke={LINE_COLOR}
+              strokeWidth={line.active ? LINE_ACTIVE_THICKNESS : LINE_THICKNESS}
+              strokeOpacity={line.active ? LINE_ACTIVE_OPACITY : LINE_OPACITY}
               strokeLinecap="round"
             />
           </React.Fragment>
@@ -158,6 +192,7 @@ export function ConstellationSky({
           animate={
             star.isNewest || star.isMilestone || star.journalId === selectedId
           }
+          dim={!connectedIds.has(star.journalId)}
           onPress={onPressStar}
         />
       ))}

@@ -19,6 +19,8 @@ interface ConstellationStarProps {
   selected?: boolean;
   /** Play the calm idle pulse (newest / milestone / selected stars only). */
   animate?: boolean;
+  /** Older star outside the connected path — rendered a little dimmer. */
+  dim?: boolean;
   onPress?: (star: ConstellationStar) => void;
   accessibilityLabel?: string;
 }
@@ -27,12 +29,18 @@ export function ConstellationStarView({
   star,
   selected = false,
   animate = false,
+  dim = false,
   onPress,
   accessibilityLabel,
 }: ConstellationStarProps) {
   const config = STAR_TYPE_CONFIG[star.type] ?? STAR_TYPE_CONFIG.sparkle;
   const color = star.color;
   const renderedGlyph = config.glyph;
+
+  // Older stars outside the connected path render a little dimmer so the
+  // sky stays readable once the constellation grows large.
+  const dimmed =
+    dim && !selected && !star.isMilestone && !star.isNewest ? 0.55 : 1;
 
   // Gentle idle pulse — only played for a small subset of stars so the sky
   // never spins hundreds of loops.
@@ -56,7 +64,7 @@ export function ConstellationStarView({
   const animatedStyle = useAnimatedStyle(() => {
     const boost = selected ? 0.12 : 0.06;
     return {
-      opacity: config.opacity * (selected ? 1 : 0.92),
+      opacity: config.opacity * (selected ? 1 : 0.92) * dimmed,
       transform: [
         { translateX: -HALF_TOUCH },
         { translateY: -HALF_TOUCH },
@@ -66,11 +74,11 @@ export function ConstellationStarView({
   });
 
   const glowStyle = useAnimatedStyle(() => ({
-    opacity: (selected ? 0.32 : 0.16) + pulse.value * (selected ? 0.2 : 0.1),
+    opacity: (selected ? 0.32 : 0.16) * dimmed + pulse.value * (selected ? 0.2 : 0.1),
   }));
 
   const outerGlowStyle = useAnimatedStyle(() => ({
-    opacity: (selected ? 0.16 : 0.08) + pulse.value * (selected ? 0.12 : 0.06),
+    opacity: (selected ? 0.16 : 0.08) * dimmed + pulse.value * (selected ? 0.12 : 0.06),
   }));
 
   const x = Math.min(0.95, Math.max(0.05, star.position.x)) * 100;
@@ -93,7 +101,7 @@ export function ConstellationStarView({
           accessibilityRole="button"
           accessibilityLabel={
             accessibilityLabel ||
-            `${formatJournalDate(star.date)} journal reflection, ${star.categoryName}, ${star.moodLabel} mood`
+            `${formatJournalDate(star.date)} journal star, ${star.categoryName} category, ${star.moodLabel} mood`
           }
           accessibilityHint="Opens your reflections for that day"
         >

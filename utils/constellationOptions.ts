@@ -154,6 +154,63 @@ export const positionFor = (journalId: string): StarPosition => {
   };
 };
 
+/**
+ * Clamp a position into the safe band the star glyphs render within (kept in
+ * sync with the star component's own clamp so collision nudges never push a
+ * star off-screen).
+ */
+const clampPosition = (pos: StarPosition): StarPosition => ({
+  x: Math.min(0.95, Math.max(0.05, pos.x)),
+  y: Math.min(0.94, Math.max(0.06, pos.y)),
+});
+
+const distanceBetween = (a: StarPosition, b: StarPosition): number =>
+  Math.hypot(a.x - b.x, a.y - b.y);
+
+/** Minimum separation between any two star centers (~10% of the sky). */
+const MIN_STAR_DISTANCE = 0.1;
+const MAX_COLLISION_ATTEMPTS = 8;
+
+/** Deterministic nudges, tried in order until a clear spot is found. */
+const COLLISION_OFFSETS: ReadonlyArray<StarPosition> = [
+  { x: 0.05, y: 0 },
+  { x: -0.05, y: 0 },
+  { x: 0, y: 0.05 },
+  { x: 0, y: -0.05 },
+  { x: 0.05, y: 0.05 },
+  { x: -0.05, y: -0.05 },
+  { x: 0.05, y: -0.05 },
+  { x: -0.05, y: 0.05 },
+];
+
+/**
+ * Collision-aware placement. If `base` is too close to an already-placed star,
+ * the star is nudged through a small set of deterministic offsets until it no
+ * longer overlaps. Stars are resolved in chronological order, so the final sky
+ * is stable for any given journal set — no randomness anywhere.
+ */
+export const resolvePosition = (
+  base: StarPosition,
+  placed: ReadonlyArray<StarPosition>,
+): StarPosition => {
+  const baseClamped = clampPosition(base);
+  if (placed.every((p) => distanceBetween(baseClamped, p) >= MIN_STAR_DISTANCE)) {
+    return baseClamped;
+  }
+  for (let attempt = 0; attempt < MAX_COLLISION_ATTEMPTS; attempt++) {
+    const ring = 1 + Math.floor(attempt / 4);
+    const offset = COLLISION_OFFSETS[attempt];
+    const candidate = clampPosition({
+      x: baseClamped.x + offset.x * ring,
+      y: baseClamped.y + offset.y * ring,
+    });
+    if (placed.every((p) => distanceBetween(candidate, p) >= MIN_STAR_DISTANCE)) {
+      return candidate;
+    }
+  }
+  return baseClamped;
+};
+
 /* ── Journal → star projection ────────────────────────────────────────── */
 
 const PREVIEW_LIMIT = 140;
@@ -177,7 +234,7 @@ export const buildConstellationStars = (
   );
   const newestId = sorted.length ? sorted[sorted.length - 1].id : undefined;
 
-  return sorted.map((entry, index) => {
+  const projected = sorted.map((entry, index) => {
     const ordinal = index + 1;
     const mood = getMood(entry.mood);
     const category = getCategory(entry.category);
@@ -203,6 +260,16 @@ export const buildConstellationStars = (
       isMilestone: isMilestoneJournal(ordinal),
       preview: truncateText(entry.thoughts),
     };
+  });
+
+  // Resolve overlaps deterministically: earlier (older) stars claim their spot
+  // first, and later stars are nudged only when they collide with one already
+  // placed. The result is stable across every render.
+  const placed: StarPosition[] = [];
+  return projected.map((star) => {
+    const position = resolvePosition(star.position, placed);
+    placed.push(position);
+    return { ...star, position };
   });
 };
 

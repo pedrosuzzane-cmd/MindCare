@@ -1,21 +1,37 @@
 import { useAuth } from "@/hooks/AuthContext";
 import { useJournal } from "@/hooks/useJournal";
-import { MindCareTheme } from "@/constants/theme";
 import { useMindCareTheme } from "@/contexts/ThemeContext";
 import { ConstellationSky } from "@/components/constellation/ConstellationSky";
-import { ConstellationProgress } from "@/components/constellation/ConstellationProgress";
-import { ConstellationCollection } from "@/components/constellation/ConstellationCollection";
 import { DailyReflectionModal } from "@/components/constellation/DailyReflectionModal";
+import { MonthlySummary } from "@/components/constellation/MonthlySummary";
+import { MonthlyProgress } from "@/components/constellation/MonthlyProgress";
+import { MonthlyCelebrationModal } from "@/components/constellation/MonthlyCelebrationModal";
+import { MonthlyHistory } from "@/components/constellation/MonthlyHistory";
+import { constellationCelebrationStorage } from "@/storage/constellationCelebrationStorage";
 import { ConstellationStar } from "@/types/constellation";
 import {
   STAR_CATEGORY_COLORS,
   buildConstellationStars,
   normalizeJournalDate,
 } from "@/utils/constellationOptions";
+import {
+  currentMonthKey,
+  formatMonthLabel,
+  formatMonthName,
+  getMonthEntries,
+  getMonthMoodCount,
+  getMonthlyGoal,
+  getMonthlyStreak,
+  getNextMonth,
+  getPreviousMonth,
+  getUniqueJournalDays,
+  groupEntriesByMonth,
+  isCurrentMonth,
+} from "@/utils/constellationMonthUtils";
 import { getCategory, getMood } from "@/utils/journalOptions";
 import { useFocusEffect } from "@react-navigation/native";
 import { Redirect, router } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -38,33 +54,76 @@ export default function ConstellationScreen() {
 
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedStarId, setSelectedStarId] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>(() =>
+    currentMonthKey(),
+  );
+  const [celebrationMonth, setCelebrationMonth] = useState<string | null>(null);
   const [legendExpanded, setLegendExpanded] = useState(false);
   const [fullSky, setFullSky] = useState(false);
 
+  const goal = getMonthlyGoal();
+
   // Refresh from the journal sync whenever the tab gains focus. Offline stays
-  // cached, so the sky still renders from stored journal entries.
+  // cached, so the sky still renders from stored journal entries. The student
+  // always lands on the current month's constellation.
   useFocusEffect(
     useCallback(() => {
       manualSync();
+      setSelectedMonth(currentMonthKey());
     }, [manualSync]),
   );
 
-  /** Every journal entry projects to one deterministic star. */
-  const stars = useMemo(() => buildConstellationStars(entries), [entries]);
+  /**
+   * Announce a completed month only once. When the current month reaches the
+   * goal, the celebration is stored so it never replays on later visits.
+   */
+  useEffect(() => {
+    if (!user || loading || entries.length === 0) return;
+    const monthKey = currentMonthKey();
+    const count = getMonthEntries(entries, monthKey).length;
+    if (count < goal) return;
+    let cancelled = false;
+    (async () => {
+      const celebrated = await constellationCelebrationStorage.getCelebratedMonths(
+        user.uid,
+      );
+      if (cancelled) return;
+      if (!celebrated.includes(monthKey)) {
+        setCelebrationMonth(formatMonthLabel(monthKey));
+        await constellationCelebrationStorage.markMonthCelebrated(
+          user.uid,
+          monthKey,
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, loading, entries, goal]);
+
+  /** Entries belonging to the selected month — the source of the sky. */
+  const monthEntries = useMemo(
+    () => getMonthEntries(entries, selectedMonth),
+    [entries, selectedMonth],
+  );
+
+  /** Every journal entry in the month projects to one deterministic star. */
+  const stars = useMemo(() => buildConstellationStars(monthEntries), [
+    monthEntries,
+  ]);
 
   const stats = useMemo(() => {
-    const days = new Set(
-      entries.map((e) => normalizeJournalDate(e.createdAt)),
-    );
-    const categories = new Set(
-      entries.map((e) => e.category).filter(Boolean),
-    );
     return {
-      reflections: entries.length,
-      days: days.size,
-      categories: categories.size,
+      reflections: monthEntries.length,
+      days: getUniqueJournalDays(monthEntries),
+      moods: getMonthMoodCount(monthEntries),
+      streak: getMonthlyStreak(monthEntries),
     };
-  }, [entries]);
+  }, [monthEntries]);
+
+  const monthLabel = formatMonthLabel(selectedMonth);
+  const monthName = formatMonthName(selectedMonth);
+  const viewingCurrentMonth = isCurrentMonth(selectedMonth);
 
   const visibleStars = useMemo(() => {
     if (fullSky || stars.length <= SKY_STAR_LIMIT) return stars;
@@ -102,7 +161,7 @@ export default function ConstellationScreen() {
 
   const legendCategories = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const e of entries) {
+    for (const e of monthEntries) {
       if (!e.category) continue;
       counts.set(e.category, (counts.get(e.category) ?? 0) + 1);
     }
@@ -113,13 +172,20 @@ export default function ConstellationScreen() {
         name: getCategory(id)?.name ?? id,
         color: STAR_CATEGORY_COLORS[id] ?? theme.primary,
       }));
-  }, [entries, theme.primary]);
+  }, [monthEntries, theme]);
 
-  // Atmosphere: the sky tints toward the most recently written mood.
+  // Atmosphere: the sky tints toward the most recently written mood in the
+  // selected month.
   const currentMood = useMemo(() => {
-    const latest = entries[0];
+    const latest = monthEntries[0];
     return latest?.mood ? getMood(latest.mood) : undefined;
-  }, [entries]);
+  }, [monthEntries]);
+
+  // History: every other month that actually contains journal entries.
+  const historyMonths = useMemo(
+    () => groupEntriesByMonth(entries, selectedMonth),
+    [entries, selectedMonth],
+  );
 
   const skyHeight = Math.min(Math.max(width * 0.78, 280), 380);
 
@@ -153,14 +219,23 @@ export default function ConstellationScreen() {
     });
   };
 
-  const handleSelectMilestone = (count: number) => {
-    const star = stars.find((s) => s.ordinal === count);
-    if (star) openStar(star);
+  const goPrevMonth = () => setSelectedMonth(getPreviousMonth(selectedMonth));
+
+  const goNextMonth = () => {
+    if (!viewingCurrentMonth) {
+      setSelectedMonth(getNextMonth(selectedMonth));
+    }
   };
 
   const showLoading = loading && entries.length === 0 && !loadError;
   const showError = !loading && loadError && entries.length === 0;
-  const showEmpty = !loading && !loadError && entries.length === 0;
+  const showOnboarding = !loading && !loadError && entries.length === 0;
+  const showEmptyMonth = !showLoading && !showError && monthEntries.length === 0;
+
+  const skyMessage =
+    monthEntries.length === 1
+      ? "Your first star is shining ✨"
+      : `${currentMood ? `${currentMood.emoji} ` : ""}Your ${monthName} sky is growing.`;
 
   return (
     <SafeAreaView
@@ -175,10 +250,10 @@ export default function ConstellationScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.headerTitle, { color: theme.text }]}>
-            ✨ My Constellation
+            ✨ Constellation Journal
           </Text>
           <Text style={[styles.headerSubtitle, { color: theme.secondaryText }]}>
-            Every reflection adds a little light to your sky.
+            Your reflections, written in the stars.
           </Text>
         </View>
 
@@ -186,13 +261,13 @@ export default function ConstellationScreen() {
           <View style={[styles.centerBox, { height: skyHeight }]}>
             <ActivityIndicator color={theme.primary} />
             <Text style={[styles.centerText, { color: theme.secondaryText }]}>
-              ✨ Preparing your sky...
+              ✨ Preparing your constellation...
             </Text>
           </View>
         ) : showError ? (
           <View style={[styles.centerBox, { height: skyHeight }]}>
             <Text style={[styles.centerTitle, { color: theme.text }]}>
-              Your constellation couldn't be loaded.
+              Your constellation could not be loaded.
             </Text>
             <Pressable
               style={[styles.primaryButton, { backgroundColor: theme.primary }]}
@@ -203,20 +278,25 @@ export default function ConstellationScreen() {
               <Text style={styles.primaryButtonText}>Try Again</Text>
             </Pressable>
           </View>
-        ) : showEmpty ? (
-          /* Empty state */
+        ) : showOnboarding ? (
+          /* New student — nothing written yet. */
           <View style={[styles.emptyBox, { height: skyHeight + 20 }]}>
             <ConstellationSky
               stars={[]}
               theme={theme}
               onPressStar={() => {}}
-              moodColor={currentMood?.color}
+              moodColor={undefined}
             />
             <View style={styles.emptyOverlay}>
-              <Text style={styles.emptyTitle}>✨ Your sky is waiting.</Text>
+              <Text style={styles.emptyTitle}>
+                ✨ Your constellation is waiting
+              </Text>
               <Text style={styles.emptySubtitle}>
-                Your first reflection will become the first star in your
-                constellation.
+                Every journal entry becomes a star in your personal sky.
+              </Text>
+              <Text style={styles.emptyStar}>🌟</Text>
+              <Text style={styles.emptyPrompt}>
+                Start writing to light up your first constellation.
               </Text>
               <Pressable
                 style={[styles.primaryButton, { backgroundColor: theme.primary }]}
@@ -232,96 +312,193 @@ export default function ConstellationScreen() {
           </View>
         ) : (
           <>
-            {/* Night sky */}
-            <View style={[styles.skyWrap, { height: skyHeight }]}>
-              <ConstellationSky
-                stars={visibleStars}
-                theme={theme}
-                onPressStar={openStar}
-                selectedId={selectedStarId}
-                moodColor={currentMood?.color}
-              />
-              <View pointerEvents="none" style={styles.skyFooter}>
-                <View style={styles.skyMessagePill}>
-                  <Text style={styles.skyMessage}>
-                    {currentMood ? `${currentMood.emoji} ` : ""}
-                    Your journal is becoming a personal night sky.
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {stars.length > SKY_STAR_LIMIT && (
+            {/* Month navigation */}
+            <View style={styles.monthNav}>
               <Pressable
-                style={styles.fullSkyToggle}
-                onPress={() => setFullSky((prev) => !prev)}
+                onPress={goPrevMonth}
+                hitSlop={10}
+                style={[styles.monthArrow, { borderColor: theme.border }]}
                 accessibilityRole="button"
-                accessibilityLabel={fullSky ? "Show fewer stars" : "View full sky"}
+                accessibilityLabel="Previous month"
               >
-                <Text style={[styles.fullSkyToggleText, { color: theme.primary }]}>
-                  {fullSky
-                    ? "Show fewer stars"
-                    : `View Full Sky (${stars.length} stars)`}
+                <Text style={[styles.monthArrowText, { color: theme.primary }]}>
+                  ◀
                 </Text>
               </Pressable>
-            )}
-
-            {/* Stats */}
-            <View style={styles.statsRow}>
-              <StatChip emoji="📖" value={stats.reflections} label="Reflections" theme={theme} />
-              <StatChip emoji="🗓️" value={stats.days} label="Days" theme={theme} />
-              <StatChip emoji="🎨" value={stats.categories} label="Categories" theme={theme} />
+              <Text style={[styles.monthLabel, { color: theme.text }]}>
+                {monthLabel}
+              </Text>
+              <Pressable
+                onPress={goNextMonth}
+                disabled={viewingCurrentMonth}
+                hitSlop={10}
+                style={[
+                  styles.monthArrow,
+                  { borderColor: theme.border },
+                  viewingCurrentMonth && styles.monthArrowDisabled,
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Next month"
+                accessibilityState={{ disabled: viewingCurrentMonth }}
+              >
+                <Text
+                  style={[
+                    styles.monthArrowText,
+                    {
+                      color: viewingCurrentMonth
+                        ? theme.secondaryText
+                        : theme.primary,
+                    },
+                  ]}
+                >
+                  ▶
+                </Text>
+              </Pressable>
             </View>
 
-            {/* Progress */}
-            <View style={styles.progressWrap}>
-              <ConstellationProgress journalCount={entries.length} theme={theme} />
-            </View>
-
-            {/* Star guide */}
-            {legendCategories.length > 0 && (
-              <View style={styles.legendWrap}>
-                <View style={styles.legendHeader}>
-                  <Text style={[styles.legendTitle, { color: theme.text }]}>
-                    ✨ Star Guide
+            {showEmptyMonth ? (
+              /* Selected month has no reflections. */
+              <View style={[styles.emptyBox, { height: skyHeight + 20 }]}>
+                <ConstellationSky
+                  stars={[]}
+                  theme={theme}
+                  onPressStar={() => {}}
+                  moodColor={undefined}
+                />
+                <View style={styles.emptyOverlay}>
+                  <Text style={styles.emptyStar}>🌙</Text>
+                  <Text style={styles.emptyTitle}>Your sky is waiting</Text>
+                  <Text style={styles.emptySubtitle}>
+                    No reflections have been added to this constellation yet.
+                  </Text>
+                  <Text style={styles.emptyPrompt}>
+                    Write a journal entry to light your first star ✨
                   </Text>
                   <Pressable
-                    onPress={() => setLegendExpanded((prev) => !prev)}
-                    hitSlop={8}
+                    style={[
+                      styles.primaryButton,
+                      { backgroundColor: theme.primary },
+                    ]}
+                    onPress={writeJournal}
                     accessibilityRole="button"
-                    accessibilityLabel={
-                      legendExpanded ? "Hide star guide" : "Show star guide"
-                    }
+                    accessibilityLabel="Write a journal entry"
                   >
-                    <Text style={[styles.legendToggle, { color: theme.primary }]}>
-                      {legendExpanded ? "Hide" : "Show"}
+                    <Text style={styles.primaryButtonText}>
+                      Write Journal Entry
                     </Text>
                   </Pressable>
                 </View>
-                {legendExpanded && (
-                  <View style={styles.legendRow}>
-                    {legendCategories.map((c) => (
-                      <View key={c.id} style={styles.legendItem}>
-                        <View
-                          style={[styles.legendDot, { backgroundColor: c.color }]}
-                        />
+              </View>
+            ) : (
+              <>
+                {/* Night sky */}
+                <View style={[styles.skyWrap, { height: skyHeight }]}>
+                  <ConstellationSky
+                    stars={visibleStars}
+                    theme={theme}
+                    onPressStar={openStar}
+                    selectedId={selectedStarId}
+                    moodColor={currentMood?.color}
+                  />
+                  <View pointerEvents="none" style={styles.skyFooter}>
+                    <View style={styles.skyMessagePill}>
+                      <Text style={styles.skyMessage}>{skyMessage}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {stars.length > SKY_STAR_LIMIT && (
+                  <Pressable
+                    style={styles.fullSkyToggle}
+                    onPress={() => setFullSky((prev) => !prev)}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      fullSky ? "Show fewer stars" : "View full sky"
+                    }
+                  >
+                    <Text
+                      style={[styles.fullSkyToggleText, { color: theme.primary }]}
+                    >
+                      {fullSky
+                        ? "Show fewer stars"
+                        : `View Full Sky (${stars.length} stars)`}
+                    </Text>
+                  </Pressable>
+                )}
+
+                {/* Monthly summary */}
+                <MonthlySummary
+                  reflections={stats.reflections}
+                  journalDays={stats.days}
+                  streak={stats.streak}
+                  moods={stats.moods}
+                  theme={theme}
+                />
+
+                {/* Monthly progress */}
+                <MonthlyProgress
+                  count={stats.reflections}
+                  goal={goal}
+                  monthLabel={monthLabel}
+                  theme={theme}
+                />
+
+                {/* Star guide */}
+                {legendCategories.length > 0 && (
+                  <View style={styles.legendWrap}>
+                    <View style={styles.legendHeader}>
+                      <Text style={[styles.legendTitle, { color: theme.text }]}>
+                        ✨ Star Guide
+                      </Text>
+                      <Pressable
+                        onPress={() => setLegendExpanded((prev) => !prev)}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          legendExpanded
+                            ? "Hide star guide"
+                            : "Show star guide"
+                        }
+                      >
                         <Text
-                          style={[styles.legendLabel, { color: theme.secondaryText }]}
+                          style={[styles.legendToggle, { color: theme.primary }]}
                         >
-                          {c.name}
+                          {legendExpanded ? "Hide" : "Show"}
                         </Text>
+                      </Pressable>
+                    </View>
+                    {legendExpanded && (
+                      <View style={styles.legendRow}>
+                        {legendCategories.map((c) => (
+                          <View key={c.id} style={styles.legendItem}>
+                            <View
+                              style={[
+                                styles.legendDot,
+                                { backgroundColor: c.color },
+                              ]}
+                            />
+                            <Text
+                              style={[
+                                styles.legendLabel,
+                                { color: theme.secondaryText },
+                              ]}
+                            >
+                              {c.name}
+                            </Text>
+                          </View>
+                        ))}
                       </View>
-                    ))}
+                    )}
                   </View>
                 )}
-              </View>
+              </>
             )}
 
-            {/* My Constellations */}
-            <ConstellationCollection
-              journalCount={entries.length}
+            {/* Constellation Journal History */}
+            <MonthlyHistory
+              months={historyMonths}
               theme={theme}
-              onSelect={handleSelectMilestone}
+              onSelect={setSelectedMonth}
             />
           </>
         )}
@@ -334,39 +511,12 @@ export default function ConstellationScreen() {
         onClose={closeModal}
         onViewJournal={goToJournal}
       />
-    </SafeAreaView>
-  );
-}
 
-function StatChip({
-  emoji,
-  value,
-  label,
-  theme,
-}: {
-  emoji: string;
-  value: number;
-  label: string;
-  theme: MindCareTheme;
-}) {
-  return (
-    <View
-      style={[
-        styles.statChip,
-        {
-          backgroundColor: theme.mode === "dark" ? "#2A2240" : "#FFFFFF",
-          borderColor: theme.border,
-        },
-      ]}
-      accessible
-      accessibilityLabel={`${value} ${label}`}
-    >
-      <Text style={styles.statEmoji}>{emoji}</Text>
-      <Text style={[styles.statValue, { color: theme.text }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: theme.secondaryText }]}>
-        {label}
-      </Text>
-    </View>
+      <MonthlyCelebrationModal
+        monthLabel={celebrationMonth}
+        onClose={() => setCelebrationMonth(null)}
+      />
+    </SafeAreaView>
   );
 }
 
@@ -392,6 +542,34 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     marginTop: 4,
+  },
+  monthNav: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+    marginBottom: 16,
+  },
+  monthArrow: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  monthArrowDisabled: {
+    opacity: 0.35,
+  },
+  monthArrowText: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  monthLabel: {
+    fontSize: 17,
+    fontWeight: "800",
+    minWidth: 130,
+    textAlign: "center",
   },
   centerBox: {
     alignItems: "center",
@@ -428,37 +606,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: "rgba(255, 255, 255, 0.95)",
-  },
-  statsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginTop: 16,
-  },
-  statChip: {
-    flexGrow: 1,
-    flexBasis: "28%",
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    alignItems: "center",
-  },
-  statEmoji: {
-    fontSize: 18,
-    marginBottom: 4,
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: "800",
-  },
-  statLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: 2,
-  },
-  progressWrap: {
-    marginTop: 14,
   },
   fullSkyToggle: {
     alignSelf: "center",
@@ -534,8 +681,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     textAlign: "center",
-    marginBottom: 18,
+    marginBottom: 14,
     color: "rgba(255, 255, 255, 0.8)",
+  },
+  emptyStar: {
+    fontSize: 40,
+    marginBottom: 10,
+  },
+  emptyPrompt: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: "center",
+    marginBottom: 18,
+    color: "rgba(255, 255, 255, 0.95)",
+    fontWeight: "600",
   },
   primaryButton: {
     borderRadius: 25,
