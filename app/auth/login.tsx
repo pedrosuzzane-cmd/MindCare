@@ -5,7 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -16,16 +16,19 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 
 const REMEMBER_EMAIL_KEY = "@MindCare:remembered_email";
 
-const COLORS = {
+const DARK = {
   background: "#0F0D15",
   card: "#1E1B2E",
   input: "#1E1B2E",
+  tile: "#FFFFFF",
   border: "rgba(167, 139, 250, 0.22)",
+  checkboxBorder: "#6B5B8A",
   primary: "#6D28D9",
   primarySoft: "#A78BFA",
   text: "#FFFFFF",
@@ -35,7 +38,202 @@ const COLORS = {
   onPrimary: "#FFFFFF",
 };
 
+const LIGHT = {
+  background: "#F8F6FC",
+  card: "#FFFFFF",
+  input: "#F8F6FC",
+  tile: "#F3EEFE",
+  border: "rgba(139, 92, 246, 0.22)",
+  checkboxBorder: "#A78BFA",
+  primary: "#6D28D9",
+  primarySoft: "#8B5CF6",
+  text: "#1E1B2E",
+  muted: "#6B7280",
+  placeholder: "#9CA3AF",
+  error: "#DC2626",
+  onPrimary: "#FFFFFF",
+};
+
+type Breakpoint = "mobile" | "tablet" | "desktop";
+
+const makeStyles = (breakpoint: Breakpoint, C: typeof DARK) => {
+  const desktop = breakpoint === "desktop";
+  const tablet = breakpoint === "tablet";
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: C.background },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: C.background,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: desktop ? "center" : "flex-start",
+    },
+    content: {
+      width: "100%",
+      maxWidth: desktop ? 500 : tablet ? 480 : 400,
+      alignSelf: "center",
+      paddingHorizontal: desktop ? 48 : 24,
+      paddingTop: desktop ? 48 : tablet ? 64 : 72,
+      paddingBottom: desktop ? 48 : 48,
+      ...(desktop && {
+        backgroundColor: C.card,
+        borderRadius: 28,
+        borderWidth: 1,
+        borderColor: "rgba(139, 92, 246, 0.18)",
+        shadowColor: "#6D28D9",
+        shadowOffset: { width: 0, height: 14 },
+        shadowOpacity: 0.12,
+        shadowRadius: 40,
+        elevation: 8,
+        // @ts-ignore
+        boxShadow: "0px 16px 48px rgba(109, 40, 217, 0.12)",
+      }),
+    },
+    brandRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: tablet ? 12 : 10,
+    },
+    brandIcon: {
+      width: desktop ? 52 : tablet ? 44 : 38,
+      height: desktop ? 52 : tablet ? 44 : 38,
+      borderRadius: desktop ? 16 : tablet ? 14 : 12,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: C.tile,
+      overflow: "hidden",
+    },
+    brandLogoImage: {
+      width: desktop ? 40 : tablet ? 34 : 30,
+      height: desktop ? 40 : tablet ? 34 : 30,
+    },
+    brandName: {
+      color: C.text,
+      fontSize: desktop ? 24 : tablet ? 22 : 20,
+      fontWeight: "800",
+    },
+    welcomeTitle: {
+      color: C.text,
+      fontSize: desktop ? 26 : tablet ? 28 : 26,
+      fontWeight: "800",
+      textAlign: "center",
+      marginTop: desktop ? 24 : tablet ? 28 : 26,
+    },
+    welcomeSubtitle: {
+      color: C.muted,
+      fontSize: desktop ? 15 : 14,
+      lineHeight: 21,
+      textAlign: "center",
+      marginTop: 8,
+      marginBottom: desktop ? 36 : tablet ? 32 : 28,
+    },
+    inputContainer: {
+      height: desktop ? 56 : tablet ? 58 : 56,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      paddingHorizontal: 18,
+      borderRadius: desktop ? 16 : tablet ? 29 : 28,
+      marginBottom: desktop ? 18 : tablet ? 18 : 16,
+      backgroundColor: C.input,
+      borderWidth: 1,
+      borderColor: C.border,
+    },
+    inputError: { borderColor: C.error },
+    input: { flex: 1, color: C.text, fontSize: desktop ? 16 : 15, fontWeight: "600" },
+    eyeIcon: { padding: 4 },
+    fieldError: {
+      color: C.error,
+      fontSize: 12,
+      fontWeight: "600",
+      marginTop: -10,
+      marginBottom: tablet || desktop ? 14 : 12,
+      paddingLeft: 16,
+    },
+    rememberRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: tablet || desktop ? 8 : 4,
+    },
+    rememberToggle: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingVertical: 6,
+    },
+    checkbox: {
+      width: 22,
+      height: 22,
+      borderRadius: 7,
+      borderWidth: 2,
+      borderColor: C.checkboxBorder,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    checkboxChecked: { backgroundColor: C.primary, borderColor: C.primary },
+    rememberText: { color: C.muted, fontSize: 13, fontWeight: "600" },
+    formError: {
+      color: C.error,
+      fontSize: 12,
+      fontWeight: "600",
+      textAlign: "center",
+      marginTop: 6,
+      marginBottom: 8,
+    },
+    loginButton: {
+      height: desktop ? 56 : tablet ? 58 : 56,
+      borderRadius: desktop ? 18 : tablet ? 29 : 28,
+      backgroundColor: C.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: desktop ? 20 : tablet ? 18 : 14,
+      shadowColor: C.primary,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.4,
+      shadowRadius: 12,
+      elevation: 6,
+      // @ts-ignore
+      boxShadow: desktop
+        ? "0px 10px 24px rgba(109, 40, 217, 0.28)"
+        : "0px 8px 20px rgba(109, 40, 217, 0.35)",
+    },
+    loginButtonPressed: { opacity: 0.88 },
+    loginButtonDisabled: { opacity: 0.65 },
+    loginButtonText: {
+      color: C.onPrimary,
+      fontSize: desktop ? 16 : 15,
+      fontWeight: "800",
+      letterSpacing: 1,
+    },
+    forgotButton: {
+      alignItems: "center",
+      paddingVertical: desktop ? 16 : 14,
+      marginTop: desktop ? 10 : 6,
+    },
+    forgotText: { color: C.primarySoft, fontSize: desktop ? 15 : 14, fontWeight: "600" },
+    footerContainer: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      marginTop: tablet || desktop ? 14 : 2,
+      flexWrap: "wrap",
+    },
+    footerText: { color: C.muted, fontSize: desktop ? 15 : 14, fontWeight: "500" },
+    signupText: { color: C.primarySoft, fontSize: desktop ? 15 : 14, fontWeight: "800" },
+  });
+};
+
 export default function LoginScreen() {
+  const { width } = useWindowDimensions();
+  const breakpoint: Breakpoint =
+    width >= 1280 ? "desktop" : width >= 768 ? "tablet" : "mobile";
+  const COLORS = breakpoint === "desktop" ? LIGHT : DARK;
+  const styles = useMemo(() => makeStyles(breakpoint, COLORS), [breakpoint, COLORS]);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -285,140 +483,3 @@ export default function LoginScreen() {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: COLORS.background,
-  },
-  scrollContent: { flexGrow: 1 },
-  content: {
-    width: "100%",
-    maxWidth: 400,
-    alignSelf: "center",
-    paddingHorizontal: 24,
-    paddingTop: 72,
-    paddingBottom: 48,
-  },
-  brandRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-  },
-  brandIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    overflow: "hidden",
-  },
-  brandLogoImage: {
-    width: 30,
-    height: 30,
-  },
-  brandName: { color: COLORS.text, fontSize: 20, fontWeight: "800" },
-  welcomeTitle: {
-    color: COLORS.text,
-    fontSize: 26,
-    fontWeight: "800",
-    textAlign: "center",
-    marginTop: 26,
-  },
-  welcomeSubtitle: {
-    color: COLORS.muted,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: "center",
-    marginTop: 8,
-    marginBottom: 28,
-  },
-  inputContainer: {
-    height: 56,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 18,
-    borderRadius: 28,
-    marginBottom: 16,
-    backgroundColor: COLORS.input,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  inputError: { borderColor: COLORS.error },
-  input: { flex: 1, color: COLORS.text, fontSize: 15, fontWeight: "600" },
-  eyeIcon: { padding: 4 },
-  fieldError: {
-    color: COLORS.error,
-    fontSize: 12,
-    fontWeight: "600",
-    marginTop: -8,
-    marginBottom: 12,
-    paddingLeft: 16,
-  },
-  rememberRow: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
-  rememberToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 6,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: "#6B5B8A",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  checkboxChecked: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  rememberText: { color: COLORS.muted, fontSize: 13, fontWeight: "600" },
-  formError: {
-    color: COLORS.error,
-    fontSize: 12,
-    fontWeight: "600",
-    textAlign: "center",
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  loginButton: {
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 14,
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 6,
-    // @ts-ignore — web-only shadow property
-    boxShadow: "0px 8px 20px rgba(109, 40, 217, 0.35)",
-  },
-  loginButtonPressed: { opacity: 0.88 },
-  loginButtonDisabled: { opacity: 0.65 },
-  loginButtonText: {
-    color: COLORS.onPrimary,
-    fontSize: 15,
-    fontWeight: "800",
-    letterSpacing: 1,
-  },
-  forgotButton: { alignItems: "center", paddingVertical: 14, marginTop: 6 },
-  forgotText: { color: COLORS.primarySoft, fontSize: 14, fontWeight: "600" },
-  footerContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 2,
-    flexWrap: "wrap",
-  },
-  footerText: { color: COLORS.muted, fontSize: 14, fontWeight: "500" },
-  signupText: { color: COLORS.primarySoft, fontSize: 14, fontWeight: "800" },
-});

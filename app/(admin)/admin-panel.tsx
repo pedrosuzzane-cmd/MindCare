@@ -2381,7 +2381,7 @@ export default function AdminPanelScreen() {
             styles.content,
             isWide && { padding: responsivePadding, paddingBottom: 40 },
           ]}
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={true}
           onScroll={(e) => {
             const offsetY = e.nativeEvent.contentOffset.y;
             scrollYRef.current = offsetY;
