@@ -1,23 +1,18 @@
 import { MindCareTheme } from "@/constants/theme";
-import { JOURNAL_MILESTONES } from "@/utils/constellationOptions";
+import { nextMilestoneFor } from "@/utils/constellationOptions";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 interface ConstellationProgressProps {
-  starCount: number;
+  journalCount: number;
   theme: MindCareTheme;
 }
 
 export function ConstellationProgress({
-  starCount,
+  journalCount,
   theme,
 }: ConstellationProgressProps) {
-  const nextMilestone =
-    JOURNAL_MILESTONES.find((m) => starCount < m.count) ??
-    JOURNAL_MILESTONES[JOURNAL_MILESTONES.length - 1];
-  const reachedAll = starCount >= nextMilestone.count;
-  const remaining = Math.max(0, nextMilestone.count - starCount);
-  const progress = Math.min(1, starCount / nextMilestone.count);
+  const { next, reachedAll, remaining, progress } = nextMilestoneFor(journalCount);
 
   return (
     <View
@@ -37,17 +32,17 @@ export function ConstellationProgress({
       </View>
 
       <Text style={[styles.milestone, { color: theme.primary }]}>
-        {nextMilestone.emoji} {nextMilestone.title}
+        {next.emoji} {next.title}
       </Text>
 
       <Text style={[styles.count, { color: theme.text }]}>
-        {starCount} / {nextMilestone.count} journals
+        {journalCount} / {next.count} reflections
       </Text>
 
       <Text style={[styles.subtitle, { color: theme.secondaryText }]}>
         {reachedAll
           ? "Your sky is complete — a legend among stars!"
-          : `${remaining} more ${remaining === 1 ? "journal" : "journals"} to unlock`}
+          : `${remaining} more ${remaining === 1 ? "reflection" : "reflections"} to unlock`}
       </Text>
 
       <View
@@ -55,8 +50,8 @@ export function ConstellationProgress({
         accessibilityRole="progressbar"
         accessibilityValue={{
           min: 0,
-          max: nextMilestone.count,
-          now: starCount,
+          max: next.count,
+          now: journalCount,
         }}
       >
         <View

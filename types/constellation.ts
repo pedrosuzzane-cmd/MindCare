@@ -1,28 +1,21 @@
 /**
  * Constellation Weaver data model.
  *
- * A star is the smallest unit of the student's personal night sky. Every
- * qualifying journal creates exactly one star (idempotent by journalId).
- * Stars only store minimal, non-content metadata — the journal content itself
- * stays in its existing journal document and is referenced by journalId.
+ * Stars are DERIVED from the student's existing journal entries. Nothing is
+ * stored in a separate collection — a star is a pure projection of a journal,
+ * so editing or deleting a journal automatically updates the constellation.
+ *
+ * Only lightweight metadata is projected onto a star; the journal content
+ * itself stays in its existing journal document, referenced by journalId.
  */
 
 export type StarType =
-  | "tiny"
+  | "dot"
   | "sparkle"
   | "fourPoint"
   | "fivePoint"
-  | "bright"
-  | "special"
-  | "cluster";
-
-export type StarBrightness = "dim" | "soft" | "bright" | "veryBright" | "special";
-
-export type StarSize = "tiny" | "small" | "medium" | "large" | "special";
-
-export type StarSource = "journal" | "gratitude" | "achievement" | "milestone";
-
-export type ConstellationSyncStatus = "synced" | "pending" | "syncing" | "failed";
+  | "cross"
+  | "glow";
 
 /** Normalized (0–1) position inside the sky container. */
 export interface StarPosition {
@@ -30,27 +23,44 @@ export interface StarPosition {
   y: number;
 }
 
+/** A star projected from a single journal entry (never persisted). */
 export interface ConstellationStar {
-  /** Stable star id. Derived from the journal id so writes are idempotent. */
-  id: string;
-  studentId: string;
-  /** The journal that created this star. */
+  /** The journal this star represents. */
   journalId: string;
+  /** Journal title (metadata shown on selection). */
+  title: string;
+  /** Mood id from the journal. */
+  mood: string;
+  /** Mood display label. */
+  moodLabel: string;
+  /** Mood emoji. */
+  moodEmoji: string;
   /** Journal category id — drives the star's celestial accent color. */
   category?: string;
-  /** True while the newly created star should play its one-time entrance. */
-  highlight?: boolean;
-  type: StarType;
-  size: StarSize;
-  brightness: StarBrightness;
+  /** Category display name. */
+  categoryName: string;
+  /** Category emoji. */
+  categoryEmoji: string;
+  /** Original ISO timestamp (ordering + daily grouping). */
+  createdAt: string;
+  /** Normalized local calendar day in YYYY-MM-DD form. */
+  date: string;
+  /** Local clock time label, e.g. "8:32 AM". */
+  timeLabel: string;
+  /** 1-based position in the journaling journey (oldest = 1). */
+  ordinal: number;
+  /** Deterministic position derived from the journal id. */
   position: StarPosition;
-  source: StarSource;
-  /** Which constellation group this star belongs to. */
-  constellationId: string;
-  /** Set when the star was earned from an achievement unlock. */
-  achievementId?: string;
-  /** Set when the star was earned from a journal-count milestone. */
-  milestoneCount?: number;
-  createdAt: string; // ISO 8601
-  syncStatus: ConstellationSyncStatus;
+  /** Deterministic visual variant derived from the journal id. */
+  type: StarType;
+  /** Celestial accent color from the journal category. */
+  color: string;
+  /** Softer halo used for the glow layers. */
+  glowColor: string;
+  /** True for the most recently created journal. */
+  isNewest: boolean;
+  /** True for milestone journals (1st, 5th, 10th, 20th, 30th, 50th…). */
+  isMilestone: boolean;
+  /** Short, safely truncated preview of the journal thoughts. */
+  preview: string;
 }

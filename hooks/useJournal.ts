@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export function useJournal() {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
@@ -38,8 +39,10 @@ export function useJournal() {
     try {
       const localEntries = await journalService.getJournalEntries(uid);
       setEntries(localEntries);
+      setLoadError(false);
     } catch (error) {
       console.error("Failed to load local journal entries:", error);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -219,6 +222,8 @@ export function useJournal() {
   return {
     entries,
     loading,
+    loadError,
+    reload: loadLocalEntries,
     syncing,
     pendingCount,
     failedCount,

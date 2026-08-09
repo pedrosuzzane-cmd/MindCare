@@ -1,18 +1,15 @@
 import { MindCareTheme } from "@/constants/theme";
 import { ConstellationStar } from "@/types/constellation";
 import {
-  STAR_POSITIONS,
   currentSeason,
   moodSkyColors,
 } from "@/utils/constellationOptions";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useMemo, useState } from "react";
-import { LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
-import Animated, { FadeInDown, FadeOutUp } from "react-native-reanimated";
+import React, { useMemo, useState } from "react";
+import { LayoutChangeEvent, StyleSheet, View } from "react-native";
 import Svg, { Line } from "react-native-svg";
 import { ConstellationStarView } from "./ConstellationStar";
 
-const NEW_STAR_MESSAGE_MS = 4500;
 const LINE_THICKNESS = 1.2;
 const LINE_GLOW_THICKNESS = 4;
 
@@ -20,8 +17,8 @@ interface ConstellationSkyProps {
   stars: ConstellationStar[];
   theme: MindCareTheme;
   onPressStar: (star: ConstellationStar) => void;
-  /** Optional per-star glyph override (e.g. achievement emoji). */
-  glyphForStar?: (star: ConstellationStar) => string | undefined;
+  /** Id of the currently selected star (stronger glow). */
+  selectedId?: string | null;
   /** Latest journal mood color; tints the sky when present. */
   moodColor?: string;
 }
@@ -34,16 +31,18 @@ interface SkyLine {
   y2: number;
 }
 
-/** Dim, non-interactive backdrop stars for atmosphere. */
-const BACKDROP_STAR_POSITIONS = STAR_POSITIONS.filter(
-  (_p, idx) => idx % 3 === 0 && idx % 2 === 1,
-);
+/** Dim, non-interactive backdrop dots for atmosphere. */
+const BACKDROP_DOTS = Array.from({ length: 18 }, (_, i) => ({
+  x: ((i * 37 + 11) % 97) / 100,
+  y: ((i * 53 + 7) % 91) / 100,
+  dim: i % 3 === 0,
+}));
 
 export function ConstellationSky({
   stars,
   theme,
   onPressStar,
-  glyphForStar,
+  selectedId,
   moodColor,
 }: ConstellationSkyProps) {
   const [layout, setLayout] = useState({ width: 0, height: 0 });
@@ -62,66 +61,27 @@ export function ConstellationSky({
 
   const lineColor = theme.mode === "dark" ? "#E9DFFF" : "#F4EEFF";
 
-  // A journal-derived star still marked `highlight` just appeared — show the
-  // short celebratory note once (milestone/achievement novas get their own
-  // reward moments, so they don't trigger the note).
-  const showNewStarMessage = stars.some(
-    (s) =>
-      s.highlight === true &&
-      (s.source === "journal" || s.source === "gratitude"),
-  );
-
-  const [showMessage, setShowMessage] = useState(showNewStarMessage);
-  useEffect(() => {
-    if (!showNewStarMessage) {
-      setShowMessage(false);
-      return;
-    }
-    setShowMessage(true);
-    const timer = setTimeout(() => setShowMessage(false), NEW_STAR_MESSAGE_MS);
-    return () => clearTimeout(timer);
-  }, [showNewStarMessage]);
-
   /**
-   * Each constellation group draws a quiet line between consecutive stars in
-   * chronological order — every new star is linked to the one that came before
-   * it, so the constellation grows into a recognizable shape over time.
+   * Connect consecutive stars in chronological order (oldest → newest). The
+   * lines are quiet, low-opacity strokes so the sky stays calm and clean.
    */
   const lines = useMemo<SkyLine[]>(() => {
     if (layout.width === 0 || layout.height === 0) return [];
     if (stars.length < 2) return [];
-
-    const groups = new Map<string, ConstellationStar[]>();
-    for (const star of stars) {
-      // All journal-derived stars (reflections + gratitude) share one journey
-      // path so the sky draws a single recognizable constellation; achievement
-      // and milestone novas stay as their own quiet side chains.
-      const key =
-        star.source === "journal" || star.source === "gratitude"
-          ? "journey"
-          : star.constellationId || "reflection";
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(star);
-    }
-
+    const sorted = [...stars].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
     const result: SkyLine[] = [];
-    for (const [groupKey, groupStars] of groups) {
-      if (groupStars.length < 2) continue;
-      const sorted = [...groupStars].sort(
-        (a, b) =>
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-      );
-      for (let i = 1; i < sorted.length; i++) {
-        const a = sorted[i - 1];
-        const b = sorted[i];
-        result.push({
-          key: `${groupKey}_${a.id}`,
-          x1: a.position.x * layout.width,
-          y1: a.position.y * layout.height,
-          x2: b.position.x * layout.width,
-          y2: b.position.y * layout.height,
-        });
-      }
+    for (let i = 1; i < sorted.length; i++) {
+      const a = sorted[i - 1];
+      const b = sorted[i];
+      result.push({
+        key: `${a.journalId}_${b.journalId}`,
+        x1: a.position.x * layout.width,
+        y1: a.position.y * layout.height,
+        x2: b.position.x * layout.width,
+        y2: b.position.y * layout.height,
+      });
     }
     return result;
   }, [stars, layout]);
@@ -145,8 +105,8 @@ export function ConstellationSky({
         pointerEvents="none"
       />
 
-      {/* Ambient backdrop stars */}
-      {BACKDROP_STAR_POSITIONS.map((pos, idx) => (
+      {/* Ambient backdrop dots */}
+      {BACKDROP_DOTS.map((pos, idx) => (
         <View
           key={`backdrop_${idx}`}
           pointerEvents="none"
@@ -155,7 +115,7 @@ export function ConstellationSky({
             {
               left: `${pos.x * 100}%`,
               top: `${pos.y * 100}%`,
-              opacity: idx % 4 === 0 ? 0.22 : 0.14,
+              opacity: pos.dim ? 0.2 : 0.12,
             },
           ]}
         />
@@ -172,7 +132,7 @@ export function ConstellationSky({
               y2={line.y2}
               stroke={lineColor}
               strokeWidth={LINE_GLOW_THICKNESS}
-              strokeOpacity={0.08}
+              strokeOpacity={0.07}
               strokeLinecap="round"
             />
             <Line
@@ -182,7 +142,7 @@ export function ConstellationSky({
               y2={line.y2}
               stroke={lineColor}
               strokeWidth={LINE_THICKNESS}
-              strokeOpacity={0.4}
+              strokeOpacity={0.38}
               strokeLinecap="round"
             />
           </React.Fragment>
@@ -192,29 +152,15 @@ export function ConstellationSky({
       {/* Real stars */}
       {stars.map((star) => (
         <ConstellationStarView
-          key={star.id}
+          key={star.journalId}
           star={star}
-          animate={star.highlight === true}
+          selected={star.journalId === selectedId}
+          animate={
+            star.isNewest || star.isMilestone || star.journalId === selectedId
+          }
           onPress={onPressStar}
-          glyph={glyphForStar?.(star)}
         />
       ))}
-
-      {/* "Your thoughts became a new star" note */}
-      {showMessage && (
-        <Animated.View
-          entering={FadeInDown.duration(400)}
-          exiting={FadeOutUp.duration(400)}
-          pointerEvents="none"
-          style={styles.newStarBanner}
-        >
-          <View style={styles.newStarPill}>
-            <Text style={styles.newStarText}>
-              Your thoughts became a new star ✨
-            </Text>
-          </View>
-        </Animated.View>
-      )}
     </View>
   );
 }
@@ -231,23 +177,5 @@ const styles = StyleSheet.create({
     height: 3,
     borderRadius: 1.5,
     backgroundColor: "#FFFFFF",
-  },
-  newStarBanner: {
-    position: "absolute",
-    top: 16,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-  },
-  newStarPill: {
-    backgroundColor: "rgba(20, 14, 40, 0.62)",
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  newStarText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "rgba(255, 255, 255, 0.95)",
   },
 });

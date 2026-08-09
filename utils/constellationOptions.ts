@@ -1,44 +1,103 @@
-import { StarType, StarSize, StarBrightness, StarPosition } from "@/types/constellation";
+import { JournalEntry } from "@/services/journalService";
+import { ConstellationStar, StarPosition, StarType } from "@/types/constellation";
+import { getCategory, getCategoryLabel, getMood } from "@/utils/journalOptions";
 
 /**
- * Controlled star system. Every star appearance is driven by a config here
- * instead of being hard-coded in the screen, so the sky stays consistent.
+ * Journal → Star projection. Everything here is DETERMINISTIC: a journal
+ * always maps to the same position, color and shape, so the sky never shuffles
+ * between renders. Stars are derived on the fly from the existing journals —
+ * no separate constellation storage exists.
  */
+
+/* ── Deterministic hashing ────────────────────────────────────────────── */
+
+export const hashSeed = (id: string): number => {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash << 5) - hash + id.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+};
+
+/* ── Date normalization ───────────────────────────────────────────────── */
+
+/**
+ * Convert an ISO timestamp into the student's LOCAL calendar day (YYYY-MM-DD).
+ * Two entries on the same day (08:32 vs 15:15) therefore share one date even
+ * though their raw timestamps differ.
+ */
+export const normalizeJournalDate = (iso: string): string => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "unknown";
+  const y = date.getFullYear();
+  const m = `${date.getMonth() + 1}`.padStart(2, "0");
+  const d = `${date.getDate()}`.padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+/** Render a normalized date as "August 8, 2026" in the local calendar. */
+export const formatJournalDate = (date: string): string => {
+  if (!date || date === "unknown") return "";
+  const [y, m, d] = date.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const timeLabelFor = (iso: string): string => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+};
+
+/* ── Star appearance ──────────────────────────────────────────────────── */
 
 export interface StarTypeConfig {
   glyph: string;
   /** Rendered font size in px. */
   sizePx: number;
-  /** Base opacity used by the sky (brightness is layered on top). */
+  /** Base opacity used by the sky (glow layered on top). */
   opacity: number;
   glow: boolean;
-  /** Warm golden tint reserved for special stars. */
-  gold?: boolean;
-  /** Renders as a small group of tiny stars instead of a single glyph. */
-  cluster?: boolean;
 }
 
 export const STAR_TYPE_CONFIG: Record<StarType, StarTypeConfig> = {
-  tiny: { glyph: "·", sizePx: 5, opacity: 0.5, glow: false },
-  sparkle: { glyph: "✧", sizePx: 9, opacity: 0.6, glow: false },
-  fourPoint: { glyph: "✦", sizePx: 12, opacity: 0.8, glow: false },
-  fivePoint: { glyph: "★", sizePx: 15, opacity: 0.9, glow: false },
-  bright: { glyph: "🌟", sizePx: 18, opacity: 1, glow: true },
-  special: { glyph: "🌟", sizePx: 26, opacity: 1, glow: true, gold: true },
-  cluster: { glyph: "·", sizePx: 7, opacity: 0.6, glow: false, cluster: true },
+  dot: { glyph: "·", sizePx: 7, opacity: 0.7, glow: false },
+  sparkle: { glyph: "✧", sizePx: 10, opacity: 0.75, glow: false },
+  fourPoint: { glyph: "✦", sizePx: 13, opacity: 0.85, glow: false },
+  fivePoint: { glyph: "★", sizePx: 16, opacity: 0.9, glow: false },
+  cross: { glyph: "✵", sizePx: 12, opacity: 0.8, glow: false },
+  glow: { glyph: "🌟", sizePx: 22, opacity: 1, glow: true },
 };
 
-export const STAR_COLORS = {
-  white: "#FFFFFF",
-  lavender: "#E9DFFF",
-  paleViolet: "#CBB8F5",
-  lightPurple: "#B79FE8",
-  gold: "#FFD98A",
+/** Ordinary variants; milestone journals use the special `glow` type. */
+const STAR_VARIANTS: StarType[] = [
+  "dot",
+  "sparkle",
+  "fourPoint",
+  "fivePoint",
+  "cross",
+];
+
+/** Journal ordinals that earn a visually distinct milestone star. */
+export const MILESTONE_ORDINALS = [1, 5, 10, 20, 30, 50];
+
+export const isMilestoneJournal = (ordinal: number): boolean =>
+  MILESTONE_ORDINALS.includes(ordinal);
+
+/** Deterministic star shape: milestone journals glow, the rest hash by id. */
+export const starTypeFor = (journalId: string, ordinal: number): StarType => {
+  if (isMilestoneJournal(ordinal)) return "glow";
+  return STAR_VARIANTS[hashSeed(journalId) % STAR_VARIANTS.length];
 };
 
 /**
  * Celestial accent color per journal category. Kept deliberately soft so the
- * sky stays in MindCare's dark purple identity instead of turning arcade-bright.
+ * sky stays in MindCare's purple identity instead of turning arcade-bright.
  */
 export const STAR_CATEGORY_COLORS: Record<string, string> = {
   personal: "#A78BFA",
@@ -47,136 +106,108 @@ export const STAR_CATEGORY_COLORS: Record<string, string> = {
   emotions: "#F9A8D4",
   social: "#F9A8D4",
   family: "#FDBA74",
-  goals: "#818CF8",
+  goals: "#67E8F9",
   growth: "#86EFAC",
   gratitude: "#FDE68A",
   work: "#FDBA74",
   financial: "#67E8F9",
   spiritual: "#C4B5FD",
   life_events: "#67E8F9",
-  other: "#67E8F9",
+  other: "#E9E9EE",
 };
 
-/** Resolve a category id to its celestial accent, if known. */
-export const starCategoryColor = (category?: string): string | undefined =>
-  category ? STAR_CATEGORY_COLORS[category] : undefined;
+export interface StarAppearance {
+  color: string;
+  glowColor: string;
+}
 
-export const STAR_BRIGHTNESS_OPACITY: Record<StarBrightness, number> = {
-  dim: 0.35,
-  soft: 0.6,
-  bright: 0.85,
-  veryBright: 1,
-  special: 1,
+export const getStarAppearance = (category?: string): StarAppearance => {
+  const color = category
+    ? STAR_CATEGORY_COLORS[category]
+    : STAR_CATEGORY_COLORS.other;
+  return { color, glowColor: color };
 };
 
-export const STAR_SIZE_LABEL: Record<StarType, StarSize> = {
-  tiny: "tiny",
-  sparkle: "small",
-  fourPoint: "medium",
-  fivePoint: "large",
-  bright: "large",
-  special: "special",
-  cluster: "tiny",
-};
+/* ── Deterministic positions ──────────────────────────────────────────── */
+
+const GRID_ROWS = 7;
+const GRID_COLS = 8;
 
 /**
- * Deterministic brightness per type so brightness never fights the glyph.
- * Special stars keep the "special" brightness for the glow effect.
+ * A journal id hashes onto a stable cell of a virtual grid, with a small
+ * id-derived jitter inside that cell. Positions never change between renders,
+ * and successive journals spread across the whole sky instead of piling up.
  */
-export const STAR_BRIGHTNESS: Record<StarType, StarBrightness> = {
-  tiny: "dim",
-  sparkle: "soft",
-  fourPoint: "bright",
-  fivePoint: "veryBright",
-  bright: "veryBright",
-  special: "special",
-  cluster: "soft",
-};
-
-/**
- * Predefined normalized positions spread across the sky. Using a fixed,
- * balanced set (rather than pure randomness) keeps stars from overlapping,
- * leaving the screen, or clustering into an unbalanced layout.
- */
-const buildPositions = (): StarPosition[] => {
-  const positions: StarPosition[] = [];
-  const rows = 8;
-  const cols = 9;
-  for (let r = 0; r < rows; r++) {
-    const offset = r % 2 === 0 ? 0 : (1 / cols) * 0.5;
-    for (let c = 0; c < cols; c++) {
-      positions.push({
-        x: offset + c / cols,
-        y: 0.1 + (r / rows) * 0.8,
-      });
-    }
-  }
-  return positions;
-};
-
-export const STAR_POSITIONS: StarPosition[] = buildPositions();
-
-/**
- * Journal stars cycle through a controlled distribution so consecutive stars
- * never look identical: small 35%, normal 35%, bright 15%, sparkle 10%,
- * special 5%. The cycle is index-driven so every journal maps to a stable type.
- */
-const JOURNAL_TYPE_CYCLE: StarType[] = [
-  // small (35%)
-  "tiny", "tiny", "tiny", "tiny", "tiny", "tiny", "tiny",
-  // normal (35%) — mix of four-point and five-point
-  "fourPoint", "fivePoint", "fourPoint", "fourPoint", "fivePoint", "fourPoint", "fivePoint",
-  // bright (15%)
-  "bright", "bright", "bright",
-  // sparkle (10%)
-  "sparkle", "sparkle",
-  // special (5%)
-  "special",
-];
-
-export const selectJournalStarType = (index: number): StarType =>
-  JOURNAL_TYPE_CYCLE[index % JOURNAL_TYPE_CYCLE.length];
-
-/**
- * Journals that earn a visually distinct special star: the very first one,
- * then every ~dozen journals (10th, 25th, 50th).
- */
-export const isMilestoneJournal = (index: number): boolean =>
-  index === 0 || index === 9 || index === 24 || index === 49;
-
-/**
- * Deterministic tiny jitter derived from a string id. Gives each star a small
- * individual offset without randomness, so positions stay stable across renders.
- */
-export const positionJitterFor = (seed: string): { dx: number; dy: number } => {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash << 5) - hash + seed.charCodeAt(i);
-    hash |= 0;
-  }
-  const dx = ((Math.abs(hash) % 100) / 100) * 0.04 - 0.02;
-  const dy = ((Math.abs(hash >> 8) % 100) / 100) * 0.04 - 0.02;
-  return { dx, dy };
-};
-
-export const nextStarPosition = (starCount: number, seed: string): StarPosition => {
-  const base = STAR_POSITIONS[starCount % STAR_POSITIONS.length];
-  const { dx, dy } = positionJitterFor(seed);
+export const positionFor = (journalId: string): StarPosition => {
+  const h = hashSeed(journalId);
+  const row = h % GRID_ROWS;
+  const col = (h >> 8) % GRID_COLS;
+  const jx = ((h >> 16) % 100) / 100;
+  const jy = ((h >> 24) % 100) / 100;
+  const marginX = 0.06;
+  const marginY = 0.08;
+  const cellW = (1 - marginX * 2) / GRID_COLS;
+  const cellH = (1 - marginY * 2) / GRID_ROWS;
   return {
-    x: Math.min(0.96, Math.max(0.04, base.x + dx)),
-    y: Math.min(0.94, Math.max(0.08, base.y + dy)),
+    x: marginX + col * cellW + jx * cellW * 0.6,
+    y: marginY + row * cellH + jy * cellH * 0.6,
   };
 };
 
-/** Constellation group a star belongs to. */
-export const CONSTELLATION_ID: Record<string, string> = {
-  journal: "reflection",
-  gratitude: "gratitude",
-  achievement: "achievements",
-  milestone: "milestones",
+/* ── Journal → star projection ────────────────────────────────────────── */
+
+const PREVIEW_LIMIT = 140;
+
+const truncateText = (text: string): string => {
+  const cleaned = (text || "").replace(/\s+/g, " ").trim();
+  if (cleaned.length <= PREVIEW_LIMIT) return cleaned;
+  return `${cleaned.slice(0, PREVIEW_LIMIT).trimEnd()}…`;
 };
 
-/** Journal-count milestones. Reaching one earns a bright nova in the sky. */
+/**
+ * Project every journal entry into a star. Pure and deterministic: the same
+ * set of journals always produces the same sky. Editing or deleting a journal
+ * is automatically reflected the next time this runs.
+ */
+export const buildConstellationStars = (
+  entries: JournalEntry[],
+): ConstellationStar[] => {
+  const sorted = [...entries].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+  const newestId = sorted.length ? sorted[sorted.length - 1].id : undefined;
+
+  return sorted.map((entry, index) => {
+    const ordinal = index + 1;
+    const mood = getMood(entry.mood);
+    const category = getCategory(entry.category);
+    const appearance = getStarAppearance(entry.category);
+    return {
+      journalId: entry.id,
+      title: entry.title,
+      mood: entry.mood,
+      moodLabel: mood?.label ?? entry.mood,
+      moodEmoji: mood?.emoji ?? "❓",
+      category: entry.category,
+      categoryName: getCategoryLabel(entry.category, entry.customCategory),
+      categoryEmoji: category?.emoji ?? "✦",
+      createdAt: entry.createdAt,
+      date: normalizeJournalDate(entry.createdAt),
+      timeLabel: timeLabelFor(entry.createdAt),
+      ordinal,
+      position: positionFor(entry.id),
+      type: starTypeFor(entry.id, ordinal),
+      color: appearance.color,
+      glowColor: appearance.glowColor,
+      isNewest: entry.id === newestId,
+      isMilestone: isMilestoneJournal(ordinal),
+      preview: truncateText(entry.thoughts),
+    };
+  });
+};
+
+/* ── Milestones ────────────────────────────────────────────────────────── */
+
 export interface JournalMilestone {
   count: number;
   emoji: string;
@@ -184,16 +215,35 @@ export interface JournalMilestone {
 }
 
 export const JOURNAL_MILESTONES: JournalMilestone[] = [
-  { count: 1, emoji: "✨", title: "First Light" },
-  { count: 5, emoji: "✦", title: "Little Dipper" },
-  { count: 10, emoji: "♡", title: "Heart Constellation" },
+  { count: 1, emoji: "🌟", title: "First Light" },
+  { count: 5, emoji: "✨", title: "Growing Sky" },
+  { count: 10, emoji: "💜", title: "Heart Constellation" },
   { count: 20, emoji: "📖", title: "Open Book" },
-  { count: 30, emoji: "🌙", title: "Crescent Moon" },
-  { count: 50, emoji: "🌠", title: "Star Path" },
-  { count: 100, emoji: "🌌", title: "MindCare Galaxy" },
+  { count: 30, emoji: "🌙", title: "Dreaming Moon" },
+  { count: 50, emoji: "🌌", title: "MindCare Galaxy" },
 ];
 
-// ── Atmosphere ────────────────────────────────────────────────────────────
+export interface MilestoneProgress {
+  next: JournalMilestone;
+  reachedAll: boolean;
+  remaining: number;
+  progress: number;
+}
+
+export const nextMilestoneFor = (journalCount: number): MilestoneProgress => {
+  const next =
+    JOURNAL_MILESTONES.find((m) => journalCount < m.count) ??
+    JOURNAL_MILESTONES[JOURNAL_MILESTONES.length - 1];
+  const reachedAll = journalCount >= next.count;
+  return {
+    next,
+    reachedAll,
+    remaining: Math.max(0, next.count - journalCount),
+    progress: Math.min(1, journalCount / next.count),
+  };
+};
+
+/* ── Atmosphere ─────────────────────────────────────────────────────────── */
 
 const hexToRgb = (hex: string): [number, number, number] => {
   const h = hex.replace("#", "");

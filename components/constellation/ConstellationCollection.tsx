@@ -10,18 +10,18 @@ import {
 } from "react-native";
 
 interface ConstellationCollectionProps {
-  starCount: number;
+  journalCount: number;
   theme: MindCareTheme;
   onSelect: (count: number) => void;
 }
 
 /**
  * "My Constellations" — the long-term progression trail. Unlocked
- * constellations are tappable and open their milestone detail; locked ones
- * show how many more journals are needed.
+ * constellations are tappable and open the milestone day's reflections; locked
+ * ones show how many more reflections are needed.
  */
 export function ConstellationCollection({
-  starCount,
+  journalCount,
   theme,
   onSelect,
 }: ConstellationCollectionProps) {
@@ -34,8 +34,8 @@ export function ConstellationCollection({
         contentContainerStyle={styles.row}
       >
         {JOURNAL_MILESTONES.map((m) => {
-          const unlocked = starCount >= m.count;
-          const remaining = Math.max(0, m.count - starCount);
+          const unlocked = journalCount >= m.count;
+          const remaining = Math.max(0, m.count - journalCount);
           return (
             <Pressable
               key={m.count}
@@ -49,7 +49,7 @@ export function ConstellationCollection({
                 },
               ]}
               accessibilityRole="button"
-              accessibilityLabel={`${m.title}, ${unlocked ? "unlocked" : `locked, ${remaining} more journals`}`}
+              accessibilityLabel={`${m.title}, ${unlocked ? "unlocked" : `locked, ${remaining} more reflections`}`}
             >
               <Text style={[styles.emoji, !unlocked && styles.emojiLocked]}>
                 {unlocked ? m.emoji : "🔒"}
