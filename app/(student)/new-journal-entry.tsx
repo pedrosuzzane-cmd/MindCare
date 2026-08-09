@@ -1,7 +1,8 @@
 import { shadows } from "@/utils/shadows";
 import { useJournal } from "@/hooks/useJournal";
 import { useNetwork } from "@/contexts/NetworkContext";
-import { CATEGORIES, MOODS, getMood } from "@/utils/journalOptions";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import { CATEGORIES, MOODS, getCategory, getMood } from "@/utils/journalOptions";
 import { generateLocalReflection, detectRisk } from "@/utils/journalReflection";
 import { journalDraftStorage } from "@/storage/journalDraftStorage";
 import { Ionicons } from "@expo/vector-icons";
@@ -24,11 +25,17 @@ import {
 import Animated, {
   FadeIn,
   FadeInDown,
+  FadeOutUp,
+  LinearTransition,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const THOUGHT_LIMIT = 3000;
 const TITLE_LIMIT = 200;
+const CUSTOM_CATEGORY_LIMIT = 40;
 const GOAL_WORDS = 50;
 const DRAFT_INTERVAL_MS = 30_000;
 
@@ -37,23 +44,37 @@ export default function NewJournalEntryScreen() {
   const { addJournalEntry, updateJournalEntry, getJournalEntry, entries } =
     useJournal();
   const { isConnected } = useNetwork();
+  const { theme } = useMindCareTheme();
   const [entryDate, setEntryDate] = useState<Date>(new Date());
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [customCategory, setCustomCategory] = useState<string>("");
   const [entryTitle, setEntryTitle] = useState<string>("");
   const [selectedMood, setSelectedMood] = useState<string>("");
   const [thoughts, setThoughts] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
+  const [isMoodExpanded, setIsMoodExpanded] = useState(false);
+  const chevronRotation = useSharedValue(0);
+  const [isCategoryExpanded, setIsCategoryExpanded] = useState(false);
+  const categoryChevronRotation = useSharedValue(0);
+  const [customCategoryError, setCustomCategoryError] = useState(false);
 
   const editEntryId = params.entryId;
   const isEditing = !!editEntryId;
 
-  const draftRef = useRef({ title: "", thoughts: "", mood: "", category: "" });
+  const draftRef = useRef({
+    title: "",
+    thoughts: "",
+    mood: "",
+    category: "",
+    customCategory: "",
+  });
   draftRef.current = {
     title: entryTitle,
     thoughts,
     mood: selectedMood,
     category: selectedCategory,
+    customCategory,
   };
 
   const isFutureDate = (date: Date): boolean => {
@@ -72,6 +93,7 @@ export default function NewJournalEntryScreen() {
         setThoughts(entry.thoughts || "");
         setSelectedMood(entry.mood || "");
         setSelectedCategory(entry.category || "");
+        setCustomCategory(entry.customCategory || "");
         setEntryDate(new Date(entry.entryDate));
       }
     } else if (params.date) {
@@ -96,11 +118,18 @@ export default function NewJournalEntryScreen() {
     let mounted = true;
     journalDraftStorage.getDraft().then((draft) => {
       if (!mounted || !draft) return;
-      if (draft.title || draft.thoughts || draft.mood || draft.category) {
+      if (
+        draft.title ||
+        draft.thoughts ||
+        draft.mood ||
+        draft.category ||
+        draft.customCategory
+      ) {
         setEntryTitle(draft.title || "");
         setThoughts(draft.thoughts || "");
         setSelectedMood(draft.mood || "");
         setSelectedCategory(draft.category || "");
+        setCustomCategory(draft.customCategory || "");
         setDraftRestored(true);
       }
     });
@@ -114,12 +143,19 @@ export default function NewJournalEntryScreen() {
     if (isEditing) return;
     const saveDraftNow = () => {
       const d = draftRef.current;
-      if (d.mood || d.category || d.title.trim() || d.thoughts.trim()) {
+      if (
+        d.mood ||
+        d.category ||
+        d.customCategory ||
+        d.title.trim() ||
+        d.thoughts.trim()
+      ) {
         journalDraftStorage.saveDraft({
           title: d.title,
           thoughts: d.thoughts,
           mood: d.mood,
           category: d.category,
+          customCategory: d.customCategory,
           savedAt: new Date().toISOString(),
         });
       }
@@ -180,6 +216,11 @@ export default function NewJournalEntryScreen() {
       return;
     }
 
+    if (selectedCategory === "other" && !customCategory.trim()) {
+      setCustomCategoryError(true);
+      return;
+    }
+
     setSaving(true);
     try {
       const sanitize = (s: string, max: number) => s.trim().slice(0, max);
@@ -201,6 +242,10 @@ export default function NewJournalEntryScreen() {
           });
       const data = {
         category: selectedCategory,
+        customCategory:
+          selectedCategory === "other"
+            ? sanitize(customCategory, CUSTOM_CATEGORY_LIMIT)
+            : undefined,
         mood: selectedMood,
         title: sanitize(entryTitle, TITLE_LIMIT),
         thoughts: sanitize(thoughts, THOUGHT_LIMIT),
@@ -250,10 +295,52 @@ export default function NewJournalEntryScreen() {
   };
 
   const canSave = Boolean(
-    selectedCategory && selectedMood && entryTitle.trim() && thoughts.trim(),
+    selectedCategory &&
+      selectedMood &&
+      entryTitle.trim() &&
+      thoughts.trim(),
   );
 
   const selectedMoodOption = getMood(selectedMood);
+  const selectedCategoryOption = getCategory(selectedCategory);
+
+  const toggleMoodExpanded = () => {
+    const next = !isMoodExpanded;
+    setIsMoodExpanded(next);
+    chevronRotation.value = withTiming(next ? 180 : 0, { duration: 200 });
+  };
+
+  const handleSelectMood = (moodId: string) => {
+    setSelectedMood(moodId);
+    setIsMoodExpanded(false);
+    chevronRotation.value = withTiming(0, { duration: 200 });
+  };
+
+  const chevronStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${chevronRotation.value}deg` }],
+  }));
+
+  const toggleCategoryExpanded = () => {
+    const next = !isCategoryExpanded;
+    setIsCategoryExpanded(next);
+    categoryChevronRotation.value = withTiming(next ? 180 : 0, {
+      duration: 200,
+    });
+  };
+
+  const handleSelectCategory = (categoryId: string) => {
+    setSelectedCategory(categoryId);
+    setCustomCategoryError(false);
+    if (categoryId !== "other") {
+      setCustomCategory("");
+    }
+    setIsCategoryExpanded(false);
+    categoryChevronRotation.value = withTiming(0, { duration: 200 });
+  };
+
+  const categoryChevronStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${categoryChevronRotation.value}deg` }],
+  }));
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
@@ -310,92 +397,340 @@ export default function NewJournalEntryScreen() {
             </View>
           )}
 
-          {/* Mood Selection */}
-          <Animated.View entering={FadeIn.duration(350)}>
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>How are you feeling today?</Text>
-              <Text style={styles.sectionHint}>
-                Pick the mood that matches how you feel right now.
-              </Text>
-              <View style={styles.moodCard}>
-                <View style={styles.moodGrid}>
-                  {MOODS.map((mood) => {
-                    const isSelected = selectedMood === mood.id;
-                    return (
-                      <Pressable
-                        key={mood.id}
-                        style={styles.moodItem}
-                        onPress={() => setSelectedMood(mood.id)}
+          {/* Mood Selection (collapsible) */}
+          <Animated.View
+            entering={FadeIn.duration(350)}
+            layout={LinearTransition.duration(200)}
+          >
+            <View
+              style={[
+                styles.moodCard,
+                { backgroundColor: theme.card, borderColor: theme.border },
+              ]}
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: isMoodExpanded }}
+                accessibilityLabel={
+                  isMoodExpanded
+                    ? "Today's mood, expanded. Double tap to collapse."
+                    : `Today's mood${
+                        selectedMoodOption
+                          ? `, ${selectedMoodOption.label}`
+                          : ""
+                      }. Double tap to expand.`
+                }
+                onPress={toggleMoodExpanded}
+                style={styles.moodHeader}
+                hitSlop={8}
+              >
+                <View style={styles.moodHeaderLeft}>
+                  <Text style={styles.moodHeaderIcon}>💭</Text>
+                  <Text style={[styles.moodHeaderTitle, { color: theme.text }]}>
+                    Today's mood
+                  </Text>
+                </View>
+                <View style={styles.moodHeaderRight}>
+                  {selectedMoodOption ? (
+                    <>
+                      <Text style={styles.moodHeaderEmoji}>
+                        {selectedMoodOption.emoji}
+                      </Text>
+                      <Text
+                        style={[styles.moodHeaderValue, { color: theme.primary }]}
                       >
-                        <View
-                          style={[
-                            styles.moodCircle,
-                            isSelected && styles.moodCircleSelected,
-                          ]}
-                        >
-                          <Text style={styles.moodEmoji}>{mood.emoji}</Text>
-                        </View>
+                        {selectedMoodOption.label}
+                      </Text>
+                    </>
+                  ) : (
+                    <Text
+                      style={[
+                        styles.moodHeaderPlaceholder,
+                        { color: theme.secondaryText },
+                      ]}
+                    >
+                      Choose your mood
+                    </Text>
+                  )}
+                  <Animated.View style={chevronStyle}>
+                    <Ionicons
+                      name="chevron-down"
+                      size={20}
+                      color={theme.primary}
+                    />
+                  </Animated.View>
+                </View>
+              </Pressable>
+
+              {isMoodExpanded && (
+                <Animated.View
+                  entering={FadeInDown.duration(180)}
+                  exiting={FadeOutUp.duration(150)}
+                >
+                  <View style={styles.moodBody}>
+                    <Text
+                      style={[styles.moodHint, { color: theme.secondaryText }]}
+                    >
+                      Pick the mood that matches how you feel right now.
+                    </Text>
+                    <View style={styles.moodGrid}>
+                      {MOODS.map((mood) => {
+                        const isSelected = selectedMood === mood.id;
+                        return (
+                          <Pressable
+                            key={mood.id}
+                            style={styles.moodItem}
+                            onPress={() => handleSelectMood(mood.id)}
+                          >
+                            <View
+                              style={[
+                                styles.moodCircle,
+                                { backgroundColor: theme.inputBg },
+                                isSelected && [
+                                  styles.moodCircleSelected,
+                                  {
+                                    backgroundColor: theme.primary,
+                                    borderColor: theme.primaryDeep,
+                                  },
+                                ],
+                              ]}
+                            >
+                              <Text style={styles.moodEmoji}>{mood.emoji}</Text>
+                            </View>
+                            <Text
+                              style={[
+                                styles.moodLabel,
+                                { color: theme.secondaryText },
+                                isSelected && [
+                                  styles.moodLabelSelected,
+                                  { color: theme.primary },
+                                ],
+                              ]}
+                            >
+                              {mood.label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    {selectedMoodOption && (
+                      <View
+                        style={[
+                          styles.selectedMoodRow,
+                          { borderTopColor: theme.border },
+                        ]}
+                      >
                         <Text
                           style={[
-                            styles.moodLabel,
-                            isSelected && styles.moodLabelSelected,
+                            styles.selectedMoodLabel,
+                            { color: theme.secondaryText },
                           ]}
                         >
-                          {mood.label}
+                          Current mood:{" "}
                         </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-                {selectedMoodOption && (
-                  <View style={styles.selectedMoodRow}>
-                    <Text style={styles.selectedMoodLabel}>Selected: </Text>
-                    <Text style={styles.selectedMoodValue}>
-                      💜 {selectedMoodOption.label}
-                    </Text>
+                        <Text
+                          style={[
+                            styles.selectedMoodValue,
+                            { color: theme.primary },
+                          ]}
+                        >
+                          {selectedMoodOption.emoji} {selectedMoodOption.label}
+                        </Text>
+                      </View>
+                    )}
                   </View>
-                )}
-              </View>
+                </Animated.View>
+              )}
             </View>
           </Animated.View>
 
-          {/* Category Selection */}
-          <Animated.View entering={FadeInDown.delay(80).duration(350)}>
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Category</Text>
-              <Text style={styles.sectionHint}>
-                Choose the area of your life this entry is about.
-              </Text>
-              <View style={styles.pillWrap}>
-                {CATEGORIES.map((category) => {
-                  const isSelected = selectedCategory === category.id;
-                  return (
-                    <Pressable
-                      key={category.id}
-                      onPress={() => setSelectedCategory(category.id)}
-                      style={[
-                        styles.pill,
-                        { borderColor: category.color },
-                        isSelected && {
-                          backgroundColor: category.color,
-                          borderColor: category.color,
-                        },
-                      ]}
-                    >
+          {/* Category Selection (collapsible) */}
+          <Animated.View
+            entering={FadeInDown.delay(80).duration(350)}
+            layout={LinearTransition.duration(200)}
+          >
+            <View
+              style={[
+                styles.categoryCard,
+                { backgroundColor: theme.card, borderColor: theme.border },
+              ]}
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: isCategoryExpanded }}
+                accessibilityLabel={
+                  isCategoryExpanded
+                    ? "Journal category selector, expanded. Double tap to collapse."
+                    : `Journal category${
+                        selectedCategoryOption
+                          ? `, ${
+                              selectedCategoryOption.id === "other" &&
+                              customCategory.trim()
+                                ? customCategory.trim()
+                                : selectedCategoryOption.name
+                            }`
+                          : ""
+                      }. Double tap to expand.`
+                }
+                onPress={toggleCategoryExpanded}
+                style={styles.categoryHeader}
+                hitSlop={8}
+              >
+                <View style={styles.categoryHeaderLeft}>
+                  <Text style={styles.categoryHeaderIcon}>🏷️</Text>
+                  <Text
+                    style={[styles.categoryHeaderTitle, { color: theme.text }]}
+                  >
+                    Category
+                  </Text>
+                </View>
+                <View style={styles.categoryHeaderRight}>
+                  {selectedCategoryOption ? (
+                    <>
+                      <Text style={styles.categoryHeaderEmoji}>
+                        {selectedCategoryOption.emoji}
+                      </Text>
                       <Text
                         style={[
-                          styles.pillText,
-                          { color: category.color },
-                          isSelected && styles.pillTextSelected,
+                          styles.categoryHeaderValue,
+                          { color: theme.primary },
                         ]}
+                        numberOfLines={1}
                       >
-                        {isSelected ? "✓ " : ""}
-                        {category.name}
+                        {selectedCategoryOption.id === "other" &&
+                        customCategory.trim()
+                          ? customCategory.trim()
+                          : selectedCategoryOption.name}
                       </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+                    </>
+                  ) : (
+                    <Text
+                      style={[
+                        styles.categoryHeaderPlaceholder,
+                        { color: theme.secondaryText },
+                      ]}
+                    >
+                      Choose
+                    </Text>
+                  )}
+                  <Animated.View style={categoryChevronStyle}>
+                    <Ionicons
+                      name="chevron-down"
+                      size={20}
+                      color={theme.primary}
+                    />
+                  </Animated.View>
+                </View>
+              </Pressable>
+
+              {isCategoryExpanded && (
+                <Animated.View
+                  entering={FadeInDown.duration(180)}
+                  exiting={FadeOutUp.duration(150)}
+                >
+                  <View style={styles.categoryBody}>
+                    <Text
+                      style={[
+                        styles.categoryHint,
+                        { color: theme.secondaryText },
+                      ]}
+                    >
+                      Choose the area of your life this entry is about.
+                    </Text>
+                    <View style={styles.categoryGrid}>
+                      {CATEGORIES.map((category) => {
+                        const isSelected = selectedCategory === category.id;
+                        return (
+                          <Pressable
+                            key={category.id}
+                            onPress={() => handleSelectCategory(category.id)}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: isSelected }}
+                            accessibilityLabel={
+                              category.id === "other"
+                                ? "Other category. Enter a custom category."
+                                : `${category.name} category`
+                            }
+                            style={[
+                              styles.categoryChip,
+                              {
+                                backgroundColor: theme.inputBg,
+                                borderColor: theme.border,
+                              },
+                              isSelected && {
+                                backgroundColor: theme.softPurple,
+                                borderColor: theme.primary,
+                              },
+                            ]}
+                          >
+                            <Text style={styles.categoryChipEmoji}>
+                              {category.emoji}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.categoryChipText,
+                                { color: theme.text },
+                                isSelected && [
+                                  styles.categoryChipTextSelected,
+                                  { color: theme.primary },
+                                ],
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {category.name}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                </Animated.View>
+              )}
+
+              {selectedCategory === "other" && (
+                <View
+                  style={[
+                    styles.customCategoryRow,
+                    { borderTopColor: theme.border },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.customCategoryLabel,
+                      { color: theme.secondaryText },
+                    ]}
+                  >
+                    ✏️ Name your category
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.customCategoryInput,
+                      {
+                        backgroundColor: theme.inputBg,
+                        color: theme.text,
+                        borderColor: customCategoryError
+                          ? "#EF4444"
+                          : "transparent",
+                      },
+                    ]}
+                    placeholder="e.g. Travel, Hobbies..."
+                    placeholderTextColor={theme.secondaryText}
+                    value={customCategory}
+                    onChangeText={(text) => {
+                      setCustomCategory(text);
+                      if (text.trim()) setCustomCategoryError(false);
+                    }}
+                    maxLength={CUSTOM_CATEGORY_LIMIT}
+                    accessibilityLabel="Custom category"
+                    accessibilityHint="Enter a name for your custom category"
+                  />
+                  {customCategoryError && (
+                    <Text style={styles.customCategoryError}>
+                      Please enter a category.
+                    </Text>
+                  )}
+                </View>
+              )}
             </View>
           </Animated.View>
 
@@ -640,12 +975,64 @@ const styles = StyleSheet.create({
   // Mood chips
   moodCard: {
     backgroundColor: "white",
-    borderRadius: 24,
-    paddingVertical: 20,
-    paddingHorizontal: 12,
+    borderRadius: 20,
+    overflow: "hidden",
     ...(shadows.sm("#000") as any),
     borderWidth: 1,
     borderColor: "rgba(156, 126, 235, 0.06)",
+  },
+  moodHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 52,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  moodHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  moodHeaderIcon: {
+    fontSize: 18,
+  },
+  moodHeaderTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#2D2640",
+  },
+  moodHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexShrink: 1,
+  },
+  moodHeaderEmoji: {
+    fontSize: 18,
+  },
+  moodHeaderValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#8A63D2",
+    flexShrink: 1,
+  },
+  moodHeaderPlaceholder: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#8B7FA8",
+  },
+  moodBody: {
+    paddingHorizontal: 12,
+    paddingBottom: 16,
+  },
+  moodHint: {
+    fontSize: 12,
+    color: "#8B7FA8",
+    marginTop: 6,
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
   moodGrid: {
     flexDirection: "row",
@@ -702,25 +1089,122 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#8A63D2",
   },
-  // Category pills
-  pillWrap: {
+  // Category picker
+  categoryCard: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    overflow: "hidden",
+    ...(shadows.sm("#000") as any),
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
+    marginBottom: 24,
+  },
+  categoryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 52,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  categoryHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  categoryHeaderIcon: {
+    fontSize: 18,
+  },
+  categoryHeaderTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#2D2640",
+  },
+  categoryHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexShrink: 1,
+  },
+  categoryHeaderEmoji: {
+    fontSize: 18,
+  },
+  categoryHeaderValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#8A63D2",
+    flexShrink: 1,
+  },
+  categoryHeaderPlaceholder: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#8B7FA8",
+  },
+  categoryBody: {
+    paddingHorizontal: 12,
+    paddingBottom: 16,
+  },
+  categoryHint: {
+    fontSize: 12,
+    color: "#8B7FA8",
+    marginTop: 6,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  categoryGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    justifyContent: "space-between",
+    rowGap: 10,
   },
-  pill: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
+  categoryChip: {
+    width: "47%",
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
     borderWidth: 1.5,
-    backgroundColor: "white",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: "#F7F4FC",
   },
-  pillText: {
-    fontSize: 14,
+  categoryChipEmoji: {
+    fontSize: 20,
+  },
+  categoryChipText: {
+    fontSize: 13,
     fontWeight: "600",
+    flexShrink: 1,
   },
-  pillTextSelected: {
-    color: "white",
+  categoryChipTextSelected: {
+    fontWeight: "700",
+  },
+  customCategoryRow: {
+    borderTopWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  customCategoryLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#8B7FA8",
+  },
+  customCategoryInput: {
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    fontWeight: "500",
+    borderWidth: 1,
+  },
+  customCategoryError: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#EF4444",
+    paddingHorizontal: 2,
   },
   // Inputs
   inputContainer: {

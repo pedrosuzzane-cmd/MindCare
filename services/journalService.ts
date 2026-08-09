@@ -39,6 +39,7 @@ export interface JournalEntry {
   thoughts: string;
   mood: string;
   category: string;
+  customCategory?: string; // Free-text name when category === "other"
   reflection?: string; // Legacy single-string reflection (kept for backwards compatibility)
   reflectionLocal?: ReflectionSections; // Instant local engine output (Layer 1)
   reflectionAI?: ReflectionSections; // Reserved for background Gemini enhancement (Layer 3)

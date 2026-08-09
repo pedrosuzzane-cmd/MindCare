@@ -1,4 +1,5 @@
 import { useJournal } from "@/hooks/useJournal";
+import { getCategory } from "@/utils/journalOptions";
 import {
   getActiveReflection,
   getReflectionStatusLabel,
@@ -79,7 +80,13 @@ export default function JournalDetailScreen() {
           </Text>
           {entry.category ? (
             <View style={styles.categoryRow}>
-              <Text style={styles.categoryText}>{entry.category}</Text>
+              <Text style={styles.categoryText}>
+                {getCategory(entry.category)?.emoji}{" "}
+                {getCategory(entry.category)?.name ?? entry.category}
+              </Text>
+              {entry.customCategory ? (
+                <Text style={styles.categoryText}>{entry.customCategory}</Text>
+              ) : null}
             </View>
           ) : null}
           <View style={{ height: 12 }} />
@@ -270,7 +277,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   editButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
-  categoryRow: { marginTop: 8 },
+  categoryRow: { marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 8 },
   categoryText: {
     alignSelf: "flex-start",
     backgroundColor: "#FFF3E0",

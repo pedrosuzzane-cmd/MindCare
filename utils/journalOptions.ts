@@ -9,6 +9,7 @@ export interface CategoryOption {
   id: string;
   name: string;
   color: string;
+  emoji: string;
 }
 
 export const MOODS: MoodOption[] = [
@@ -30,14 +31,20 @@ export const MOODS: MoodOption[] = [
 ];
 
 export const CATEGORIES: CategoryOption[] = [
-  { id: "personal", name: "Personal", color: "#9C7EEB" },
-  { id: "academic", name: "Academic", color: "#8A63D2" },
-  { id: "wellness", name: "Wellness", color: "#9C27B0" },
-  { id: "social", name: "Social", color: "#E91E63" },
-  { id: "goals", name: "Goals", color: "#FF9800" },
-  { id: "gratitude", name: "Gratitude", color: "#7C5AC8" },
-  { id: "work", name: "Work", color: "#FF5722" },
-  { id: "spiritual", name: "Spiritual", color: "#7B1FA2" },
+  { id: "personal", name: "Personal", color: "#9C7EEB", emoji: "🧍" },
+  { id: "academic", name: "Academic", color: "#8A63D2", emoji: "📚" },
+  { id: "wellness", name: "Wellness", color: "#9C27B0", emoji: "🌿" },
+  { id: "emotions", name: "Emotions", color: "#EC4899", emoji: "🧠" },
+  { id: "social", name: "Social", color: "#E91E63", emoji: "👥" },
+  { id: "family", name: "Family", color: "#F59E0B", emoji: "🏠" },
+  { id: "goals", name: "Goals", color: "#FF9800", emoji: "🎯" },
+  { id: "growth", name: "Growth", color: "#16A34A", emoji: "🌱" },
+  { id: "gratitude", name: "Gratitude", color: "#7C5AC8", emoji: "💜" },
+  { id: "work", name: "Work", color: "#FF5722", emoji: "💼" },
+  { id: "financial", name: "Financial", color: "#0EA5E9", emoji: "💰" },
+  { id: "spiritual", name: "Spiritual", color: "#7B1FA2", emoji: "✨" },
+  { id: "life_events", name: "Life Events", color: "#64748B", emoji: "🌎" },
+  { id: "other", name: "Other", color: "#6B7280", emoji: "⋯" },
 ];
 
 export const getMood = (id?: string): MoodOption | undefined =>
@@ -45,3 +52,15 @@ export const getMood = (id?: string): MoodOption | undefined =>
 
 export const getCategory = (id?: string): CategoryOption | undefined =>
   CATEGORIES.find((c) => c.id === id);
+
+export const getCategoryLabel = (
+  id?: string,
+  customCategory?: string,
+): string => {
+  const category = getCategory(id);
+  if (!category) return id || "";
+  if (category.id === "other" && customCategory?.trim()) {
+    return customCategory.trim();
+  }
+  return category.name;
+};

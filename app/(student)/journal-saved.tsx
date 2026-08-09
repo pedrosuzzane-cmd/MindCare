@@ -208,7 +208,12 @@ export default function JournalSavedScreen() {
                     )}
                     {category && (
                       <Text style={[styles.entryTag, { color: category.color }]}>
-                        {category.name}
+                        {category.emoji} {category.name}
+                      </Text>
+                    )}
+                    {entry.customCategory && (
+                      <Text style={[styles.entryTag, { color: category?.color ?? "#8A63D2" }]}>
+                        {entry.customCategory}
                       </Text>
                     )}
                   </View>

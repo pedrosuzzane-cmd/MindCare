@@ -5,6 +5,7 @@ export interface JournalDraft {
   thoughts: string;
   mood: string;
   category: string;
+  customCategory: string;
   savedAt: string;
 }
 

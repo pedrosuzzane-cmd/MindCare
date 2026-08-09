@@ -35,6 +35,30 @@ export const CATEGORY_ANGLE: Record<string, string[]> = {
     "Carve out a few quiet minutes for reflection or prayer.",
     "Notice one moment of peace today and let it count.",
   ],
+  emotions: [
+    "Give your feelings a name today — naming them softens their hold.",
+    "Let the emotion pass through instead of resisting it.",
+  ],
+  family: [
+    "Reach out to a family member today, even with a short message.",
+    "A small gesture of care toward family can settle the heart.",
+  ],
+  growth: [
+    "Celebrate how far you've come — growth is rarely a straight line.",
+    "Pick one small lesson from today and carry it forward.",
+  ],
+  financial: [
+    "Check in gently with your budget — small steps keep money worries lighter.",
+    "Tackle one small money task today to ease that load.",
+  ],
+  life_events: [
+    "Give yourself grace — big life moments take time to settle.",
+    "Name one thing that stayed steady through the change.",
+  ],
+  other: [
+    "Whatever this topic is, you made space for it today — that counts.",
+    "A small, kind next step in this area can ease the day.",
+  ],
 };
 
 /** Time-of-day opener that leads the Mood Summary section. */

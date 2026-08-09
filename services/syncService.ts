@@ -86,6 +86,7 @@ const syncJournals = async (userId: string): Promise<void> => {
           thoughts: remoteEntryData.thoughts || "",
           mood: remoteEntryData.mood || "neutral",
           category: remoteEntryData.category || "general",
+          customCategory: remoteEntryData.customCategory || undefined,
           reflection:
             remoteEntryData.reflection ||
             remoteEntryData.aiInsight ||
@@ -122,6 +123,8 @@ const syncJournals = async (userId: string): Promise<void> => {
           localEntry.thoughts = remoteEntryData.thoughts;
           localEntry.mood = remoteEntryData.mood;
           localEntry.category = remoteEntryData.category;
+          localEntry.customCategory =
+            remoteEntryData.customCategory || localEntry.customCategory;
           localEntry.reflection =
             remoteEntryData.reflection ||
             remoteEntryData.aiInsight ||
