@@ -6,7 +6,6 @@ import { DailyReflectionModal } from "@/components/constellation/DailyReflection
 import { MonthlySummary } from "@/components/constellation/MonthlySummary";
 import { MonthlyProgress } from "@/components/constellation/MonthlyProgress";
 import { MonthlyCelebrationModal } from "@/components/constellation/MonthlyCelebrationModal";
-import { MonthlyHistory } from "@/components/constellation/MonthlyHistory";
 import { constellationCelebrationStorage } from "@/storage/constellationCelebrationStorage";
 import { ConstellationStar } from "@/types/constellation";
 import {
@@ -25,7 +24,6 @@ import {
   getNextMonth,
   getPreviousMonth,
   getUniqueJournalDays,
-  groupEntriesByMonth,
   isCurrentMonth,
 } from "@/utils/constellationMonthUtils";
 import { getCategory, getMood } from "@/utils/journalOptions";
@@ -58,7 +56,6 @@ export default function ConstellationScreen() {
     currentMonthKey(),
   );
   const [celebrationMonth, setCelebrationMonth] = useState<string | null>(null);
-  const [legendExpanded, setLegendExpanded] = useState(false);
   const [fullSky, setFullSky] = useState(false);
 
   const goal = getMonthlyGoal();
@@ -180,12 +177,6 @@ export default function ConstellationScreen() {
     const latest = monthEntries[0];
     return latest?.mood ? getMood(latest.mood) : undefined;
   }, [monthEntries]);
-
-  // History: every other month that actually contains journal entries.
-  const historyMonths = useMemo(
-    () => groupEntriesByMonth(entries, selectedMonth),
-    [entries, selectedMonth],
-  );
 
   const skyHeight = Math.min(Math.max(width * 0.78, 280), 380);
 
@@ -446,60 +437,33 @@ export default function ConstellationScreen() {
                 {/* Star guide */}
                 {legendCategories.length > 0 && (
                   <View style={styles.legendWrap}>
-                    <View style={styles.legendHeader}>
-                      <Text style={[styles.legendTitle, { color: theme.text }]}>
-                        ✨ Star Guide
-                      </Text>
-                      <Pressable
-                        onPress={() => setLegendExpanded((prev) => !prev)}
-                        hitSlop={8}
-                        accessibilityRole="button"
-                        accessibilityLabel={
-                          legendExpanded
-                            ? "Hide star guide"
-                            : "Show star guide"
-                        }
-                      >
-                        <Text
-                          style={[styles.legendToggle, { color: theme.primary }]}
-                        >
-                          {legendExpanded ? "Hide" : "Show"}
-                        </Text>
-                      </Pressable>
+                    <Text style={[styles.legendTitle, { color: theme.text }]}>
+                      ✨ Star Guide
+                    </Text>
+                    <View style={styles.legendRow}>
+                      {legendCategories.map((c) => (
+                        <View key={c.id} style={styles.legendItem}>
+                          <View
+                            style={[
+                              styles.legendDot,
+                              { backgroundColor: c.color },
+                            ]}
+                          />
+                          <Text
+                            style={[
+                              styles.legendLabel,
+                              { color: theme.secondaryText },
+                            ]}
+                          >
+                            {c.name}
+                          </Text>
+                        </View>
+                      ))}
                     </View>
-                    {legendExpanded && (
-                      <View style={styles.legendRow}>
-                        {legendCategories.map((c) => (
-                          <View key={c.id} style={styles.legendItem}>
-                            <View
-                              style={[
-                                styles.legendDot,
-                                { backgroundColor: c.color },
-                              ]}
-                            />
-                            <Text
-                              style={[
-                                styles.legendLabel,
-                                { color: theme.secondaryText },
-                              ]}
-                            >
-                              {c.name}
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
-                    )}
                   </View>
                 )}
               </>
             )}
-
-            {/* Constellation Journal History */}
-            <MonthlyHistory
-              months={historyMonths}
-              theme={theme}
-              onSelect={setSelectedMonth}
-            />
           </>
         )}
       </ScrollView>
@@ -620,19 +584,10 @@ const styles = StyleSheet.create({
   legendWrap: {
     marginTop: 16,
   },
-  legendHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
   legendTitle: {
     fontSize: 15,
     fontWeight: "800",
-  },
-  legendToggle: {
-    fontSize: 13,
-    fontWeight: "700",
+    marginBottom: 8,
   },
   legendRow: {
     flexDirection: "row",
