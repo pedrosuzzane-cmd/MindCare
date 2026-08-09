@@ -23,6 +23,9 @@ export const MOODS: MoodOption[] = [
   { id: "exhausted", emoji: "😫", label: "Exhausted", color: "#708090" },
   { id: "stressed", emoji: "😓", label: "Stressed", color: "#FF6347" },
   { id: "burnout", emoji: "😤", label: "Burnout", color: "#800020" },
+  { id: "mad", emoji: "😡", label: "Mad", color: "#DC2626" },
+  { id: "fearful", emoji: "😰", label: "Fearful", color: "#2563EB" },
+  { id: "flushed", emoji: "😅", label: "Flushed", color: "#F472B6" },
   { id: "very-upset", emoji: "😢", label: "Very Upset", color: "#000080" },
 ];
 

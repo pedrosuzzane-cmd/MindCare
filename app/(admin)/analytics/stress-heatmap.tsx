@@ -11,7 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const MOOD_WELLNESS: Record<string, number> = {
   happy: 5, calm: 5, relaxed: 5, good: 4, neutral: 3,
   worried: 2, sad: 2, overwhelmed: 1, exhausted: 1,
-  stressed: 0, burnout: 0, "very-upset": 0,
+  stressed: 0, burnout: 0, mad: 0, fearful: 1, flushed: 2, "very-upset": 0,
 };
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];

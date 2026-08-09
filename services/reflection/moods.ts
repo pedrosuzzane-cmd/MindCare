@@ -395,4 +395,100 @@ export const MOOD_PROFILES: Record<string, MoodProfile> = {
       "Be gentle with yourself and rest if you can",
     ],
   },
+  mad: {
+    summary: [
+      "anger comes through clearly in your words today.",
+      "there's a hot, frustrated energy in what you shared.",
+      "your writing carries real anger today, and that's a feeling worth honoring.",
+      "something genuinely got to you, and it shows in how you wrote.",
+    ],
+    positive: [
+      "Naming your anger instead of pushing it down is a real act of self-awareness.",
+      "You gave yourself permission to feel mad — that's honest, and it matters.",
+      "Anger often points to something you value being crossed. You paid attention to that.",
+      "You chose words instead of letting the anger run the moment — that's strength.",
+    ],
+    suggestion: [
+      "Try taking slow, deep breaths before responding to anything — anger passes through the body.",
+      "Write out what you're angry about, then step away from it for a few minutes.",
+      "Release the energy safely — walk, stretch, or shake it out.",
+      "When you're calmer, consider what you actually need to say or change.",
+    ],
+    encouragement: [
+      "Feeling mad is human. What you do with it is what counts.",
+      "You don't have to stay angry to be heard — you can be calm and still be firm.",
+      "This anger is telling you something matters. You'll figure out the right next step.",
+      "You're allowed to feel this. Be kind to yourself while you do.",
+    ],
+    tips: [
+      "Take slow, deep breaths before reacting",
+      "Write out what's making you angry, then step away",
+      "Release the energy safely — walk, stretch, or shake it out",
+      "When calmer, decide what you actually want to say or change",
+    ],
+  },
+  fearful: {
+    summary: [
+      "fear comes through clearly in what you shared today.",
+      "there's an anxious, uncertain energy in your writing.",
+      "your words carry real fear today — about something that matters to you.",
+      "a sense of being afraid or on edge is present in your reflection.",
+    ],
+    positive: [
+      "You noticed the fear instead of letting it take over — that awareness is strength.",
+      "It takes courage to name what scares you, and you did that.",
+      "You stayed honest about feeling afraid, and honesty is brave.",
+      "Fear means something matters to you — you recognized that.",
+    ],
+    suggestion: [
+      "Try grounding yourself — name five things you can see, four you can touch, three you can hear.",
+      "Breathe slowly: inhale for four, exhale for six, a few times to settle your body.",
+      "Remind yourself of what is true and certain right now, in this moment.",
+      "Share your fear with someone you trust — fear shrinks when it's spoken.",
+    ],
+    encouragement: [
+      "Fear is a sign you care about the outcome. That's not weakness.",
+      "You have faced uncertainty before and made it through. You will again.",
+      "One step at a time is enough. You don't need to see the whole path.",
+      "You are braver than this moment feels.",
+    ],
+    tips: [
+      "Ground yourself with your five senses",
+      "Breathe slowly: inhale 4, exhale 6",
+      "Focus on what is true and certain right now",
+      "Talk to someone you trust about the fear",
+    ],
+  },
+  flushed: {
+    summary: [
+      "there's an embarrassed, flustered energy in what you shared.",
+      "your writing has a warm, awkward feeling today.",
+      "you're feeling flushed and self-conscious, and you put that into words.",
+      "a sense of embarrassment or discomfort is clear in your reflection.",
+    ],
+    positive: [
+      "You were honest about feeling awkward — that's refreshingly real.",
+      "You can laugh at yourself, and that lightness is a strength.",
+      "You didn't let the embarrassment stop you from writing about it.",
+      "Recognizing the feeling without spiraling shows real composure.",
+    ],
+    suggestion: [
+      "Take a slow breath and remember most people weren't paying as close attention as you think.",
+      "Reframe the moment with humor — a small joke at your own expense eases the heat.",
+      "If you can, gently address what happened — naming it often deflates the awkwardness.",
+      "Give yourself permission to move on; this moment will feel smaller tomorrow.",
+    ],
+    encouragement: [
+      "Everyone has awkward moments — they make us human.",
+      "The feeling of being flushed will pass. Be kind to yourself until it does.",
+      "You handled it better than you think.",
+      "Tomorrow this will be a story, not a wound.",
+    ],
+    tips: [
+      "Take a slow breath and let the moment settle",
+      "Reframe it with humor if you can",
+      "Address what happened gently if needed",
+      "Remember most people aren't judging as closely as you fear",
+    ],
+  },
 };

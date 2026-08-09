@@ -137,6 +137,9 @@ app.post("/api/ai-reflection", async (req, res) => {
     exhausted: "😫",
     stressed: "😓",
     burnout: "😤",
+    mad: "😡",
+    fearful: "😰",
+    flushed: "😅",
     "very-upset": "😢",
   };
 

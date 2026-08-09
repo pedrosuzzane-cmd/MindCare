@@ -46,6 +46,9 @@ export default function MoodCalendarScreen() {
     { id: "exhausted", emoji: "😫", color: "#708090" },
     { id: "stressed", emoji: "😓", color: "#FF6347" },
     { id: "burnout", emoji: "😤", color: "#800020" },
+    { id: "mad", emoji: "😡", color: "#DC2626" },
+    { id: "fearful", emoji: "😰", color: "#2563EB" },
+    { id: "flushed", emoji: "😅", color: "#F472B6" },
     { id: "very-upset", emoji: "😢", color: "#000080" },
   ];
 

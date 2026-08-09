@@ -11,7 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 const POSITIVE_MOODS = new Set(["happy", "calm", "relaxed", "good"]);
 const NEUTRAL_MOODS = new Set(["neutral"]);
-const DISTRESSED_MOODS = new Set(["worried", "sad", "overwhelmed", "exhausted", "stressed", "burnout", "very-upset"]);
+const DISTRESSED_MOODS = new Set(["worried", "sad", "overwhelmed", "exhausted", "stressed", "burnout", "mad", "fearful", "flushed", "very-upset"]);
 
 const DEPARTMENTS = ["CITCS", "COA", "CCJE", "CTE", "CN", "CEA", "CHTM"];
 const MOOD_BAR_COLORS = { positive: "#22C55E", neutral: "#F59E0B", distressed: "#EF4444" };

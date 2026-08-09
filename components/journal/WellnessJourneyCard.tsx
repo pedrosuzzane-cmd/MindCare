@@ -34,6 +34,9 @@ const MOODS_NEEDING_CARE = new Set([
   "worried",
   "exhausted",
   "burnout",
+  "mad",
+  "fearful",
+  "flushed",
   "very-upset",
 ]);
 

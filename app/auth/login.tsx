@@ -347,7 +347,7 @@ export default function LoginScreen() {
           <View style={styles.brandRow}>
             <View style={styles.brandIcon}>
               <Image
-                source={require("@/assets/images/appicon_circle.png")}
+                source={require("@/assets/images/appicon_background.png")}
                 style={styles.brandLogoImage}
                 resizeMode="contain"
               />

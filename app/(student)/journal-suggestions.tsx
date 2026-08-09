@@ -23,7 +23,7 @@ interface Suggestion {
 
 type MoodKey =
   | "happy" | "calm" | "relaxed" | "good" | "neutral"
-  | "worried" | "sad" | "overwhelmed" | "exhausted" | "stressed" | "burnout" | "very-upset";
+  | "worried" | "sad" | "overwhelmed" | "exhausted" | "stressed" | "burnout" | "mad" | "fearful" | "flushed" | "very-upset";
 
 const MOOD_SUGGESTIONS: Record<MoodKey, Suggestion[]> = {
   happy: [
@@ -120,6 +120,30 @@ const MOOD_SUGGESTIONS: Record<MoodKey, Suggestion[]> = {
     { title: "Set Firm Boundaries", description: "Identify one commitment you can say no to this week. Protecting your energy is not selfish.", icon: "🚧" },
     { title: "Nourish Your Body", description: "Eat a balanced meal, drink water, and consider a gentle walk. Physical care is part of burnout recovery.", icon: "🥗" },
     { title: "Do Something Mindless", description: "Color, fold laundry, or watch something undemanding. Give your brain a break from problem-solving.", icon: "🧩" },
+  ],
+  mad: [
+    { title: "Pause Before Reacting", description: "Take 5 slow deep breaths before responding to anything. Anger peaks and passes — give it a moment.", icon: "⏸️" },
+    { title: "Write It Out", description: "Write down exactly what made you angry. Externalizing it reduces its grip on you.", icon: "✍️" },
+    { title: "Move the Energy", description: "Go for a brisk walk, stretch, or shake it out. Anger lives in the body — release it safely.", icon: "🚶" },
+    { title: "Cool Down First", description: "Hold off on messages or decisions until your body has calmed. Respond later, respond better.", icon: "🧊" },
+    { title: "Name the Need", description: "Ask yourself what you really need right now — respect, fairness, space? Naming it points you forward.", icon: "🎯" },
+    { title: "Talk It Through", description: "Share what happened with someone you trust. A second perspective softens the heat.", icon: "🗣️" },
+  ],
+  fearful: [
+    { title: "Ground Yourself", description: "Name 5 things you can see, 4 you can touch, 3 you can hear, 2 you can smell, 1 you can taste.", icon: "🌍" },
+    { title: "Slow Breathing", description: "Inhale for 4 counts, exhale for 6. Longer exhales tell your nervous system you're safe.", icon: "🫁" },
+    { title: "Stay in This Moment", description: "Fear is about the future. Bring yourself back to what is true and certain right now.", icon: "🎯" },
+    { title: "Speak the Fear", description: "Say what you're afraid of out loud or write it down. Naming it shrinks its power.", icon: "🗣️" },
+    { title: "Reach Out", description: "Tell someone you trust what you're afraid of. You don't have to carry the uncertainty alone.", icon: "📞" },
+    { title: "Take One Small Step", description: "You don't need the whole plan — just the next tiny action. Momentum calms fear.", icon: "👣" },
+  ],
+  flushed: [
+    { title: "Let It Pass", description: "Take a slow breath. Embarrassment is a wave — it rises, then it fades. Let it move through you.", icon: "🌬️" },
+    { title: "Reframe with Humor", description: "Make a light joke about the moment. Laughing at yourself disarms the awkwardness.", icon: "😄" },
+    { title: "Keep Perspective", description: "Most people weren't paying as much attention as you think. The spotlight on you is brighter in your mind.", icon: "🔎" },
+    { title: "Move On Gently", description: "Give yourself permission to let the moment go. Tomorrow it will be a story, not a wound.", icon: "🚶" },
+    { title: "Address It Briefly", description: "If you can, name what happened lightly. It often deflates the tension for everyone.", icon: "💬" },
+    { title: "Be Kind to Yourself", description: "Everyone has awkward moments. Treat yourself the way you'd treat a friend who slipped up.", icon: "🫂" },
   ],
   "very-upset": [
     { title: "Pause and Breathe", description: "Stop. Take 5 slow deep breaths. You don't need to solve anything right now.", icon: "⏸️" },

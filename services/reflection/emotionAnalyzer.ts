@@ -27,6 +27,9 @@ const MOOD_EMOTION: Record<string, string> = {
   exhausted: "Exhausted",
   stressed: "Stressed",
   burnout: "Burnt Out",
+  mad: "Mad",
+  fearful: "Fearful",
+  flushed: "Flushed",
   "very-upset": "Very Upset",
 };
 
@@ -277,6 +280,8 @@ const STRESS_EMOTIONS = new Set([
   "Burnt Out",
   "Exhausted",
   "Frustrated",
+  "Mad",
+  "Fearful",
 ]);
 
 const STRESS_KEYWORDS = [

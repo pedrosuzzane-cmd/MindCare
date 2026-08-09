@@ -129,6 +129,9 @@ const MOOD_EMOJIS: Record<string, string> = {
   hopeful: "🌟",
   lonely: "💔",
   stressed: "😫",
+  mad: "😡",
+  fearful: "😰",
+  flushed: "😅",
   peaceful: "🕊️",
 };
 

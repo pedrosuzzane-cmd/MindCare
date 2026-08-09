@@ -198,6 +198,9 @@ export function useJournal() {
       exhausted: "😫",
       stressed: "😓",
       burnout: "😤",
+      mad: "😡",
+      fearful: "😰",
+      flushed: "😅",
       "very-upset": "😢",
     };
     return moodMap[moodId] || "❓";

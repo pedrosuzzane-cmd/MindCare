@@ -59,6 +59,21 @@ export const MOOD_WELLNESS_ACTIVITIES: Record<string, WellnessActivity[]> = {
     { title: "Rest for 20 minutes", icon: "😴" },
     { title: "Step away from screens for an hour", icon: "📵" },
   ],
+  mad: [
+    { title: "Breathe slowly before you react", icon: "🫁" },
+    { title: "Write out what made you angry", icon: "✍️" },
+    { title: "Walk it off to release the energy", icon: "🚶" },
+  ],
+  fearful: [
+    { title: "Ground yourself with your five senses", icon: "🌍" },
+    { title: "Breathe slowly: inhale 4, exhale 6", icon: "🫁" },
+    { title: "Talk to someone you trust", icon: "📞" },
+  ],
+  flushed: [
+    { title: "Take a slow breath and let it pass", icon: "🌬️" },
+    { title: "Reframe the moment with humor", icon: "😄" },
+    { title: "Be kind to yourself — everyone has awkward moments", icon: "🫂" },
+  ],
   "very-upset": [
     { title: "Reach out to someone you trust", icon: "📞" },
     { title: "Breathe slowly and name how you feel", icon: "🌬️" },

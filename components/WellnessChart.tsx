@@ -21,6 +21,9 @@ const MOODS = [
   { id: "exhausted", emoji: "😫", color: "#708090", wellness: 1 },
   { id: "stressed", emoji: "😓", color: "#FF6347", wellness: 0 },
   { id: "burnout", emoji: "😤", color: "#800020", wellness: 0 },
+  { id: "mad", emoji: "😡", color: "#DC2626", wellness: 0 },
+  { id: "fearful", emoji: "😰", color: "#2563EB", wellness: 1 },
+  { id: "flushed", emoji: "😅", color: "#F472B6", wellness: 2 },
   { id: "very-upset", emoji: "😢", color: "#000080", wellness: 0 },
 ];
 

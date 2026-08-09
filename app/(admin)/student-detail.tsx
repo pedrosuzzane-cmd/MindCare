@@ -67,6 +67,9 @@ const MOOD_COLORS: Record<string, string> = {
   exhausted: "#708090",
   stressed: "#FF6347",
   burnout: "#800020",
+  mad: "#DC2626",
+  fearful: "#2563EB",
+  flushed: "#F472B6",
   "very-upset": "#000080",
 };
 
@@ -82,6 +85,9 @@ const MOOD_EMOJIS: Record<string, string> = {
   exhausted: "😫",
   stressed: "😓",
   burnout: "😤",
+  mad: "😡",
+  fearful: "😰",
+  flushed: "😅",
   "very-upset": "😢",
 };
 
@@ -97,6 +103,9 @@ const MOOD_LABELS: Record<string, string> = {
   exhausted: "Exhausted",
   stressed: "Stressed",
   burnout: "Burnout",
+  mad: "Mad",
+  fearful: "Fearful",
+  flushed: "Flushed",
   "very-upset": "Very Upset",
 };
 

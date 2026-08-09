@@ -903,6 +903,9 @@ export default function AdminPanelScreen() {
         "very-upset",
         "exhausted",
         "overwhelmed",
+        "mad",
+        "fearful",
+        "flushed",
       ];
       let wellSum = 0;
       let moodTotal = 0;
@@ -1282,6 +1285,9 @@ export default function AdminPanelScreen() {
       "very-upset",
       "exhausted",
       "overwhelmed",
+      "mad",
+      "fearful",
+      "flushed",
     ];
     const moodTotals: Record<string, number> = {};
     let moodLoggers = 0;

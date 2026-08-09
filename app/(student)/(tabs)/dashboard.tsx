@@ -561,23 +561,21 @@ const styles = StyleSheet.create({
   microRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 20,
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 16,
   },
   microStat: {
+    width: "48%",
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 14,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    gap: 8,
-    minWidth: 0,
-    backgroundColor: "#FFFFFF",
+    justifyContent: "space-between",
+    borderRadius: 16,
+    padding: 16,
+    gap: 10,
+    backgroundColor: "#1E1B2E",
     borderWidth: 1,
-    borderColor: "#F0EBFA",
-    // @ts-ignore — web-only shadow property
-    boxShadow: "0px 1px 6px rgba(124, 77, 204, 0.05)",
-    elevation: 1,
+    borderColor: "rgba(139, 92, 246, 0.2)",
   },
   microIcon: {
     width: 28,
@@ -587,6 +585,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   microText: {
+    flex: 1,
     flexShrink: 1,
   },
   microValue: {
@@ -595,7 +594,7 @@ const styles = StyleSheet.create({
   },
   microLabel: {
     fontSize: 11,
-    color: "#737083",
+    color: "#A79FC4",
   },
   cardsContainer: {
     gap: 14,
