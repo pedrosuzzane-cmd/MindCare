@@ -1,19 +1,14 @@
 import { HapticTab } from "@/components/haptic-tab";
 import { useMindCareTheme } from "@/contexts/ThemeContext";
-import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React, { useEffect, useRef } from "react";
 import { Animated, Platform, StyleSheet, Text, View } from "react-native";
 
 function TabIcon({
-  name,
-  color,
-  size,
+  emoji,
   focused,
 }: {
-  name: keyof typeof Ionicons.glyphMap;
-  color: string;
-  size: number;
+  emoji: string;
   focused: boolean;
 }) {
   const { theme } = useMindCareTheme();
@@ -31,14 +26,18 @@ function TabIcon({
   return (
     <View
       style={[
-        styles.pill,
-        focused && {
-          backgroundColor: theme.softPurple,
-        },
+        styles.iconContainer,
+        focused && { backgroundColor: theme.softPurple },
       ]}
     >
       <Animated.View style={{ transform: [{ scale }] }}>
-        <Ionicons name={name} size={focused ? size + 2 : size} color={color} />
+        <Text
+          style={[styles.emoji, { opacity: focused ? 1 : 0.6 }]}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          {emoji}
+        </Text>
       </Animated.View>
     </View>
   );
@@ -50,7 +49,9 @@ function TabLabel({ label, focused }: { label: string; focused: boolean }) {
     <Text
       style={[
         styles.label,
-        { color: focused ? theme.tabIconSelected : theme.tabIconDefault },
+        {
+          color: focused ? theme.tabIconSelected : theme.tabIconDefault,
+        },
         focused && styles.labelActive,
       ]}
     >
@@ -70,10 +71,21 @@ export default function TabLayout() {
         tabBarInactiveTintColor: theme.tabIconDefault,
         tabBarStyle: {
           backgroundColor: theme.tabBar,
+          borderTopWidth: 1,
           borderTopColor: theme.tabBarBorder,
-          paddingBottom: Platform.OS === "android" ? 8 : 0,
-          paddingTop: 6,
-          height: Platform.OS === "android" ? 68 : 54,
+          height: Platform.OS === "ios" ? 88 : 68,
+          paddingTop: 7,
+          paddingBottom: Platform.OS === "ios" ? 24 : 7,
+          elevation: 8,
+          shadowColor: "#6D28D9",
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: theme.mode === "dark" ? 0.15 : 0.08,
+          shadowRadius: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: "600",
+          marginTop: 2,
         },
       }}
     >
@@ -82,8 +94,8 @@ export default function TabLayout() {
         options={{
           title: "Dashboard",
           tabBarButton: HapticTab,
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon name="home" color={color} size={size} focused={focused} />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon emoji="🏠" focused={focused} />
           ),
           tabBarLabel: ({ focused }) => (
             <TabLabel label="Dashboard" focused={focused} />
@@ -95,13 +107,8 @@ export default function TabLayout() {
         options={{
           title: "Announcements",
           tabBarButton: HapticTab,
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon
-              name="megaphone"
-              color={color}
-              size={size}
-              focused={focused}
-            />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon emoji="📣" focused={focused} />
           ),
           tabBarLabel: ({ focused }) => (
             <TabLabel label="Announcements" focused={focused} />
@@ -113,8 +120,8 @@ export default function TabLayout() {
         options={{
           title: "Breathe",
           tabBarButton: HapticTab,
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon name="leaf" color={color} size={size} focused={focused} />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon emoji="🌱" focused={focused} />
           ),
           tabBarLabel: ({ focused }) => (
             <TabLabel label="Breathe" focused={focused} />
@@ -126,13 +133,8 @@ export default function TabLayout() {
         options={{
           title: "Inbox",
           tabBarButton: HapticTab,
-          tabBarIcon: ({ color, size, focused }) => (
-            <TabIcon
-              name="chatbubbles"
-              color={color}
-              size={size}
-              focused={focused}
-            />
+          tabBarIcon: ({ focused }) => (
+            <TabIcon emoji="💬" focused={focused} />
           ),
           tabBarLabel: ({ focused }) => (
             <TabLabel label="Inbox" focused={focused} />
@@ -144,15 +146,19 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  pill: {
-    width: 44,
-    height: 28,
-    borderRadius: 14,
+  iconContainer: {
+    width: 42,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 1,
+  },
+  emoji: {
+    fontSize: 19,
   },
   label: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "600",
   },
   labelActive: {

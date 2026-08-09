@@ -888,7 +888,7 @@ export default function InboxTab() {
         </View>
       ) : conversations.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="chatbubbles-outline" size={48} color="#D1D5DB" />
+          <Ionicons name="chatbubbles-outline" size={48} color="#9CA3AF" />
           <Text style={styles.emptyTitle}>Start the conversation</Text>
           <Text style={styles.emptyText}>
             You're in a private space to talk. Share what's on your mind, ask
@@ -906,7 +906,7 @@ export default function InboxTab() {
         </View>
       ) : filteredConversations.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="search-outline" size={48} color="#D1D5DB" />
+          <Ionicons name="search-outline" size={48} color="#9CA3AF" />
           <Text style={styles.emptyTitle}>
             {inboxQuery
               ? "No matches"
@@ -1043,7 +1043,7 @@ export default function InboxTab() {
                   : "shield-checkmark-outline"
               }
               size={48}
-              color="#D1D5DB"
+              color="#9CA3AF"
             />
             <Text style={styles.emptyTitle}>
               {directoryFilter
@@ -1138,7 +1138,7 @@ export default function InboxTab() {
         </View>
       ) : allMessages.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="chatbubble-outline" size={48} color="#D1D5DB" />
+          <Ionicons name="chatbubble-outline" size={48} color="#9CA3AF" />
           <Text style={styles.emptyTitle}>Start the conversation</Text>
           <Text style={styles.emptyText}>
             You're in a private space to talk. You can share what's on your
@@ -1578,13 +1578,13 @@ export default function InboxTab() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F7F5FC" },
+  container: { flex: 1, backgroundColor: "#0F0D15" },
 
   // Header
   headerGradient: {
-    backgroundColor: "#F0EBFB",
+    backgroundColor: "#1E1B2E",
     borderBottomWidth: 1,
-    borderBottomColor: "#E6DCF7",
+    borderBottomColor: "rgba(139, 92, 246, 0.2)",
   },
   header: {
     flexDirection: "row",
@@ -1602,7 +1602,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 12,
-    color: "#6B7280",
+    color: "#9CA3AF",
     textAlign: "center",
   },
   headerStats: {
@@ -1614,7 +1614,7 @@ const styles = StyleSheet.create({
   headerStatsText: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#7C4DCC",
+    color: "#A78BFA",
   },
   headerStatsDot: { fontSize: 11, color: "#9CA3AF" },
   backBtn: { width: 40, height: 40, justifyContent: "center", alignItems: "center" },
@@ -1634,29 +1634,29 @@ const styles = StyleSheet.create({
   },
   headerSub: {
     fontSize: 11,
-    color: "#6B7280",
+    color: "#9CA3AF",
     maxWidth: 180,
   },
   headerVerifiedPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
-    backgroundColor: "#EFE7FB",
+    backgroundColor: "rgba(139, 92, 246, 0.15)",
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 8,
   },
-  headerVerifiedText: { fontSize: 9, fontWeight: "700", color: "#7C4DCC" },
+  headerVerifiedText: { fontSize: 9, fontWeight: "700", color: "#A78BFA" },
   headerActions: { flexDirection: "row", alignItems: "center" },
   headerAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#7A54C4" },
   headerAvatarFallback: { alignItems: "center", justifyContent: "center" },
-  headerTitle: { color: "#2D1B69", fontSize: 18, fontWeight: "800", flexShrink: 1 },
+  headerTitle: { color: "#FFFFFF", fontSize: 18, fontWeight: "800", flexShrink: 1 },
 
   // Search + filters
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "white",
+    backgroundColor: "#1E1B2E",
     margin: 16,
     marginBottom: 8,
     borderRadius: 14,
@@ -1664,9 +1664,9 @@ const styles = StyleSheet.create({
     height: 46,
     gap: 8,
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
+    borderColor: "rgba(139, 92, 246, 0.2)",
   },
-  searchInput: { flex: 1, fontSize: 15, color: "#1E1B4B", paddingVertical: 0 },
+  searchInput: { flex: 1, fontSize: 15, color: "#FFFFFF", paddingVertical: 0 },
   filterBar: {
     flexDirection: "row",
     paddingHorizontal: 16,
@@ -1680,13 +1680,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: "white",
+    backgroundColor: "#1E1B2E",
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.1)",
+    borderColor: "rgba(139, 92, 246, 0.2)",
   },
-  filterPillActive: { backgroundColor: "#F3EEFF", borderColor: "#8A63D2" },
-  filterText: { fontSize: 13, fontWeight: "500", color: "#94A3B8" },
-  filterTextActive: { color: "#8A63D2", fontWeight: "600" },
+  filterPillActive: { backgroundColor: "rgba(139, 92, 246, 0.2)", borderColor: "#8B5CF6" },
+  filterText: { fontSize: 13, fontWeight: "500", color: "#9CA3AF" },
+  filterTextActive: { color: "#A78BFA", fontWeight: "600" },
 
   // Conversation list
   convList: { paddingHorizontal: 16, paddingBottom: 24 },
@@ -1700,23 +1700,23 @@ const styles = StyleSheet.create({
   sectionHeaderText: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#8A63D2",
+    color: "#A78BFA",
     letterSpacing: 0.5,
   },
   convCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "white",
+    backgroundColor: "#1E1B2E",
     borderRadius: 16,
     padding: 14,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
+    borderColor: "rgba(139, 92, 246, 0.2)",
     gap: 12,
   },
   convCardUnread: {
-    backgroundColor: "#FBF9FF",
-    borderColor: "#E5D9FF",
+    backgroundColor: "#26223A",
+    borderColor: "rgba(139, 92, 246, 0.4)",
   },
   convAvatar: {
     width: 46,
@@ -1725,8 +1725,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  convAvatarPeer: { backgroundColor: "#F3EEFF" },
-  convAvatarAdmin: { backgroundColor: "#EDE9FE" },
+  convAvatarPeer: { backgroundColor: "rgba(139, 92, 246, 0.2)" },
+  convAvatarAdmin: { backgroundColor: "rgba(139, 92, 246, 0.15)" },
   convInfo: { flex: 1 },
   convTop: {
     flexDirection: "row",
@@ -1740,46 +1740,46 @@ const styles = StyleSheet.create({
     gap: 4,
     flex: 1,
   },
-  convName: { fontSize: 15, fontWeight: "600", color: "#1E1B4B", flexShrink: 1 },
-  convNameBold: { fontWeight: "800", color: "#4C1D95" },
-  convTime: { fontSize: 11, color: "#94A3B8", marginLeft: 8 },
-  convTimeUnread: { color: "#8A63D2", fontWeight: "700" },
+  convName: { fontSize: 15, fontWeight: "600", color: "#FFFFFF", flexShrink: 1 },
+  convNameBold: { fontWeight: "800", color: "#A78BFA" },
+  convTime: { fontSize: 11, color: "#9CA3AF", marginLeft: 8 },
+  convTimeUnread: { color: "#A78BFA", fontWeight: "700" },
   convSubRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     marginBottom: 2,
   },
-  convSubtitle: { fontSize: 12, color: "#64748B", flexShrink: 1 },
-  convSubtitleUnread: { color: "#4C1D95", fontWeight: "600" },
+  convSubtitle: { fontSize: 12, color: "#9CA3AF", flexShrink: 1 },
+  convSubtitleUnread: { color: "#D1D5DB", fontWeight: "600" },
   verifiedPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
-    backgroundColor: "#EDE9FE",
+    backgroundColor: "rgba(139, 92, 246, 0.15)",
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
     alignSelf: "flex-start",
   },
-  verifiedPillText: { fontSize: 10, fontWeight: "700", color: "#6D5BBF" },
-  convPreview: { fontSize: 13, color: "#64748B" },
-  convPreviewBold: { fontWeight: "600", color: "#1E1B4B" },
+  verifiedPillText: { fontSize: 10, fontWeight: "700", color: "#A78BFA" },
+  convPreview: { fontSize: 13, color: "#9CA3AF" },
+  convPreviewBold: { fontWeight: "600", color: "#D1D5DB" },
   unreadDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: "#8A63D2",
+    backgroundColor: "#8B5CF6",
     marginLeft: 4,
   },
   inboxPrivacyNote: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
-    backgroundColor: "#F3EEFF",
+    backgroundColor: "rgba(139, 92, 246, 0.12)",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(138, 99, 210, 0.12)",
+    borderColor: "rgba(139, 92, 246, 0.2)",
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginTop: 8,
@@ -1787,7 +1787,7 @@ const styles = StyleSheet.create({
   inboxPrivacyNoteText: {
     flex: 1,
     fontSize: 11,
-    color: "#6D5BBF",
+    color: "#A78BFA",
     lineHeight: 16,
   },
 
@@ -1800,23 +1800,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: "white",
+    backgroundColor: "#1E1B2E",
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.1)",
+    borderColor: "rgba(139, 92, 246, 0.2)",
   },
-  tabActive: { backgroundColor: "#F3EEFF", borderColor: "#8A63D2" },
-  tabText: { fontSize: 14, fontWeight: "500", color: "#94A3B8" },
-  tabTextActive: { color: "#8A63D2", fontWeight: "600" },
+  tabActive: { backgroundColor: "rgba(139, 92, 246, 0.2)", borderColor: "#8B5CF6" },
+  tabText: { fontSize: 14, fontWeight: "500", color: "#9CA3AF" },
+  tabTextActive: { color: "#A78BFA", fontWeight: "600" },
   userList: { paddingHorizontal: 16, paddingBottom: 24 },
   userCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "white",
+    backgroundColor: "#1E1B2E",
     borderRadius: 16,
     padding: 14,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
+    borderColor: "rgba(139, 92, 246, 0.2)",
     gap: 12,
   },
   userAvatar: {
@@ -1826,11 +1826,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  userAvatarPeer: { backgroundColor: "#F3EEFF" },
-  userAvatarAdmin: { backgroundColor: "#EDE9FE" },
+  userAvatarPeer: { backgroundColor: "rgba(139, 92, 246, 0.2)" },
+  userAvatarAdmin: { backgroundColor: "rgba(139, 92, 246, 0.15)" },
   userInfo: { flex: 1 },
-  userName: { fontSize: 15, fontWeight: "600", color: "#1E1B4B" },
-  userRole: { fontSize: 13, color: "#64748B", marginTop: 2 },
+  userName: { fontSize: 15, fontWeight: "600", color: "#FFFFFF" },
+  userRole: { fontSize: 13, color: "#9CA3AF", marginTop: 2 },
 
   // Empty state
   emptyState: {
@@ -1840,11 +1840,11 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 40,
   },
-  emptyTitle: { fontSize: 17, fontWeight: "700", color: "#1E1B4B" },
-  emptyText: { fontSize: 14, color: "#64748B", textAlign: "center" },
+  emptyTitle: { fontSize: 17, fontWeight: "700", color: "#FFFFFF" },
+  emptyText: { fontSize: 14, color: "#9CA3AF", textAlign: "center" },
   privacyNote: {
     fontSize: 12,
-    color: "#94A3B8",
+    color: "#9CA3AF",
     textAlign: "center",
     fontStyle: "italic",
     marginTop: 4,
@@ -1853,7 +1853,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#8A63D2",
+    backgroundColor: "#8B5CF6",
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 25,
@@ -1866,7 +1866,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
-    backgroundColor: "#F3EEFF",
+    backgroundColor: "rgba(139, 92, 246, 0.12)",
     marginHorizontal: 16,
     marginTop: 10,
     marginBottom: 4,
@@ -1874,9 +1874,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(138, 99, 210, 0.12)",
+    borderColor: "rgba(139, 92, 246, 0.2)",
   },
-  reminderText: { flex: 1, fontSize: 12, color: "#6D5BBF", lineHeight: 17 },
+  reminderText: { flex: 1, fontSize: 12, color: "#A78BFA", lineHeight: 17 },
 
   // Messages
   messagesList: { flexGrow: 1, paddingVertical: 12, paddingHorizontal: 16 },
@@ -1889,28 +1889,28 @@ const styles = StyleSheet.create({
   },
   dateLine: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(138, 99, 210, 0.2)",
+    backgroundColor: "rgba(139, 92, 246, 0.2)",
     flex: 1,
     maxWidth: 60,
   },
   dateSeparatorText: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#8A63D2",
+    color: "#A78BFA",
     letterSpacing: 0.5,
   },
   bubbleRow: { marginBottom: 8, flexDirection: "row" },
   bubbleRowRight: { justifyContent: "flex-end" },
   bubbleRowLeft: { justifyContent: "flex-start" },
   bubble: { maxWidth: "78%", borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
-  bubbleMine: { backgroundColor: "#8A63D2", borderBottomRightRadius: 4 },
+  bubbleMine: { backgroundColor: "#8B5CF6", borderBottomRightRadius: 4 },
   bubbleTheirs: {
-    backgroundColor: "white",
+    backgroundColor: "#1E1B2E",
     borderBottomLeftRadius: 4,
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
+    borderColor: "rgba(139, 92, 246, 0.2)",
   },
-  bubbleText: { fontSize: 15, color: "#1E1B4B", lineHeight: 20 },
+  bubbleText: { fontSize: 15, color: "#FFFFFF", lineHeight: 20 },
   bubbleTextMine: { color: "white" },
   bubbleFooter: {
     flexDirection: "row",
@@ -1919,8 +1919,8 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 4,
   },
-  bubbleTime: { fontSize: 10, color: "#94A3B8" },
-  bubbleTimeMine: { color: "rgba(255,255,255,0.5)" },
+  bubbleTime: { fontSize: 10, color: "#9CA3AF" },
+  bubbleTimeMine: { color: "rgba(255,255,255,0.6)" },
   retryText: { fontSize: 11, color: "#EF4444", fontWeight: "600" },
 
   // Input
@@ -1930,20 +1930,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: "rgba(156, 126, 235, 0.08)",
-    backgroundColor: "white",
+    borderTopColor: "rgba(139, 92, 246, 0.2)",
+    backgroundColor: "#1E1B2E",
     gap: 8,
   },
   textInput: {
     flex: 1,
-    backgroundColor: "#FAF8FF",
+    backgroundColor: "#26223A",
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
+    borderColor: "rgba(139, 92, 246, 0.3)",
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
-    color: "#1E1B4B",
+    color: "#FFFFFF",
     maxHeight: 100,
   },
   sendBtn: { width: 40, height: 40, justifyContent: "center", alignItems: "center" },
@@ -1952,12 +1952,12 @@ const styles = StyleSheet.create({
   // Conversation info modal
   infoOverlay: {
     flex: 1,
-    backgroundColor: "rgba(30, 27, 75, 0.4)",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
     justifyContent: "center",
     paddingHorizontal: 24,
   },
   infoCard: {
-    backgroundColor: "white",
+    backgroundColor: "#1E1B2E",
     borderRadius: 20,
     padding: 20,
   },
@@ -1966,13 +1966,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: "#3B3550",
     marginBottom: 12,
   },
   infoTitle: {
     fontSize: 17,
     fontWeight: "800",
-    color: "#1E1B4B",
+    color: "#FFFFFF",
     textAlign: "center",
     marginBottom: 14,
   },
@@ -1980,7 +1980,7 @@ const styles = StyleSheet.create({
   infoLabel: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#8A63D2",
+    color: "#A78BFA",
     textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 6,
@@ -1994,12 +1994,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   infoParticipantText: { flex: 1 },
-  infoName: { fontSize: 16, fontWeight: "700", color: "#1E1B4B" },
-  infoRole: { fontSize: 13, color: "#64748B", marginTop: 2 },
-  infoValue: { fontSize: 14, color: "#1E1B4B", lineHeight: 20 },
+  infoName: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
+  infoRole: { fontSize: 13, color: "#9CA3AF", marginTop: 2 },
+  infoValue: { fontSize: 14, color: "#D1D5DB", lineHeight: 20 },
   infoDivider: {
     height: 1,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "rgba(139, 92, 246, 0.15)",
     marginVertical: 14,
   },
   infoActionRow: {
@@ -2008,16 +2008,16 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 10,
   },
-  infoActionText: { fontSize: 15, fontWeight: "600", color: "#1E1B4B" },
+  infoActionText: { fontSize: 15, fontWeight: "600", color: "#FFFFFF" },
 
   // Chat ellipsis menu
   menuOverlay: {
     flex: 1,
-    backgroundColor: "rgba(30, 27, 75, 0.35)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-end",
   },
   menuCard: {
-    backgroundColor: "white",
+    backgroundColor: "#1E1B2E",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 16,
@@ -2030,7 +2030,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#F1F5F9",
+    borderBottomColor: "rgba(139, 92, 246, 0.15)",
   },
-  menuLabel: { fontSize: 15, fontWeight: "600", color: "#1E1B4B" },
+  menuLabel: { fontSize: 15, fontWeight: "600", color: "#FFFFFF" },
 });

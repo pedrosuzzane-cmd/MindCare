@@ -39,7 +39,6 @@ const MENU_SECTIONS: { title: string; items: MenuEntry[] }[] = [
       { label: "Profile", icon: "person-circle-outline", route: "/profile" },
       { label: "Achievements", icon: "trophy-outline", route: "/achievements" },
       { label: "Daily Journal", icon: "book-outline", route: "/daily-journal" },
-      { label: "Mood Calendar", icon: "calendar-outline", route: "/mood-calendar" },
       { label: "Daily Reminders", icon: "notifications-outline", route: "/daily-reminders" },
       { label: "Self-Assessment", icon: "clipboard-outline", route: "/self-assessment-menu" },
     ],
@@ -47,7 +46,6 @@ const MENU_SECTIONS: { title: string; items: MenuEntry[] }[] = [
   {
     title: "Support",
     items: [
-      { label: "AI Helper", icon: "bulb-outline", route: "/ai-helper" },
       { label: "Support Hotlines", icon: "call-outline", route: "/support-hotlines" },
       { label: "Help & Support", icon: "help-circle-outline", route: "/help-and-support" },
     ],

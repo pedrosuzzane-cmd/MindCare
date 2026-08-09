@@ -26,6 +26,6 @@ export default function RelaxationScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F3FF",
+    backgroundColor: "#0F0D15",
   },
 });

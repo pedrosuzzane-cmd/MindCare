@@ -64,7 +64,7 @@ export default function AnnouncementsTab() {
               a.targetDepartments.includes(studentDepartment)),
         ).length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="megaphone-outline" size={48} color="#D1D5DB" />
+            <Ionicons name="megaphone-outline" size={48} color="#9CA3AF" />
             <Text style={styles.emptyStateText}>No announcements yet</Text>
           </View>
         ) : (
@@ -132,7 +132,7 @@ export default function AnnouncementsTab() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F7F5FC" },
+  container: { flex: 1, backgroundColor: "#0F0D15" },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -147,39 +147,38 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#2D1B69",
+    color: "#FFFFFF",
   },
   list: {
     padding: 20,
     gap: 16,
-    paddingBottom: 40,
+    paddingBottom: 110,
   },
   card: {
-    backgroundColor: "white",
+    backgroundColor: "#1E1B2E",
     borderRadius: 20,
     padding: 18,
-    elevation: 2,
     borderWidth: 1,
-    borderColor: "#EDE9FE",
+    borderColor: "rgba(139, 92, 246, 0.2)",
     // @ts-ignore — web-only shadow property
-    boxShadow: "0px 2px 12px rgba(124, 77, 204, 0.06)",
+    boxShadow: "0px 2px 12px rgba(0, 0, 0, 0.3)",
   },
   cardTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#1E1B4B",
+    color: "#A78BFA",
     marginBottom: 8,
   },
   cardBody: {
     fontSize: 14,
-    color: "#4B5563",
+    color: "#D1D5DB",
     lineHeight: 22,
     marginBottom: 12,
   },
   linksContainer: { gap: 6, marginBottom: 12 },
   linkText: {
     fontSize: 13,
-    color: "#8A63D2",
+    color: "#A78BFA",
     fontWeight: "600",
     textDecorationLine: "underline",
   },
@@ -198,7 +197,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#8A63D2",
+    backgroundColor: "#8B5CF6",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -208,16 +207,16 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   cardMeta: { fontSize: 12, color: "#9CA3AF", marginBottom: 2 },
-  cardDate: { fontSize: 11, color: "#D1D5DB" },
+  cardDate: { fontSize: 11, color: "#9CA3AF" },
   expiry: {
     marginTop: 6,
     alignSelf: "flex-start",
-    backgroundColor: "#F3EEFF",
+    backgroundColor: "rgba(139, 92, 246, 0.15)",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
   },
-  expiryText: { fontSize: 10, fontWeight: "600", color: "#8A63D2" },
+  expiryText: { fontSize: 10, fontWeight: "600", color: "#A78BFA" },
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
