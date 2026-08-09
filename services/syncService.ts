@@ -8,6 +8,7 @@ import {
     writeBatch,
 } from "firebase/firestore";
 import { JournalEntry, journalService } from "./journalService";
+import { constellationService } from "./constellationService";
 
 const syncJournals = async (userId: string): Promise<void> => {
   let localEntries = await journalService.getJournalEntries(userId);
@@ -164,6 +165,14 @@ const syncJournals = async (userId: string): Promise<void> => {
   } catch (error) {
     // Download step failed (e.g., offline drop) — upload already succeeded
     console.warn("Failed to download remote entries:", error);
+  }
+
+  // 3. Sync the student's constellation stars (additive — a star failure must
+  //    never break the journal sync or the journal flow).
+  try {
+    await constellationService.syncConstellationStars(userId);
+  } catch (error) {
+    console.warn("Failed to sync constellation stars:", error);
   }
 };
 

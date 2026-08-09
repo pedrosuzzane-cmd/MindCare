@@ -116,15 +116,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="relaxation"
+        name="constellation"
         options={{
-          title: "Breathe",
+          title: "Constellation",
           tabBarButton: HapticTab,
           tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="🌱" focused={focused} />
+            <TabIcon emoji="✨" focused={focused} />
           ),
           tabBarLabel: ({ focused }) => (
-            <TabLabel label="Breathe" focused={focused} />
+            <TabLabel label="Constellation" focused={focused} />
           ),
         }}
       />

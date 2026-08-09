@@ -5,6 +5,7 @@ import { useMindCareTheme } from "@/contexts/ThemeContext";
 import { CATEGORIES, MOODS, getCategory, getMood } from "@/utils/journalOptions";
 import { generateLocalReflection, detectRisk } from "@/utils/journalReflection";
 import { journalDraftStorage } from "@/storage/journalDraftStorage";
+import { constellationService } from "@/services/constellationService";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -41,7 +42,7 @@ const DRAFT_INTERVAL_MS = 30_000;
 
 export default function NewJournalEntryScreen() {
   const params = useLocalSearchParams<{ date?: string; entryId?: string }>();
-  const { addJournalEntry, updateJournalEntry, getJournalEntry, entries } =
+  const { addJournalEntry, updateJournalEntry, getJournalEntry, entries, manualSync } =
     useJournal();
   const { isConnected } = useNetwork();
   const { theme } = useMindCareTheme();
@@ -279,6 +280,21 @@ export default function NewJournalEntryScreen() {
       } else {
         const created = await addJournalEntry(data);
         savedId = created.id;
+
+        // Constellation Weaver: every newly saved journal becomes one star in
+        // the student's night sky. Idempotent by journalId — edits and repeat
+        // saves never create duplicates. Runs alongside the journal, and never
+        // blocks the journal save if it fails.
+        try {
+          await constellationService.createStarForJournal(created.userId, {
+            id: created.id,
+            category: created.category,
+            createdAt: created.createdAt,
+          });
+        } catch (err) {
+          console.warn("Could not create constellation star", err);
+        }
+        manualSync();
       }
 
       await journalDraftStorage.clearDraft();
