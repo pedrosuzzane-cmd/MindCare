@@ -7,11 +7,15 @@ import { auth } from "@/constants/firebase";
 import { useMindCareTheme } from "@/contexts/ThemeContext";
 import { ConstellationSky } from "@/components/constellation/ConstellationSky";
 import { ConstellationProgress } from "@/components/constellation/ConstellationProgress";
+import { ConstellationCollection } from "@/components/constellation/ConstellationCollection";
 import { StarDetailModal } from "@/components/constellation/StarDetailModal";
 import { constellationStorage } from "@/storage/constellationStorage";
 import { ConstellationStar } from "@/types/constellation";
-import { JOURNAL_MILESTONES } from "@/utils/constellationOptions";
-import { getMood } from "@/utils/journalOptions";
+import {
+  JOURNAL_MILESTONES,
+  STAR_CATEGORY_COLORS,
+} from "@/utils/constellationOptions";
+import { getCategory, getMood } from "@/utils/journalOptions";
 import { useFocusEffect } from "@react-navigation/native";
 import { Redirect, router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -33,6 +37,9 @@ const SKY_PROGRESSION: Array<{ min: number; message: string }> = [
   { min: 10, message: "Your constellation is taking shape." },
   { min: 20, message: "Your night sky is becoming something special." },
 ];
+
+/** Render cap — keeps the sky smooth on mid-range devices. */
+const SKY_STAR_LIMIT = 80;
 
 export default function ConstellationScreen() {
   const { user, role } = useAuth();
@@ -57,6 +64,8 @@ export default function ConstellationScreen() {
     title: string;
     count: number;
   } | null>(null);
+  const [legendExpanded, setLegendExpanded] = useState(false);
+  const [fullSky, setFullSky] = useState(false);
   const checkingMilestones = useRef(false);
 
   // Mint a golden star for every unlocked achievement (idempotent by
@@ -172,6 +181,70 @@ export default function ConstellationScreen() {
     maybeCelebrate();
   }, [journalStarCount, maybeCelebrate]);
 
+  /**
+   * Newly created stars keep a one-time `highlight` flag so their entrance
+   * plays exactly once. Once the tab has been open long enough to watch it,
+   * clear the flag from storage (state keeps the flag for this session so the
+   * animation is not cut off mid-play).
+   */
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid || role === "admin") return;
+    if (!stars.some((s) => s.highlight)) return;
+    const timer = setTimeout(async () => {
+      const stored = await constellationStorage.getStars(uid);
+      if (!stored.some((s) => s.highlight)) return;
+      await constellationStorage.saveStars(
+        uid,
+        stored.map((s) => (s.highlight ? { ...s, highlight: false } : s)),
+      );
+    }, 20_000);
+    return () => clearTimeout(timer);
+  }, [stars, role]);
+
+  /**
+   * Keep the sky smooth on large histories: render the newest ~80 stars plus
+   * any bonus nova, with a "View Full Sky" toggle for the complete night sky.
+   */
+  const visibleStars = useMemo(() => {
+    if (fullSky || stars.length <= SKY_STAR_LIMIT) return stars;
+    const newestFirst = [...stars].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+    const alwaysKeep = new Set<string>();
+    for (const s of stars) {
+      if (s.source === "milestone" || s.source === "achievement" || s.highlight) {
+        alwaysKeep.add(s.id);
+      }
+    }
+    const kept: ConstellationStar[] = [];
+    for (const s of newestFirst) {
+      if (alwaysKeep.has(s.id)) {
+        kept.push(s);
+        alwaysKeep.delete(s.id);
+      } else if (kept.length < SKY_STAR_LIMIT) {
+        kept.push(s);
+      }
+    }
+    return kept;
+  }, [stars, fullSky]);
+
+  const legendCategories = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of stars) {
+      if (!s.category) continue;
+      counts.set(s.category, (counts.get(s.category) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([id]) => ({
+        id,
+        name: getCategory(id)?.name ?? id,
+        color: STAR_CATEGORY_COLORS[id] ?? theme.primary,
+      }));
+  }, [stars, theme.primary]);
+
   const progressionMessage = useMemo(() => {
     const entry =
       [...SKY_PROGRESSION].reverse().find((p) => stats.total >= p.min) ??
@@ -224,6 +297,24 @@ export default function ConstellationScreen() {
     });
   };
 
+  const handleSelectMilestone = (count: number) => {
+    const star = stars.find(
+      (s) => s.source === "milestone" && s.milestoneCount === count,
+    );
+    if (star) {
+      setSelectedStar(star);
+      return;
+    }
+    const milestone = JOURNAL_MILESTONES.find((m) => m.count === count);
+    if (milestone) {
+      setCelebration({
+        emoji: milestone.emoji,
+        title: milestone.title,
+        count: milestone.count,
+      });
+    }
+  };
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
@@ -258,19 +349,18 @@ export default function ConstellationScreen() {
               moodColor={currentMood?.color}
             />
             <View style={styles.emptyOverlay}>
-              <Text style={styles.emptyTitle}>
-                ✨ Your constellation is waiting for its first star.
-              </Text>
+              <Text style={styles.emptyTitle}>✨ Your sky is waiting.</Text>
               <Text style={styles.emptySubtitle}>
-                Write your first journal entry and watch your night sky begin.
+                Write your first journal entry and turn your thoughts into a
+                star.
               </Text>
               <Pressable
                 style={[styles.primaryButton, { backgroundColor: theme.primary }]}
                 onPress={writeJournal}
                 accessibilityRole="button"
-                accessibilityLabel="Write a journal"
+                accessibilityLabel="Write my first journal"
               >
-                <Text style={styles.primaryButtonText}>Write a Journal</Text>
+                <Text style={styles.primaryButtonText}>Write My First Journal</Text>
               </Pressable>
             </View>
           </View>
@@ -279,7 +369,7 @@ export default function ConstellationScreen() {
             {/* Night sky */}
             <View style={[styles.skyWrap, { height: skyHeight }]}>
               <ConstellationSky
-                stars={stars}
+                stars={visibleStars}
                 theme={theme}
                 onPressStar={setSelectedStar}
                 moodColor={currentMood?.color}
@@ -300,6 +390,21 @@ export default function ConstellationScreen() {
                 </View>
               </View>
             </View>
+
+            {stars.length > SKY_STAR_LIMIT && (
+              <Pressable
+                style={styles.fullSkyToggle}
+                onPress={() => setFullSky((prev) => !prev)}
+                accessibilityRole="button"
+                accessibilityLabel={fullSky ? "Show fewer stars" : "View full sky"}
+              >
+                <Text style={[styles.fullSkyToggleText, { color: theme.primary }]}>
+                  {fullSky
+                    ? "Show fewer stars"
+                    : `View Full Sky (${stars.length} stars)`}
+                </Text>
+              </Pressable>
+            )}
 
             {/* Stats */}
             <View style={styles.statsRow}>
@@ -328,6 +433,52 @@ export default function ConstellationScreen() {
             <View style={styles.progressWrap}>
               <ConstellationProgress starCount={journalStarCount} theme={theme} />
             </View>
+
+            {/* Category legend */}
+            {legendCategories.length > 0 && (
+              <View style={styles.legendWrap}>
+                <View style={styles.legendHeader}>
+                  <Text style={[styles.legendTitle, { color: theme.text }]}>
+                    Categories in your sky
+                  </Text>
+                  <Pressable
+                    onPress={() => setLegendExpanded((prev) => !prev)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      legendExpanded ? "Hide categories" : "View categories"
+                    }
+                  >
+                    <Text style={[styles.legendToggle, { color: theme.primary }]}>
+                      {legendExpanded ? "Hide" : "View Categories"}
+                    </Text>
+                  </Pressable>
+                </View>
+                <View style={styles.legendRow}>
+                  {legendCategories
+                    .slice(0, legendExpanded ? undefined : 4)
+                    .map((c) => (
+                      <View key={c.id} style={styles.legendItem}>
+                        <View
+                          style={[styles.legendDot, { backgroundColor: c.color }]}
+                        />
+                        <Text
+                          style={[styles.legendLabel, { color: theme.secondaryText }]}
+                        >
+                          {c.name}
+                        </Text>
+                      </View>
+                    ))}
+                </View>
+              </View>
+            )}
+
+            {/* My Constellations */}
+            <ConstellationCollection
+              starCount={journalStarCount}
+              theme={theme}
+              onSelect={handleSelectMilestone}
+            />
           </>
         )}
       </ScrollView>
@@ -526,6 +677,54 @@ const styles = StyleSheet.create({
   },
   progressWrap: {
     marginTop: 14,
+  },
+  fullSkyToggle: {
+    alignSelf: "center",
+    marginTop: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  fullSkyToggleText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  legendWrap: {
+    marginTop: 16,
+  },
+  legendHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  legendTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  legendToggle: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  legendRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 12,
+    paddingVertical: 4,
+  },
+  legendDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+  },
+  legendLabel: {
+    fontSize: 13,
+    fontWeight: "600",
   },
   emptyBox: {
     borderRadius: 24,

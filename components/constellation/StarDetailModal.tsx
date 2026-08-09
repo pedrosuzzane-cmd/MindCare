@@ -1,7 +1,7 @@
 import { JournalEntry } from "@/services/journalService";
 import { MindCareTheme } from "@/constants/theme";
 import { ConstellationStar } from "@/types/constellation";
-import { STAR_TYPE_CONFIG } from "@/utils/constellationOptions";
+import { STAR_TYPE_CONFIG, starCategoryColor } from "@/utils/constellationOptions";
 import { ACHIEVEMENT_CATEGORIES } from "@/hooks/useAchievements";
 import { getCategory, getMood } from "@/utils/journalOptions";
 import { Ionicons } from "@expo/vector-icons";
@@ -56,11 +56,14 @@ export function StarDetailModal({
     : isMilestone
       ? milestone?.title || "Milestone Star"
       : isGratitude
-        ? "Gratitude Star"
-        : "Your Reflection";
+        ? entry?.title || "Gratitude Star"
+        : entry?.title || "Your Reflection";
 
   const mood = entry ? getMood(entry.mood) : undefined;
   const category = entry ? getCategory(entry.category) : undefined;
+  const starColor = star
+    ? starCategoryColor(star.category) ?? theme.primary
+    : theme.primary;
 
   const formatDate = (iso?: string) => {
     if (!iso) return "";
@@ -94,7 +97,12 @@ export function StarDetailModal({
 
           {star && config && (
             <>
-              <Text style={styles.starGlyph}>
+              <Text
+                style={[
+                  styles.starGlyph,
+                  !isAchievement && !isMilestone && { color: starColor },
+                ]}
+              >
                 {isAchievement
                   ? achievement?.emoji || "🏆"
                   : isMilestone
@@ -181,6 +189,22 @@ export function StarDetailModal({
                       ? "This special star was created from a gratitude journal entry."
                       : "This star was created from your journal entry."}
                   </Text>
+
+                  {entry?.thoughts ? (
+                    <View
+                      style={[
+                        styles.preview,
+                        { backgroundColor: theme.inputBg },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.previewText, { color: theme.text }]}
+                        numberOfLines={4}
+                      >
+                        {entry.thoughts}
+                      </Text>
+                    </View>
+                  ) : null}
                 </>
               )}
 
@@ -285,7 +309,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 16,
+  },
+  preview: {
+    alignSelf: "stretch",
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 18,
+  },
+  previewText: {
+    fontSize: 14,
+    lineHeight: 20,
   },
   button: {
     flexDirection: "row",

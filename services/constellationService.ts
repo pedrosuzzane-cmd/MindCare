@@ -9,6 +9,7 @@ import {
   CONSTELLATION_ID,
   STAR_BRIGHTNESS,
   STAR_SIZE_LABEL,
+  isMilestoneJournal,
   nextStarPosition,
   selectJournalStarType,
 } from "@/utils/constellationOptions";
@@ -57,17 +58,27 @@ const createStarForJournal = async (
     return null;
   }
 
+  // Journal ordinal only counts journal-derived stars, so achievement and
+  // milestone bonus novas never shift a journal's "1st / 10th / 25th / 50th".
+  const journalIndex = existing.filter(
+    (s) => s.source === "journal" || s.source === "gratitude",
+  ).length;
+
   const isGratitude = journal.category === "gratitude";
   const source: StarSource = isGratitude ? "gratitude" : "journal";
   const type = isGratitude
     ? "special"
-    : selectJournalStarType(existing.length);
+    : isMilestoneJournal(journalIndex)
+      ? "special"
+      : selectJournalStarType(journalIndex);
   const position: StarPosition = nextStarPosition(existing.length, journal.id);
 
   const star: ConstellationStar = {
     id: starIdFor(journal.id),
     studentId: userId,
     journalId: journal.id,
+    category: journal.category,
+    highlight: true,
     type,
     size: STAR_SIZE_LABEL[type],
     brightness: STAR_BRIGHTNESS[type],
@@ -106,6 +117,7 @@ const createAchievementStar = async (
     id: starId,
     studentId: userId,
     journalId: "",
+    highlight: true,
     type: "special",
     size: STAR_SIZE_LABEL.special,
     brightness: STAR_BRIGHTNESS.special,
@@ -146,6 +158,7 @@ const createMilestoneStar = async (
     id: starId,
     studentId: userId,
     journalId: "",
+    highlight: true,
     type: "special",
     size: STAR_SIZE_LABEL.special,
     brightness: STAR_BRIGHTNESS.special,
@@ -222,6 +235,8 @@ const syncConstellationStars = async (userId: string): Promise<void> => {
         id: remoteDoc.id,
         studentId: userId,
         journalId: data.journalId || remoteDoc.id.replace("star_", ""),
+        category: data.category,
+        highlight: data.highlight,
         type: data.type || "sparkle",
         size: data.size || "small",
         brightness: data.brightness || "soft",

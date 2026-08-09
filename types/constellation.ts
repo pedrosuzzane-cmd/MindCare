@@ -36,6 +36,10 @@ export interface ConstellationStar {
   studentId: string;
   /** The journal that created this star. */
   journalId: string;
+  /** Journal category id — drives the star's celestial accent color. */
+  category?: string;
+  /** True while the newly created star should play its one-time entrance. */
+  highlight?: boolean;
   type: StarType;
   size: StarSize;
   brightness: StarBrightness;

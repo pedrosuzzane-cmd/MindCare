@@ -6,11 +6,13 @@ import {
   moodSkyColors,
 } from "@/utils/constellationOptions";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useMemo, useState } from "react";
-import { LayoutChangeEvent, StyleSheet, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { LayoutChangeEvent, StyleSheet, Text, View } from "react-native";
+import Animated, { FadeInDown, FadeOutUp } from "react-native-reanimated";
+import Svg, { Line } from "react-native-svg";
 import { ConstellationStarView } from "./ConstellationStar";
 
-const NEW_STAR_WINDOW_MS = 15_000;
+const NEW_STAR_MESSAGE_MS = 4500;
 const LINE_THICKNESS = 1.2;
 const LINE_GLOW_THICKNESS = 4;
 
@@ -26,11 +28,10 @@ interface ConstellationSkyProps {
 
 interface SkyLine {
   key: string;
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-  angle: number;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
 }
 
 /** Dim, non-interactive backdrop stars for atmosphere. */
@@ -59,24 +60,32 @@ export function ConstellationSky({
 
   const season = useMemo(() => currentSeason(), []);
 
-  const now = Date.now();
-  const newStarIds = useMemo(() => {
-    const set = new Set<string>();
-    for (const star of stars) {
-      const created = new Date(star.createdAt).getTime();
-      if (now - created >= 0 && now - created < NEW_STAR_WINDOW_MS) {
-        set.add(star.id);
-      }
-    }
-    return set;
-  }, [stars, now]);
-
   const lineColor = theme.mode === "dark" ? "#E9DFFF" : "#F4EEFF";
+
+  // A journal-derived star still marked `highlight` just appeared — show the
+  // short celebratory note once (milestone/achievement novas get their own
+  // reward moments, so they don't trigger the note).
+  const showNewStarMessage = stars.some(
+    (s) =>
+      s.highlight === true &&
+      (s.source === "journal" || s.source === "gratitude"),
+  );
+
+  const [showMessage, setShowMessage] = useState(showNewStarMessage);
+  useEffect(() => {
+    if (!showNewStarMessage) {
+      setShowMessage(false);
+      return;
+    }
+    setShowMessage(true);
+    const timer = setTimeout(() => setShowMessage(false), NEW_STAR_MESSAGE_MS);
+    return () => clearTimeout(timer);
+  }, [showNewStarMessage]);
 
   /**
    * Each constellation group draws a quiet line between consecutive stars in
    * chronological order — every new star is linked to the one that came before
-   * it, so the constellation grows into a shape over time.
+   * it, so the constellation grows into a recognizable shape over time.
    */
   const lines = useMemo<SkyLine[]>(() => {
     if (layout.width === 0 || layout.height === 0) return [];
@@ -84,7 +93,13 @@ export function ConstellationSky({
 
     const groups = new Map<string, ConstellationStar[]>();
     for (const star of stars) {
-      const key = star.constellationId || "reflection";
+      // All journal-derived stars (reflections + gratitude) share one journey
+      // path so the sky draws a single recognizable constellation; achievement
+      // and milestone novas stay as their own quiet side chains.
+      const key =
+        star.source === "journal" || star.source === "gratitude"
+          ? "journey"
+          : star.constellationId || "reflection";
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(star);
     }
@@ -99,21 +114,12 @@ export function ConstellationSky({
       for (let i = 1; i < sorted.length; i++) {
         const a = sorted[i - 1];
         const b = sorted[i];
-        const ax = a.position.x * layout.width;
-        const ay = a.position.y * layout.height;
-        const bx = b.position.x * layout.width;
-        const by = b.position.y * layout.height;
-        const dx = bx - ax;
-        const dy = by - ay;
-        const length = Math.sqrt(dx * dx + dy * dy);
-        const angle = Math.atan2(dy, dx);
         result.push({
           key: `${groupKey}_${a.id}`,
-          left: (ax + bx) / 2 - length / 2,
-          top: (ay + by) / 2 - LINE_THICKNESS / 2,
-          width: length,
-          height: LINE_THICKNESS,
-          angle,
+          x1: a.position.x * layout.width,
+          y1: a.position.y * layout.height,
+          x2: b.position.x * layout.width,
+          y2: b.position.y * layout.height,
         });
       }
     }
@@ -155,48 +161,60 @@ export function ConstellationSky({
         />
       ))}
 
-      {/* Constellation lines */}
-      {lines.map((line) => (
-        <View key={line.key} pointerEvents="none">
-          <View
-            style={[
-              styles.lineGlow,
-              {
-                left: line.left - (LINE_GLOW_THICKNESS - line.height) / 2,
-                top: line.top - (LINE_GLOW_THICKNESS - line.height) / 2,
-                width: line.width,
-                height: LINE_GLOW_THICKNESS,
-                backgroundColor: lineColor,
-                transform: [{ rotate: `${line.angle}rad` }],
-              },
-            ]}
-          />
-          <View
-            style={[
-              styles.line,
-              {
-                left: line.left,
-                top: line.top,
-                width: line.width,
-                height: line.height,
-                backgroundColor: lineColor,
-                transform: [{ rotate: `${line.angle}rad` }],
-              },
-            ]}
-          />
-        </View>
-      ))}
+      {/* Constellation lines — subtle SVG strokes, never overpowering. */}
+      <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+        {lines.map((line) => (
+          <React.Fragment key={line.key}>
+            <Line
+              x1={line.x1}
+              y1={line.y1}
+              x2={line.x2}
+              y2={line.y2}
+              stroke={lineColor}
+              strokeWidth={LINE_GLOW_THICKNESS}
+              strokeOpacity={0.08}
+              strokeLinecap="round"
+            />
+            <Line
+              x1={line.x1}
+              y1={line.y1}
+              x2={line.x2}
+              y2={line.y2}
+              stroke={lineColor}
+              strokeWidth={LINE_THICKNESS}
+              strokeOpacity={0.4}
+              strokeLinecap="round"
+            />
+          </React.Fragment>
+        ))}
+      </Svg>
 
       {/* Real stars */}
       {stars.map((star) => (
         <ConstellationStarView
           key={star.id}
           star={star}
-          animate={newStarIds.has(star.id)}
+          animate={star.highlight === true}
           onPress={onPressStar}
           glyph={glyphForStar?.(star)}
         />
       ))}
+
+      {/* "Your thoughts became a new star" note */}
+      {showMessage && (
+        <Animated.View
+          entering={FadeInDown.duration(400)}
+          exiting={FadeOutUp.duration(400)}
+          pointerEvents="none"
+          style={styles.newStarBanner}
+        >
+          <View style={styles.newStarPill}>
+            <Text style={styles.newStarText}>
+              Your thoughts became a new star ✨
+            </Text>
+          </View>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -214,14 +232,22 @@ const styles = StyleSheet.create({
     borderRadius: 1.5,
     backgroundColor: "#FFFFFF",
   },
-  line: {
+  newStarBanner: {
     position: "absolute",
-    borderRadius: 1,
-    opacity: 0.4,
+    top: 16,
+    left: 0,
+    right: 0,
+    alignItems: "center",
   },
-  lineGlow: {
-    position: "absolute",
-    borderRadius: 2,
-    opacity: 0.1,
+  newStarPill: {
+    backgroundColor: "rgba(20, 14, 40, 0.62)",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  newStarText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "rgba(255, 255, 255, 0.95)",
   },
 });

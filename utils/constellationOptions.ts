@@ -36,6 +36,31 @@ export const STAR_COLORS = {
   gold: "#FFD98A",
 };
 
+/**
+ * Celestial accent color per journal category. Kept deliberately soft so the
+ * sky stays in MindCare's dark purple identity instead of turning arcade-bright.
+ */
+export const STAR_CATEGORY_COLORS: Record<string, string> = {
+  personal: "#A78BFA",
+  academic: "#60A5FA",
+  wellness: "#86EFAC",
+  emotions: "#F9A8D4",
+  social: "#F9A8D4",
+  family: "#FDBA74",
+  goals: "#818CF8",
+  growth: "#86EFAC",
+  gratitude: "#FDE68A",
+  work: "#FDBA74",
+  financial: "#67E8F9",
+  spiritual: "#C4B5FD",
+  life_events: "#67E8F9",
+  other: "#67E8F9",
+};
+
+/** Resolve a category id to its celestial accent, if known. */
+export const starCategoryColor = (category?: string): string | undefined =>
+  category ? STAR_CATEGORY_COLORS[category] : undefined;
+
 export const STAR_BRIGHTNESS_OPACITY: Record<StarBrightness, number> = {
   dim: 0.35,
   soft: 0.6,
@@ -91,19 +116,33 @@ const buildPositions = (): StarPosition[] => {
 
 export const STAR_POSITIONS: StarPosition[] = buildPositions();
 
-/** Journal stars cycle through types so five journals never look identical. */
+/**
+ * Journal stars cycle through a controlled distribution so consecutive stars
+ * never look identical: small 35%, normal 35%, bright 15%, sparkle 10%,
+ * special 5%. The cycle is index-driven so every journal maps to a stable type.
+ */
 const JOURNAL_TYPE_CYCLE: StarType[] = [
-  "tiny",
-  "sparkle",
-  "fourPoint",
-  "fivePoint",
-  "tiny",
-  "sparkle",
-  "bright",
+  // small (35%)
+  "tiny", "tiny", "tiny", "tiny", "tiny", "tiny", "tiny",
+  // normal (35%) — mix of four-point and five-point
+  "fourPoint", "fivePoint", "fourPoint", "fourPoint", "fivePoint", "fourPoint", "fivePoint",
+  // bright (15%)
+  "bright", "bright", "bright",
+  // sparkle (10%)
+  "sparkle", "sparkle",
+  // special (5%)
+  "special",
 ];
 
 export const selectJournalStarType = (index: number): StarType =>
   JOURNAL_TYPE_CYCLE[index % JOURNAL_TYPE_CYCLE.length];
+
+/**
+ * Journals that earn a visually distinct special star: the very first one,
+ * then every ~dozen journals (10th, 25th, 50th).
+ */
+export const isMilestoneJournal = (index: number): boolean =>
+  index === 0 || index === 9 || index === 24 || index === 49;
 
 /**
  * Deterministic tiny jitter derived from a string id. Gives each star a small
@@ -145,11 +184,13 @@ export interface JournalMilestone {
 }
 
 export const JOURNAL_MILESTONES: JournalMilestone[] = [
-  { count: 5, emoji: "🌱", title: "First Constellation" },
-  { count: 10, emoji: "🌿", title: "Growing Constellation" },
-  { count: 20, emoji: "🌟", title: "Radiant Sky" },
-  { count: 30, emoji: "🌙", title: "Night Sky Watcher" },
-  { count: 50, emoji: "🌌", title: "Cosmic Weaver" },
+  { count: 1, emoji: "✨", title: "First Light" },
+  { count: 5, emoji: "✦", title: "Little Dipper" },
+  { count: 10, emoji: "♡", title: "Heart Constellation" },
+  { count: 20, emoji: "📖", title: "Open Book" },
+  { count: 30, emoji: "🌙", title: "Crescent Moon" },
+  { count: 50, emoji: "🌠", title: "Star Path" },
+  { count: 100, emoji: "🌌", title: "MindCare Galaxy" },
 ];
 
 // ── Atmosphere ────────────────────────────────────────────────────────────
