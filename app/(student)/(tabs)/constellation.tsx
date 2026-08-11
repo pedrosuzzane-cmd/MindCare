@@ -17,6 +17,7 @@ import {
   currentMonthKey,
   formatMonthLabel,
   formatMonthName,
+  getEntryDateIso,
   getMonthEntries,
   getMonthMoodCount,
   getMonthlyGoal,
@@ -29,7 +30,7 @@ import {
 import { getCategory, getMood } from "@/utils/journalOptions";
 import { useFocusEffect } from "@react-navigation/native";
 import { Redirect, router } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -49,6 +50,7 @@ export default function ConstellationScreen() {
   const { theme } = useMindCareTheme();
   const { entries, loading, loadError, reload, manualSync } = useJournal();
   const { width } = useWindowDimensions();
+  const scrollRef = useRef<ScrollView>(null);
 
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedStarId, setSelectedStarId] = useState<string | null>(null);
@@ -59,6 +61,12 @@ export default function ConstellationScreen() {
   const [fullSky, setFullSky] = useState(false);
 
   const goal = getMonthlyGoal();
+
+  /** Jump to a month and bring the constellation back into view. */
+  const selectMonth = (monthKey: string) => {
+    setSelectedMonth(monthKey);
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
 
   // Refresh from the journal sync whenever the tab gains focus. Offline stays
   // cached, so the sky still renders from stored journal entries. The student
@@ -149,7 +157,7 @@ export default function ConstellationScreen() {
   const dayEntries = useMemo(() => {
     if (!selectedDate) return [];
     return entries
-      .filter((e) => normalizeJournalDate(e.createdAt) === selectedDate)
+      .filter((e) => normalizeJournalDate(getEntryDateIso(e)) === selectedDate)
       .sort(
         (a, b) =>
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
@@ -180,14 +188,6 @@ export default function ConstellationScreen() {
 
   const skyHeight = Math.min(Math.max(width * 0.78, 280), 380);
 
-  if (role === "admin") {
-    return <Redirect href="/admin-panel" />;
-  }
-
-  if (!user) {
-    return <Redirect href="/auth/login" />;
-  }
-
   const openStar = (star: ConstellationStar) => {
     setSelectedStarId(star.journalId);
     setSelectedDate(star.date);
@@ -210,11 +210,11 @@ export default function ConstellationScreen() {
     });
   };
 
-  const goPrevMonth = () => setSelectedMonth(getPreviousMonth(selectedMonth));
+  const goPrevMonth = () => selectMonth(getPreviousMonth(selectedMonth));
 
   const goNextMonth = () => {
     if (!viewingCurrentMonth) {
-      setSelectedMonth(getNextMonth(selectedMonth));
+      selectMonth(getNextMonth(selectedMonth));
     }
   };
 
@@ -228,12 +228,21 @@ export default function ConstellationScreen() {
       ? "Your first star is shining ✨"
       : `${currentMood ? `${currentMood.emoji} ` : ""}Your ${monthName} sky is growing.`;
 
+  if (role === "admin") {
+    return <Redirect href="/admin-panel" />;
+  }
+
+  if (!user) {
+    return <Redirect href="/auth/login" />;
+  }
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
       edges={["top", "bottom"]}
     >
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}

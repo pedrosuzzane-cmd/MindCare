@@ -1,5 +1,6 @@
 import { JournalEntry } from "@/services/journalService";
 import { ConstellationStar, StarPosition, StarType } from "@/types/constellation";
+import { getEntryDateIso } from "@/utils/constellationMonthUtils";
 import { getCategory, getCategoryLabel, getMood } from "@/utils/journalOptions";
 
 /**
@@ -130,29 +131,24 @@ export const getStarAppearance = (category?: string): StarAppearance => {
 
 /* ── Deterministic positions ──────────────────────────────────────────── */
 
-const GRID_ROWS = 7;
-const GRID_COLS = 8;
-
 /**
- * A journal id hashes onto a stable cell of a virtual grid, with a small
- * id-derived jitter inside that cell. Positions never change between renders,
- * and successive journals spread across the whole sky instead of piling up.
+ * A journal id hashes onto a stable, organically scattered spot in the sky.
+ * Positions are a pure function of the journal id — no Math.random anywhere —
+ * so a star never moves between renders, month switches or app reloads.
+ * Stars written today keep their exact spot when revisited months later.
  */
 export const positionFor = (journalId: string): StarPosition => {
-  const h = hashSeed(journalId);
-  const row = h % GRID_ROWS;
-  const col = (h >> 8) % GRID_COLS;
-  const jx = ((h >> 16) % 100) / 100;
-  const jy = ((h >> 24) % 100) / 100;
-  const marginX = 0.06;
-  const marginY = 0.08;
-  const cellW = (1 - marginX * 2) / GRID_COLS;
-  const cellH = (1 - marginY * 2) / GRID_ROWS;
+  const marginX = 0.08;
+  const marginY = 0.1;
   return {
-    x: marginX + col * cellW + jx * cellW * 0.6,
-    y: marginY + row * cellH + jy * cellH * 0.6,
+    x: marginX + hashUnit(journalId, "x") * (1 - marginX * 2),
+    y: marginY + hashUnit(journalId, "y") * (1 - marginY * 2),
   };
 };
+
+/** High-entropy 0–1 unit value derived from a salted id hash. */
+const hashUnit = (value: string, salt: string): number =>
+  ((hashSeed(`${value}:${salt}`) >>> 16) & 0xffff) / 0xffff;
 
 /**
  * Clamp a position into the safe band the star glyphs render within (kept in
@@ -167,48 +163,145 @@ const clampPosition = (pos: StarPosition): StarPosition => ({
 const distanceBetween = (a: StarPosition, b: StarPosition): number =>
   Math.hypot(a.x - b.x, a.y - b.y);
 
-/** Minimum separation between any two star centers (~10% of the sky). */
-const MIN_STAR_DISTANCE = 0.1;
-const MAX_COLLISION_ATTEMPTS = 8;
+/**
+ * Minimum separation between any two journal-star centers (~12% of the sky).
+ * Large enough for comfortable taps, small enough that very active months
+ * (20–40 entries) still find room.
+ */
+export const MIN_STAR_DISTANCE = 0.12;
 
-/** Deterministic nudges, tried in order until a clear spot is found. */
-const COLLISION_OFFSETS: ReadonlyArray<StarPosition> = [
-  { x: 0.05, y: 0 },
-  { x: -0.05, y: 0 },
-  { x: 0, y: 0.05 },
-  { x: 0, y: -0.05 },
-  { x: 0.05, y: 0.05 },
-  { x: -0.05, y: -0.05 },
-  { x: 0.05, y: -0.05 },
-  { x: -0.05, y: 0.05 },
+/** Euclidean distance from `pos` to its closest existing star. */
+export const getMinimumDistance = (
+  pos: StarPosition,
+  existing: readonly StarPosition[],
+): number => {
+  let min = Infinity;
+  for (const p of existing) {
+    const d = distanceBetween(pos, p);
+    if (d < min) min = d;
+  }
+  return min;
+};
+
+/**
+ * True when `pos` keeps at least `minDistance` from every existing star.
+ * Only journal-star centers count — decorative backdrop dots and constellation
+ * lines never participate in collision detection.
+ */
+export const isPositionAvailable = (
+  pos: StarPosition,
+  existing: readonly StarPosition[],
+  minDistance: number = MIN_STAR_DISTANCE,
+): boolean =>
+  existing.every((p) => distanceBetween(pos, p) >= minDistance);
+
+/**
+ * Deterministic candidate spots used when a month is so crowded that the
+ * search below cannot find a clear position. The spot furthest from every
+ * existing star wins, so the sky degrades gracefully instead of overlapping.
+ */
+const FALLBACK_POSITIONS: readonly StarPosition[] = [
+  { x: 0.15, y: 0.15 },
+  { x: 0.5, y: 0.15 },
+  { x: 0.85, y: 0.15 },
+  { x: 0.2, y: 0.4 },
+  { x: 0.5, y: 0.4 },
+  { x: 0.8, y: 0.4 },
+  { x: 0.15, y: 0.65 },
+  { x: 0.5, y: 0.65 },
+  { x: 0.85, y: 0.65 },
+  { x: 0.25, y: 0.85 },
+  { x: 0.5, y: 0.85 },
+  { x: 0.75, y: 0.85 },
+];
+
+export const findFallbackPosition = (
+  existing: readonly StarPosition[],
+): StarPosition =>
+  [...FALLBACK_POSITIONS].sort(
+    (a, b) => getMinimumDistance(b, existing) - getMinimumDistance(a, existing),
+  )[0];
+
+/** Bounded collision search before the fallback kicks in. */
+const MAX_SEARCH_ATTEMPTS = 100;
+/** Whole-sky scan used when the area around the base spot is saturated. */
+const MAX_GLOBAL_ATTEMPTS = 450;
+/** Golden angle — the deterministic sunflower spiral covers space organically. */
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+
+/**
+ * Spacing tiers, relaxed only as a last resort for genuinely crowded months.
+ * Active students can otherwise exhaust the space at a strict 12% — stepping
+ * down to 10% then 8% keeps stars separated (never overlapping) while still
+ * giving every journal its own star. The lower tiers exist purely so extreme
+ * months (90+ entries) still find distinct spots instead of stacking on the
+ * fixed fallback slots.
+ */
+const DISTANCE_TIERS: readonly number[] = [
+  MIN_STAR_DISTANCE,
+  0.1,
+  0.08,
+  0.06,
+  0.05,
 ];
 
 /**
- * Collision-aware placement. If `base` is too close to an already-placed star,
- * the star is nudged through a small set of deterministic offsets until it no
- * longer overlaps. Stars are resolved in chronological order, so the final sky
- * is stable for any given journal set — no randomness anywhere.
+ * Deterministic whole-sky scan (sunflower disk large enough to reach every
+ * corner of the safe band). Explored only when the spiral around the base
+ * spot is saturated, so a crowded month spreads across the entire canvas
+ * instead of stacking on the fixed fallback spots.
+ */
+const scanWholeSky = (
+  placed: readonly StarPosition[],
+  minDistance: number,
+): StarPosition | null => {
+  const step = 0.63 / Math.sqrt(MAX_GLOBAL_ATTEMPTS);
+  for (let attempt = 1; attempt <= MAX_GLOBAL_ATTEMPTS; attempt++) {
+    const radius = Math.sqrt(attempt) * step;
+    const angle = attempt * GOLDEN_ANGLE;
+    const candidate = clampPosition({
+      x: 0.5 + Math.cos(angle) * radius,
+      y: 0.5 + Math.sin(angle) * radius,
+    });
+    if (isPositionAvailable(candidate, placed, minDistance)) return candidate;
+  }
+  return null;
+};
+
+/**
+ * Collision-aware placement. The base spot is used unchanged whenever it is
+ * free. Otherwise a deterministic sunflower spiral spirals outward from the
+ * base (bounded), then scans the whole sky, relaxing the spacing one tier at
+ * a time only for genuinely crowded months. A completely full month finally
+ * picks the furthest free candidate spot.
+ *
+ * Stars are resolved in chronological order, so older journals always keep
+ * their claimed spot and newer ones are nudged around them — no randomness,
+ * no re-render shuffling, and existing stars never move when one is added.
  */
 export const resolvePosition = (
   base: StarPosition,
-  placed: ReadonlyArray<StarPosition>,
+  placed: readonly StarPosition[],
 ): StarPosition => {
-  const baseClamped = clampPosition(base);
-  if (placed.every((p) => distanceBetween(baseClamped, p) >= MIN_STAR_DISTANCE)) {
-    return baseClamped;
-  }
-  for (let attempt = 0; attempt < MAX_COLLISION_ATTEMPTS; attempt++) {
-    const ring = 1 + Math.floor(attempt / 4);
-    const offset = COLLISION_OFFSETS[attempt];
-    const candidate = clampPosition({
-      x: baseClamped.x + offset.x * ring,
-      y: baseClamped.y + offset.y * ring,
-    });
-    if (placed.every((p) => distanceBetween(candidate, p) >= MIN_STAR_DISTANCE)) {
-      return candidate;
+  for (const tier of DISTANCE_TIERS) {
+    const baseClamped = clampPosition(base);
+    if (isPositionAvailable(baseClamped, placed, tier)) return baseClamped;
+
+    const step = tier * 0.75;
+    for (let attempt = 1; attempt <= MAX_SEARCH_ATTEMPTS; attempt++) {
+      const radius = Math.sqrt(attempt) * step;
+      const angle = attempt * GOLDEN_ANGLE;
+      const candidate = clampPosition({
+        x: baseClamped.x + Math.cos(angle) * radius,
+        y: baseClamped.y + Math.sin(angle) * radius,
+      });
+      if (isPositionAvailable(candidate, placed, tier)) return candidate;
     }
+
+    const global = scanWholeSky(placed, tier);
+    if (global) return global;
   }
-  return baseClamped;
+  return findFallbackPosition(placed);
 };
 
 /* ── Journal → star projection ────────────────────────────────────────── */
@@ -249,7 +342,7 @@ export const buildConstellationStars = (
       categoryName: getCategoryLabel(entry.category, entry.customCategory),
       categoryEmoji: category?.emoji ?? "✦",
       createdAt: entry.createdAt,
-      date: normalizeJournalDate(entry.createdAt),
+      date: normalizeJournalDate(getEntryDateIso(entry)),
       timeLabel: timeLabelFor(entry.createdAt),
       ordinal,
       position: positionFor(entry.id),
@@ -269,6 +362,16 @@ export const buildConstellationStars = (
   return projected.map((star) => {
     const position = resolvePosition(star.position, placed);
     placed.push(position);
+    if (__DEV__) {
+      const minDistance = getMinimumDistance(position, placed.slice(0, -1));
+      console.log(
+        `[constellation] Star ${star.journalId}: (${position.x.toFixed(
+          3,
+        )}, ${position.y.toFixed(3)}), min distance ${
+          Number.isFinite(minDistance) ? minDistance.toFixed(3) : "n/a"
+        }`,
+      );
+    }
     return { ...star, position };
   });
 };

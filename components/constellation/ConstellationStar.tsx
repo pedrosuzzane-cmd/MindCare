@@ -96,7 +96,7 @@ export function ConstellationStarView({
       <Animated.View style={[styles.touch, animatedStyle]}>
         <Pressable
           onPress={() => onPress?.(star)}
-          hitSlop={6}
+          hitSlop={8}
           style={styles.pressable}
           accessibilityRole="button"
           accessibilityLabel={
