@@ -165,7 +165,7 @@ export function exportUniversityExcelReport(
   XLSX.utils.book_append_sheet(wb, wsSummary, "Executive Summary");
 
   const advancedRows: (string | number)[][] = [];
-  advancedRows.push(["Risk Trend Indicators"]);
+  advancedRows.push(["Wellness & Concern Trend Indicators"]);
   advancedRows.push(["Category", "Count", "Baseline", "Change (%)"]);
   data.riskTrends.forEach((r) =>
     advancedRows.push([r.label, r.count, r.baseline, r.changePct]),
@@ -185,7 +185,7 @@ export function exportUniversityExcelReport(
     advancedRows.push([a.category, a.count]),
   );
   advancedRows.push([]);
-  advancedRows.push(["Risk Variance (Per Department)"]);
+  advancedRows.push(["Wellness Score Variance (Per Department)"]);
   advancedRows.push([
     "Department",
     "Min",

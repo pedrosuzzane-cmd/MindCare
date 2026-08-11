@@ -193,5 +193,32 @@ service cloud.firestore {
         allow delete: if isAdmin();
       }
     }
+
+    // ─── SAFEGUARDING & FOLLOW-UP ───────────────────────────────
+    // Case records and audit logs for the guidance office. Students are never
+    // permitted to read or write these collections. Only admins can read, and
+    // only admins can create/update cases. Audit log entries are immutable
+    // (append-only) and may only be created by admins.
+    match /safeguardingCases/{caseId} {
+      allow read, list: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.status == 'PENDING_REVIEW';
+      allow update: if isAdmin();
+      allow delete: if false;
+
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
+
+    match /auditLogs/{logId} {
+      allow read, list: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
+
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
   }
 }

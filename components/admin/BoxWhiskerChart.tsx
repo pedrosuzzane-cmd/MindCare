@@ -147,7 +147,7 @@ export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiske
     <View style={[styles.container, isWide && styles.containerWide]}>
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <Text style={styles.title}>{title || "Risk Score Variance — Box & Whisker"}</Text>
+          <Text style={styles.title}>{title || "Wellness Score Variance — Box & Whisker"}</Text>
           <Text style={styles.subtitle}>
             {subtitle || "Distribution of student risk assessment scores across departments — showing median, quartiles, and outliers"}
           </Text>

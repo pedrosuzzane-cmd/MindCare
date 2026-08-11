@@ -15,11 +15,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 /**
- * Admin Risk Monitor.
+ * Admin Concern Monitor.
  *
  * PRIVACY-FIRST: journal text is private and never shown here. This screen
- * only surfaces METADATA (student, department, date, risk level, mood, AI
- * insight) so the guidance office can follow up appropriately without
+ * only surfaces METADATA (student, department, date, concern indicators, mood,
+ * AI insight) so the guidance office can follow up appropriately without
  * exposing the student's writing.
  */
 
@@ -181,7 +181,7 @@ export default function RiskMonitorScreen() {
           </View>
           <View style={[styles.riskBadge, { backgroundColor: color.bg }]}>
             <Text style={[styles.riskBadgeText, { color: color.text }]}>
-              {item.riskLevel === "high" ? "🔴 High" : "🟡 Moderate"}
+              {item.riskLevel === "high" ? "🔴 Elevated" : "🟡 Moderate"}
             </Text>
           </View>
         </View>
@@ -200,7 +200,7 @@ export default function RiskMonitorScreen() {
             </Text>
           </View>
           <View style={styles.metaCell}>
-            <Text style={styles.metaLabel}>Risk Score</Text>
+            <Text style={styles.metaLabel}>Concern Score</Text>
             <Text style={styles.metaValue}>{item.riskScore}</Text>
           </View>
         </View>
@@ -214,13 +214,16 @@ export default function RiskMonitorScreen() {
             <Text style={styles.insightText} numberOfLines={2}>
               {item.aiInsight}
             </Text>
+            <Text style={styles.insightDisclaimer}>
+              Non-clinical summary based on journal metadata — for guidance-office review only.
+            </Text>
           </View>
         ) : null}
 
         <View style={styles.flagFooter}>
           <Text style={styles.statusText}>
             {item.riskLevel === "high"
-              ? "Status: Needs Follow-up"
+              ? "Status: Follow-up Recommended"
               : "Status: Monitoring"}
           </Text>
           <Text style={styles.viewDetailText}>View student →</Text>
@@ -237,9 +240,9 @@ export default function RiskMonitorScreen() {
             <Ionicons name="arrow-back" size={22} color="white" />
           </Pressable>
           <View style={styles.headerCenter}>
-            <Text style={styles.headerTitle}>Risk Monitor</Text>
+            <Text style={styles.headerTitle}>Concern Monitor</Text>
             <Text style={styles.headerSubtitle}>
-              Journal risk flags · metadata only
+              Journal concern indicators · metadata only
             </Text>
           </View>
           <View style={{ width: 40 }} />
@@ -267,22 +270,22 @@ export default function RiskMonitorScreen() {
         </View>
       ) : (
         <>
-          <View style={styles.summaryRow}>
+            <View style={styles.summaryRow}>
             <View style={[styles.summaryChip, styles.summaryHigh]}>
-              <Text style={styles.summaryHighText}>{highCount} High</Text>
+              <Text style={styles.summaryHighText}>{highCount} Elevated</Text>
             </View>
             <View style={[styles.summaryChip, styles.summaryModerate]}>
               <Text style={styles.summaryModerateText}>
                 {moderateCount} Moderate
               </Text>
             </View>
-            <Text style={styles.summaryTotal}>{flags.length} flags total</Text>
+            <Text style={styles.summaryTotal}>{flags.length} indicators total</Text>
           </View>
 
           {flags.length === 0 ? (
             <View style={styles.centerState}>
               <Ionicons name="shield-checkmark-outline" size={48} color="#22C55E" />
-              <Text style={styles.stateTitle}>No Risk Flags</Text>
+              <Text style={styles.stateTitle}>No Concern Indicators</Text>
               <Text style={styles.stateText}>
                 No journal entries currently require follow-up.
               </Text>
@@ -414,6 +417,13 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   insightText: { fontSize: 13, color: "#4B5563", lineHeight: 19, fontStyle: "italic" },
+  insightDisclaimer: {
+    fontSize: 11,
+    color: "#8A63D2",
+    marginTop: 6,
+    fontWeight: "600",
+    lineHeight: 15,
+  },
   flagFooter: {
     flexDirection: "row",
     justifyContent: "space-between",

@@ -231,7 +231,7 @@ export function generateWordNarrativeReport(
 
   ${sectionHtml}
 
-  <h2>Risk Trend Indicators</h2>
+  <h2>Wellness & Concern Trend Indicators</h2>
   ${htmlTable(["Category", "Count", "Baseline", "Change (%)"], riskRows)}
 
   <h2>Department Comparison &amp; Insights</h2>

@@ -150,7 +150,7 @@ export default function RiskTrendsScreen() {
             <Ionicons name="arrow-back" size={22} color="#0F172A" />
           </Pressable>
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Risk Score Variance</Text>
+            <Text style={styles.headerTitle}>Wellness Score Variance</Text>
             <Text style={styles.headerSubtitle}>Box & whisker distribution of assessment scores across departments</Text>
           </View>
         </View>
@@ -167,8 +167,8 @@ export default function RiskTrendsScreen() {
             </View>
             <View style={styles.kpiCard}>
               <Ionicons name="warning" size={20} color="#EF4444" />
-              <Text style={[styles.kpiValue, { color: "#EF4444" }]}>{highRiskCount}</Text>
-              <Text style={styles.kpiLabel}>High Risk</Text>
+              <Text style={styles.kpiValue}>{highRiskCount}</Text>
+              <Text style={styles.kpiLabel}>Elevated Concern</Text>
             </View>
             <View style={styles.kpiCard}>
               <Ionicons name="stats-chart" size={20} color="#D97706" />
@@ -181,20 +181,20 @@ export default function RiskTrendsScreen() {
             <View style={styles.alertCard}>
               <View style={styles.alertHeader}>
                 <Ionicons name="information-circle" size={18} color="#D97706" />
-                <Text style={styles.alertTitle}>Intervention Insights</Text>
+                <Text style={styles.alertTitle}>Aggregate Wellness Insights</Text>
               </View>
               {highRiskDepts.length > 0 && (
                 <Text style={styles.alertText}>
-                  <Text style={styles.alertBold}>High median risk: </Text>
+                  <Text style={styles.alertBold}>Elevated median wellness indicators: </Text>
                   {highRiskDepts.join(", ")} — these departments show elevated median scores
-                  and may need targeted wellness support.
+                  and may benefit from a review of available wellness supports.
                 </Text>
               )}
               {highVarianceDepts.length > 0 && (
                 <Text style={[styles.alertText, { marginTop: 8 }]}>
                   <Text style={styles.alertBold}>High variance: </Text>
-                  {highVarianceDepts.join(", ")} — wide score distribution indicates inconsistent
-                  wellness across student cohorts.
+                  {highVarianceDepts.join(", ")} — wide score distribution indicates differing
+                  wellness scores across student cohorts.
                 </Text>
               )}
             </View>
@@ -203,27 +203,27 @@ export default function RiskTrendsScreen() {
           <View style={styles.explanationCard}>
             <View style={styles.explanationHeader}>
               <Ionicons name="school-outline" size={20} color="#8A63D2" />
-              <Text style={styles.explanationTitle}>Administrator Guide: Understanding Risk Score Variance & Scoring</Text>
+              <Text style={styles.explanationTitle}>Administrator Guide: Understanding Wellness Score Variance & Scoring</Text>
             </View>
 
             <Text style={styles.guideSectionTitle}>The Core Score (WEMWBS Scale)</Text>
             <Text style={styles.guideText}>
               Each student's assessment score is evaluated out of <Text style={{ fontWeight: "700" }}>80 points</Text> based on standardized mental well-being metrics.
             </Text>
-            <View style={styles.guideScaleRow}>
-              <View style={[styles.guideScaleItem, { backgroundColor: "#DCFCE7", borderColor: "#22C55E" }]}>
-                <Text style={[styles.guideScaleLabel, { color: "#166534" }]}>Low Risk (0–20)</Text>
-                <Text style={styles.guideScaleDesc}>Healthy emotional range; routine monitoring required.</Text>
+              <View style={styles.guideScaleRow}>
+                <View style={[styles.guideScaleItem, { backgroundColor: "#DCFCE7", borderColor: "#22C55E" }]}>
+                  <Text style={[styles.guideScaleLabel, { color: "#166534" }]}>Lower Concern (0–20)</Text>
+                  <Text style={styles.guideScaleDesc}>Indicators within the expected range; routine monitoring continues.</Text>
+                </View>
+                <View style={[styles.guideScaleItem, { backgroundColor: "#FEF3C7", borderColor: "#F59E0B" }]}>
+                  <Text style={[styles.guideScaleLabel, { color: "#92400E" }]}>Moderate Concern (21–50)</Text>
+                  <Text style={styles.guideScaleDesc}>Some concern indicators; may benefit from routine wellness resources.</Text>
+                </View>
+                <View style={[styles.guideScaleItem, { backgroundColor: "#FEE2E2", borderColor: "#EF4444" }]}>
+                  <Text style={[styles.guideScaleLabel, { color: "#991B1B" }]}>Elevated Concern (51–80)</Text>
+                  <Text style={styles.guideScaleDesc}>Elevated concern indicators; review according to the safeguarding and student-support protocol.</Text>
+                </View>
               </View>
-              <View style={[styles.guideScaleItem, { backgroundColor: "#FEF3C7", borderColor: "#F59E0B" }]}>
-                <Text style={[styles.guideScaleLabel, { color: "#92400E" }]}>Moderate Risk (21–50)</Text>
-                <Text style={styles.guideScaleDesc}>Mild to moderate distress indicators; may benefit from light guidance support.</Text>
-              </View>
-              <View style={[styles.guideScaleItem, { backgroundColor: "#FEE2E2", borderColor: "#EF4444" }]}>
-                <Text style={[styles.guideScaleLabel, { color: "#991B1B" }]}>High Risk (51–80)</Text>
-                <Text style={styles.guideScaleDesc}>Significant distress detected; immediate counselor intervention recommended.</Text>
-              </View>
-            </View>
 
             <Text style={[styles.guideSectionTitle, { marginTop: 16 }]}>Reading the Box & Whisker Chart</Text>
 
@@ -242,7 +242,7 @@ export default function RiskTrendsScreen() {
                 <View style={styles.guideItemContent}>
                   <Text style={styles.guideItemTitle}>The Box (Interquartile Range / IQR)</Text>
                   <Text style={styles.guideItemText}>
-                    Spans from the 25th percentile (Q1) to the 75th percentile (Q3). A wide box (high IQR) indicates inconsistent wellness — meaning some students are thriving while others are struggling heavily. A narrow box means students share similar risk levels.
+                    Spans from the 25th percentile (Q1) to the 75th percentile (Q3). A wide box (high IQR) indicates greater variation in wellness scores across the cohort. A narrow box means students share similar wellness indicator levels.
                   </Text>
                 </View>
               </View>
@@ -260,7 +260,7 @@ export default function RiskTrendsScreen() {
                 <View style={styles.guideItemContent}>
                   <Text style={styles.guideItemTitle}>Outliers (Red Crosses)</Text>
                   <Text style={styles.guideItemText}>
-                    Individual student scores falling abnormally far from the department norm (&gt; Q3 + 1.5 × IQR). These represent acute outlier cases requiring urgent individual review.
+                    Individual student scores falling far from the department norm (&gt; Q3 + 1.5 × IQR). These are statistical outliers that suggest review according to the safeguarding and student-support protocol — the aggregate trend alone does not define any student.
                   </Text>
                 </View>
               </View>
@@ -269,14 +269,14 @@ export default function RiskTrendsScreen() {
 
           <BoxWhiskerChart
             data={boxWhiskerData}
-            title="Risk Score Distribution by Department"
-            subtitle="Boxes span Q1–Q3 (interquartile range), center line = median. Red crosses mark outlier students needing attention."
+            title="Wellness Score Distribution by Department"
+            subtitle="Boxes span Q1–Q3 (interquartile range), center line = median. Red crosses mark outlier scores for staff review."
             yAxisLabel="Score"
           />
 
           {boxWhiskerData.length > 0 && (
             <View style={styles.summaryTable}>
-              <Text style={styles.summaryTableTitle}>Department Risk Summary</Text>
+              <Text style={styles.summaryTableTitle}>Department Wellness Summary</Text>
               <View style={styles.summaryTableHeader}>
                 <Text style={[styles.summaryTableCell, styles.headerCell, { flex: 1.5 }]}>Department</Text>
                 <Text style={[styles.summaryTableCell, styles.headerCell]}>Count</Text>

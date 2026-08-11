@@ -148,8 +148,8 @@ export default function MoodAnalyticsScreen() {
             <Ionicons name="arrow-back" size={22} color="#0F172A" />
           </Pressable>
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>Mood & Assessment Analytics</Text>
-            <Text style={styles.headerSubtitle}>Department completion rates and mood distribution</Text>
+            <Text style={styles.headerTitle}>Aggregate Mood Distribution</Text>
+            <Text style={styles.headerSubtitle}>Department completion rates and aggregate mood distribution</Text>
           </View>
         </View>
 
@@ -219,7 +219,10 @@ export default function MoodAnalyticsScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Overall Mood Distribution</Text>
+            <Text style={styles.sectionTitle}>Aggregate Mood Distribution</Text>
+            <Text style={styles.overallMoodHint}>
+              Percentages reflect recorded mood entries across the cohort, not individual students.
+            </Text>
             <View style={styles.overallMoodRow}>
               <View style={styles.overallMoodCard}>
                 <View style={[styles.moodBar, { flex: moodCounts.positive, backgroundColor: "#22C55E" }]} />
@@ -358,6 +361,7 @@ const styles = StyleSheet.create({
   deptGaugeRow: { flexDirection: "row", flexWrap: "wrap", gap: 12, justifyContent: "center" },
   deptGaugeCard: { backgroundColor: "#FFFFFF", borderRadius: 16, padding: 12, borderWidth: 1, borderColor: "#E9D5FF" },
   overallMoodRow: { flexDirection: "row", gap: 12, height: 140 },
+  overallMoodHint: { fontSize: 12, color: "#94A3B8", marginBottom: 4, lineHeight: 17 },
   overallMoodCard: {
     flex: 1,
     backgroundColor: "#FFFFFF",

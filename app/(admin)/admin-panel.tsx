@@ -8,6 +8,7 @@ import {
   DepartmentCorrelationScatter,
 } from "@/components/admin/DepartmentCharts";
 import { StudentListModal } from "@/components/admin/StudentListModal";
+import AnalyticsInsightsPanel from "@/components/admin/AnalyticsInsightsPanel";
 import { db } from "@/constants/firebase";
 import { useAuth } from "@/hooks/AuthContext";
 import { listenForAdminDashboardData } from "@/services/adminFirestoreService";
@@ -639,7 +640,7 @@ export default function AdminPanelScreen() {
 
     return [
       {
-        riskLabel: "At-Risk Students (HIGH)",
+        riskLabel: "Elevated Concern Indicators",
         count: atRisk,
         percentageChange: pctChange(atRisk, baselineAtRisk),
         baselineCount: baselineAtRisk,
@@ -648,7 +649,7 @@ export default function AdminPanelScreen() {
         icon: "warning",
       },
       {
-        riskLabel: "Moderate Students",
+        riskLabel: "Moderate Concern Indicators",
         count: moderate,
         percentageChange: pctChange(moderate, baselineModerate),
         baselineCount: baselineModerate,
@@ -657,7 +658,7 @@ export default function AdminPanelScreen() {
         icon: "alert-circle",
       },
       {
-        riskLabel: "Healthy Students (LOW)",
+        riskLabel: "Lower Concern Indicators",
         count: healthy,
         percentageChange: pctChange(healthy, baselineHealthy),
         baselineCount: baselineHealthy,
@@ -806,7 +807,7 @@ export default function AdminPanelScreen() {
     const total = totalLow + totalNormal + totalHigh || 1;
     return [
       {
-        label: "Low Concern",
+        label: "Lower Concern",
         value: Math.round((totalLow / total) * 100),
         color: "#22C55E",
       },
@@ -816,7 +817,7 @@ export default function AdminPanelScreen() {
         color: "#F59E0B",
       },
       {
-        label: "High Concern",
+        label: "Elevated Concern",
         value: Math.round((totalHigh / total) * 100),
         color: "#EF4444",
       },
@@ -1137,14 +1138,14 @@ export default function AdminPanelScreen() {
         body: `Out of ${totalStudents} tracked students, ${assessed} (${completionRate}%) have completed at least one well-being assessment, averaging a wellness score of ${avgScore} out of 100 across all completed assessments. Students have written ${totalJournals} journal entries in total, reflecting measurable engagement with self-reflection tools.`,
       },
       risk: {
-        body: `Risk distribution places ${lowCount} students (${lowPct}%) in the low-concern (healthy) range, ${normalCount} (${normalPct}%) in the moderate range, and ${highCount} (${highPct}%) in the high-concern range. The moderate band is the largest, signalling a stable but watchful baseline; the ${highCount} high-concern students should be prioritised for guidance-office follow-up.`,
+        body: `Concern distribution places ${lowCount} students (${lowPct}%) in the lower concern range, ${normalCount} (${normalPct}%) in the moderate concern range, and ${highCount} (${highPct}%) in the elevated concern range. The moderate band is the largest, signalling a stable but watchful baseline; the ${highCount} students with elevated concern indicators should be considered for guidance-office follow-up according to the institutional safeguarding and student-support protocol.`,
       },
       participation: {
         body: topByStudents
           ? `${departmentRows.length} departments are represented. ${getDeptAbbreviation(topByStudents.name)} holds the largest cohort with ${topByStudents.totalStudents} tracked students. ${
               topHighDept && topHighDept.highCount > 0
-                ? `${getDeptAbbreviation(topHighDept.name)} reports the most high-concern students (${topHighDept.highCount}, ${topHighPct}% of its cohort) and is the top candidate for intervention outreach.`
-                : "No high-concern cases are currently flagged, suggesting an encouraging overall baseline."
+                ? `${getDeptAbbreviation(topHighDept.name)} reports the most students with elevated concern indicators (${topHighDept.highCount}, ${topHighPct}% of its cohort) and may benefit from proactive student-support outreach.`
+                : "No elevated concern indicators are currently flagged at the department level, suggesting an encouraging overall baseline."
             }`
           : "No department data is available yet. Data will appear once students complete their profiles and assessments.",
       },
@@ -1172,7 +1173,7 @@ export default function AdminPanelScreen() {
         body:
           scatterPlotData.length < 2
             ? "At least two students with assessment or journal activity are required to surface a score-vs-journal correlation pattern."
-            : `Across ${scatterPlotData.length} students with assessment or journal activity, journal frequency shows a ${corrStrength} ${corrDirection} relationship with wellness scores (Pearson r = ${corrR.toFixed(2)}). ${highConcernScatter} students record high-concern scores (51+) and merit guidance-office follow-up regardless of the overall trend.`,
+            : `Across ${scatterPlotData.length} students with assessment or journal activity, journal frequency shows a ${corrStrength} ${corrDirection} statistical association with wellness scores (Pearson r = ${corrR.toFixed(2)}). ${highConcernScatter} students record elevated concern indicators (51+) and warrant guidance-office follow-up regardless of the overall trend. Correlation describes an aggregate association and does not establish causation — no individual student is characterized by it.`,
       },
       multiMetric: {
         body:
@@ -1186,7 +1187,7 @@ export default function AdminPanelScreen() {
           : "Comparison data will appear once multiple departments have recorded assessments.",
       },
       visual: {
-        donut: `Across assessed students, ${donutData[0]?.value ?? 0}% fall in the low-concern band, ${donutData[1]?.value ?? 0}% in the moderate band, and ${donutData[2]?.value ?? 0}% in the high-concern band. The dominant moderate band points to a need for proactive, early-intervention programs rather than crisis-only responses.`,
+        donut: `Across assessed students, ${donutData[0]?.value ?? 0}% fall in the lower concern band, ${donutData[1]?.value ?? 0}% in the moderate concern band, and ${donutData[2]?.value ?? 0}% in the elevated concern band. The dominant moderate band points to a need for proactive wellness programs rather than crisis-only responses.`,
         radial: `${completionRate}% of tracked students have completed a well-being assessment. The remaining ${100 - completionRate}% have not yet participated and represent the primary target for outreach and engagement campaigns.`,
         engagement: `${assessed} of ${totalStudents} students have signed in and completed an assessment. Encouraging regular journaling and repeat assessments will help build a complete wellness picture over time.`,
       },
@@ -1253,19 +1254,19 @@ export default function AdminPanelScreen() {
 
     const riskTrends = [
       {
-        label: "At-Risk Students (HIGH)",
+        label: "Elevated Concern Indicators",
         count: atRisk,
         baseline: Math.round(atRisk * 0.9) || 1,
         changePct: pctChange(atRisk, Math.round(atRisk * 0.9) || 1),
       },
       {
-        label: "Moderate Students",
+        label: "Moderate Concern Indicators",
         count: moderate,
         baseline: Math.round(moderate * 0.9) || 1,
         changePct: pctChange(moderate, Math.round(moderate * 0.9) || 1),
       },
       {
-        label: "Healthy Students (LOW)",
+        label: "Lower Concern Indicators",
         count: healthy,
         baseline: Math.round(healthy * 0.9) || 1,
         changePct: pctChange(healthy, Math.round(healthy * 0.9) || 1),
@@ -1517,10 +1518,10 @@ export default function AdminPanelScreen() {
         metric: "Interpretation",
         value:
           Math.abs(corr) < 0.3
-            ? "Weak relationship"
+            ? "Weak statistical association"
             : Math.abs(corr) < 0.6
-              ? "Moderate relationship"
-              : "Strong relationship",
+              ? "Moderate statistical association"
+              : "Strong statistical association",
       },
     ];
 
@@ -1558,7 +1559,7 @@ export default function AdminPanelScreen() {
           paragraphs: [descriptiveInsights.overall.body],
         },
         {
-          title: "2. Risk Trend Indicators",
+          title: "2. Wellness & Concern Trend Indicators",
           paragraphs: [descriptiveInsights.risk.body],
         },
         {
@@ -2246,8 +2247,8 @@ export default function AdminPanelScreen() {
   function getFilterFnForTitle(title: string): (s: StudentSummary) => boolean {
     const lowerTitle = title.toLowerCase();
 
-    if (lowerTitle.includes("low concern")) {
-      if (lowerTitle.includes("students"))
+    if (lowerTitle.includes("lower concern") || lowerTitle.includes("low concern")) {
+      if (lowerTitle.includes("students") || lowerTitle.includes("indicators"))
         return (s) => s.latestRiskLevel === "low";
       const dept = title.split(" - ")[0];
       return (s) => s.department === dept && s.latestRiskLevel === "low";
@@ -2256,13 +2257,13 @@ export default function AdminPanelScreen() {
       lowerTitle.includes("medium concern") ||
       lowerTitle.includes("moderate concern")
     ) {
-      if (lowerTitle.includes("students"))
+      if (lowerTitle.includes("students") || lowerTitle.includes("indicators"))
         return (s) => s.latestRiskLevel === "normal";
       const dept = title.split(" - ")[0];
       return (s) => s.department === dept && s.latestRiskLevel === "normal";
     }
-    if (lowerTitle.includes("high concern")) {
-      if (lowerTitle.includes("students"))
+    if (lowerTitle.includes("elevated concern") || lowerTitle.includes("high concern")) {
+      if (lowerTitle.includes("students") || lowerTitle.includes("indicators"))
         return (s) => s.latestRiskLevel === "high";
       const dept = title.split(" - ")[0];
       return (s) => s.department === dept && s.latestRiskLevel === "high";
@@ -3306,7 +3307,7 @@ export default function AdminPanelScreen() {
                         />
                       </View>
                       <Text style={styles.analyticsNavTitle}>
-                        Risk Variance
+                        Wellness Variance
                       </Text>
                       <Text style={styles.analyticsNavDesc}>
                         Box & whisker charts with outlier detection
@@ -3326,15 +3327,18 @@ export default function AdminPanelScreen() {
                     body={descriptiveInsights.overall.body}
                   />
 
+                  {/* ─── Aggregate Trend Alerts, Trends & Safeguarding ─── */}
+                  <AnalyticsInsightsPanel students={studentSummaries} />
+
                   {/* ─── SECTION 2: Risk Trend KPIs ──────────────────────── */}
                   <Text style={styles.sectionHeader}>
-                    Risk Trend Indicators
+                    Wellness & Concern Trend Indicators
                   </Text>
                   <View style={[styles.kpiRow, isWide && styles.kpiRowWide]}>
                     {riskTrendKpiData.map((kpi, i) => renderKpiCard(kpi, i))}
                   </View>
                   <DescriptiveInsight
-                    title="Risk Distribution Summary"
+                    title="Concern Distribution Summary"
                     body={descriptiveInsights.risk.body}
                   />
 
@@ -3399,7 +3403,7 @@ export default function AdminPanelScreen() {
                               { backgroundColor: "#22C55E" },
                             ]}
                           />
-                          <Text style={styles.barLegendText}>Low</Text>
+                          <Text style={styles.barLegendText}>Lower</Text>
                         </View>
                         <View style={styles.barLegendItem}>
                           <View
@@ -3417,7 +3421,7 @@ export default function AdminPanelScreen() {
                               { backgroundColor: "#EF4444" },
                             ]}
                           />
-                          <Text style={styles.barLegendText}>High</Text>
+                          <Text style={styles.barLegendText}>Elevated</Text>
                         </View>
                       </View>
 
@@ -3490,11 +3494,11 @@ export default function AdminPanelScreen() {
                           color="#8A63D2"
                         />
                         <Text style={styles.thresholdTitle}>
-                          How Risk Levels Are Determined
+                          How Concern Levels Are Determined
                         </Text>
                       </View>
                       <Text style={styles.thresholdDescription}>
-                        Each student's risk level is calculated from their
+                        Each student's concern indicator is calculated from their
                         latest WEMWBS assessment score (out of 80):
                       </Text>
                       <View style={styles.thresholdBlock}>
@@ -3505,10 +3509,10 @@ export default function AdminPanelScreen() {
                               { backgroundColor: "#22C55E" },
                             ]}
                           />
-                          <Text style={styles.thresholdLabel}>Low (0–20)</Text>
+                          <Text style={styles.thresholdLabel}>Lower (0–20)</Text>
                         </View>
                         <Text style={styles.thresholdDetail}>
-                          Healthy range, routine monitoring
+                          Indicators within the expected range, routine monitoring
                         </Text>
                       </View>
                       <View style={styles.thresholdBlock}>
@@ -3524,7 +3528,7 @@ export default function AdminPanelScreen() {
                           </Text>
                         </View>
                         <Text style={styles.thresholdDetail}>
-                          Some distress indicators, may need support
+                          Some concern indicators, may benefit from wellness resources
                         </Text>
                       </View>
                       <View style={styles.thresholdBlock}>
@@ -3536,11 +3540,11 @@ export default function AdminPanelScreen() {
                             ]}
                           />
                           <Text style={styles.thresholdLabel}>
-                            High (51–80)
+                            Elevated (51–80)
                           </Text>
                         </View>
                         <Text style={styles.thresholdDetail}>
-                          Significant distress, intervention recommended
+                          Elevated concern indicators, review per safeguarding protocol
                         </Text>
                       </View>
                     </View>
@@ -3589,8 +3593,9 @@ export default function AdminPanelScreen() {
                           </View>
                           <Text style={styles.insightsEnlargedSubtitle}>
                             Each student plotted by assessment severity (Y) and
-                            journal activity (X). High-risk outliers appear in
-                            the upper region.
+                            journal activity (X). Elevated concern indicators
+                            appear in the upper region. Correlation does not
+                            establish causation.
                           </Text>
                           <View style={styles.chartContainer}>
                             <DepartmentCorrelationScatter

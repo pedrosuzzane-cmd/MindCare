@@ -11,6 +11,7 @@ export default function AdminLayout() {
       <Stack.Screen name="analytics/stress-heatmap" />
       <Stack.Screen name="analytics/mood-analytics" />
       <Stack.Screen name="analytics/risk-variance" />
+      <Stack.Screen name="safeguarding" />
     </Stack>
   );
 }
