@@ -8,37 +8,73 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
   RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-interface AdminEntry {
-  uid: string;
-  displayName?: string;
-  email?: string;
-  role?: string;
-  position?: string;
-  contactNo?: string;
-  college?: string;
-  schoolId?: string;
-  genderIdentity?: string;
-  nationality?: string;
-  address?: string;
-  isSuperAdmin?: boolean;
-  hasAdminClaim?: boolean;
-  createdAtMs?: number | null;
+interface ResetRequest {
+  requestId: string;
+  adminUid: string;
+  email: string;
+  adminName: string;
+  status: "pending" | "approved" | "rejected" | "completed";
+  requestedAtMs?: number;
+  approvedAtMs?: number | null;
+  rejectedAtMs?: number | null;
+  completedAtMs?: number | null;
+  otpSent?: boolean;
+  otpExpiresAtMs?: number | null;
+  completed?: boolean;
 }
 
-function timeAgo(ms?: number | null): string {
+type StatusKey = ResetRequest["status"];
+
+const STATUS_META: Record<
+  StatusKey,
+  { label: string; color: string; bg: string; dot: string; avatarBg: string; avatarFg: string }
+> = {
+  pending: {
+    label: "Pending",
+    color: "#B45309",
+    bg: "#FEF3C7",
+    dot: "#F59E0B",
+    avatarBg: "#FEF3C7",
+    avatarFg: "#B45309",
+  },
+  approved: {
+    label: "Approved",
+    color: "#047857",
+    bg: "#D1FAE5",
+    dot: "#10B981",
+    avatarBg: "#D1FAE5",
+    avatarFg: "#047857",
+  },
+  rejected: {
+    label: "Rejected",
+    color: "#B91C1C",
+    bg: "#FEE2E2",
+    dot: "#EF4444",
+    avatarBg: "#FEE2E2",
+    avatarFg: "#B91C1C",
+  },
+  completed: {
+    label: "Completed",
+    color: "#1D4ED8",
+    bg: "#DBEAFE",
+    dot: "#3B82F6",
+    avatarBg: "#DBEAFE",
+    avatarFg: "#1D4ED8",
+  },
+};
+
+function timeAgo(ms?: number): string {
   if (!ms) return "—";
   const s = Math.floor((Date.now() - ms) / 1000);
   if (s < 60) return "just now";
@@ -55,22 +91,25 @@ function timeAgo(ms?: number | null): string {
   });
 }
 
+function expiresInLabel(ms?: number | null): string {
+  if (!ms) return "";
+  const mins = Math.max(0, Math.ceil((ms - Date.now()) / 60000));
+  if (mins <= 0) return "expired";
+  return `expires in ${mins} min${mins === 1 ? "" : "s"}`;
+}
+
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
   const out = parts.map((p) => p[0]?.toUpperCase() || "").join("");
   return out || "A";
 }
 
-function RoleBadge({ isSuper }: { isSuper: boolean }) {
-  return isSuper ? (
-    <View style={[styles.badge, styles.badgeSuper]}>
-      <Ionicons name="shield-checkmark" size={12} color="#7C3AED" />
-      <Text style={[styles.badgeText, { color: "#6D28D9" }]}>Super Admin</Text>
-    </View>
-  ) : (
-    <View style={[styles.badge, styles.badgeAdmin]}>
-      <Ionicons name="shield-outline" size={12} color="#047857" />
-      <Text style={[styles.badgeText, { color: "#047857" }]}>Admin</Text>
+function StatusBadge({ status }: { status: StatusKey }) {
+  const meta = STATUS_META[status] || STATUS_META.pending;
+  return (
+    <View style={[styles.statusBadge, { backgroundColor: meta.bg }]}>
+      <View style={[styles.statusDot, { backgroundColor: meta.dot }]} />
+      <Text style={[styles.statusText, { color: meta.color }]}>{meta.label}</Text>
     </View>
   );
 }
@@ -108,28 +147,17 @@ function StatTile({
   );
 }
 
-export default function AdminManagementScreen() {
+export default function PasswordResetRequestsScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const [admins, setAdmins] = useState<AdminEntry[]>([]);
+  const [requests, setRequests] = useState<ResetRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [actingUid, setActingUid] = useState<string | null>(null);
+  const [actingId, setActingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
-  const [editing, setEditing] = useState<AdminEntry | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    displayName: "",
-    position: "",
-    contactNo: "",
-    college: "",
-    schoolId: "",
-    isSuperAdmin: false,
-  });
-
-  const loadAdmins = useCallback(async () => {
+  const loadRequests = useCallback(async () => {
     try {
       const token = await auth.currentUser?.getIdToken();
       if (!token) {
@@ -137,16 +165,19 @@ export default function AdminManagementScreen() {
         setLoading(false);
         return;
       }
-      const response = await fetch(`${API_URL}/api/superadmin/admins`, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch(
+        `${API_URL}/api/superadmin/password-reset-requests`,
+        {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       const data = await response.json();
       if (!response.ok) {
-        setError(data.error || "Unable to load administrators.");
+        setError(data.error || "Unable to load requests.");
         return;
       }
-      setAdmins(data.admins || []);
+      setRequests(data.requests || []);
       setError(null);
     } catch {
       setError("Network error. Please try again.");
@@ -157,74 +188,16 @@ export default function AdminManagementScreen() {
   }, []);
 
   useEffect(() => {
-    loadAdmins();
-  }, [loadAdmins]);
+    loadRequests();
+  }, [loadRequests]);
 
   const handleRefresh = () => {
     setRefreshing(true);
-    loadAdmins();
+    loadRequests();
   };
 
-  const openEdit = (admin: AdminEntry) => {
-    setEditing(admin);
-    setForm({
-      displayName: admin.displayName || "",
-      position: admin.position || "",
-      contactNo: admin.contactNo || "",
-      college: admin.college || "",
-      schoolId: admin.schoolId || "",
-      isSuperAdmin: !!admin.isSuperAdmin,
-    });
-  };
-
-  const closeEdit = () => {
-    setEditing(null);
-    setSaving(false);
-  };
-
-  const handleSave = async () => {
-    if (!editing) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const token = await auth.currentUser?.getIdToken();
-      if (!token) {
-        setError("You must be signed in as a Super Admin.");
-        setSaving(false);
-        return;
-      }
-      const response = await fetch(`${API_URL}/api/superadmin/update-admin`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          uid: editing.uid,
-          displayName: form.displayName.trim() || null,
-          position: form.position.trim() || null,
-          contactNo: form.contactNo.trim() || null,
-          college: form.college.trim() || null,
-          schoolId: form.schoolId.trim() || null,
-          isSuperAdmin: form.isSuperAdmin,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data.error || "Failed to update administrator.");
-        setSaving(false);
-        return;
-      }
-      closeEdit();
-      await loadAdmins();
-    } catch {
-      setError("Network error. Please try again.");
-      setSaving(false);
-    }
-  };
-
-  const act = async (uid: string, action: "revoke-admin" | "delete-admin") => {
-    setActingUid(uid);
+  const act = async (requestId: string, action: "approve" | "reject") => {
+    setActingId(requestId);
     setError(null);
     try {
       const token = await auth.currentUser?.getIdToken();
@@ -232,68 +205,62 @@ export default function AdminManagementScreen() {
         setError("You must be signed in as a Super Admin.");
         return;
       }
-      const response = await fetch(`${API_URL}/api/superadmin/${action}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+      const response = await fetch(
+        `${API_URL}/api/superadmin/${action}-password-reset`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ requestId }),
         },
-        body: JSON.stringify({ uid }),
-      });
+      );
       const data = await response.json();
       if (!response.ok) {
         setError(data.error || "Action failed.");
         return;
       }
-      await loadAdmins();
+      await loadRequests();
     } catch {
       setError("Network error. Please try again.");
     } finally {
-      setActingUid(null);
+      setActingId(null);
     }
   };
 
-  const confirmRevoke = (admin: AdminEntry) => {
+  const handleReject = (request: ResetRequest) => {
     Alert.alert(
-      "Revoke Admin Access",
-      `Remove admin access for ${admin.displayName || admin.email}? They will no longer be able to access the admin dashboard.`,
+      "Reject Request",
+      `Reject the password reset request for ${request.email}? They will be notified by email.`,
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Revoke",
+          text: "Reject",
           style: "destructive",
-          onPress: () => act(admin.uid, "revoke-admin"),
+          onPress: () => act(request.requestId, "reject"),
         },
       ],
     );
   };
 
-  const confirmDelete = (admin: AdminEntry) => {
-    Alert.alert(
-      "Delete Administrator",
-      `Permanently delete the account for ${admin.displayName || admin.email}? This cannot be undone.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => act(admin.uid, "delete-admin"),
-        },
-      ],
-    );
+  const pending = requests.filter((r) => r.status === "pending");
+  const counts = {
+    pending: pending.length,
+    approved: requests.filter((r) => r.status === "approved").length,
+    rejected: requests.filter((r) => r.status === "rejected").length,
+    completed: requests.filter((r) => r.status === "completed").length,
   };
-
-  const superCount = admins.filter((a) => a.isSuperAdmin).length;
-  const standardCount = admins.length - superCount;
 
   const q = query.trim().toLowerCase();
-  const visible = admins.filter(
-    (a) =>
+  const visible = requests.filter(
+    (r) =>
       !q ||
-      (a.displayName || "").toLowerCase().includes(q) ||
-      (a.email || "").toLowerCase().includes(q) ||
-      (a.position || "").toLowerCase().includes(q),
+      r.email.toLowerCase().includes(q) ||
+      (r.adminName || "").toLowerCase().includes(q),
   );
+  const visiblePending = visible.filter((r) => r.status === "pending");
+  const visibleHistory = visible.filter((r) => r.status !== "pending");
 
   return (
     <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
@@ -310,26 +277,28 @@ export default function AdminManagementScreen() {
               <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
             </Pressable>
             <View style={styles.titleWrap}>
-              <Text style={styles.headerTitle}>Administrators</Text>
+              <View style={styles.titleRow}>
+                <Text style={styles.headerTitle}>Admin Management</Text>
+              </View>
               <Text style={styles.headerSubtitle}>
-                Manage admin accounts and permissions
+                Approve or reject administrator resets
               </Text>
             </View>
           </View>
           <View style={styles.headerActions}>
             <Pressable
               style={styles.iconButton}
-              onPress={() => router.push("/(superadmin)/password-reset-requests")}
+              onPress={() => router.push("/(superadmin)/student-management")}
               accessibilityRole="button"
-              accessibilityLabel="Password reset requests"
+              accessibilityLabel="Manage administrators"
             >
-              <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" />
+              <Ionicons name="people-outline" size={20} color="#FFFFFF" />
             </Pressable>
             <Pressable
               style={styles.iconButton}
               onPress={handleRefresh}
               accessibilityRole="button"
-              accessibilityLabel="Refresh administrators"
+              accessibilityLabel="Refresh requests"
             >
               <Ionicons name="refresh" size={20} color="#FFFFFF" />
             </Pressable>
@@ -338,26 +307,33 @@ export default function AdminManagementScreen() {
 
         <View style={styles.statsRow}>
           <StatTile
-            label="Total"
-            value={admins.length}
+            label="Pending"
+            value={counts.pending}
             color="#B45309"
             bg="#FDE68A"
-            icon="people-outline"
+            icon="time-outline"
             highlighted
           />
           <StatTile
-            label="Super Admins"
-            value={superCount}
-            color="#6D28D9"
-            bg="#DDD6FE"
-            icon="shield-checkmark-outline"
-          />
-          <StatTile
-            label="Admins"
-            value={standardCount}
+            label="Approved"
+            value={counts.approved}
             color="#047857"
             bg="#A7F3D0"
-            icon="shield-outline"
+            icon="checkmark-circle-outline"
+          />
+          <StatTile
+            label="Rejected"
+            value={counts.rejected}
+            color="#B91C1C"
+            bg="#FECACA"
+            icon="close-circle-outline"
+          />
+          <StatTile
+            label="Completed"
+            value={counts.completed}
+            color="#1D4ED8"
+            bg="#BFDBFE"
+            icon="flag-outline"
           />
         </View>
       </LinearGradient>
@@ -368,6 +344,24 @@ export default function AdminManagementScreen() {
         </Text>
       ) : null}
 
+      {!loading && pending.length > 0 && (
+        <View style={styles.pendingBanner}>
+          <View style={styles.pendingCountCircle}>
+            <Text style={styles.pendingCountText}>{pending.length}</Text>
+          </View>
+          <View style={styles.pendingBannerText}>
+            <Text style={styles.pendingBannerTitle}>
+              {pending.length === 1
+                ? "1 administrator is waiting for approval"
+                : `${pending.length} administrators are waiting for approval`}
+            </Text>
+            <Text style={styles.pendingBannerSubtitle}>
+              Approve or reject below to process the request.
+            </Text>
+          </View>
+        </View>
+      )}
+
       <ScrollView
         style={styles.content}
         contentContainerStyle={styles.scroll}
@@ -377,14 +371,14 @@ export default function AdminManagementScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
-        {admins.length > 0 && (
+        {requests.length > 0 && (
           <View style={styles.searchBox}>
             <Ionicons name="search-outline" size={18} color="#9CA3AF" />
             <TextInput
               style={styles.searchInput}
               value={query}
               onChangeText={setQuery}
-              placeholder="Search by name, email, or position"
+              placeholder="Search by name or email"
               placeholderTextColor="#9CA3AF"
               autoCapitalize="none"
             />
@@ -400,14 +394,28 @@ export default function AdminManagementScreen() {
           <View style={styles.center}>
             <ActivityIndicator size="large" color="#7C3AED" />
           </View>
-        ) : admins.length === 0 ? (
+        ) : !user ? (
+          <View style={styles.signInCard}>
+            <Ionicons name="lock-closed-outline" size={20} color="#7C3AED" />
+            <Text style={styles.signInText}>
+              Please sign in to view password reset requests.
+            </Text>
+            <Pressable
+              style={styles.signInButton}
+              onPress={() => router.replace("/auth/login")}
+            >
+              <Text style={styles.signInButtonText}>Go to Login</Text>
+            </Pressable>
+          </View>
+        ) : requests.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
-              <Ionicons name="people-circle-outline" size={40} color="#7C3AED" />
+              <Ionicons name="checkmark-done-circle-outline" size={40} color="#7C3AED" />
             </View>
-            <Text style={styles.emptyTitle}>No administrators yet</Text>
+            <Text style={styles.emptyTitle}>No reset requests yet</Text>
             <Text style={styles.emptyText}>
-              Administrators created from the Admin Panel will appear here.
+              When an administrator requests a password reset, it will appear
+              here for your approval.
             </Text>
           </View>
         ) : visible.length === 0 ? (
@@ -417,211 +425,125 @@ export default function AdminManagementScreen() {
             </View>
             <Text style={styles.emptyTitle}>No results</Text>
             <Text style={styles.emptyText}>
-              Nothing matches "{query}". Try a different search.
+              Nothing matches "{query}". Try a different name or email.
             </Text>
           </View>
         ) : (
-          visible.map((admin) => {
-            const isSelf = admin.uid === user?.uid;
-            return (
-              <View key={admin.uid} style={styles.card}>
-                <View style={styles.cardTop}>
-                  <View
-                    style={[
-                      styles.avatar,
-                      { backgroundColor: admin.isSuperAdmin ? "#EDE9FE" : "#D1FAE5" },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.avatarText,
-                        { color: admin.isSuperAdmin ? "#6D28D9" : "#047857" },
-                      ]}
-                    >
-                      {initials(admin.displayName || "A")}
-                    </Text>
-                  </View>
-                  <View style={styles.cardInfo}>
-                    <View style={styles.nameRow}>
-                      <Text style={styles.cardName}>
-                        {admin.displayName || "Administrator"}
-                      </Text>
-                      {isSelf && <Text style={styles.youTag}>You</Text>}
-                    </View>
-                    <Text style={styles.cardEmail}>{admin.email || "—"}</Text>
-                    {admin.position ? (
-                      <View style={styles.metaRow}>
-                        <Ionicons name="briefcase-outline" size={12} color="#9CA3AF" />
-                        <Text style={styles.cardMeta}>{admin.position}</Text>
-                      </View>
-                    ) : null}
-                    <View style={styles.metaRow}>
-                      <Ionicons name="calendar-outline" size={12} color="#9CA3AF" />
-                      <Text style={styles.cardMeta}>
-                        Joined {timeAgo(admin.createdAtMs)}
-                      </Text>
-                    </View>
-                  </View>
-                  <RoleBadge isSuper={!!admin.isSuperAdmin} />
-                </View>
+          <>
+            <Text style={styles.sectionTitle}>
+              Pending ({visiblePending.length})
+            </Text>
+            {visiblePending.length === 0 ? (
+              <Text style={styles.sectionEmpty}>No pending requests.</Text>
+            ) : (
+              visiblePending.map((request) => (
+                <RequestCard
+                  key={request.requestId}
+                  request={request}
+                  acting={actingId === request.requestId}
+                  onApprove={() => act(request.requestId, "approve")}
+                  onReject={() => handleReject(request)}
+                />
+              ))
+            )}
 
-                {!isSelf && (
-                  <View style={styles.cardActions}>
-                    <Pressable
-                      style={[styles.actionButton, styles.editButton]}
-                      onPress={() => openEdit(admin)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Edit ${admin.displayName || admin.email}`}
-                    >
-                      <Ionicons name="create-outline" size={16} color="#6D28D9" />
-                      <Text style={styles.editButtonText}>Edit</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.actionButton, styles.revokeButton]}
-                      onPress={() => confirmRevoke(admin)}
-                      disabled={actingUid === admin.uid}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Revoke ${admin.displayName || admin.email}`}
-                    >
-                      {actingUid === admin.uid ? (
-                        <ActivityIndicator size="small" color="#B45309" />
-                      ) : (
-                        <Ionicons name="shield-outline" size={16} color="#B45309" />
-                      )}
-                      <Text style={styles.revokeButtonText}>Revoke</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.actionButton, styles.deleteButton]}
-                      onPress={() => confirmDelete(admin)}
-                      disabled={actingUid === admin.uid}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Delete ${admin.displayName || admin.email}`}
-                    >
-                      {actingUid === admin.uid ? (
-                        <ActivityIndicator size="small" color="#B91C1C" />
-                      ) : (
-                        <Ionicons name="trash-outline" size={16} color="#B91C1C" />
-                      )}
-                      <Text style={styles.deleteButtonText}>Delete</Text>
-                    </Pressable>
-                  </View>
-                )}
-              </View>
-            );
-          })
+            {visibleHistory.length > 0 && (
+              <>
+                <Text style={styles.sectionTitle}>History</Text>
+                {visibleHistory.map((request) => (
+                  <RequestCard
+                    key={request.requestId}
+                    request={request}
+                    acting={false}
+                    onApprove={() => {}}
+                    onReject={() => {}}
+                  />
+                ))}
+              </>
+            )}
+          </>
         )}
       </ScrollView>
-
-      <Modal
-        visible={!!editing}
-        transparent
-        animationType="fade"
-        onRequestClose={closeEdit}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modal}>
-            <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderIcon}>
-                <Ionicons name="create-outline" size={20} color="#7C3AED" />
-              </View>
-              <View style={styles.modalHeaderText}>
-                <Text style={styles.modalTitle}>
-                  Edit {editing?.displayName || "Administrator"}
-                </Text>
-                <Text style={styles.modalSubtitle}>{editing?.email || ""}</Text>
-              </View>
-            </View>
-
-            <ScrollView
-              contentContainerStyle={styles.modalBody}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              <Text style={styles.label}>Full name</Text>
-              <TextInput
-                style={styles.input}
-                value={form.displayName}
-                onChangeText={(v) => setForm({ ...form, displayName: v })}
-                placeholder="Full name"
-                placeholderTextColor="#9CA3AF"
-              />
-              <Text style={styles.label}>Position</Text>
-              <TextInput
-                style={styles.input}
-                value={form.position}
-                onChangeText={(v) => setForm({ ...form, position: v })}
-                placeholder="Position"
-                placeholderTextColor="#9CA3AF"
-              />
-              <Text style={styles.label}>Contact number</Text>
-              <TextInput
-                style={styles.input}
-                value={form.contactNo}
-                onChangeText={(v) => setForm({ ...form, contactNo: v })}
-                placeholder="Contact number"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="phone-pad"
-              />
-              <Text style={styles.label}>College</Text>
-              <TextInput
-                style={styles.input}
-                value={form.college}
-                onChangeText={(v) => setForm({ ...form, college: v })}
-                placeholder="College"
-                placeholderTextColor="#9CA3AF"
-              />
-              <Text style={styles.label}>School ID</Text>
-              <TextInput
-                style={styles.input}
-                value={form.schoolId}
-                onChangeText={(v) => setForm({ ...form, schoolId: v })}
-                placeholder="School ID"
-                placeholderTextColor="#9CA3AF"
-                autoCapitalize="characters"
-              />
-
-              <View style={styles.switchRow}>
-                <View style={styles.switchText}>
-                  <Text style={styles.switchTitle}>Super Admin</Text>
-                  <Text style={styles.switchHint}>
-                    Can approve resets, grant/revoke admins, and manage security
-                  </Text>
-                </View>
-                <Switch
-                  value={form.isSuperAdmin}
-                  onValueChange={(v) => setForm({ ...form, isSuperAdmin: v })}
-                  trackColor={{ false: "#D1D5DB", true: "#A78BFA" }}
-                  thumbColor={form.isSuperAdmin ? "#7C3AED" : "#F4F4F5"}
-                />
-              </View>
-            </ScrollView>
-
-            <View style={styles.modalActions}>
-              <Pressable
-                style={styles.modalCancel}
-                onPress={closeEdit}
-                disabled={saving}
-                accessibilityRole="button"
-              >
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.modalSave, saving && styles.buttonDisabled]}
-                onPress={handleSave}
-                disabled={saving}
-                accessibilityRole="button"
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <Text style={styles.modalSaveText}>Save</Text>
-                )}
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
+  );
+}
+
+function RequestCard({
+  request,
+  acting,
+  onApprove,
+  onReject,
+}: {
+  request: ResetRequest;
+  acting: boolean;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  const meta = STATUS_META[request.status];
+  const isPending = request.status === "pending";
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardTop}>
+        <View style={[styles.avatar, { backgroundColor: meta.avatarBg }]}>
+          <Text style={[styles.avatarText, { color: meta.avatarFg }]}>
+            {initials(request.adminName || "Administrator")}
+          </Text>
+        </View>
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardName}>{request.adminName || "Administrator"}</Text>
+          <Text style={styles.cardEmail}>{request.email}</Text>
+          <View style={styles.cardMetaRow}>
+            <Ionicons name="time-outline" size={12} color="#9CA3AF" />
+            <Text style={styles.cardMeta}>
+              Requested {timeAgo(request.requestedAtMs)}
+            </Text>
+          </View>
+          <Text style={styles.cardId}>ID {request.requestId.slice(0, 8)}</Text>
+        </View>
+        <StatusBadge status={request.status} />
+      </View>
+
+      {request.status === "approved" && (
+        <View style={styles.otpNote}>
+          <Ionicons name="mail-outline" size={14} color="#047857" />
+          <Text style={styles.otpNoteText}>
+            Code sent to {request.email} — {expiresInLabel(request.otpExpiresAtMs)}
+          </Text>
+        </View>
+      )}
+
+      {isPending && (
+        <View style={styles.cardActions}>
+          <Pressable
+            style={[styles.approveButton, acting && styles.buttonDisabled]}
+            onPress={onApprove}
+            disabled={acting}
+            accessibilityRole="button"
+            accessibilityLabel={`Approve ${request.email}`}
+          >
+            {acting ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <>
+                <Ionicons name="checkmark" size={16} color="white" />
+                <Text style={styles.approveButtonText}>Approve</Text>
+              </>
+            )}
+          </Pressable>
+          <Pressable
+            style={[styles.rejectButton, acting && styles.buttonDisabled]}
+            onPress={onReject}
+            disabled={acting}
+            accessibilityRole="button"
+            accessibilityLabel={`Reject ${request.email}`}
+          >
+            <Ionicons name="close" size={16} color="#B91C1C" />
+            <Text style={styles.rejectButtonText}>Reject</Text>
+          </Pressable>
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -656,6 +578,11 @@ const styles = StyleSheet.create({
   },
   titleWrap: {
     flex: 1,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   headerTitle: {
     fontSize: 18,
@@ -723,6 +650,45 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
   },
+  pendingBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#FEF3C7",
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+    marginHorizontal: 20,
+    marginTop: 16,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  pendingCountCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#F59E0B",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  pendingCountText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  pendingBannerText: {
+    flex: 1,
+  },
+  pendingBannerTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#92400E",
+  },
+  pendingBannerSubtitle: {
+    fontSize: 12,
+    color: "#B45309",
+    marginTop: 2,
+  },
   content: {
     flex: 1,
     backgroundColor: "#F8F7FB",
@@ -756,6 +722,31 @@ const styles = StyleSheet.create({
     paddingVertical: 80,
     alignItems: "center",
   },
+  signInCard: {
+    backgroundColor: "#F3F0FF",
+    borderRadius: 14,
+    padding: 16,
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 16,
+  },
+  signInText: {
+    fontSize: 13,
+    color: "#5B21B6",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  signInButton: {
+    backgroundColor: "#7C3AED",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  signInButtonText: {
+    color: "white",
+    fontSize: 13,
+    fontWeight: "700",
+  },
   empty: {
     alignItems: "center",
     paddingVertical: 64,
@@ -780,6 +771,20 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 19,
     maxWidth: 280,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#5B21B6",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  sectionEmpty: {
+    fontSize: 13,
+    color: "#9CA3AF",
+    marginBottom: 16,
   },
   card: {
     backgroundColor: "#FFFFFF",
@@ -811,220 +816,103 @@ const styles = StyleSheet.create({
   cardInfo: {
     flex: 1,
   },
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
   cardName: {
     fontSize: 15,
     fontWeight: "700",
     color: "#1F2937",
-  },
-  youTag: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#7C3AED",
-    backgroundColor: "#EDE9FE",
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    overflow: "hidden",
   },
   cardEmail: {
     fontSize: 13,
     color: "#6B7280",
     marginTop: 2,
   },
-  metaRow: {
+  cardMetaRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    marginTop: 4,
+    marginTop: 6,
   },
   cardMeta: {
     fontSize: 12,
     color: "#9CA3AF",
   },
-  badge: {
+  cardId: {
+    fontSize: 10,
+    color: "#D1D5DB",
+    marginTop: 4,
+    fontVariant: ["tabular-nums"],
+  },
+  statusBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 5,
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  badgeSuper: {
-    backgroundColor: "#EDE9FE",
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
-  badgeAdmin: {
-    backgroundColor: "#D1FAE5",
-  },
-  badgeText: {
+  statusText: {
     fontSize: 12,
     fontWeight: "700",
   },
+  otpNote: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#F0FDF4",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 12,
+  },
+  otpNoteText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#047857",
+    fontWeight: "600",
+  },
   cardActions: {
     flexDirection: "row",
-    gap: 8,
+    gap: 10,
     marginTop: 14,
   },
-  actionButton: {
+  approveButton: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    height: 40,
-    borderRadius: 10,
+    backgroundColor: "#22C55E",
+    borderRadius: 12,
+    height: 44,
   },
-  editButton: {
-    backgroundColor: "#EDE9FE",
-    borderWidth: 1,
-    borderColor: "#DDD6FE",
-  },
-  editButtonText: {
-    color: "#6D28D9",
-    fontSize: 13,
+  approveButtonText: {
+    color: "white",
+    fontSize: 14,
     fontWeight: "700",
   },
-  revokeButton: {
-    backgroundColor: "#FEF3C7",
-    borderWidth: 1,
-    borderColor: "#FDE68A",
-  },
-  revokeButtonText: {
-    color: "#B45309",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  deleteButton: {
+  rejectButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
     backgroundColor: "#FEE2E2",
+    borderRadius: 12,
+    height: 44,
     borderWidth: 1,
     borderColor: "#FECACA",
   },
-  deleteButtonText: {
+  rejectButtonText: {
     color: "#B91C1C",
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "700",
   },
   buttonDisabled: {
     opacity: 0.6,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(30,20,50,0.55)",
-    justifyContent: "center",
-    padding: 20,
-  },
-  modal: {
-    backgroundColor: "white",
-    borderRadius: 22,
-    padding: 20,
-    maxHeight: "88%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F0F6",
-  },
-  modalHeaderIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#EDE9FE",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalHeaderText: {
-    flex: 1,
-  },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#1F2937",
-  },
-  modalSubtitle: {
-    fontSize: 13,
-    color: "#6B7280",
-    marginTop: 2,
-  },
-  modalBody: {
-    paddingTop: 4,
-    paddingBottom: 4,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#374151",
-    marginTop: 12,
-    marginBottom: 6,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: "#1F2937",
-    backgroundColor: "#F9FAFB",
-  },
-  switchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 16,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: "#F1F0F6",
-  },
-  switchText: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  switchTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#1F2937",
-  },
-  switchHint: {
-    fontSize: 12,
-    color: "#9CA3AF",
-    marginTop: 2,
-  },
-  modalActions: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 16,
-  },
-  modalCancel: {
-    flex: 1,
-    height: 46,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F3F4F6",
-  },
-  modalCancelText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#374151",
-  },
-  modalSave: {
-    flex: 1,
-    height: 46,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#7C3AED",
-  },
-  modalSaveText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "white",
   },
 });

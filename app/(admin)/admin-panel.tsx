@@ -8,7 +8,6 @@ import {
   DepartmentCorrelationScatter,
 } from "@/components/admin/DepartmentCharts";
 import { StudentListModal } from "@/components/admin/StudentListModal";
-import AnalyticsInsightsPanel from "@/components/admin/AnalyticsInsightsPanel";
 import { db } from "@/constants/firebase";
 import { useAuth } from "@/hooks/AuthContext";
 import { listenForAdminDashboardData } from "@/services/adminFirestoreService";
@@ -2328,7 +2327,7 @@ export default function AdminPanelScreen() {
                 label="Security / Admin Management"
                 icon="shield-checkmark-outline"
                 onPress={() =>
-                  router.push("/(superadmin)/password-reset-requests")
+                  router.push("/(superadmin)/admin-management")
                 }
                 badge={
                   pendingResetCount > 0 ? (
@@ -2345,7 +2344,7 @@ export default function AdminPanelScreen() {
               <HeaderIconButton
                 label="Student Management"
                 icon="people-outline"
-                onPress={() => router.push("/(superadmin)/admin-management")}
+                onPress={() => router.push("/(superadmin)/student-management")}
               />
             )}
             <HeaderIconButton
@@ -3326,9 +3325,6 @@ export default function AdminPanelScreen() {
                     title="Descriptive Analysis Summary"
                     body={descriptiveInsights.overall.body}
                   />
-
-                  {/* ─── Aggregate Trend Alerts, Trends & Safeguarding ─── */}
-                  <AnalyticsInsightsPanel students={studentSummaries} />
 
                   {/* ─── SECTION 2: Risk Trend KPIs ──────────────────────── */}
                   <Text style={styles.sectionHeader}>

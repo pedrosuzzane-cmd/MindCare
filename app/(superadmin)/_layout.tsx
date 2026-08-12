@@ -3,8 +3,8 @@ import { Stack } from "expo-router";
 export default function SuperAdminLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="password-reset-requests" />
       <Stack.Screen name="admin-management" />
+      <Stack.Screen name="student-management" />
     </Stack>
   );
 }
