@@ -2340,13 +2340,11 @@ export default function AdminPanelScreen() {
                 }
               />
             )}
-            {isSuperAdmin && (
-              <HeaderIconButton
-                label="Student Management"
-                icon="people-outline"
-                onPress={() => router.push("/(superadmin)/student-management")}
-              />
-            )}
+            <HeaderIconButton
+              label="Student Management"
+              icon="people-outline"
+              onPress={() => router.push("/(admin)/student-management")}
+            />
             <HeaderIconButton
               label="Alerts / High Concern Students"
               icon="warning-outline"

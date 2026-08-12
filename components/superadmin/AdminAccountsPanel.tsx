@@ -1,9 +1,15 @@
+/**
+ * Admin Accounts panel — lists administrator accounts and permissions.
+ *
+ * Embedded inside the Admin Management screen alongside password-reset
+ * requests. All operations go through the super-admin REST endpoints.
+ */
+
 import { API_URL } from "@/backend/config";
 import { auth } from "@/constants/firebase";
 import { useAuth } from "@/hooks/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -11,7 +17,6 @@ import {
   Modal,
   Pressable,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Switch,
@@ -19,7 +24,6 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface AdminEntry {
   uid: string;
@@ -94,7 +98,10 @@ function StatTile({
     <View
       style={[
         styles.statTile,
-        highlighted && { backgroundColor: "rgba(255,255,255,0.18)", borderColor: "rgba(255,255,255,0.45)" },
+        highlighted && {
+          backgroundColor: "rgba(255,255,255,0.18)",
+          borderColor: "rgba(255,255,255,0.45)",
+        },
       ]}
     >
       <View style={[styles.statIcon, { backgroundColor: bg }]}>
@@ -108,8 +115,7 @@ function StatTile({
   );
 }
 
-export default function AdminManagementScreen() {
-  const insets = useSafeAreaInsets();
+export function AdminAccountsPanel() {
   const { user } = useAuth();
   const [admins, setAdmins] = useState<AdminEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -296,44 +302,23 @@ export default function AdminManagementScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.root}>
       <LinearGradient colors={["#7C3AED", "#9B6BF2"]} style={styles.headerBand}>
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Pressable
-              style={styles.backButton}
-              onPress={() => router.replace("/admin-panel")}
-              accessibilityRole="button"
-              accessibilityLabel="Back to admin panel"
-              hitSlop={8}
-            >
-              <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-            </Pressable>
-            <View style={styles.titleWrap}>
-              <Text style={styles.headerTitle}>Administrators</Text>
-              <Text style={styles.headerSubtitle}>
-                Manage admin accounts and permissions
-              </Text>
-            </View>
+          <View style={styles.titleWrap}>
+            <Text style={styles.headerTitle}>Admin Accounts</Text>
+            <Text style={styles.headerSubtitle}>
+              Manage admin accounts and permissions
+            </Text>
           </View>
-          <View style={styles.headerActions}>
-            <Pressable
-              style={styles.iconButton}
-              onPress={() => router.push("/(superadmin)/admin-management")}
-              accessibilityRole="button"
-              accessibilityLabel="Admin management"
-            >
-              <Ionicons name="shield-checkmark-outline" size={20} color="#FFFFFF" />
-            </Pressable>
-            <Pressable
-              style={styles.iconButton}
-              onPress={handleRefresh}
-              accessibilityRole="button"
-              accessibilityLabel="Refresh administrators"
-            >
-              <Ionicons name="refresh" size={20} color="#FFFFFF" />
-            </Pressable>
-          </View>
+          <Pressable
+            style={styles.iconButton}
+            onPress={handleRefresh}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh administrators"
+          >
+            <Ionicons name="refresh" size={20} color="#FFFFFF" />
+          </Pressable>
         </View>
 
         <View style={styles.statsRow}>
@@ -621,14 +606,14 @@ export default function AdminManagementScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#F8F7FB",
   },
   headerBand: {
     paddingHorizontal: 20,
@@ -639,20 +624,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
     gap: 12,
-    flex: 1,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.22)",
-    justifyContent: "center",
-    alignItems: "center",
   },
   titleWrap: {
     flex: 1,
@@ -666,11 +638,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "rgba(255,255,255,0.85)",
     marginTop: 2,
-  },
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
   },
   iconButton: {
     width: 40,
@@ -725,7 +692,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: "#F8F7FB",
   },
   scroll: {
     paddingHorizontal: 20,

@@ -18,6 +18,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AdminAccountsPanel } from "@/components/superadmin/AdminAccountsPanel";
 
 interface ResetRequest {
   requestId: string;
@@ -150,6 +151,7 @@ function StatTile({
 export default function PasswordResetRequestsScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const [segment, setSegment] = useState<"requests" | "accounts">("requests");
   const [requests, setRequests] = useState<ResetRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -281,61 +283,83 @@ export default function PasswordResetRequestsScreen() {
                 <Text style={styles.headerTitle}>Admin Management</Text>
               </View>
               <Text style={styles.headerSubtitle}>
-                Approve or reject administrator resets
+                {segment === "requests"
+                  ? "Approve or reject administrator resets"
+                  : "Manage admin accounts and permissions"}
               </Text>
             </View>
           </View>
           <View style={styles.headerActions}>
             <Pressable
               style={styles.iconButton}
-              onPress={() => router.push("/(superadmin)/student-management")}
-              accessibilityRole="button"
-              accessibilityLabel="Manage administrators"
-            >
-              <Ionicons name="people-outline" size={20} color="#FFFFFF" />
-            </Pressable>
-            <Pressable
-              style={styles.iconButton}
               onPress={handleRefresh}
               accessibilityRole="button"
-              accessibilityLabel="Refresh requests"
+              accessibilityLabel="Refresh"
             >
               <Ionicons name="refresh" size={20} color="#FFFFFF" />
             </Pressable>
           </View>
         </View>
 
-        <View style={styles.statsRow}>
-          <StatTile
-            label="Pending"
-            value={counts.pending}
-            color="#B45309"
-            bg="#FDE68A"
-            icon="time-outline"
-            highlighted
-          />
-          <StatTile
-            label="Approved"
-            value={counts.approved}
-            color="#047857"
-            bg="#A7F3D0"
-            icon="checkmark-circle-outline"
-          />
-          <StatTile
-            label="Rejected"
-            value={counts.rejected}
-            color="#B91C1C"
-            bg="#FECACA"
-            icon="close-circle-outline"
-          />
-          <StatTile
-            label="Completed"
-            value={counts.completed}
-            color="#1D4ED8"
-            bg="#BFDBFE"
-            icon="flag-outline"
-          />
+        <View style={styles.segmentRow}>
+          {(["requests", "accounts"] as const).map((seg) => (
+            <Pressable
+              key={seg}
+              style={[styles.segmentPill, segment === seg && styles.segmentPillActive]}
+              onPress={() => setSegment(seg)}
+              accessibilityRole="button"
+              accessibilityLabel={seg === "requests" ? "Password requests" : "Admin accounts"}
+            >
+              <Ionicons
+                name={seg === "requests" ? "key-outline" : "people-outline"}
+                size={14}
+                color={segment === seg ? "#6D28D9" : "rgba(255,255,255,0.9)"}
+              />
+              <Text
+                style={[
+                  styles.segmentText,
+                  segment === seg && styles.segmentTextActive,
+                ]}
+              >
+                {seg === "requests" ? "Password Requests" : "Admin Accounts"}
+              </Text>
+            </Pressable>
+          ))}
         </View>
+
+        {segment === "requests" && (
+          <View style={styles.statsRow}>
+            <StatTile
+              label="Pending"
+              value={counts.pending}
+              color="#B45309"
+              bg="#FDE68A"
+              icon="time-outline"
+              highlighted
+            />
+            <StatTile
+              label="Approved"
+              value={counts.approved}
+              color="#047857"
+              bg="#A7F3D0"
+              icon="checkmark-circle-outline"
+            />
+            <StatTile
+              label="Rejected"
+              value={counts.rejected}
+              color="#B91C1C"
+              bg="#FECACA"
+              icon="close-circle-outline"
+            />
+            <StatTile
+              label="Completed"
+              value={counts.completed}
+              color="#1D4ED8"
+              bg="#BFDBFE"
+              icon="flag-outline"
+            />
+          </View>
+        )}
       </LinearGradient>
 
       {error ? (
@@ -362,15 +386,16 @@ export default function PasswordResetRequestsScreen() {
         </View>
       )}
 
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-      >
+      {segment === "requests" ? (
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          }
+        >
         {requests.length > 0 && (
           <View style={styles.searchBox}>
             <Ionicons name="search-outline" size={18} color="#9CA3AF" />
@@ -463,7 +488,10 @@ export default function PasswordResetRequestsScreen() {
             )}
           </>
         )}
-      </ScrollView>
+        </ScrollView>
+      ) : (
+        <AdminAccountsPanel />
+      )}
     </SafeAreaView>
   );
 }
@@ -598,6 +626,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  segmentRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 14,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderRadius: 14,
+    padding: 4,
+  },
+  segmentPill: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 11,
+  },
+  segmentPillActive: {
+    backgroundColor: "#FFFFFF",
+  },
+  segmentText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.9)",
+  },
+  segmentTextActive: {
+    color: "#6D28D9",
   },
   iconButton: {
     width: 40,

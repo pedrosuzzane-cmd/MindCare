@@ -220,5 +220,20 @@ service cloud.firestore {
         allow read, write: if false;
       }
     }
+
+    // ─── SUPPORT WORKFLOWS ─────────────────────────────────────
+    // Non-clinical support workflow records created by admins for authorized
+    // follow-up. Students can never read or write these. No journal content
+    // or AI conversation data is stored here.
+    match /supportWorkflows/{workflowId} {
+      allow read, list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if false;
+
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
   }
 }

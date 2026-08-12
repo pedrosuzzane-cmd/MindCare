@@ -4,7 +4,6 @@ export default function SuperAdminLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="admin-management" />
-      <Stack.Screen name="student-management" />
     </Stack>
   );
 }

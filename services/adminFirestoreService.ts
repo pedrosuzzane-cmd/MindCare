@@ -1,9 +1,25 @@
 import { db } from "@/constants/firebase";
 import { collection, getDocs, onSnapshot, query, orderBy } from "firebase/firestore";
 import { ASSESSMENT_INTERVAL_DAYS, bucketAssessments, riskFromScore } from "@/utils/assessmentTrend";
+import {
+  DEFAULT_LIFECYCLE_STATUS,
+  DEFAULT_SUPPORT_STATUS,
+  type LifecycleStatus,
+  type SupportStatus,
+} from "@/services/studentTypes";
 
 // --- TYPE DEFINITIONS ---
 type RiskLevel = "low" | "normal" | "high";
+
+function toDateOrNull(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === "object" && value !== null && "toDate" in value) {
+    return (value as { toDate: () => Date }).toDate();
+  }
+  if (typeof value === "number") return new Date(value);
+  return null;
+}
 
 export interface AssessmentRecord {
   id: string;
@@ -49,6 +65,15 @@ export interface StudentSummary {
     fileName?: string;
     secureUrl?: string;
   } | null;
+  // Student lifecycle & support metadata (administrative, non-clinical)
+  email?: string;
+  status?: LifecycleStatus;
+  supportStatus?: SupportStatus;
+  supportAssignedTo?: string | null;
+  supportAssignedName?: string | null;
+  followUpDate?: Date | null;
+  supportUpdatedAt?: Date | null;
+  updatedAt?: Date | null;
 }
 
 export interface AdminDashboardData {
@@ -131,6 +156,15 @@ export function listenForAdminDashboardData(
             lsnCategory: userData.lsnCategory || "",
             lsnDocument: userData.lsnDocument || null,
             profileImage: userData.profileImage || undefined,
+            email: userData.email || undefined,
+            status: (userData.status as LifecycleStatus) || DEFAULT_LIFECYCLE_STATUS,
+            supportStatus:
+              (userData.supportStatus as SupportStatus) || DEFAULT_SUPPORT_STATUS,
+            supportAssignedTo: userData.supportAssignedTo ?? null,
+            supportAssignedName: userData.supportAssignedName ?? null,
+            followUpDate: toDateOrNull(userData.followUpDate),
+            supportUpdatedAt: toDateOrNull(userData.supportUpdatedAt),
+            updatedAt: toDateOrNull(userData.updatedAt),
           };
 
           let latestAssessment: AssessmentRecord | undefined;
