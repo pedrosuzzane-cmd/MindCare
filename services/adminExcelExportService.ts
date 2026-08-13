@@ -84,9 +84,9 @@ export interface UniversityExportData {
 }
 
 const RISK_LABEL: Record<ExportRiskLevel, string> = {
-  low: "Low",
-  normal: "Moderate",
-  high: "High",
+  low: "Lower Concern",
+  normal: "Moderate Concern",
+  high: "Elevated Concern",
 };
 
 const LSN_LABEL: Record<string, string> = {
@@ -230,7 +230,7 @@ export function exportUniversityExcelReport(
     "LSN Students",
     "Participation Rate",
     "Low Concern",
-    "Moderate",
+    "Moderate Concern",
     "High Concern",
   ]);
   data.departmentMetrics.forEach((d) =>

@@ -31,6 +31,8 @@ export type SupportActionType =
   | "schedule_follow_up"
   | "provide_resources"
   | "monitor_only"
+  | "contact_recommended"
+  | "resolved"
   | "no_action";
 
 export const DEFAULT_LIFECYCLE_STATUS: LifecycleStatus = "active";
@@ -105,15 +107,19 @@ export const SUPPORT_ACTIONS: SupportActionType[] = [
   "schedule_follow_up",
   "provide_resources",
   "monitor_only",
+  "contact_recommended",
+  "resolved",
   "no_action",
 ];
 
 export const SUPPORT_ACTION_LABELS: Record<SupportActionType, string> = {
-  send_wellness_checkin: "Send wellness check-in",
-  guidance_consultation: "Invite to guidance consultation",
+  send_wellness_checkin: "Contacted",
+  guidance_consultation: "Referred to guidance/counseling",
   schedule_follow_up: "Schedule follow-up",
   provide_resources: "Provide wellness resources",
-  monitor_only: "Monitor only",
+  monitor_only: "Continue monitoring",
+  contact_recommended: "Contact recommended",
+  resolved: "Resolved",
   no_action: "No action",
 };
 

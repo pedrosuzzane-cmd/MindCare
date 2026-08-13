@@ -11,7 +11,8 @@
  * ever stored here — only counts, categories, dates and support metadata.
  */
 
-import { db } from "@/constants/firebase";
+import { API_URL } from "@/backend/config";
+import { auth, db } from "@/constants/firebase";
 import {
   addDoc,
   collection,
@@ -24,6 +25,7 @@ import {
   serverTimestamp,
   Timestamp,
   updateDoc,
+  writeBatch,
 } from "firebase/firestore";
 import {
   listenForAdminDashboardData,
@@ -376,12 +378,67 @@ export async function createSupportWorkflow(
   return ref.id;
 }
 
+export interface RecordSupportActionInput {
+  studentId: string;
+  action: SupportActionType;
+  assignedTo: string;
+  assignedToName?: string;
+  followUpDate: Date | null;
+  reason: string;
+  /** Stable per-student UUID so a network retry is idempotent on the backend. */
+  requestId: string;
+}
+
+/**
+ * Records a support action through the backend, which is the authoritative
+ * writer: the workflow record, student support status, audit entry, and the
+ * student inbox notification are written atomically in one transaction. The
+ * stable requestId prevents duplicates on retry.
+ */
+export async function recordSupportAction(
+  input: RecordSupportActionInput,
+): Promise<string> {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) {
+    throw new Error("Not authenticated.");
+  }
+  const res = await fetch(`${API_URL}/api/record-support-action`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      studentId: input.studentId,
+      action: input.action,
+      assignedTo: input.assignedTo || undefined,
+      assignedToName: input.assignedToName ?? undefined,
+      followUpDate: input.followUpDate
+        ? input.followUpDate.toISOString()
+        : null,
+      reason: input.reason,
+      requestId: input.requestId,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      typeof data?.error === "string" && data.error
+        ? data.error
+        : "Failed to record the support action.",
+    );
+  }
+  return String(data.workflowId ?? input.requestId);
+}
+
 const SUPPORT_STATUS_FROM_ACTION: Record<SupportActionType, SupportStatus> = {
   send_wellness_checkin: "contact_initiated",
   guidance_consultation: "support_offered",
   schedule_follow_up: "follow_up_scheduled",
   provide_resources: "support_offered",
   monitor_only: "monitor",
+  contact_recommended: "outreach_recommended",
+  resolved: "resolved",
   no_action: "no_action",
 };
 
@@ -409,20 +466,35 @@ export async function updateStudentSupportStatus(
   });
 }
 
-/** Complete an open workflow (e.g. follow-up finished). */
+/** Complete an open workflow (e.g. follow-up finished) and resolve the student. */
 export async function completeSupportWorkflow(
   workflowId: string,
   context: ActionContext = {},
+  student?: { uid: string; name: string },
 ): Promise<void> {
-  await updateDoc(doc(db, "supportWorkflows", workflowId), {
+  const batch = writeBatch(db);
+  batch.update(doc(db, "supportWorkflows", workflowId), {
     status: "completed",
     closedAt: serverTimestamp(),
     closedBy: context.actor?.uid ?? null,
     updatedAt: serverTimestamp(),
   });
+  if (student) {
+    batch.update(doc(db, "users", student.uid), {
+      supportStatus: "resolved",
+      followUpDate: null,
+      supportAssignedTo: null,
+      supportAssignedName: null,
+      supportUpdatedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  }
+  await batch.commit();
   await writeAudit({
     actor: context.actor,
     action: "support_workflow_completed",
+    targetStudentId: student?.uid,
+    targetStudentName: student?.name,
     newValue: workflowId,
   });
 }
@@ -464,8 +536,11 @@ export interface StudentFilters {
   status: string;
   riskLevel: string;
   supportStatus: string;
+  assessed: "All" | "assessed" | "not_assessed";
   isLSNOnly: boolean;
   activity: string;
+  assessmentFrom: Date | null;
+  assessmentTo: Date | null;
 }
 
 export function applyStudentFilters(
@@ -474,6 +549,10 @@ export function applyStudentFilters(
 ): StudentManagementEntry[] {
   const q = filters.search.trim().toLowerCase();
   const activityCutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const from = filters.assessmentFrom?.getTime() ?? null;
+  const to = filters.assessmentTo
+    ? new Date(filters.assessmentTo).setHours(23, 59, 59, 999)
+    : null;
 
   return entries.filter((s) => {
     if (q) {
@@ -490,7 +569,13 @@ export function applyStudentFilters(
     ) {
       return false;
     }
+    if (filters.assessed === "assessed" && s.assessmentsCount === 0) return false;
+    if (filters.assessed === "not_assessed" && s.assessmentsCount > 0) return false;
     if (filters.isLSNOnly && !s.isLSN) return false;
+
+    const assessmentTs = s.latestAssessmentDate?.getTime() ?? 0;
+    if (from !== null && (assessmentTs === 0 || assessmentTs < from)) return false;
+    if (to !== null && (assessmentTs === 0 || assessmentTs > to)) return false;
 
     if (filters.activity === "recent") {
       const last = s.lastActivity?.getTime() ?? 0;
@@ -630,7 +715,147 @@ export function buildAttentionItems(
 }
 
 export function countAttentionStudents(entries: StudentManagementEntry[]): number {
-  return new Set(buildAttentionItems(entries).map((i) => i.student.uid)).size;
+  return buildTriageQueue(entries).filter((i) => i.score > 0).length;
+}
+
+// ─── Priority-based triage queue ────────────────────────────────────────────
+
+/**
+ * A deterministic, support-indicator-based triage queue. Priorities describe
+ * administrative attention levels only — they are NOT clinical diagnoses.
+ * Each student appears exactly once, ordered by a transparent priority score.
+ */
+export type TriagePriority = "high" | "medium" | "monitor";
+
+export interface TriageItem {
+  student: StudentManagementEntry;
+  priority: TriagePriority;
+  priorityLabel: string;
+  /** Assessment-derived statement about the latest recorded assessment. */
+  riskStatement: string;
+  /** Human-readable support-indicator reasons (no diagnoses). */
+  reasons: string[];
+  score: number;
+  daysSinceAssessment: number | null;
+}
+
+export const TRIAGE_PRIORITY_LABELS: Record<TriagePriority, string> = {
+  high: "High Priority",
+  medium: "Medium Priority",
+  monitor: "Monitor",
+};
+
+export function buildTriageQueue(entries: StudentManagementEntry[]): TriageItem[] {
+  const items: TriageItem[] = [];
+  const now = Date.now();
+  const todayStart = startOfToday();
+  const todayEnd = todayStart + DAY - 1;
+
+  for (const s of entries) {
+    const status = s.status ?? DEFAULT_LIFECYCLE_STATUS;
+    if (status === "archived" || status === "inactive") continue;
+
+    const support = s.supportStatus ?? DEFAULT_SUPPORT_STATUS;
+    const activeSupport = ACTIVE_SUPPORT_STATUSES.includes(support);
+    const followUp = s.followUpDate ? s.followUpDate.getTime() : null;
+    const risk = s.latestRiskLevel;
+
+    const reasons: string[] = [];
+    let score = 0;
+
+    // 1. High/elevated assessment concern.
+    if (risk === "high") {
+      score += 40;
+      reasons.push("High assessment concern");
+    } else if (risk === "normal") {
+      score += 12;
+    }
+
+    // 2. Follow-up timing.
+    if (followUp !== null && activeSupport && followUp < now) {
+      score += 35;
+      reasons.push(`Follow-up overdue (${s.followUpDate?.toLocaleDateString()})`);
+    } else if (followUp !== null && followUp >= todayStart && followUp <= todayEnd) {
+      score += 20;
+      reasons.push("Follow-up due today");
+    }
+
+    // 3. Outreach already recommended by a prior review.
+    if (support === "outreach_recommended") {
+      score += 30;
+      reasons.push("Outreach recommended");
+    }
+
+    // 4. No previous support action despite concerning indicators.
+    if (support === DEFAULT_SUPPORT_STATUS && (risk === "high" || risk === "normal")) {
+      score += 15;
+      if (!reasons.includes("No support action recorded")) {
+        reasons.push("No support action recorded");
+      }
+    }
+
+    // 5. Long time since last assessment.
+    const daysSinceAssessment = s.latestAssessmentDate
+      ? Math.floor((now - s.latestAssessmentDate.getTime()) / DAY)
+      : null;
+    if (s.assessmentsCount === 0) {
+      score += 10;
+      reasons.push("No assessment recorded yet");
+    } else if (daysSinceAssessment !== null && daysSinceAssessment > 90) {
+      score += 10;
+      reasons.push(`No assessment in ${daysSinceAssessment} days`);
+    }
+
+    // 6. Low engagement.
+    if (
+      s.assessmentsCount === 0 &&
+      s.journalCount === 0 &&
+      (!s.lastActivity || s.lastActivity.getTime() < now - 60 * DAY)
+    ) {
+      score += 5;
+      reasons.push("Low engagement");
+    }
+
+    if (reasons.length === 0) {
+      reasons.push("No urgent support indicators");
+    }
+
+    const priority: TriagePriority = score >= 50 ? "high" : score >= 20 ? "medium" : "monitor";
+
+    const riskStatement =
+      risk === "high"
+        ? "High assessment concern"
+        : risk === "normal"
+          ? "Moderate assessment concern"
+          : s.latestAssessmentDate
+            ? "No concern indicators"
+            : "No assessment recorded yet";
+
+    items.push({
+      student: s,
+      priority,
+      priorityLabel: TRIAGE_PRIORITY_LABELS[priority],
+      riskStatement,
+      reasons,
+      score,
+      daysSinceAssessment,
+    });
+  }
+
+  const priorityRank: Record<TriagePriority, number> = { high: 0, medium: 1, monitor: 2 };
+  const riskRank = (r?: StudentSummary["latestRiskLevel"]) =>
+    r === "high" ? 0 : r === "normal" ? 1 : 2;
+
+  items.sort((a, b) => {
+    if (a.score !== b.score) return b.score - a.score;
+    const pr = priorityRank[a.priority] - priorityRank[b.priority];
+    if (pr !== 0) return pr;
+    const rr = riskRank(a.student.latestRiskLevel) - riskRank(b.student.latestRiskLevel);
+    if (rr !== 0) return rr;
+    return a.student.name.localeCompare(b.student.name);
+  });
+
+  return items;
 }
 
 // ─── Audit reads ────────────────────────────────────────────────────────────

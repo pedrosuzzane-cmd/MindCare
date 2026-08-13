@@ -1,12 +1,12 @@
-import { API_URL, isSuperAdminEmail } from "@/backend/config";
+﻿import { API_URL, isSuperAdminEmail } from "@/backend/config";
+import MultiSelectModal from "@/components/MultiSelectModal";
 import { auth, db } from "@/constants/firebase";
 import { useAuth } from "@/hooks/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
-import { Redirect, router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { v4 as uuidv4 } from "uuid";
 import {
   ActivityIndicator,
   Modal,
@@ -25,14 +25,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { doc, getDoc } from "firebase/firestore";
 import {
   applyStudentFilters,
-  buildTriageQueue,
+  buildAttentionItems,
   completeSupportWorkflow,
   countAttentionStudents,
+  createSupportWorkflow,
   fetchAdminDirectory,
   fetchStudentAuditLogs,
   listenForStudentManagementData,
   permanentlyDeleteStudent,
-  recordSupportAction,
   updateStudentDepartment,
   updateStudentStatus,
   updateStudentYearLevel,
@@ -40,7 +40,6 @@ import {
   type StudentAuditEntry,
   type StudentManagementEntry,
   type SupportWorkflow,
-  type TriagePriority,
 } from "@/services/studentManagementService";
 import {
   ACTIVE_SUPPORT_STATUSES,
@@ -61,7 +60,7 @@ type RiskLevel = "low" | "normal" | "high";
 
 const RISK_LABELS: Record<RiskLevel, string> = {
   low: "Low",
-  normal: "Moderate",
+  normal: "Normal",
   high: "High",
 };
 
@@ -100,7 +99,7 @@ const AUDIT_ACTION_LABELS: Record<string, string> = {
 };
 
 function formatDate(d?: Date | null): string {
-  if (!d) return "—";
+  if (!d) return "ΓÇö";
   return d.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
@@ -109,7 +108,7 @@ function formatDate(d?: Date | null): string {
 }
 
 function formatDateTime(d?: Date | null): string {
-  if (!d) return "—";
+  if (!d) return "ΓÇö";
   return d.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
@@ -132,19 +131,7 @@ function addDays(base: Date, days: number): Date {
   return d;
 }
 
-/** Whole days between `date` and now (0 if the date is in the future). */
-function daysSince(date?: Date | null): number | null {
-  if (!date) return null;
-  return Math.max(0, Math.floor((Date.now() - date.getTime()) / 86400000));
-}
-
-/** True when a scheduled follow-up date has already passed. */
-function isFollowUpOverdue(date?: Date | null): boolean {
-  if (!date) return false;
-  return date.getTime() < Date.now();
-}
-
-// ─── Small UI pieces ────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Small UI pieces ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 function Badge({
   label,
@@ -195,47 +182,27 @@ function KpiCard({
   );
 }
 
-function PriorityBadge({ priority }: { priority: TriagePriority }) {
-  const config: Record<TriagePriority, { label: string; color: string; bg: string }> = {
-    high: { label: "HIGH", color: "#BE123C", bg: "#FFE4E6" },
-    medium: { label: "MEDIUM", color: "#B45309", bg: "#FEF3C7" },
-    monitor: { label: "MONITOR", color: "#0F766E", bg: "#CCFBF1" },
-  };
-  const c = config[priority];
-  return <Badge label={c.label} color={c.color} bg={c.bg} />;
-}
-
-function FilterGroup({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <View style={styles.filterGroup}>
-      <Text style={styles.filterGroupTitle}>{title}</Text>
-      <View style={styles.filterGroupChips}>{children}</View>
-    </View>
-  );
-}
-
-function FilterOptionChip({
+function FilterChip({
   label,
   active,
   onPress,
+  color,
 }: {
   label: string;
   active: boolean;
   onPress: () => void;
+  color?: string;
 }) {
   return (
     <Pressable
-      style={[styles.filterOptChip, active && styles.filterOptChipActive]}
       onPress={onPress}
+      style={[styles.chip, active && { borderColor: color ?? "#8A63D2", backgroundColor: `${color ?? "#8A63D2"}14` }]}
     >
       <Text
-        style={[styles.filterOptChipText, active && styles.filterOptChipTextActive]}
+        style={[
+          styles.chipText,
+          active && { color: color ?? "#6D28D9", fontWeight: "800" },
+        ]}
       >
         {label}
       </Text>
@@ -243,25 +210,13 @@ function FilterOptionChip({
   );
 }
 
-// ─── Main screen ────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Main screen ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 export default function StudentManagementScreen() {
-  const { user, role } = useAuth();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const isWide = screenWidth >= 900;
-
-  // Deep-link default filters: apply only explicitly provided params; otherwise
-  // start with no restrictive filters so the directory never shows a misleading
-  // "0 students" state. Initialized once so filters are never stale after nav.
-  const params = useLocalSearchParams<{
-    department?: string;
-    yearLevel?: string;
-    status?: string;
-    riskLevel?: string;
-    supportStatus?: string;
-    isLSN?: string;
-  }>();
 
   const [entries, setEntries] = useState<StudentManagementEntry[]>([]);
   const [workflows, setWorkflows] = useState<SupportWorkflow[]>([]);
@@ -273,23 +228,13 @@ export default function StudentManagementScreen() {
   const [admins, setAdmins] = useState<{ uid: string; name: string }[]>([]);
 
   const [search, setSearch] = useState("");
-  const [deptFilter, setDeptFilter] = useState(params.department ?? "All");
-  const [yearFilter, setYearFilter] = useState(params.yearLevel ?? "All");
-  const [statusFilter, setStatusFilter] = useState(params.status ?? "All");
-  const [riskFilter, setRiskFilter] = useState(params.riskLevel ?? "All");
-  const [supportFilter, setSupportFilter] = useState(
-    params.supportStatus ?? "All",
-  );
-  const [assessedFilter, setAssessedFilter] = useState<
-    "All" | "assessed" | "not_assessed"
-  >("All");
+  const [deptFilter, setDeptFilter] = useState("All");
+  const [yearFilter, setYearFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("Active");
+  const [riskFilter, setRiskFilter] = useState("All");
+  const [supportFilter, setSupportFilter] = useState("All");
   const [activityFilter, setActivityFilter] = useState("All");
-  const [lsnOnly, setLsnOnly] = useState(params.isLSN === "true");
-  const [assessmentFrom, setAssessmentFrom] = useState<Date | null>(null);
-  const [assessmentTo, setAssessmentTo] = useState<Date | null>(null);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
-  const [rangePicker, setRangePicker] = useState<"from" | "to" | null>(null);
+  const [lsnOnly, setLsnOnly] = useState(false);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
@@ -315,11 +260,13 @@ export default function StudentManagementScreen() {
   // Row action menu
   const [menuUid, setMenuUid] = useState<string | null>(null);
 
-  // Support action modal (single-step workflow)
+  // Workflow wizard
   const [wfOpen, setWfOpen] = useState(false);
   const [wfBulk, setWfBulk] = useState(false);
   const [wfTarget, setWfTarget] = useState<string | null>(null);
+  const [wfStep, setWfStep] = useState(1);
   const [wfAction, setWfAction] = useState<SupportActionType | null>(null);
+  const [wfActionPicker, setWfActionPicker] = useState(false);
   const [wfReason, setWfReason] = useState("");
   const [wfNote, setWfNote] = useState("");
   const [wfAssignee, setWfAssignee] = useState("");
@@ -327,7 +274,6 @@ export default function StudentManagementScreen() {
   const [wfSaving, setWfSaving] = useState(false);
   const [wfError, setWfError] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const wfRequestIds = useRef<Map<string, string>>(new Map());
 
   // Profile / audit / delete modals
   const [profileUid, setProfileUid] = useState<string | null>(null);
@@ -348,6 +294,15 @@ export default function StudentManagementScreen() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 3200);
   }, []);
+
+  const params = useLocalSearchParams<{
+    department?: string;
+    yearLevel?: string;
+    status?: string;
+    riskLevel?: string;
+    supportStatus?: string;
+    isLSN?: string;
+  }>();
 
   const actor = useMemo<ActionContext["actor"]>(
     () => ({
@@ -380,16 +335,22 @@ export default function StudentManagementScreen() {
       .catch(() => {});
   }, []);
 
-  // Real-time data. `reload` is used by pull-to-refresh and error retry so the
-  // full-screen loading state is only shown when there is nothing to display.
-  const reload = useCallback(() => {
-    setLoading(true);
-    setRefreshing(true);
-    setRefreshKey((k) => k + 1);
+  // Deep-link default filter: Active status unless overridden
+  useEffect(() => {
+    if (params.status) setStatusFilter(params.status);
+    else setStatusFilter("Active");
+    if (params.department) setDeptFilter(params.department);
+    if (params.yearLevel) setYearFilter(params.yearLevel);
+    if (params.riskLevel) setRiskFilter(params.riskLevel);
+    if (params.supportStatus) setSupportFilter(params.supportStatus);
+    if (params.isLSN === "true") setLsnOnly(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Real-time data
   useEffect(() => {
     if (!user) return;
+    setLoading(true);
 
     const stop = listenForStudentManagementData(
       (data) => {
@@ -408,27 +369,10 @@ export default function StudentManagementScreen() {
     return stop;
   }, [user, refreshKey]);
 
-  // Reset pagination when filters change. This uses the React-recommended
-  // render-time adjustment pattern instead of an effect so the current page
-  // never refers to a stale filter combination.
-  const [filterSignature, setFilterSignature] = useState("");
-  const currentFilterSignature = JSON.stringify([
-    search,
-    deptFilter,
-    yearFilter,
-    statusFilter,
-    riskFilter,
-    supportFilter,
-    assessedFilter,
-    activityFilter,
-    lsnOnly,
-    assessmentFrom,
-    assessmentTo,
-  ]);
-  if (currentFilterSignature !== filterSignature) {
-    setFilterSignature(currentFilterSignature);
+  // Reset pagination when filters change
+  useEffect(() => {
     setPage(1);
-  }
+  }, [search, deptFilter, yearFilter, statusFilter, riskFilter, supportFilter, activityFilter, lsnOnly]);
 
   const departments = useMemo(() => {
     const set = new Set<string>();
@@ -448,13 +392,10 @@ export default function StudentManagementScreen() {
         status: statusFilter,
         riskLevel: riskFilter,
         supportStatus: supportFilter,
-        assessed: assessedFilter,
         isLSNOnly: lsnOnly,
         activity: activityFilter,
-        assessmentFrom,
-        assessmentTo,
       }),
-    [entries, search, deptFilter, yearFilter, statusFilter, riskFilter, supportFilter, assessedFilter, lsnOnly, activityFilter, assessmentFrom, assessmentTo],
+    [entries, search, deptFilter, yearFilter, statusFilter, riskFilter, supportFilter, lsnOnly, activityFilter],
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -479,114 +420,14 @@ export default function StudentManagementScreen() {
     };
   }, [entries]);
 
-  const attentionItems = useMemo(() => buildTriageQueue(entries), [entries]);
+  const attentionItems = useMemo(() => buildAttentionItems(entries), [entries]);
 
   const entryById = useCallback(
     (uid: string) => entries.find((e) => e.uid === uid),
     [entries],
   );
 
-  // ─── Active filter summary ────────────────────────────────────────────────
-
-  const activeFilters = useMemo(() => {
-    const chips: { key: string; label: string; clear: () => void }[] = [];
-    if (search.trim()) {
-      chips.push({
-        key: "search",
-        label: `Search: ${search.trim()}`,
-        clear: () => setSearch(""),
-      });
-    }
-    if (statusFilter !== "All") {
-      chips.push({
-        key: "status",
-        label: LIFECYCLE_LABELS[statusFilter as LifecycleStatus],
-        clear: () => setStatusFilter("All"),
-      });
-    }
-    if (deptFilter !== "All") {
-      chips.push({ key: "dept", label: deptFilter, clear: () => setDeptFilter("All") });
-    }
-    if (yearFilter !== "All") {
-      chips.push({ key: "year", label: yearFilter, clear: () => setYearFilter("All") });
-    }
-    if (riskFilter !== "All") {
-      chips.push({
-        key: "risk",
-        label: `Risk: ${RISK_LABELS[riskFilter as RiskLevel]}`,
-        clear: () => setRiskFilter("All"),
-      });
-    }
-    if (supportFilter !== "All") {
-      chips.push({
-        key: "support",
-        label: SUPPORT_LABELS[supportFilter as SupportStatus],
-        clear: () => setSupportFilter("All"),
-      });
-    }
-    if (assessedFilter !== "All") {
-      chips.push({
-        key: "assessed",
-        label: assessedFilter === "assessed" ? "Assessed" : "Not assessed",
-        clear: () => setAssessedFilter("All"),
-      });
-    }
-    if (activityFilter !== "All") {
-      chips.push({
-        key: "activity",
-        label:
-          ACTIVITY_OPTIONS.find((a) => a.key === activityFilter)?.label ??
-          activityFilter,
-        clear: () => setActivityFilter("All"),
-      });
-    }
-    if (lsnOnly) {
-      chips.push({ key: "lsn", label: "LSN only", clear: () => setLsnOnly(false) });
-    }
-    if (assessmentFrom) {
-      chips.push({
-        key: "from",
-        label: `Assessed from ${formatDate(assessmentFrom)}`,
-        clear: () => setAssessmentFrom(null),
-      });
-    }
-    if (assessmentTo) {
-      chips.push({
-        key: "to",
-        label: `Assessed to ${formatDate(assessmentTo)}`,
-        clear: () => setAssessmentTo(null),
-      });
-    }
-    return chips;
-  }, [
-    search,
-    statusFilter,
-    deptFilter,
-    yearFilter,
-    riskFilter,
-    supportFilter,
-    assessedFilter,
-    activityFilter,
-    lsnOnly,
-    assessmentFrom,
-    assessmentTo,
-  ]);
-
-  const clearAllFilters = useCallback(() => {
-    setSearch("");
-    setDeptFilter("All");
-    setYearFilter("All");
-    setStatusFilter("All");
-    setRiskFilter("All");
-    setSupportFilter("All");
-    setAssessedFilter("All");
-    setActivityFilter("All");
-    setLsnOnly(false);
-    setAssessmentFrom(null);
-    setAssessmentTo(null);
-  }, []);
-
-  // ─── Selection helpers ────────────────────────────────────────────────────
+  // ΓöÇΓöÇΓöÇ Selection helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
   const toggleSelect = (uid: string) => {
     setSelected((prev) => {
@@ -611,7 +452,7 @@ export default function StudentManagementScreen() {
 
   const clearSelection = () => setSelected(new Set());
 
-  // ─── Actions ──────────────────────────────────────────────────────────────
+  // ΓöÇΓöÇΓöÇ Actions ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
   const openEdit = (kind: "status" | "department" | "year", targets: string[]) => {
     setEditModal({ kind, targets });
@@ -690,22 +531,25 @@ export default function StudentManagementScreen() {
     }
   };
 
-  const openWorkflow = (targets: string[], presetAction?: SupportActionType) => {
+  const openWorkflow = (targets: string[]) => {
     setWfBulk(targets.length > 1);
     setWfTarget(targets[0] ?? null);
-    setWfAction(presetAction ?? null);
+    setWfStep(1);
+    setWfAction(null);
     setWfNote("");
     setWfFollowUp(null);
     setWfError(null);
     setWfAssignee(user?.uid ?? "");
-    wfRequestIds.current = new Map();
     const first = entryById(targets[0]);
     if (first) {
       const reasons: string[] = [];
       if (first.latestRiskLevel === "high") reasons.push("Repeated elevated concern indicators were recorded.");
       if ((first.supportStatus ?? "no_action") === "outreach_recommended") reasons.push("Outreach was recommended after a review of indicators.");
       if (first.assessmentsCount === 0 || first.latestAssessmentDate === undefined) reasons.push("No assessment has been recorded yet.");
-      if (isFollowUpOverdue(first.followUpDate)) {
+      if (
+        first.followUpDate &&
+        first.followUpDate.getTime() < Date.now()
+      ) {
         reasons.push("A scheduled follow-up is overdue.");
       }
       setWfReason(reasons.length ? reasons.join(" ") : "Standard check-in to review current wellbeing.");
@@ -737,26 +581,25 @@ export default function StudentManagementScreen() {
       for (const uid of targets) {
         const s = entryById(uid);
         if (!s) continue;
-        let requestId = wfRequestIds.current.get(uid);
-        if (!requestId) {
-          requestId = uuidv4();
-          wfRequestIds.current.set(uid, requestId);
-        }
-        await recordSupportAction({
+        await createSupportWorkflow({
           studentId: uid,
-          action: wfAction,
+          studentName: s.name,
+          department: s.department,
+          actionType: wfAction,
+          reason: wfReason.trim() || "Support workflow",
+          note: wfNote.trim() || undefined,
           assignedTo: wfAssignee || user?.uid || "",
           assignedToName: wfAssignee ? assigneeName : actor?.name,
           followUpDate: wfFollowUp,
-          reason: wfReason.trim() || "Support workflow",
-          requestId,
+          createdBy: user?.uid || "",
+          createdByName: actor?.name,
         });
       }
       setWfOpen(false);
       clearSelection();
-      showToast("Support action recorded successfully.");
+      showToast("Support workflow saved.");
     } catch {
-      setWfError("Unable to save the support action. Please try again.");
+      setWfError("Could not save the workflow. Please try again.");
     } finally {
       setWfSaving(false);
     }
@@ -823,19 +666,14 @@ export default function StudentManagementScreen() {
 
   const completeWf = async (wf: SupportWorkflow) => {
     try {
-      const student = entryById(wf.studentId);
-      await completeSupportWorkflow(
-        wf.id,
-        { actor },
-        student ? { uid: student.uid, name: student.name } : undefined,
-      );
+      await completeSupportWorkflow(wf.id, { actor });
       showToast("Workflow marked complete.");
     } catch {
       showToast("Could not update the workflow.");
     }
   };
 
-  // ─── Row render helpers ───────────────────────────────────────────────────
+  // ΓöÇΓöÇΓöÇ Row render helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
   const renderStudentCell = (s: StudentManagementEntry) => (
     <Pressable style={styles.studentCell} onPress={() => setProfileUid(s.uid)}>
@@ -851,7 +689,7 @@ export default function StudentManagementScreen() {
           {s.name}
         </Text>
         <Text style={styles.subText} numberOfLines={1}>
-          {s.schoolId} · {s.email ?? "No email"}
+          {s.schoolId} ┬╖ {s.email ?? "No email"}
         </Text>
       </View>
     </Pressable>
@@ -886,27 +724,6 @@ export default function StudentManagementScreen() {
     return "None";
   };
 
-  const triageActions = (uid: string) => (
-    <View style={styles.triageActions}>
-      <Pressable
-        style={styles.triageActionBtn}
-        onPress={() => setProfileUid(uid)}
-      >
-        <Ionicons name="eye-outline" size={13} color="#6D28D9" />
-        <Text style={styles.triageActionText}>Review</Text>
-      </Pressable>
-      <Pressable
-        style={[styles.triageActionBtn, styles.triageActionPrimary]}
-        onPress={() => openWorkflow([uid])}
-      >
-        <Ionicons name="add" size={13} color="#FFFFFF" />
-        <Text style={[styles.triageActionText, { color: "#FFFFFF" }]}>
-          Record Support
-        </Text>
-      </Pressable>
-    </View>
-  );
-
   const rowMenuActions = (s?: StudentManagementEntry) => {
     if (!s) return [];
     const st = s.status ?? "active";
@@ -935,21 +752,13 @@ export default function StudentManagementScreen() {
     return actions;
   };
 
-  // ─── Render ───────────────────────────────────────────────────────────────
-
-  // Route guard: only administrators may access student management data.
-  if (role === "student") {
-    return <Redirect href="/dashboard" />;
-  }
-  if (!user) {
-    return <Redirect href="/auth/login" />;
-  }
+  // ΓöÇΓöÇΓöÇ Render ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
   if (loading && entries.length === 0) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#8A63D2" />
-        <Text style={styles.centerText}>Loading student directory…</Text>
+        <Text style={styles.centerText}>Loading student directoryΓÇª</Text>
       </View>
     );
   }
@@ -987,7 +796,7 @@ export default function StudentManagementScreen() {
           <View style={styles.superBanner}>
             <Ionicons name="shield-checkmark" size={14} color="#C4B5FD" />
             <Text style={styles.superBannerText}>
-              Super Admin — permanent deletion is available.
+              Super Admin ΓÇö permanent deletion is available.
             </Text>
           </View>
         )}
@@ -1001,7 +810,10 @@ export default function StudentManagementScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={reload}
+            onRefresh={() => {
+              setRefreshing(true);
+              setRefreshKey((k) => k + 1);
+            }}
           />
         }
       >
@@ -1009,7 +821,7 @@ export default function StudentManagementScreen() {
           <View style={styles.errorCard}>
             <Ionicons name="cloud-offline-outline" size={18} color="#B91C1C" />
             <Text style={styles.errorText}>{error}</Text>
-            <Pressable style={styles.retryBtn} onPress={reload}>
+            <Pressable style={styles.retryBtn} onPress={() => setRefreshKey((k) => k + 1)}>
               <Text style={styles.retryText}>Retry</Text>
             </Pressable>
           </View>
@@ -1025,242 +837,179 @@ export default function StudentManagementScreen() {
           <KpiCard label="Attention Required" value={kpis.attention} icon="alert-circle-outline" color="#BE123C" bg="#FFE4E6" />
         </View>
 
-        {/* Attention Required — vertical triage queue */}
+        {/* Attention list */}
         {attentionItems.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.sectionTitle}>Attention Required</Text>
-                <Text style={styles.sectionSubtitle}>
-                  Ordered by support priority — assessment-derived indicators,
-                  not diagnoses.
-                </Text>
-              </View>
+              <Text style={styles.sectionTitle}>Attention Required</Text>
               <Text style={styles.sectionCount}>{attentionItems.length}</Text>
             </View>
-            {isWide ? (
-              <View>
-                <View style={styles.triageHead}>
-                  <Text style={[styles.triageHeadCell, styles.triageColPriority]}>
-                    Priority
-                  </Text>
-                  <Text style={[styles.triageHeadCell, styles.triageColStudent]}>
-                    Student
-                  </Text>
-                  <Text style={[styles.triageHeadCell, styles.triageColRisk]}>
-                    Risk
-                  </Text>
-                  <Text style={[styles.triageHeadCell, styles.triageColSupport]}>
-                    Support
-                  </Text>
-                  <View style={styles.triageColActions} />
-                </View>
-                {attentionItems.slice(0, 12).map((item) => (
-                  <View
-                    key={item.student.uid}
-                    style={[
-                      styles.triageRow,
-                      item.priority === "high" && styles.triageRowHigh,
-                    ]}
-                  >
-                    <View style={styles.triageColPriority}>
-                      <PriorityBadge priority={item.priority} />
-                    </View>
-                    <View style={styles.triageColStudent}>
-                      {renderStudentCell(item.student)}
-                    </View>
-                    <View style={styles.triageColRisk}>
-                      <Text style={styles.triageRiskText} numberOfLines={1}>
-                        {item.riskStatement}
-                      </Text>
-                      <Text style={styles.triageMetaText} numberOfLines={1}>
-                        {item.daysSinceAssessment === null
-                          ? "No assessment yet"
-                          : item.daysSinceAssessment === 0
-                            ? "Assessed today"
-                            : `Last assessed ${item.daysSinceAssessment}d ago`}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.attentionRow}
+            >
+              {attentionItems.slice(0, 8).map((item, i) => (
+                <Pressable
+                  key={item.student.uid + "-" + i}
+                  style={styles.attentionCard}
+                  onPress={() => openWorkflow([item.student.uid])}
+                >
+                  <View style={styles.attentionCardHead}>
+                    <View style={styles.attentionAvatar}>
+                      <Text style={styles.attentionAvatarText}>
+                        {initials(item.student.name)}
                       </Text>
                     </View>
-                    <View style={styles.triageColSupport}>
-                      {renderSupportBadge(item.student)}
-                    </View>
-                    <View style={styles.triageColActions}>
-                      {triageActions(item.student.uid)}
-                    </View>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <View style={styles.cardList}>
-                {attentionItems.slice(0, 12).map((item) => (
-                  <View
-                    key={item.student.uid}
-                    style={[
-                      styles.triageCard,
-                      item.priority === "high" && styles.triageCardHigh,
-                    ]}
-                  >
-                    <View style={styles.triageCardTop}>
-                      <PriorityBadge priority={item.priority} />
-                      <View style={{ flex: 1 }}>{renderStudentCell(item.student)}</View>
-                    </View>
-                    <Text style={styles.triageRiskText}>{item.riskStatement}</Text>
-                    <Text style={styles.triageMetaText}>
-                      {item.daysSinceAssessment === null
-                        ? "No assessment yet"
-                        : item.daysSinceAssessment === 0
-                          ? "Assessed today"
-                          : `Last assessed ${item.daysSinceAssessment}d ago`}{" "}
-                      · {SUPPORT_LABELS[item.student.supportStatus ?? "no_action"]}
-                    </Text>
-                    {item.reasons.map((r) => (
-                      <View key={r} style={styles.triageReasonRow}>
-                        <Ionicons name="ellipse" size={6} color="#8A63D2" />
-                        <Text style={styles.triageReason}>{r}</Text>
-                      </View>
-                    ))}
-                    <View style={styles.triageActions}>
-                      <Pressable
-                        style={styles.triageActionBtn}
-                        onPress={() => setProfileUid(item.student.uid)}
-                      >
-                        <Ionicons name="eye-outline" size={13} color="#6D28D9" />
-                        <Text style={styles.triageActionText}>Review</Text>
-                      </Pressable>
-                      <Pressable
-                        style={styles.triageActionBtn}
-                        onPress={() => openWorkflow([item.student.uid], "schedule_follow_up")}
-                      >
-                        <Ionicons name="calendar-outline" size={13} color="#0F766E" />
-                        <Text style={[styles.triageActionText, { color: "#0F766E" }]}>
-                          Schedule Follow-up
-                        </Text>
-                      </Pressable>
-                      <Pressable
-                        style={[styles.triageActionBtn, styles.triageActionPrimary]}
-                        onPress={() => openWorkflow([item.student.uid])}
-                      >
-                        <Ionicons name="add" size={13} color="#FFFFFF" />
-                        <Text style={[styles.triageActionText, { color: "#FFFFFF" }]}>
-                          Record Support
-                        </Text>
-                      </Pressable>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.attentionName} numberOfLines={1}>
+                        {item.student.name}
+                      </Text>
+                      <Text style={styles.attentionCategory}>{item.label}</Text>
                     </View>
                   </View>
-                ))}
-              </View>
-            )}
+                  <Text style={styles.attentionReason} numberOfLines={3}>
+                    {item.reason}
+                  </Text>
+                  <View style={styles.attentionFooter}>
+                    {renderStatusBadge(item.student)}
+                    {renderRiskBadge(item.student)}
+                  </View>
+                </Pressable>
+              ))}
+            </ScrollView>
           </View>
         )}
 
-        {/* Filters — always-visible controls + advanced filters */}
+        {/* Filters */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.sectionTitle}>Student Directory</Text>
-              <Text style={styles.sectionSubtitle}>
-                Showing {filtered.length} of {entries.length} students
-              </Text>
-            </View>
+            <Text style={styles.sectionTitle}>Student Directory</Text>
+            <Text style={styles.sectionCount}>{filtered.length} shown</Text>
           </View>
 
-          <View style={styles.filterBar}>
-            <View style={styles.searchRowCompact}>
-              <Ionicons name="search" size={16} color="#9CA3AF" />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search students…"
-                placeholderTextColor="#9CA3AF"
-                value={search}
-                onChangeText={setSearch}
-              />
-              {search ? (
-                <Pressable onPress={() => setSearch("")}>
-                  <Ionicons name="close-circle" size={18} color="#9CA3AF" />
-                </Pressable>
-              ) : null}
-            </View>
-            <Pressable
-              style={styles.statusSelect}
-              onPress={() => setStatusMenuOpen(true)}
-            >
-              <Text style={styles.statusSelectText} numberOfLines={1}>
-                {statusFilter === "All"
-                  ? "All Statuses"
-                  : LIFECYCLE_LABELS[statusFilter as LifecycleStatus]}
-              </Text>
-              <Ionicons name="chevron-down" size={14} color="#4B5563" />
-            </Pressable>
-            <Pressable
-              style={[styles.filterBtn, activeFilters.length > 0 && styles.filterBtnActive]}
-              onPress={() => setAdvancedOpen(true)}
-            >
-              <Ionicons
-                name="options-outline"
-                size={15}
-                color={activeFilters.length > 0 ? "#FFFFFF" : "#6D28D9"}
-              />
-              <Text
-                style={[
-                  styles.filterBtnText,
-                  activeFilters.length > 0 && styles.filterBtnTextActive,
-                ]}
-              >
-                Filters{activeFilters.length > 0 ? ` (${activeFilters.length})` : ""}
-              </Text>
-            </Pressable>
-            {activeFilters.length > 0 ? (
-              <Pressable style={styles.clearBtn} onPress={clearAllFilters}>
-                <Ionicons name="close" size={14} color="#6B7280" />
-                <Text style={styles.clearBtnText}>Clear</Text>
+          <View style={styles.searchRow}>
+            <Ionicons name="search" size={16} color="#9CA3AF" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search name, ID, or emailΓÇª"
+              placeholderTextColor="#9CA3AF"
+              value={search}
+              onChangeText={setSearch}
+            />
+            {search ? (
+              <Pressable onPress={() => setSearch("")}>
+                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
               </Pressable>
             ) : null}
           </View>
 
-          {activeFilters.length > 0 ? (
-            <View style={styles.activeFilterWrap}>
-              <Text style={styles.activeFilterLabel}>Active filters:</Text>
-              <View style={styles.activeFilterChips}>
-                {activeFilters.map((chip) => (
-                  <Pressable
-                    key={chip.key}
-                    style={styles.activeFilterChip}
-                    onPress={chip.clear}
-                    accessibilityLabel={`Remove filter ${chip.label}`}
-                  >
-                    <Text style={styles.activeFilterChipText}>{chip.label}</Text>
-                    <Ionicons name="close-circle" size={14} color="#6D28D9" />
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          ) : null}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipRow}
+          >
+            {["All", ...LIFECYCLE_STATUSES].map((st) => (
+              <FilterChip
+                key={st}
+                label={st === "All" ? "All Statuses" : LIFECYCLE_LABELS[st as LifecycleStatus]}
+                active={statusFilter === st}
+                onPress={() => setStatusFilter(st)}
+                color={st === "All" ? "#8A63D2" : LIFECYCLE_COLORS[st as LifecycleStatus]}
+              />
+            ))}
+          </ScrollView>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipRow}
+          >
+            {["All", ...departments].map((d) => (
+              <FilterChip key={d} label={d} active={deptFilter === d} onPress={() => setDeptFilter(d)} />
+            ))}
+          </ScrollView>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipRow}
+          >
+            {["All", ...YEAR_OPTIONS].map((y) => (
+              <FilterChip key={y} label={y} active={yearFilter === y} onPress={() => setYearFilter(y)} />
+            ))}
+            {["All", ...SUPPORT_STATUSES].map((sp) => (
+              <FilterChip
+                key={"sp" + sp}
+                label={sp === "All" ? "Support: All" : SUPPORT_LABELS[sp as SupportStatus]}
+                active={supportFilter === sp}
+                onPress={() => setSupportFilter(sp)}
+                color="#2563EB"
+              />
+            ))}
+          </ScrollView>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipRow}
+          >
+            {["All", "low", "normal", "high"].map((r) => (
+              <FilterChip
+                key={r}
+                label={r === "All" ? "Risk: All" : `Risk: ${RISK_LABELS[r as RiskLevel]}`}
+                active={riskFilter === r}
+                onPress={() => setRiskFilter(r)}
+                color={r === "All" ? "#8A63D2" : RISK_COLORS[r as RiskLevel]}
+              />
+            ))}
+            {ACTIVITY_OPTIONS.map((a) => (
+              <FilterChip
+                key={a.key}
+                label={a.label}
+                active={activityFilter === a.key}
+                onPress={() => setActivityFilter(a.key)}
+              />
+            ))}
+          </ScrollView>
+
+          <View style={styles.lsnRow}>
+            <Switch
+              value={lsnOnly}
+              onValueChange={setLsnOnly}
+              trackColor={{ false: "#E5E7EB", true: "#8A63D2" }}
+              thumbColor="#FFFFFF"
+            />
+            <Text style={styles.lsnText}>LSN students only</Text>
+          </View>
+
+          <Pressable
+            style={styles.resetBtn}
+            onPress={() => {
+              setSearch("");
+              setDeptFilter("All");
+              setYearFilter("All");
+              setStatusFilter("Active");
+              setRiskFilter("All");
+              setSupportFilter("All");
+              setActivityFilter("All");
+              setLsnOnly(false);
+            }}
+          >
+            <Ionicons name="funnel-outline" size={14} color="#6B7280" />
+            <Text style={styles.resetText}>Reset filters</Text>
+          </Pressable>
         </View>
 
         {/* Directory */}
         {pageStudents.length === 0 ? (
-          entries.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Ionicons name="people-outline" size={26} color="#CBD5E1" />
-              <Text style={styles.emptyTitle}>No students have been registered yet</Text>
-              <Text style={styles.emptyText}>
-                New student accounts will appear here once they register.
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.emptyCard}>
-              <Ionicons name="file-tray-outline" size={26} color="#CBD5E1" />
-              <Text style={styles.emptyTitle}>No students match these filters</Text>
-              <Text style={styles.emptyText}>
-                Try removing one or more filters or search for another student.
-              </Text>
-              {activeFilters.length > 0 ? (
-                <Pressable style={styles.emptyClearBtn} onPress={clearAllFilters}>
-                  <Text style={styles.emptyClearText}>Clear Filters</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          )
+          <View style={styles.emptyCard}>
+            <Ionicons name="file-tray-outline" size={26} color="#CBD5E1" />
+            <Text style={styles.emptyTitle}>No students found</Text>
+            <Text style={styles.emptyText}>
+              Try adjusting your filters or search.
+            </Text>
+          </View>
         ) : isWide ? (
           <View style={styles.tableCard}>
             <View style={styles.tableHead}>
@@ -1293,10 +1042,10 @@ export default function StudentManagementScreen() {
                 </Pressable>
                 <View style={styles.colStudent}>{renderStudentCell(s)}</View>
                 <Text style={[styles.cellText, styles.colDept]} numberOfLines={1}>
-                  {s.department || "—"}
+                  {s.department || "ΓÇö"}
                 </Text>
                 <Text style={[styles.cellText, styles.colYear]} numberOfLines={1}>
-                  {s.yearLevel || "—"}
+                  {s.yearLevel || "ΓÇö"}
                 </Text>
                 <View style={styles.colStatus}>{renderStatusBadge(s)}</View>
                 <View style={styles.colWell}>{renderRiskBadge(s)}</View>
@@ -1333,10 +1082,10 @@ export default function StudentManagementScreen() {
                 </View>
                 <View style={styles.studentCardMeta}>
                   <Text style={styles.cardMetaText} numberOfLines={1}>
-                    {s.department || "—"} · {s.yearLevel || "—"}
+                    {s.department || "ΓÇö"} ┬╖ {s.yearLevel || "ΓÇö"}
                   </Text>
                   <Text style={styles.cardMetaText}>
-                    {s.assessmentsCount} assessments · {s.journalCount} journals
+                    {s.assessmentsCount} assessments ┬╖ {s.journalCount} journals
                   </Text>
                 </View>
                 <View style={styles.studentCardBadges}>
@@ -1458,8 +1207,8 @@ export default function StudentManagementScreen() {
                 style={styles.reasonInput}
                 placeholder={
                   editModal.kind === "status"
-                    ? "Reason for this status change (required)…"
-                    : "Administrative reason (optional)…"
+                    ? "Reason for this status change (required)ΓÇª"
+                    : "Administrative reason (optional)ΓÇª"
                 }
                 placeholderTextColor="#9CA3AF"
                 multiline
@@ -1558,227 +1307,6 @@ export default function StudentManagementScreen() {
         )}
       </Modal>
 
-      {/* Primary status filter dropdown */}
-      <Modal
-        visible={statusMenuOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setStatusMenuOpen(false)}
-      >
-        <View style={styles.backdrop}>
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={() => setStatusMenuOpen(false)}
-          />
-          <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>Student Status</Text>
-            <Text style={styles.sheetSubtitle}>Filter the directory by lifecycle status.</Text>
-            <ScrollView style={{ maxHeight: 360 }}>
-              {["All", ...LIFECYCLE_STATUSES].map((st) => (
-                <Pressable
-                  key={st}
-                  style={[styles.optionRow, statusFilter === st && styles.optionRowActive]}
-                  onPress={() => {
-                    setStatusFilter(st);
-                    setStatusMenuOpen(false);
-                  }}
-                >
-                  <Text
-                    style={[styles.optionText, statusFilter === st && styles.optionTextActive]}
-                  >
-                    {st === "All" ? "All Statuses" : LIFECYCLE_LABELS[st as LifecycleStatus]}
-                  </Text>
-                  {statusFilter === st ? (
-                    <Ionicons name="checkmark-circle" size={18} color="#6D28D9" />
-                  ) : null}
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Advanced filters */}
-      <Modal
-        visible={advancedOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setAdvancedOpen(false)}
-      >
-        <View style={styles.backdrop}>
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={() => setAdvancedOpen(false)}
-          />
-          <View style={[styles.wizardSheet, { maxHeight: "88%" }]}>
-            <View style={styles.wizardHead}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.sheetTitle}>Advanced Filters</Text>
-                <Text style={styles.sheetSubtitle}>
-                  Combine any of these filters — all conditions apply together.
-                </Text>
-              </View>
-              <Pressable onPress={() => setAdvancedOpen(false)} style={styles.closeBtn}>
-                <Ionicons name="close" size={20} color="#6B7280" />
-              </Pressable>
-            </View>
-
-            <ScrollView
-              style={{ flex: 1 }}
-              contentContainerStyle={styles.advancedBody}
-              keyboardShouldPersistTaps="handled"
-            >
-              <FilterGroup title="Department / College">
-                {["All", ...departments].map((d) => (
-                  <FilterOptionChip
-                    key={d}
-                    label={d}
-                    active={deptFilter === d}
-                    onPress={() => setDeptFilter(d)}
-                  />
-                ))}
-              </FilterGroup>
-
-              <FilterGroup title="Year Level">
-                {["All", ...YEAR_OPTIONS].map((y) => (
-                  <FilterOptionChip
-                    key={y}
-                    label={y}
-                    active={yearFilter === y}
-                    onPress={() => setYearFilter(y)}
-                  />
-                ))}
-              </FilterGroup>
-
-              <FilterGroup title="Risk Level">
-                {(["All", "low", "normal", "high"] as (RiskLevel | "All")[]).map((r) => (
-                  <FilterOptionChip
-                    key={r}
-                    label={r === "All" ? "All levels" : RISK_LABELS[r]}
-                    active={riskFilter === r}
-                    onPress={() => setRiskFilter(r)}
-                  />
-                ))}
-              </FilterGroup>
-
-              <FilterGroup title="Support Status">
-                {["All", ...SUPPORT_STATUSES].map((sp) => (
-                  <FilterOptionChip
-                    key={"sp" + sp}
-                    label={sp === "All" ? "All statuses" : SUPPORT_LABELS[sp as SupportStatus]}
-                    active={supportFilter === sp}
-                    onPress={() => setSupportFilter(sp)}
-                  />
-                ))}
-              </FilterGroup>
-
-              <FilterGroup title="Assessment Status">
-                <FilterOptionChip
-                  label="All"
-                  active={assessedFilter === "All"}
-                  onPress={() => setAssessedFilter("All")}
-                />
-                <FilterOptionChip
-                  label="Assessed"
-                  active={assessedFilter === "assessed"}
-                  onPress={() => setAssessedFilter("assessed")}
-                />
-                <FilterOptionChip
-                  label="Not assessed"
-                  active={assessedFilter === "not_assessed"}
-                  onPress={() => setAssessedFilter("not_assessed")}
-                />
-              </FilterGroup>
-
-              <FilterGroup title="Activity">
-                {ACTIVITY_OPTIONS.map((a) => (
-                  <FilterOptionChip
-                    key={a.key}
-                    label={a.label}
-                    active={activityFilter === a.key}
-                    onPress={() => setActivityFilter(a.key)}
-                  />
-                ))}
-              </FilterGroup>
-
-              <FilterGroup title="LSN / Special Needs">
-                <View style={styles.lsnRow}>
-                  <Switch
-                    value={lsnOnly}
-                    onValueChange={setLsnOnly}
-                    trackColor={{ false: "#E5E7EB", true: "#8A63D2" }}
-                    thumbColor="#FFFFFF"
-                  />
-                  <Text style={styles.lsnText}>LSN students only</Text>
-                </View>
-              </FilterGroup>
-
-              <FilterGroup title="Assessment Date Range">
-                <View style={styles.rangeRow}>
-                  <Pressable style={styles.rangeBtn} onPress={() => setRangePicker("from")}>
-                    <Ionicons name="calendar-outline" size={14} color="#6D28D9" />
-                    <Text style={styles.rangeBtnText}>
-                      {assessmentFrom ? formatDate(assessmentFrom) : "From…"}
-                    </Text>
-                  </Pressable>
-                  <Pressable style={styles.rangeBtn} onPress={() => setRangePicker("to")}>
-                    <Ionicons name="calendar-outline" size={14} color="#6D28D9" />
-                    <Text style={styles.rangeBtnText}>
-                      {assessmentTo ? formatDate(assessmentTo) : "To…"}
-                    </Text>
-                  </Pressable>
-                </View>
-                {assessmentFrom || assessmentTo ? (
-                  <Pressable
-                    onPress={() => {
-                      setAssessmentFrom(null);
-                      setAssessmentTo(null);
-                    }}
-                  >
-                    <Text style={styles.rangeClear}>Clear date range</Text>
-                  </Pressable>
-                ) : null}
-              </FilterGroup>
-            </ScrollView>
-
-            <View style={styles.sheetFooter}>
-              <Pressable style={styles.cancelBtn} onPress={clearAllFilters}>
-                <Text style={styles.cancelBtnText}>Reset All</Text>
-              </Pressable>
-              <Pressable
-                style={styles.primaryBtn}
-                onPress={() => setAdvancedOpen(false)}
-              >
-                <Text style={styles.primaryBtnText}>Apply Filters</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {rangePicker ? (
-        <DateTimePicker
-          value={rangePicker === "from" ? assessmentFrom ?? new Date() : assessmentTo ?? new Date()}
-          mode="date"
-          display="default"
-          textColor="#1E1B4B"
-          onChange={(event, selectedDate) => {
-            if (Platform.OS === "android") {
-              setRangePicker(null);
-              if (event.type === "set" && selectedDate) {
-                if (rangePicker === "from") setAssessmentFrom(selectedDate);
-                else setAssessmentTo(selectedDate);
-              }
-            } else {
-              if (selectedDate) {
-                if (rangePicker === "from") setAssessmentFrom(selectedDate);
-                else setAssessmentTo(selectedDate);
-              }
-            }
-          }}
-        />
-      ) : null}
-
       {/* Row action menu */}
       <Modal
         visible={menuUid !== null}
@@ -1820,7 +1348,7 @@ export default function StudentManagementScreen() {
         )}
       </Modal>
 
-      {/* Record Support Action — single streamlined modal */}
+      {/* Workflow wizard */}
       <Modal
         visible={wfOpen}
         transparent
@@ -1829,14 +1357,14 @@ export default function StudentManagementScreen() {
       >
         <View style={styles.backdrop}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => !wfSaving && setWfOpen(false)} />
-          <View style={[styles.wizardSheet, { maxHeight: "88%" }]}>
+          <View style={[styles.wizardSheet, { maxHeight: "86%" }]}>
             <View style={styles.wizardHead}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.sheetTitle}>Record Support Action</Text>
+                <Text style={styles.sheetTitle}>Support Workflow</Text>
                 <Text style={styles.sheetSubtitle}>
                   {wfBulk
                     ? `${selected.size} students selected`
-                    : entryById(wfTarget ?? "")?.name ?? "New support action"}
+                    : entryById(wfTarget ?? "")?.name ?? "New workflow"}
                 </Text>
               </View>
               <Pressable onPress={() => !wfSaving && setWfOpen(false)} style={styles.closeBtn}>
@@ -1844,50 +1372,58 @@ export default function StudentManagementScreen() {
               </Pressable>
             </View>
 
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.wizardBody} keyboardShouldPersistTaps="handled">
-              {!wfBulk && wfTarget ? (
-                <StudentContext
-                  student={entryById(wfTarget)}
-                />
-              ) : (
-                <View style={styles.bulkNote}>
-                  <Ionicons name="people" size={15} color="#6D28D9" />
-                  <Text style={styles.bulkNoteText}>
-                    This action will be recorded for {selected.size} students.
-                  </Text>
-                </View>
-              )}
-
-              <Text style={styles.fieldLabel}>Support action</Text>
-              {SUPPORT_ACTIONS.map((action) => {
-                const selectedAction = wfAction === action;
+            {/* Step indicator */}
+            <View style={styles.stepsRow}>
+              {["Review", "Action", "Follow-up", "Confirm"].map((label, i) => {
+                const step = i + 1;
+                const done = wfStep > step;
+                const active = wfStep === step;
                 return (
-                  <Pressable
-                    key={action}
-                    style={[styles.wfActionRow, selectedAction && styles.wfActionRowActive]}
-                    onPress={() => setWfAction(action)}
-                  >
-                    <View
-                      style={[
-                        styles.wfActionRadio,
-                        selectedAction && styles.wfActionRadioActive,
-                      ]}
-                    >
-                      {selectedAction ? <View style={styles.wfActionRadioDot} /> : null}
+                  <View key={label} style={styles.stepWrap}>
+                    <View style={[styles.stepDot, active && styles.stepDotActive, done && styles.stepDotDone]}>
+                      {done ? (
+                        <Ionicons name="checkmark" size={12} color="#FFFFFF" />
+                      ) : (
+                        <Text style={[styles.stepDotText, active && styles.stepDotTextActive]}>{step}</Text>
+                      )}
                     </View>
-                    <Text
-                      style={[
-                        styles.wfActionLabel,
-                        selectedAction && styles.wfActionLabelActive,
-                      ]}
-                    >
-                      {SUPPORT_ACTION_LABELS[action]}
-                    </Text>
-                  </Pressable>
+                    <Text style={[styles.stepLabel, active && styles.stepLabelActive]}>{label}</Text>
+                  </View>
                 );
               })}
+            </View>
 
-              {wfAction === "schedule_follow_up" ? (
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.wizardBody} keyboardShouldPersistTaps="handled">
+              {wfStep === 1 && wfTarget ? (
+                <StudentReview
+                  student={entryById(wfTarget)}
+                  workflows={workflows.filter((w) => w.studentId === wfTarget)}
+                />
+              ) : null}
+
+              {wfStep === 2 ? (
+                <View>
+                  <Text style={styles.fieldLabel}>Select an action</Text>
+                  <Pressable style={styles.pickerField} onPress={() => setWfActionPicker(true)}>
+                    {wfAction ? (
+                      <Text style={styles.pickerValue}>{SUPPORT_ACTION_LABELS[wfAction]}</Text>
+                    ) : (
+                      <Text style={styles.pickerPlaceholder}>Choose action typeΓÇª</Text>
+                    )}
+                    <Ionicons name="chevron-down" size={16} color="#6B7280" />
+                  </Pressable>
+                  <TextInput
+                    style={[styles.reasonInput, styles.wfReason]}
+                    placeholder="Reason / notes for this interventionΓÇª"
+                    placeholderTextColor="#9CA3AF"
+                    multiline
+                    value={wfReason}
+                    onChangeText={setWfReason}
+                  />
+                </View>
+              ) : null}
+
+              {wfStep === 3 ? (
                 <View>
                   <Text style={styles.fieldLabel}>Follow-up date</Text>
                   <View style={styles.quickDates}>
@@ -1913,17 +1449,17 @@ export default function StudentManagementScreen() {
                     })}
                     <Pressable style={styles.quickDateBtn} onPress={() => setShowDatePicker(true)}>
                       <Ionicons name="calendar-outline" size={14} color="#6D28D9" />
-                      <Text style={styles.quickDateText}>Custom…</Text>
+                      <Text style={styles.quickDateText}>CustomΓÇª</Text>
                     </Pressable>
                   </View>
                   <Text style={styles.followUpValue}>
                     {wfFollowUp ? formatDate(wfFollowUp) : "No follow-up date selected"}
                   </Text>
 
-                  <Text style={styles.fieldLabel}>Assigned counselor</Text>
+                  <Text style={styles.fieldLabel}>Assigned to</Text>
                   <View style={styles.assigneeRow}>
                     {admins.length === 0 ? (
-                      <Text style={styles.pickerPlaceholder}>Loading administrators…</Text>
+                      <Text style={styles.pickerPlaceholder}>Loading administratorsΓÇª</Text>
                     ) : (
                       admins.map((a) => {
                         const active = wfAssignee === a.uid;
@@ -1941,51 +1477,93 @@ export default function StudentManagementScreen() {
                       })
                     )}
                   </View>
+
+                  <Text style={styles.fieldLabel}>Note</Text>
+                  <TextInput
+                    style={styles.reasonInput}
+                    placeholder="Optional note for the assigneeΓÇª"
+                    placeholderTextColor="#9CA3AF"
+                    multiline
+                    value={wfNote}
+                    onChangeText={setWfNote}
+                  />
                 </View>
               ) : null}
 
-              <Text style={styles.fieldLabel}>Reason / notes</Text>
-              <TextInput
-                style={[styles.reasonInput, styles.wfReason]}
-                placeholder="Administrative notes for this action…"
-                placeholderTextColor="#9CA3AF"
-                multiline
-                value={wfReason}
-                onChangeText={setWfReason}
-              />
-
-              {!wfBulk && wfTarget ? (
-                <SupportHistory
-                  workflows={workflows.filter((w) => w.studentId === wfTarget)}
-                />
+              {wfStep === 4 ? (
+                <View style={styles.summaryBox}>
+                  <SummaryRow
+                    label="Action"
+                    value={wfAction ? SUPPORT_ACTION_LABELS[wfAction] : "ΓÇö"}
+                  />
+                  <SummaryRow label="Follow-up" value={wfFollowUp ? formatDate(wfFollowUp) : "Not scheduled"} />
+                  <SummaryRow
+                    label="Assigned to"
+                    value={admins.find((a) => a.uid === wfAssignee)?.name ?? "You"}
+                  />
+                  <SummaryRow label="Reason" value={wfReason.trim() || "ΓÇö"} last />
+                  {wfBulk ? (
+                    <Text style={styles.summaryBulkNote}>
+                      This will create a workflow for {selected.size} students.
+                    </Text>
+                  ) : null}
+                </View>
               ) : null}
 
               {wfError ? <Text style={styles.errorText}>{wfError}</Text> : null}
             </ScrollView>
 
             <View style={styles.sheetFooter}>
-              <Pressable style={styles.cancelBtn} onPress={() => setWfOpen(false)} disabled={wfSaving}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.primaryBtn, (!wfAction || wfSaving) && styles.btnDisabled]}
-                disabled={!wfAction || wfSaving}
-                onPress={saveWorkflow}
-              >
-                {wfSaving ? (
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+              {wfStep > 1 ? (
+                <Pressable style={styles.cancelBtn} onPress={() => setWfStep((s) => s - 1)} disabled={wfSaving}>
+                  <Text style={styles.cancelBtnText}>Back</Text>
+                </Pressable>
+              ) : (
+                <Pressable style={styles.cancelBtn} onPress={() => setWfOpen(false)} disabled={wfSaving}>
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </Pressable>
+              )}
+              {wfStep < 4 ? (
+                <Pressable
+                  style={[styles.primaryBtn, wfStep === 2 && !wfAction && styles.btnDisabled]}
+                  disabled={wfStep === 2 && !wfAction}
+                  onPress={() => setWfStep((s) => s + 1)}
+                >
+                  <Text style={styles.primaryBtnText}>Continue</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={[styles.primaryBtn, wfSaving && styles.btnDisabled]}
+                  disabled={wfSaving}
+                  onPress={saveWorkflow}
+                >
+                  {wfSaving ? (
                     <ActivityIndicator color="#FFFFFF" size="small" />
-                    <Text style={[styles.primaryBtnText, { marginLeft: 8 }]}>
-                      Saving…
-                    </Text>
-                  </View>
-                ) : (
-                  <Text style={styles.primaryBtnText}>Save Support Action</Text>
-                )}
-              </Pressable>
+                  ) : (
+                    <Text style={styles.primaryBtnText}>Save Workflow</Text>
+                  )}
+                </Pressable>
+              )}
             </View>
           </View>
         </View>
+
+        <MultiSelectModal
+          visible={wfActionPicker}
+          title="Select Action"
+          maxSelection={1}
+          selected={wfAction ? [wfAction] : []}
+          items={SUPPORT_ACTIONS.map((a) => ({
+            key: a,
+            label: SUPPORT_ACTION_LABELS[a],
+            icon: "git-branch-outline",
+          }))}
+          onCancel={() => setWfActionPicker(false)}
+          onConfirm={(keys) => {
+            if (keys[0]) setWfAction(keys[0] as SupportActionType);
+            setWfActionPicker(false);
+          }}
+        />
 
         {showDatePicker ? (
           <DateTimePicker
@@ -2018,10 +1596,6 @@ export default function StudentManagementScreen() {
         onOpenWorkflow={(uid) => {
           setProfileUid(null);
           openWorkflow([uid]);
-        }}
-        onChangeStatus={(uid) => {
-          setProfileUid(null);
-          openEdit("status", [uid]);
         }}
         onCompleteWf={completeWf}
       />
@@ -2067,15 +1641,15 @@ export default function StudentManagementScreen() {
                         {AUDIT_ACTION_LABELS[log.action] ?? log.action}
                       </Text>
                       <Text style={styles.auditMeta}>
-                        {log.targetStudentName ?? "—"}
-                        {log.newValue ? ` → ${log.newValue}` : ""}
+                        {log.targetStudentName ?? "ΓÇö"}
+                        {log.newValue ? ` ΓåÆ ${log.newValue}` : ""}
                         {log.previousValue ? ` (from ${log.previousValue})` : ""}
                       </Text>
                       {log.reason ? (
-                        <Text style={styles.auditReason}>“{log.reason}”</Text>
+                        <Text style={styles.auditReason}>ΓÇ£{log.reason}ΓÇ¥</Text>
                       ) : null}
                       <Text style={styles.auditBy}>
-                        {log.actorName ?? "Administrator"} · {formatDateTime(log.createdAt)}
+                        {log.actorName ?? "Administrator"} ┬╖ {formatDateTime(log.createdAt)}
                       </Text>
                     </View>
                   </View>
@@ -2104,13 +1678,13 @@ export default function StudentManagementScreen() {
               <Text style={styles.sheetBody}>
                 This permanently removes the account of{" "}
                 <Text style={{ fontWeight: "800" }}>{entryById(deleteUid)?.name}</Text>,
-                including wellness history, journals and profile — and cannot be
+                including wellness history, journals and profile ΓÇö and cannot be
                 undone. Type <Text style={{ fontWeight: "800" }}>DELETE</Text> to
                 confirm.
               </Text>
               <TextInput
                 style={styles.reasonInput}
-                placeholder="Type DELETE to confirm…"
+                placeholder="Type DELETE to confirmΓÇª"
                 placeholderTextColor="#9CA3AF"
                 autoCapitalize="characters"
                 value={deleteText}
@@ -2149,102 +1723,125 @@ export default function StudentManagementScreen() {
   );
 }
 
-// ─── Student context (support modal) ────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Workflow review (step 1) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
-/**
- * Minimal, non-sensitive context for triage. Assessment-derived risk and
- * administrative support metadata only — no journal content is shown here.
- */
-function StudentContext({ student }: { student?: StudentManagementEntry }) {
+function StudentReview({
+  student,
+  workflows,
+}: {
+  student?: StudentManagementEntry;
+  workflows: SupportWorkflow[];
+}) {
   if (!student) {
     return <Text style={styles.emptyText}>No student selected.</Text>;
   }
   const risk = (student.latestRiskLevel ?? "low") as RiskLevel;
   const support = student.supportStatus ?? "no_action";
-  const lastAssessed = daysSince(student.latestAssessmentDate);
+  const activeSupport = ACTIVE_SUPPORT_STATUSES.includes(support);
+  const indicators: { label: string; tone: "red" | "amber" | "green" }[] = [];
+  if (risk === "high") indicators.push({ label: "Elevated concern indicators", tone: "red" });
+  if (student.assessmentsCount === 0) indicators.push({ label: "No assessment yet", tone: "amber" });
+  if (
+    student.latestAssessmentDate &&
+    student.latestAssessmentDate.getTime() < Date.now() - 90 * 24 * 60 * 60 * 1000
+  ) {
+    indicators.push({ label: "No recent assessment (90d+)", tone: "amber" });
+  }
+  if (activeSupport && student.followUpDate && student.followUpDate.getTime() < Date.now()) {
+    indicators.push({ label: "Follow-up overdue", tone: "red" });
+  }
+  if (
+    student.assessmentsCount === 0 &&
+    student.journalCount === 0 &&
+    (!student.lastActivity || student.lastActivity.getTime() < Date.now() - 60 * 24 * 60 * 60 * 1000)
+  ) {
+    indicators.push({ label: "Low engagement", tone: "amber" });
+  }
+  if (indicators.length === 0) indicators.push({ label: "No urgent indicators", tone: "green" });
 
   return (
-    <View style={styles.studentContextCard}>
-      <View style={styles.studentContextHead}>
+    <View>
+      <View style={styles.reviewHead}>
         <View style={styles.avatarLarge}>
           <Text style={styles.avatarTextLarge}>{initials(student.name)}</Text>
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.reviewName}>{student.name}</Text>
           <Text style={styles.reviewSub}>
-            {student.schoolId} · {student.department || "—"} · {student.yearLevel || "—"}
+            {student.schoolId} ┬╖ {student.department || "ΓÇö"} ┬╖ {student.yearLevel || "ΓÇö"}
           </Text>
         </View>
       </View>
+
       <View style={styles.reviewGrid}>
         <View style={styles.reviewCell}>
-          <Text style={styles.reviewLabel}>Latest assessment</Text>
-          <Text style={styles.reviewValue}>
-            {lastAssessed === null
-              ? "None"
-              : lastAssessed === 0
-                ? "Today"
-                : `${lastAssessed}d ago`}
-          </Text>
+          <Text style={styles.reviewLabel}>Status</Text>
+          <Badge
+            label={LIFECYCLE_LABELS[student.status ?? "active"]}
+            color={LIFECYCLE_COLORS[student.status ?? "active"]}
+          />
         </View>
         <View style={styles.reviewCell}>
-          <Text style={styles.reviewLabel}>Assessment risk</Text>
+          <Text style={styles.reviewLabel}>Wellness</Text>
           <Badge label={RISK_LABELS[risk]} color={RISK_COLORS[risk]} />
         </View>
         <View style={styles.reviewCell}>
-          <Text style={styles.reviewLabel}>Support status</Text>
-          <Badge label={SUPPORT_LABELS[support]} color={SUPPORT_COLORS[support]} />
+          <Text style={styles.reviewLabel}>Assessments</Text>
+          <Text style={styles.reviewValue}>{student.assessmentsCount}</Text>
         </View>
         <View style={styles.reviewCell}>
-          <Text style={styles.reviewLabel}>Follow-up</Text>
-          <Text style={styles.reviewValue}>{formatDate(student.followUpDate)}</Text>
+          <Text style={styles.reviewLabel}>Journals</Text>
+          <Text style={styles.reviewValue}>{student.journalCount}</Text>
         </View>
       </View>
-    </View>
-  );
-}
 
-// ─── Support history (append-only) ──────────────────────────────────────────
+      <Text style={styles.fieldLabel}>Observed indicators</Text>
+      {indicators.map((ind) => (
+        <View key={ind.label} style={styles.indicatorRow}>
+          <Ionicons
+            name={ind.tone === "red" ? "close-circle" : ind.tone === "amber" ? "warning" : "checkmark-circle"}
+            size={16}
+            color={ind.tone === "red" ? "#B91C1C" : ind.tone === "amber" ? "#B45309" : "#16A34A"}
+          />
+          <Text style={styles.indicatorText}>{ind.label}</Text>
+        </View>
+      ))}
 
-function SupportHistory({ workflows }: { workflows: SupportWorkflow[] }) {
-  if (workflows.length === 0) return null;
-  const sorted = [...workflows].sort(
-    (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
-  );
-  return (
-    <View>
-      <Text style={styles.fieldLabel}>Support history</Text>
-      <View style={styles.supportHistoryBox}>
-        {sorted.map((w) => (
-          <View key={w.id} style={styles.supportHistoryRow}>
-            <View style={styles.supportHistoryDot} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.supportHistoryTitle}>
-                {SUPPORT_ACTION_LABELS[w.actionType]}
-              </Text>
-              <Text style={styles.supportHistoryMeta}>
-                {formatDateTime(w.createdAt)} ·{" "}
-                {w.status === "open"
-                  ? "In progress"
-                  : w.status === "completed"
-                    ? "Completed"
-                    : "Closed"}
-                {w.followUpDate
-                  ? ` · Follow-up ${formatDate(w.followUpDate)}`
-                  : ""}
-              </Text>
-              <Text style={styles.supportHistoryMeta}>
-                Recorded by: {w.createdByName ?? "Administrator"}
-              </Text>
-            </View>
+      <Text style={styles.fieldLabel}>Open workflows</Text>
+      {workflows.length === 0 ? (
+        <Text style={styles.emptyText}>No workflows yet.</Text>
+      ) : (
+        workflows.map((w) => (
+          <View key={w.id} style={styles.wfRow}>
+            <Text style={styles.wfRowTitle}>{SUPPORT_ACTION_LABELS[w.actionType]}</Text>
+            <Text style={styles.wfRowMeta}>
+              {w.status} ┬╖ {w.followUpDate ? `Follow-up ${formatDate(w.followUpDate)}` : "No follow-up"}
+            </Text>
           </View>
-        ))}
-      </View>
+        ))
+      )}
     </View>
   );
 }
 
-// ─── Student profile modal ──────────────────────────────────────────────────
+function SummaryRow({
+  label,
+  value,
+  last,
+}: {
+  label: string;
+  value: string;
+  last?: boolean;
+}) {
+  return (
+    <View style={[styles.summaryRow, last && { borderBottomWidth: 0 }]}>
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <Text style={styles.summaryValue}>{value}</Text>
+    </View>
+  );
+}
+
+// ΓöÇΓöÇΓöÇ Student profile modal ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 function StudentProfileModal({
   uid,
@@ -2253,7 +1850,6 @@ function StudentProfileModal({
   onClose,
   onOpenAudit,
   onOpenWorkflow,
-  onChangeStatus,
   onCompleteWf,
 }: {
   uid: string | null;
@@ -2262,43 +1858,30 @@ function StudentProfileModal({
   onClose: () => void;
   onOpenAudit: (uid: string) => void;
   onOpenWorkflow: (uid: string) => void;
-  onChangeStatus: (uid: string) => void;
   onCompleteWf: (wf: SupportWorkflow) => void;
 }) {
   const [deptName, setDeptName] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!uid) return;
-    let cancelled = false;
+    if (!uid) {
+      setDeptName(null);
+      return;
+    }
     getDoc(doc(db, "users", uid))
       .then((snap) => {
-        if (cancelled) return;
         if (snap.exists()) {
           const d = snap.data();
           const dref = d.departmentRef;
           if (dref && typeof dref === "string" && dref.startsWith("departments/")) {
             getDoc(doc(db, "departments", dref.split("/")[1]))
-              .then((dsnap) => {
-                if (!cancelled) {
-                  setDeptName(
-                    dsnap.exists() ? String(dsnap.data().name ?? "") : null,
-                  );
-                }
-              })
-              .catch(() => {
-                if (!cancelled) setDeptName(null);
-              });
-          } else if (!cancelled) {
+              .then((dsnap) => setDeptName(dsnap.exists() ? String(dsnap.data().name ?? "") : null))
+              .catch(() => setDeptName(null));
+          } else {
             setDeptName(null);
           }
         }
       })
-      .catch(() => {
-        if (!cancelled) setDeptName(null);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .catch(() => setDeptName(null));
   }, [uid]);
 
   if (!uid || !student) return null;
@@ -2335,8 +1918,8 @@ function StudentProfileModal({
 
           <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.profileBody}>
             <ProfileSection title="Student Overview" icon="person-outline">
-              <ProfileRow label="Department" value={(deptName ?? student.department) || "—"} />
-              <ProfileRow label="Year Level" value={student.yearLevel || "—"} />
+              <ProfileRow label="Department" value={(deptName ?? student.department) || "ΓÇö"} />
+              <ProfileRow label="Year Level" value={student.yearLevel || "ΓÇö"} />
               <ProfileRow
                 label="Special Needs"
                 value={student.isLSN ? student.specialNeedsType ?? student.lsnCategory ?? "LSN" : "No"}
@@ -2353,7 +1936,7 @@ function StudentProfileModal({
               </View>
               <ProfileRow
                 label="Assigned admin"
-                value={student.supportAssignedName ?? student.supportAssignedTo ?? "—"}
+                value={student.supportAssignedName ?? student.supportAssignedTo ?? "ΓÇö"}
               />
               <ProfileRow label="Follow-up" value={formatDate(student.followUpDate)} />
               <ProfileRow label="Last updated" value={formatDateTime(student.updatedAt)} />
@@ -2367,13 +1950,13 @@ function StudentProfileModal({
                 label="Last assessment"
                 value={
                   student.latestAssessmentDate
-                    ? `${formatDate(student.latestAssessmentDate)}${student.latestTotalScore !== undefined ? ` · Score ${student.latestTotalScore}` : ""}`
+                    ? `${formatDate(student.latestAssessmentDate)}${student.latestTotalScore !== undefined ? ` ┬╖ Score ${student.latestTotalScore}` : ""}`
                     : "None"
                 }
               />
               <ProfileRow label="Assessments" value={String(student.assessmentsCount)} />
               <ProfileRow label="Journals" value={String(student.journalCount)} />
-              <ProfileRow label="Latest mood" value={student.latestJournalMood ?? "—"} />
+              <ProfileRow label="Latest mood" value={student.latestJournalMood ?? "ΓÇö"} />
               {moodSummary.length > 0 ? (
                 <ProfileRow
                   label="Mood mix"
@@ -2405,7 +1988,7 @@ function StudentProfileModal({
                       />
                     </View>
                     <Text style={styles.wfCardMeta}>
-                      Assigned: {w.assignedToName ?? w.assignedTo ?? "—"} · Follow-up: {formatDate(w.followUpDate)}
+                      Assigned: {w.assignedToName ?? w.assignedTo ?? "ΓÇö"} ┬╖ Follow-up: {formatDate(w.followUpDate)}
                     </Text>
                     {w.reason ? <Text style={styles.wfCardNote}>{w.reason}</Text> : null}
                     {w.status === "open" ? (
@@ -2422,20 +2005,14 @@ function StudentProfileModal({
             </ProfileSection>
 
             <ProfileSection title="Administrative Notes" icon="document-text-outline">
-              <ProfileRow label="Created workflow" value={workflows.length ? formatDateTime(workflows[0]?.createdAt) : "—"} />
+              <ProfileRow label="Created workflow" value={workflows.length ? formatDateTime(workflows[0]?.createdAt) : "ΓÇö"} />
             </ProfileSection>
 
             <View style={styles.profileActions}>
-              <Pressable style={styles.outlineBtn} onPress={() => onChangeStatus(student.uid)}>
-                <Ionicons name="swap-horizontal-outline" size={16} color="#6D28D9" />
-                <Text style={styles.outlineBtnText}>Change Status</Text>
-              </Pressable>
               <Pressable style={styles.outlineBtn} onPress={() => onOpenAudit(student.uid)}>
                 <Ionicons name="document-text-outline" size={16} color="#6D28D9" />
                 <Text style={styles.outlineBtnText}>View audit trail</Text>
               </Pressable>
-            </View>
-            <View style={styles.profileActions}>
               <Pressable
                 style={styles.outlineBtn}
                 onPress={() => router.push({ pathname: "./student-detail", params: { uid: student.uid } })}
@@ -2485,7 +2062,7 @@ function ProfileRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-// ─── Styles ─────────────────────────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Styles ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 const styles = StyleSheet.create({
   root: {
@@ -2636,11 +2213,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#1E1B4B",
   },
-  sectionSubtitle: {
-    fontSize: 12,
-    color: "#6B7280",
-    marginTop: 2,
-  },
   sectionCount: {
     fontSize: 12,
     fontWeight: "700",
@@ -2650,272 +2222,88 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 8,
   },
-  // Triage queue (wide table)
-  triageHead: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "#FAF9FE",
-    borderBottomWidth: 1,
-    borderBottomColor: "#EEECF7",
+  attentionRow: {
+    gap: 10,
+    paddingRight: 4,
   },
-  triageHeadCell: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#6B7280",
-  },
-  triageColPriority: {
-    width: 76,
-  },
-  triageColStudent: {
-    flex: 1.6,
-  },
-  triageColRisk: {
-    flex: 1.2,
-  },
-  triageColSupport: {
-    width: 132,
-  },
-  triageColActions: {
-    width: 206,
-  },
-  triageRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F2FA",
-  },
-  triageRowHigh: {
-    backgroundColor: "#FFF5F6",
-  },
-  triageRiskText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#1E1B4B",
-  },
-  triageMetaText: {
-    fontSize: 12,
-    color: "#6B7280",
-    marginTop: 2,
-  },
-  // Triage queue (compact cards)
-  triageCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
+  attentionCard: {
+    width: 240,
+    backgroundColor: "#FDF6FF",
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#EEECF7",
+    borderColor: "#EDE0F9",
     padding: 12,
   },
-  triageCardHigh: {
-    borderColor: "#FDA4AF",
-    backgroundColor: "#FFF8F9",
-  },
-  triageCardTop: {
+  attentionCardHead: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginBottom: 8,
   },
-  triageReasonRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 4,
-  },
-  triageReason: {
-    flex: 1,
-    fontSize: 12,
-    color: "#4B5563",
-  },
-  triageActions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 10,
-  },
-  triageActionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    borderWidth: 1,
-    borderColor: "#D9CFF2",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: "#FFFFFF",
-  },
-  triageActionPrimary: {
+  attentionAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: "#6D28D9",
-    borderColor: "#6D28D9",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  triageActionText: {
+  attentionAvatarText: {
+    color: "#FFFFFF",
     fontSize: 12,
     fontWeight: "800",
-    color: "#6D28D9",
   },
-  // Always-visible filter bar
-  filterBar: {
+  attentionName: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#1E1B4B",
+  },
+  attentionCategory: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#BE123C",
+  },
+  attentionReason: {
+    fontSize: 12,
+    color: "#4B5563",
+    marginTop: 8,
+    lineHeight: 17,
+  },
+  attentionFooter: {
     flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 8,
+    gap: 6,
+    marginTop: 10,
   },
-  searchRowCompact: {
-    flex: 1,
-    minWidth: 180,
+  searchRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     backgroundColor: "#F5F4FA",
     borderRadius: 10,
     paddingHorizontal: 12,
-    height: 40,
+    height: 42,
+    marginBottom: 10,
   },
   searchInput: {
     flex: 1,
     fontSize: 14,
     color: "#111827",
   },
-  statusSelect: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 40,
-    backgroundColor: "#FFFFFF",
-    maxWidth: 150,
-  },
-  statusSelectText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#4B5563",
-  },
-  filterBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderWidth: 1,
-    borderColor: "#D9CFF2",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 40,
-    backgroundColor: "#F5F0FF",
-  },
-  filterBtnActive: {
-    backgroundColor: "#6D28D9",
-    borderColor: "#6D28D9",
-  },
-  filterBtnText: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#6D28D9",
-  },
-  filterBtnTextActive: {
-    color: "#FFFFFF",
-  },
-  clearBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    height: 40,
-    borderRadius: 10,
-  },
-  clearBtnText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#6B7280",
-  },
-  // Active filter summary chips
-  activeFilterWrap: {
-    marginTop: 10,
-  },
-  activeFilterLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#6B7280",
-    marginBottom: 6,
-  },
-  activeFilterChips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  activeFilterChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "#F5F0FF",
-    borderWidth: 1,
-    borderColor: "#E1D6F7",
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  activeFilterChipText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#6D28D9",
-  },
-  // Empty state clear action
-  emptyClearBtn: {
-    marginTop: 14,
-    backgroundColor: "#6D28D9",
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  emptyClearText: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#FFFFFF",
-  },
-  // Advanced filter groups (drawer/modal)
-  advancedBody: {
-    paddingVertical: 4,
-    paddingBottom: 20,
-  },
-  filterGroup: {
-    marginBottom: 16,
-  },
-  filterGroupTitle: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: "#374151",
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-    marginBottom: 8,
-  },
-  filterGroupChips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+  chipRow: {
     gap: 8,
+    paddingBottom: 4,
   },
-  filterOptChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     backgroundColor: "#FFFFFF",
   },
-  filterOptChipActive: {
-    borderColor: "#6D28D9",
-    backgroundColor: "#6D28D9",
-  },
-  filterOptChipText: {
-    fontSize: 13,
+  chipText: {
+    fontSize: 12,
     fontWeight: "600",
     color: "#4B5563",
-  },
-  filterOptChipTextActive: {
-    color: "#FFFFFF",
   },
   lsnRow: {
     flexDirection: "row",
@@ -2928,33 +2316,20 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#4B5563",
   },
-  // Assessment date range
-  rangeRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  rangeBtn: {
-    flex: 1,
+  resetBtn: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 6,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+    marginTop: 10,
+    paddingVertical: 8,
     borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "#F5F4FA",
   },
-  rangeBtnText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  rangeClear: {
+  resetText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#6D28D9",
-    marginTop: 8,
+    color: "#6B7280",
   },
   tableCard: {
     backgroundColor: "#FFFFFF",
@@ -3340,6 +2715,47 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  stepsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 14,
+    marginBottom: 6,
+  },
+  stepWrap: {
+    alignItems: "center",
+    flex: 1,
+  },
+  stepDot: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#E5E7EB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepDotActive: {
+    backgroundColor: "#6D28D9",
+  },
+  stepDotDone: {
+    backgroundColor: "#16A34A",
+  },
+  stepDotText: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#6B7280",
+  },
+  stepDotTextActive: {
+    color: "#FFFFFF",
+  },
+  stepLabel: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#9CA3AF",
+    marginTop: 4,
+  },
+  stepLabelActive: {
+    color: "#6D28D9",
+  },
   wizardBody: {
     paddingBottom: 8,
   },
@@ -3351,6 +2767,22 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     textTransform: "uppercase",
     letterSpacing: 0.4,
+  },
+  pickerField: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: "#F9FAFB",
+  },
+  pickerValue: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#111827",
   },
   pickerPlaceholder: {
     fontSize: 13,
@@ -3418,75 +2850,41 @@ const styles = StyleSheet.create({
   assigneeChipTextActive: {
     color: "#6D28D9",
   },
-  // Bulk support note
-  bulkNote: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#F5F0FF",
-    borderRadius: 10,
-    padding: 12,
-  },
-  bulkNoteText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#6D28D9",
-  },
-  // Support action radio rows
-  wfActionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginBottom: 6,
-    backgroundColor: "#FFFFFF",
-  },
-  wfActionRowActive: {
-    borderColor: "#6D28D9",
-    backgroundColor: "#F5F0FF",
-  },
-  wfActionRadio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: "#D1D5DB",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  wfActionRadioActive: {
-    borderColor: "#6D28D9",
-  },
-  wfActionRadioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#6D28D9",
-  },
-  wfActionLabel: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#374151",
-  },
-  wfActionLabelActive: {
-    color: "#6D28D9",
-    fontWeight: "800",
-  },
-  // Student context card (support modal)
-  studentContextCard: {
+  summaryBox: {
     backgroundColor: "#F9FAFB",
     borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#EEECF7",
+    padding: 4,
   },
-  studentContextHead: {
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEF0F4",
+    gap: 12,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#6B7280",
+    width: 70,
+  },
+  summaryValue: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#111827",
+    textAlign: "right",
+  },
+  summaryBulkNote: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#6D28D9",
+    padding: 12,
+  },
+  reviewHead: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
@@ -3536,36 +2934,32 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#1E1B4B",
   },
-  // Support history (append-only)
-  supportHistoryBox: {
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  supportHistoryRow: {
+  indicatorRow: {
     flexDirection: "row",
-    gap: 10,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#EEF0F4",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 6,
   },
-  supportHistoryDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#8A63D2",
-    marginTop: 6,
+  indicatorText: {
+    fontSize: 13,
+    color: "#374151",
   },
-  supportHistoryTitle: {
+  wfRow: {
+    borderWidth: 1,
+    borderColor: "#EEECF7",
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 6,
+  },
+  wfRowTitle: {
     fontSize: 13,
     fontWeight: "800",
     color: "#1E1B4B",
   },
-  supportHistoryMeta: {
+  wfRowMeta: {
     fontSize: 11,
     color: "#6B7280",
-    marginTop: 1,
+    marginTop: 2,
   },
   profileHeader: {
     flexDirection: "row",

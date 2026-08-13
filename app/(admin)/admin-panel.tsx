@@ -7,8 +7,16 @@ import {
   DepartmentComparisonChart,
   DepartmentCorrelationScatter,
 } from "@/components/admin/DepartmentCharts";
+import { MetricInfoAccordion } from "@/components/admin/MetricInfoAccordion";
 import { StudentListModal } from "@/components/admin/StudentListModal";
 import { db } from "@/constants/firebase";
+import {
+  canonicalDeptName,
+  formatDepartmentName,
+  getDepartmentCode,
+  getDeptAbbreviation,
+  mergeDepartmentBuckets,
+} from "@/utils/departmentMeta";
 import { useAuth } from "@/hooks/AuthContext";
 import { listenForAdminDashboardData } from "@/services/adminFirestoreService";
 import {
@@ -201,12 +209,6 @@ const YEAR_LEVEL_OPTIONS = [
   "N/A",
 ];
 
-// ─── Helper: Extract abbreviation from department name ───────────────────────
-const getDeptAbbreviation = (fullName: string): string => {
-  const match = fullName.match(/\(([^)]+)\)/);
-  return match ? match[1] : fullName;
-};
-
 // ─── Helper: Human-readable LSN classification label ─────────────────────────
 const formatLsnCategory = (category?: string): string => {
   if (category === "additional-needs") return "Students with Additional Needs";
@@ -239,14 +241,38 @@ const toExportRow = (s: StudentSummary): ExportStudentRow => ({
 });
 
 // ─── Descriptive text block rendered under analytics sections ────────────────
-function DescriptiveInsight({ title, body }: { title: string; body: string }) {
+interface InsightSection {
+  label: string;
+  text: string;
+}
+
+function DescriptiveInsight({
+  title,
+  body,
+  sections,
+}: {
+  title: string;
+  body: string;
+  sections?: InsightSection[];
+}) {
   return (
     <View style={styles.descriptiveContainer}>
       <View style={styles.descriptiveHeader}>
         <Ionicons name="document-text-outline" size={16} color="#8A63D2" />
         <Text style={styles.insightTitle}>{title}</Text>
       </View>
-      <Text style={styles.insightText}>{body}</Text>
+      {sections && sections.length > 0 ? (
+        <View style={styles.insightSections}>
+          {sections.map((sec, i) => (
+            <View key={i} style={styles.insightSectionBlock}>
+              <Text style={styles.insightSectionLabel}>{sec.label}</Text>
+              <Text style={styles.insightSectionText}>{sec.text}</Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Text style={styles.insightText}>{body}</Text>
+      )}
     </View>
   );
 }
@@ -567,6 +593,7 @@ export default function AdminPanelScreen() {
     visible: boolean;
     title: string;
   } | null>(null);
+  const [metricsGuideVisible, setMetricsGuideVisible] = useState(false);
 
   const allFilteredStudents = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
@@ -757,6 +784,7 @@ export default function AdminPanelScreen() {
     const deptMap = new Map<
       string,
       {
+        name: string;
         total: number;
         low: number;
         normal: number;
@@ -765,8 +793,10 @@ export default function AdminPanelScreen() {
       }
     >();
     for (const s of filtered) {
-      if (!deptMap.has(s.department)) {
-        deptMap.set(s.department, {
+      const code = getDepartmentCode(s.department);
+      if (!deptMap.has(code)) {
+        deptMap.set(code, {
+          name: canonicalDeptName(code, s.department),
           total: 0,
           low: 0,
           normal: 0,
@@ -774,7 +804,7 @@ export default function AdminPanelScreen() {
           scoreSum: 0,
         });
       }
-      const entry = deptMap.get(s.department)!;
+      const entry = deptMap.get(code)!;
       entry.total++;
       if (s.latestRiskLevel === "low") entry.low++;
       else if (s.latestRiskLevel === "high") entry.high++;
@@ -782,8 +812,8 @@ export default function AdminPanelScreen() {
       if (s.latestTotalScore != null) entry.scoreSum += s.latestTotalScore;
     }
 
-    return Array.from(deptMap.entries())
-      .map(([name, d]) => ({
+    return Array.from(deptMap.values())
+      .map(({ name, ...d }) => ({
         name,
         totalStudents: d.total,
         lowCount: d.low,
@@ -794,6 +824,14 @@ export default function AdminPanelScreen() {
         highPct: d.total ? Math.round((d.high / d.total) * 100) : 0,
       }))
       .sort((a, b) => b.totalStudents - a.totalStudents);
+  }, [yearLevelFilter, studentSummaries]);
+
+  // ─── Count of students shown under the active year-level filter ────────────
+  const filteredStudentCount = useMemo(() => {
+    return yearLevelFilter === "All"
+      ? studentSummaries.length
+      : studentSummaries.filter((s) => matchesYearLevelFilter(s, yearLevelFilter))
+          .length;
   }, [yearLevelFilter, studentSummaries]);
 
   // ─── Computed Chart Data ───────────────────────────────────────────────────
@@ -860,27 +898,24 @@ export default function AdminPanelScreen() {
 
   // ─── Computed Per-Department KPI Data ──────────────────────────────────────
   const perDepartmentKpiData = useMemo((): PerDepartmentKpi[] => {
+    const deptBuckets = mergeDepartmentBuckets(analyticsData.department);
+    const deptStudentsFor = (label: string) =>
+      studentSummaries.filter((s) => getDepartmentCode(s.department) === getDepartmentCode(label));
     const maxJournal = Math.max(
-      ...analyticsData.department.map((d) => {
-        return studentSummaries
-          .filter((s) => s.department === d.label)
-          .reduce((sum, s) => sum + s.journalCount, 0);
+      ...deptBuckets.map((d) => {
+        return deptStudentsFor(d.label).reduce((sum, s) => sum + s.journalCount, 0);
       }),
       1,
     );
     const maxLsn = Math.max(
-      ...analyticsData.department.map(
-        (d) =>
-          studentSummaries.filter((s) => s.department === d.label && s.isLSN)
-            .length,
+      ...deptBuckets.map(
+        (d) => deptStudentsFor(d.label).filter((s) => s.isLSN).length,
       ),
       1,
     );
 
-    return analyticsData.department.map((d) => {
-      const deptStudents = studentSummaries.filter(
-        (s) => s.department === d.label,
-      );
+    return deptBuckets.map((d) => {
+      const deptStudents = deptStudentsFor(d.label);
       const journalEntries = deptStudents.reduce(
         (sum, s) => sum + s.journalCount,
         0,
@@ -920,7 +955,7 @@ export default function AdminPanelScreen() {
 
       return {
         deptName: d.label,
-        deptAbbr: getDeptAbbreviation(d.label),
+        deptAbbr: getDepartmentCode(d.label),
         avgScore: d.total > 0 ? +(d.scoreSum / d.total).toFixed(1) : 0,
         journalEntries,
         lsnStudents,
@@ -939,7 +974,7 @@ export default function AdminPanelScreen() {
     if (perDepartmentKpiData.length === 0) return null;
     const sorted = [...perDepartmentKpiData];
     const byScore = [...sorted].sort((a, b) => b.avgScore - a.avgScore);
-    const byTotal = [...analyticsData.department].sort(
+    const byTotal = mergeDepartmentBuckets(analyticsData.department).sort(
       (a, b) => b.total - a.total,
     );
     const byLsn = [...sorted].sort((a, b) => b.lsnStudents - a.lsnStudents);
@@ -963,7 +998,7 @@ export default function AdminPanelScreen() {
       },
       {
         label: "Most Active",
-        deptName: getDeptAbbreviation(byTotal[0].label),
+        deptName: getDepartmentCode(byTotal[0].label),
         value: `${byTotal[0].total} assessments`,
         icon: "flash",
         color: "#D97706",
@@ -982,9 +1017,9 @@ export default function AdminPanelScreen() {
 
   // ─── Computed Data for Department Comparison Charts ────────────────────
   const deptComparisonChartData = useMemo((): DeptComparisonMetric[] => {
-    return analyticsData.department.map((d) => {
+    return mergeDepartmentBuckets(analyticsData.department).map((d) => {
       const deptStudents = studentSummaries.filter(
-        (s) => s.department === d.label,
+        (s) => getDepartmentCode(s.department) === getDepartmentCode(d.label),
       );
       const journalCount = deptStudents.reduce(
         (sum, s) => sum + s.journalCount,
@@ -997,7 +1032,7 @@ export default function AdminPanelScreen() {
       const participationRate =
         deptStudents.length > 0 ? assessedCount / deptStudents.length : 0;
       return {
-        deptAbbr: getDeptAbbreviation(d.label),
+        deptAbbr: getDepartmentCode(d.label),
         deptName: d.label,
         avgScore: d.total > 0 ? +(d.scoreSum / d.total).toFixed(1) : 0,
         journalCount,
@@ -1132,12 +1167,44 @@ export default function AdminPanelScreen() {
       (a, b) => b.avgScore - a.avgScore,
     );
 
+    const fmtDept = (raw: string) => formatDepartmentName(raw);
+    const smallCorrSample =
+      corrPoints.length > 0 && corrPoints.length < 30;
+
     return {
       overall: {
-        body: `Out of ${totalStudents} tracked students, ${assessed} (${completionRate}%) have completed at least one well-being assessment, averaging a wellness score of ${avgScore} out of 100 across all completed assessments. Students have written ${totalJournals} journal entries in total, reflecting measurable engagement with self-reflection tools.`,
+        body: `Out of ${totalStudents} tracked students, ${assessed} (${completionRate}%) have completed at least one well-being assessment, averaging a wellness score of ${avgScore} out of 80. Students have written ${totalJournals} journal entries in total, reflecting measurable engagement with self-reflection tools.`,
+        sections: [
+          {
+            label: "Key Finding",
+            text: `${assessed} of ${totalStudents} tracked students (${completionRate}%) have completed at least one well-being assessment, averaging a wellness score of ${avgScore} out of 80.`,
+          },
+          {
+            label: "What This Means",
+            text: `A growing assessment base gives the guidance office a more complete view of student wellness across the university. Journal activity (${totalJournals} entries) shows students are also engaging with self-reflection tools.`,
+          },
+          {
+            label: "Recommended Attention",
+            text: "Continue inviting students who have not yet completed an assessment to participate so the university picture becomes more complete over time.",
+          },
+        ],
       },
       risk: {
-        body: `Concern distribution places ${lowCount} students (${lowPct}%) in the lower concern range, ${normalCount} (${normalPct}%) in the moderate concern range, and ${highCount} (${highPct}%) in the elevated concern range. The moderate band is the largest, signalling a stable but watchful baseline; the ${highCount} students with elevated concern indicators should be considered for guidance-office follow-up according to the institutional safeguarding and student-support protocol.`,
+        body: `Concern distribution places ${lowCount} students (${lowPct}%) in the lower concern range, ${normalCount} (${normalPct}%) in the moderate concern range, and ${highCount} (${highPct}%) in the elevated concern range. The ${highCount} students with elevated concern indicators should be considered for guidance-office follow-up according to the institutional safeguarding and student-support protocol.`,
+        sections: [
+          {
+            label: "Key Finding",
+            text: `Of ${totalStudents} tracked students, ${lowCount} (${lowPct}%) show lower concern indicators, ${normalCount} (${normalPct}%) moderate, and ${highCount} (${highPct}%) elevated.`,
+          },
+          {
+            label: "What This Means",
+            text: "A majority in the lower-to-moderate range reflects a stable overall baseline. The elevated band represents the primary focus for follow-up rather than a university-wide concern.",
+          },
+          {
+            label: "Recommended Attention",
+            text: `Review the ${highCount} students with elevated concern indicators and follow the safeguarding and student-support protocol for appropriate follow-up.`,
+          },
+        ],
       },
       participation: {
         body: topByStudents
@@ -1147,6 +1214,28 @@ export default function AdminPanelScreen() {
                 : "No elevated concern indicators are currently flagged at the department level, suggesting an encouraging overall baseline."
             }`
           : "No department data is available yet. Data will appear once students complete their profiles and assessments.",
+        sections: topByStudents
+          ? [
+              {
+                label: "Key Finding",
+                text: `${departmentRows.length} departments are represented. ${fmtDept(topByStudents.name)} holds the largest cohort with ${topByStudents.totalStudents} tracked students.`,
+              },
+              {
+                label: "What This Means",
+                text:
+                  topHighDept && topHighDept.highCount > 0
+                    ? `${fmtDept(topHighDept.name)} reports the most students with elevated concern indicators (${topHighDept.highCount}, ${topHighPct}% of its cohort), which may reflect different cohort sizes or support needs.`
+                    : "No elevated concern indicators are currently flagged at the department level, suggesting an encouraging overall baseline.",
+              },
+              {
+                label: "Recommended Attention",
+                text:
+                  topHighDept && topHighDept.highCount > 0
+                    ? "Consider proactive student-support outreach for departments with the highest share of elevated concern indicators."
+                    : "Maintain routine monitoring and continue encouraging assessment participation across departments.",
+              },
+            ]
+          : [],
       },
       insights: {
         body:
@@ -1157,6 +1246,26 @@ export default function AdminPanelScreen() {
                   : "Mood data is still building as students log journal entries."
               }`
             : "Department insight data will appear once assessments and journals are recorded.",
+        sections:
+          bestDept && worstDept
+            ? [
+                {
+                  label: "Key Finding",
+                  text: `${fmtDept(bestDept.deptName)} leads with an average wellness score of ${bestDept.avgScore}, while ${fmtDept(worstDept.deptName)} posts ${worstDept.avgScore}.`,
+                },
+                {
+                  label: "What This Means",
+                  text:
+                    moodDept && moodDept.topMood !== "N/A"
+                      ? `The most frequently reported mood is "${moodDept.topMood}" in ${fmtDept(moodDept.deptName)}, reflecting a ${moodDept.moodWellnessPct}% mood-wellness index for that department.`
+                      : "Mood data is still building as students log journal entries.",
+                },
+                {
+                  label: "Recommended Attention",
+                  text: "Use department-level averages to target wellness resources where average scores are lowest.",
+                },
+              ]
+            : [],
       },
       deptInsights: {
         body:
@@ -1167,23 +1276,112 @@ export default function AdminPanelScreen() {
                   : "Mood data is still building as students log journal entries."
               } These profiles help the guidance office tailor interventions per college.`
             : "Department insight data will appear once assessments and journals are recorded.",
+        sections:
+          bestDept && worstDept
+            ? [
+                {
+                  label: "Key Finding",
+                  text: `Across ${perDepartmentKpiData.length} departments, ${fmtDept(bestDept.deptName)} has the highest average wellness score (${bestDept.avgScore}) and ${fmtDept(worstDept.deptName)} the lowest (${worstDept.avgScore}).`,
+                },
+                {
+                  label: "What This Means",
+                  text: `${fmtDept(byJournal[0].deptName)} is the most journal-active (${byJournal[0].journalEntries} entries) and ${fmtDept(byLsn[0].deptName)} supports the most learners with special needs (${byLsn[0].lsnStudents}).${
+                    moodDept && moodDept.topMood !== "N/A"
+                      ? ` The most positive mood climate is reported in ${fmtDept(moodDept.deptName)} with a ${moodDept.moodWellnessPct}% mood-wellness index, where "${moodDept.topMood}" is the dominant mood.`
+                      : " Mood data is still building as students log journal entries."
+                  }`,
+                },
+                {
+                  label: "Recommended Attention",
+                  text: "These profiles help the guidance office tailor interventions per college.",
+                },
+              ]
+            : [],
       },
       correlation: {
         body:
           scatterPlotData.length < 2
             ? "At least two students with assessment or journal activity are required to surface a score-vs-journal correlation pattern."
-            : `Across ${scatterPlotData.length} students with assessment or journal activity, journal frequency shows a ${corrStrength} ${corrDirection} statistical association with wellness scores (Pearson r = ${corrR.toFixed(2)}). ${highConcernScatter} students record elevated concern indicators (51+) and warrant guidance-office follow-up regardless of the overall trend. Correlation describes an aggregate association and does not establish causation — no individual student is characterized by it.`,
+            : `Across ${scatterPlotData.length} students with assessment or journal activity, journal frequency shows a ${corrStrength} ${corrDirection} statistical association with wellness scores (Pearson r = ${corrR.toFixed(2)}). ${highConcernScatter} students record elevated concern indicators (51+) and warrant guidance-office follow-up regardless of the overall trend. Correlation describes an aggregate association and does not establish causation — no individual student is characterized by it.${
+                smallCorrSample
+                  ? " Because the sample is small, interpret this pattern cautiously."
+                  : ""
+              }`,
+        sections:
+          scatterPlotData.length < 2
+            ? [
+                {
+                  label: "Key Finding",
+                  text: "At least two students with assessment or journal activity are required to surface a score-vs-journal correlation pattern.",
+                },
+              ]
+            : [
+                {
+                  label: "Key Finding",
+                  text: `Across ${scatterPlotData.length} students, journal frequency shows a ${corrStrength} ${corrDirection} statistical association with wellness scores (Pearson r = ${corrR.toFixed(2)}).`,
+                },
+                {
+                  label: "What This Means",
+                  text: "This describes an aggregate pattern across the university, not a rule for any individual student. Correlation does not establish causation.",
+                },
+                {
+                  label: "Recommended Attention",
+                  text: `${highConcernScatter} students record elevated concern indicators (51+) and warrant guidance-office follow-up regardless of the overall trend.${
+                    smallCorrSample
+                      ? ` With only ${corrPoints.length} students, interpret this pattern cautiously.`
+                      : ""
+                  }`,
+                },
+              ],
       },
       multiMetric: {
         body:
           deptComparisonChartData.length === 0
             ? "Multi-metric comparison data will appear once multiple departments have recorded activity."
             : `The multi-metric profile shows ${byDeptAssess[0].deptAbbr} leading assessment volume (${byDeptAssess[0].assessmentCount}), while ${byDeptParticipation[0].deptAbbr} holds the highest participation rate (${Math.round(byDeptParticipation[0].participationRate * 100)}%). ${byDeptJournal[0].deptAbbr} leads journal activity (${byDeptJournal[0].journalCount} entries), ${byDeptLsn[0].deptAbbr} supports the most learners with special needs (${byDeptLsn[0].lsnCount}), and ${byDeptScore[0].deptAbbr} records the highest average wellness score (${byDeptScore[0].avgScore}). Departments with high activity but lower average scores may indicate engagement without proportionate wellness gains — a useful flag for program review.`,
+        sections:
+          deptComparisonChartData.length === 0
+            ? [
+                {
+                  label: "Key Finding",
+                  text: "Multi-metric comparison data will appear once multiple departments have recorded activity.",
+                },
+              ]
+            : [
+                {
+                  label: "Key Finding",
+                  text: `${fmtDept(byDeptAssess[0].deptName)} leads assessment volume (${byDeptAssess[0].assessmentCount}) and ${fmtDept(byDeptParticipation[0].deptName)} has the highest participation rate (${Math.round(byDeptParticipation[0].participationRate * 100)}%).`,
+                },
+                {
+                  label: "What This Means",
+                  text: `${fmtDept(byDeptJournal[0].deptName)} leads journal activity (${byDeptJournal[0].journalCount} entries), ${fmtDept(byDeptLsn[0].deptName)} supports the most learners with special needs (${byDeptLsn[0].lsnCount}), and ${fmtDept(byDeptScore[0].deptName)} records the highest average wellness score (${byDeptScore[0].avgScore}). Departments with high activity but lower average scores may indicate engagement without proportionate wellness gains.`,
+                },
+                {
+                  label: "Recommended Attention",
+                  text: "Use these differences to inform program-level review and where support resources may be allocated.",
+                },
+              ],
       },
       comparison: {
         body: comparisonInsightData
           ? `${comparisonInsightData[0].deptName} leads with the highest average wellness score (${comparisonInsightData[0].value}), while ${comparisonInsightData[1].deptName} posts the lowest (${comparisonInsightData[1].value}). ${comparisonInsightData[2].deptName} is the most assessment-active, and ${comparisonInsightData[3].deptName} supports the most learners with special needs (${comparisonInsightData[3].value}).`
           : "Comparison data will appear once multiple departments have recorded assessments.",
+        sections: comparisonInsightData
+          ? [
+              {
+                label: "Key Finding",
+                text: `${fmtDept(comparisonInsightData[0].deptName)} leads with the highest average wellness score (${comparisonInsightData[0].value}), while ${fmtDept(comparisonInsightData[1].deptName)} posts the lowest (${comparisonInsightData[1].value}).`,
+              },
+              {
+                label: "What This Means",
+                text: `${fmtDept(comparisonInsightData[2].deptName)} is the most assessment-active and ${fmtDept(comparisonInsightData[3].deptName)} supports the most learners with special needs (${comparisonInsightData[3].value}). Comparing departments side by side highlights where support resources may be needed most.`,
+              },
+              {
+                label: "Recommended Attention",
+                text: "Review the lowest-scoring departments for additional support while sustaining engagement in the most active ones.",
+              },
+            ]
+          : [],
       },
       visual: {
         donut: `Across assessed students, ${donutData[0]?.value ?? 0}% fall in the lower concern band, ${donutData[1]?.value ?? 0}% in the moderate concern band, and ${donutData[2]?.value ?? 0}% in the elevated concern band. The dominant moderate band points to a need for proactive wellness programs rather than crisis-only responses.`,
@@ -1376,9 +1574,10 @@ export default function AdminPanelScreen() {
       }
     >();
     filtered.forEach((s) => {
-      const entry = deptAcc.get(s.department) ?? {
-        name: s.department,
-        abbr: getDeptAbbreviation(s.department),
+      const code = getDepartmentCode(s.department);
+      const entry = deptAcc.get(code) ?? {
+        name: canonicalDeptName(code, s.department),
+        abbr: code,
         total: 0,
         assessed: 0,
         scoreSum: 0,
@@ -1396,7 +1595,7 @@ export default function AdminPanelScreen() {
       if (s.latestRiskLevel === "low") entry.low += 1;
       else if (s.latestRiskLevel === "normal") entry.normal += 1;
       else if (s.latestRiskLevel === "high") entry.high += 1;
-      deptAcc.set(s.department, entry);
+      deptAcc.set(code, entry);
     });
 
     const departmentMetrics = Array.from(deptAcc.values())
@@ -1454,7 +1653,7 @@ export default function AdminPanelScreen() {
     const deptScores = new Map<string, number[]>();
     filtered.forEach((s) => {
       if (s.latestTotalScore == null) return;
-      const abbr = getDeptAbbreviation(s.department);
+      const abbr = getDepartmentCode(s.department);
       const arr = deptScores.get(abbr) ?? [];
       arr.push(s.latestTotalScore);
       deptScores.set(abbr, arr);
@@ -1796,7 +1995,9 @@ export default function AdminPanelScreen() {
         </View>
         <Text style={styles.kpiCount}>{kpi.count}</Text>
         <Text style={styles.kpiLabel}>{kpi.riskLabel}</Text>
-        <Text style={styles.kpiBaseline}>Baseline: ({kpi.baselineCount})</Text>
+        <Text style={styles.kpiBaseline}>
+          Baseline (prior period, est.): ({kpi.baselineCount})
+        </Text>
       </Pressable>
     );
   };
@@ -1865,6 +2066,9 @@ export default function AdminPanelScreen() {
         }
       >
         <Text style={styles.deptKpiCardTitle}>{kpi.deptAbbr}</Text>
+        <Text style={styles.deptKpiCardFull} numberOfLines={1}>
+          {kpi.deptName}
+        </Text>
         <View style={styles.deptKpiMetricsGrid}>
           <View style={styles.deptKpiMetricSpark}>
             <View style={styles.sparklineRow}>
@@ -2304,7 +2508,9 @@ export default function AdminPanelScreen() {
       return (s) => s.assessmentsCount > 0;
     }
 
-    return (s) => s.department === title;
+    const deptCode = getDepartmentCode(title);
+    return (s) =>
+      s.department === title || getDepartmentCode(s.department) === deptCode;
   }
 
   return (
@@ -3157,6 +3363,22 @@ export default function AdminPanelScreen() {
                       <Text style={styles.analyticsHeroEyebrow}>
                         LIVE WELLNESS OVERVIEW
                       </Text>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Open MindCare Analytics Guide"
+                        style={({ pressed }) => [
+                          styles.heroGuideBtn,
+                          pressed && { opacity: 0.8, transform: [{ scale: 0.95 }] },
+                        ]}
+                        onPress={() => setMetricsGuideVisible(true)}
+                      >
+                        <Ionicons
+                          name="help-circle-outline"
+                          size={22}
+                          color="#FFFFFF"
+                        />
+                        <Text style={styles.heroGuideBtnText}>Guide</Text>
+                      </Pressable>
                     </View>
                     <Text style={styles.analyticsHeroTitle}>
                       University of the Cordilleras Analytics
@@ -3322,6 +3544,19 @@ export default function AdminPanelScreen() {
                   <DescriptiveInsight
                     title="Descriptive Analysis Summary"
                     body={descriptiveInsights.overall.body}
+                    sections={descriptiveInsights.overall.sections}
+                  />
+                  <MetricInfoAccordion
+                    lines={[
+                      {
+                        label: "Completion Rate",
+                        text: "Students who completed at least one assessment ÷ total tracked students × 100.",
+                      },
+                      {
+                        label: "Average Wellness Score",
+                        text: "Sum of latest assessment scores ÷ number of assessed students. Scores use the WEMWBS scale (0–80).",
+                      },
+                    ]}
                   />
 
                   {/* ─── SECTION 2: Risk Trend KPIs ──────────────────────── */}
@@ -3334,6 +3569,23 @@ export default function AdminPanelScreen() {
                   <DescriptiveInsight
                     title="Concern Distribution Summary"
                     body={descriptiveInsights.risk.body}
+                    sections={descriptiveInsights.risk.sections}
+                  />
+                  <MetricInfoAccordion
+                    lines={[
+                      {
+                        label: "Concern Bands",
+                        text: "Lower (0–20): expected range, routine monitoring. Moderate (21–50): some concern indicators, may benefit from wellness resources. Elevated (51–80): review per the safeguarding and student-support protocol.",
+                      },
+                      {
+                        label: "Baseline",
+                        text: "Baselines are estimates of the prior period used to show direction of change (e.g., +12%). Treat trend percentages as directional guidance, not exact measurements.",
+                      },
+                      {
+                        label: "Note",
+                        text: "Concern levels are workflow indicators based on the latest assessment score. They are not clinical diagnoses.",
+                      },
+                    ]}
                   />
 
                   {/* ─── SECTION 3: Assessment Participation by Department ── */}
@@ -3375,6 +3627,47 @@ export default function AdminPanelScreen() {
                         ))}
                       </ScrollView>
                     </View>
+                  </View>
+                  <View style={styles.filterFeedbackRow}>
+                    <View style={styles.filterFeedbackLeft}>
+                      <Ionicons
+                        name="people-outline"
+                        size={14}
+                        color="#8A63D2"
+                      />
+                      <Text style={styles.filterFeedbackText}>
+                        Showing {filteredStudentCount} of {studentSummaries.length}{" "}
+                        students
+                        {yearLevelFilter !== "All"
+                          ? ` (filtered by ${yearLevelFilter})`
+                          : ""}
+                      </Text>
+                    </View>
+                    {yearLevelFilter !== "All" && (
+                      <View style={styles.filterFeedbackRight}>
+                        <View style={styles.activeFilterPill}>
+                          <Text style={styles.activeFilterPillText}>
+                            1 filter active
+                          </Text>
+                        </View>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.clearFilterBtn,
+                            pressed && { opacity: 0.7 },
+                          ]}
+                          onPress={() => setYearLevelFilter("All")}
+                        >
+                          <Ionicons
+                            name="close-circle"
+                            size={14}
+                            color="#8A63D2"
+                          />
+                          <Text style={styles.clearFilterText}>
+                            Clear Filters
+                          </Text>
+                        </Pressable>
+                      </View>
+                    )}
                   </View>
                   <View
                     style={[
@@ -3421,9 +3714,25 @@ export default function AdminPanelScreen() {
 
                       {departmentRows.length === 0 ? (
                         <View style={styles.stateCard}>
+                          <Ionicons
+                            name={
+                              yearLevelFilter !== "All"
+                                ? "filter-outline"
+                                : "bar-chart-outline"
+                            }
+                            size={26}
+                            color="#A78BFA"
+                          />
                           <Text style={styles.stateText}>
-                            No department data available yet.
+                            {yearLevelFilter !== "All"
+                              ? "No students match the current filters."
+                              : "No department data is available yet. Data will appear once students complete their profiles and assessments."}
                           </Text>
+                          {yearLevelFilter !== "All" && (
+                            <Text style={styles.stateHintText}>
+                              Try removing one or more filters.
+                            </Text>
+                          )}
                         </View>
                       ) : (
                         <ScrollView
@@ -3547,6 +3856,24 @@ export default function AdminPanelScreen() {
                   <DescriptiveInsight
                     title="Participation by Department"
                     body={descriptiveInsights.participation.body}
+                    sections={descriptiveInsights.participation.sections}
+                  />
+
+                  <MetricInfoAccordion
+                    lines={[
+                      {
+                        label: "Participation Rate",
+                        text: "Number of students in the department who completed at least one assessment ÷ total tracked students × 100.",
+                      },
+                      {
+                        label: "Cohort Sizes",
+                        text: "Bars show the share of the department's cohort that falls in each concern band (Lower / Moderate / Elevated), based on each student's latest assessment.",
+                      },
+                      {
+                        label: "Filters",
+                        text: "The year-level filter above applies to this section. \"Showing X of Y students\" reflects the currently selected filter.",
+                      },
+                    ]}
                   />
 
                   {/* ─── SECTION 4: Department Insights ──────────────────── */}
@@ -3566,6 +3893,19 @@ export default function AdminPanelScreen() {
                       <DescriptiveInsight
                         title="Department Insights Analysis"
                         body={descriptiveInsights.deptInsights.body}
+                        sections={descriptiveInsights.deptInsights.sections}
+                      />
+                      <MetricInfoAccordion
+                        lines={[
+                          {
+                            label: "Average Wellness Score",
+                            text: "Sum of the department's latest assessment scores ÷ number of assessed students. Scores are on the WEMWBS scale (0–80).",
+                          },
+                          {
+                            label: "Wellness Index",
+                            text: "Share of mood entries that lean positive versus distressed. It reflects journal moods only, not assessment scores.",
+                          },
+                        ]}
                       />
                       {/* Scatter plot – correlation analysis */}
                       {scatterPlotData.length > 1 && (
@@ -3586,10 +3926,10 @@ export default function AdminPanelScreen() {
                             </Text>
                           </View>
                           <Text style={styles.insightsEnlargedSubtitle}>
-                            Each student plotted by assessment severity (Y) and
-                            journal activity (X). Elevated concern indicators
-                            appear in the upper region. Correlation does not
-                            establish causation.
+                            Each student plotted by latest concern indicator (Y)
+                            and journal activity (X). Students with elevated
+                            concern indicators appear in the upper region.
+                            Correlation does not establish causation.
                           </Text>
                           <View style={styles.chartContainer}>
                             <DepartmentCorrelationScatter
@@ -3602,6 +3942,7 @@ export default function AdminPanelScreen() {
                         <DescriptiveInsight
                           title="Correlation Analysis"
                           body={descriptiveInsights.correlation.body}
+                          sections={descriptiveInsights.correlation.sections}
                         />
                       )}
                     </>
@@ -3611,6 +3952,7 @@ export default function AdminPanelScreen() {
                     <DescriptiveInsight
                       title="Department Insights Analysis"
                       body={descriptiveInsights.deptInsights.body}
+                      sections={descriptiveInsights.deptInsights.sections}
                     />
                   )}
 
@@ -3629,6 +3971,19 @@ export default function AdminPanelScreen() {
                       <DescriptiveInsight
                         title="Department Comparison Summary"
                         body={descriptiveInsights.comparison.body}
+                        sections={descriptiveInsights.comparison.sections}
+                      />
+                      <MetricInfoAccordion
+                        lines={[
+                          {
+                            label: "Participation Rate",
+                            text: "Students in the department who completed at least one assessment ÷ total tracked students in that department × 100.",
+                          },
+                          {
+                            label: "Radar Normalization",
+                            text: "The radar chart normalizes each metric to a 0–100 relative scale so departments of different sizes can be compared fairly.",
+                          },
+                        ]}
                       />
                       {/* Grouped bar / radar chart */}
                       {deptComparisonChartData.length > 1 && (
@@ -3654,6 +4009,7 @@ export default function AdminPanelScreen() {
                         <DescriptiveInsight
                           title="Multi-Metric Comparison Analysis"
                           body={descriptiveInsights.multiMetric.body}
+                          sections={descriptiveInsights.multiMetric.sections}
                         />
                       )}
                     </>
@@ -3663,6 +4019,7 @@ export default function AdminPanelScreen() {
                     <DescriptiveInsight
                       title="Department Comparison Summary"
                       body={descriptiveInsights.comparison.body}
+                      sections={descriptiveInsights.comparison.sections}
                     />
                   )}
 
@@ -3714,6 +4071,120 @@ export default function AdminPanelScreen() {
             journalMode
           />
         )}
+
+        {/* ─── MindCare Analytics Guide Modal ───────────────────────────── */}
+        <Modal
+          visible={metricsGuideVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setMetricsGuideVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>MindCare Analytics Guide</Text>
+                <Pressable
+                  style={styles.modalCloseButton}
+                  onPress={() => setMetricsGuideVisible(false)}
+                >
+                  <Ionicons name="close" size={24} color="#0F172A" />
+                </Pressable>
+              </View>
+              <ScrollView
+                style={styles.modalScroll}
+                contentContainerStyle={styles.modalScrollContent}
+              >
+                <View style={styles.guideSection}>
+                  <Text style={styles.guideSectionTitle}>
+                    A. Participation & Engagement
+                  </Text>
+                  <Text style={styles.guideSectionBody}>
+                    Participation rate = students who completed at least one
+                    assessment ÷ total tracked students × 100. Journal activity
+                    counts how often students use the journal tool. These
+                    metrics measure engagement, not performance.
+                  </Text>
+                </View>
+                <View style={styles.guideSection}>
+                  <Text style={styles.guideSectionTitle}>B. Wellness Score</Text>
+                  <Text style={styles.guideSectionBody}>
+                    The wellness score is a student's latest WEMWBS assessment
+                    on a scale from 0 to 80. A higher score signals higher
+                    concern indicators and triggers review. Average wellness
+                    score = sum of latest scores ÷ number of students with an
+                    assessment.
+                  </Text>
+                </View>
+                <View style={styles.guideSection}>
+                  <Text style={styles.guideSectionTitle}>C. Concern Levels</Text>
+                  <View style={styles.guideTermRow}>
+                    <Text style={styles.guideTerm}>Lower Concern (0–20)</Text>
+                    <Text style={styles.guideTermDesc}>
+                      Indicators within the expected range; routine monitoring.
+                    </Text>
+                  </View>
+                  <View style={styles.guideTermRow}>
+                    <Text style={styles.guideTerm}>Moderate Concern (21–50)</Text>
+                    <Text style={styles.guideTermDesc}>
+                      Some concern indicators; may benefit from wellness
+                      resources.
+                    </Text>
+                  </View>
+                  <View style={styles.guideTermRow}>
+                    <Text style={styles.guideTerm}>Elevated Concern (51–80)</Text>
+                    <Text style={styles.guideTermDesc}>
+                      Elevated concern indicators; review per the safeguarding
+                      and student-support protocol.
+                    </Text>
+                  </View>
+                  <Text style={styles.guideSectionBody}>
+                    Concern levels are workflow indicators based on assessment
+                    scores. They are not clinical diagnoses.
+                  </Text>
+                </View>
+                <View style={styles.guideSection}>
+                  <Text style={styles.guideSectionTitle}>D. Journal Activity</Text>
+                  <Text style={styles.guideSectionBody}>
+                    The correlation plot compares journal frequency (X) with
+                    wellness scores (Y). Correlation describes an aggregate
+                    association — it does not prove that journaling causes a
+                    change in scores, and it never characterizes an individual
+                    student.
+                  </Text>
+                </View>
+                <View style={styles.guideSection}>
+                  <Text style={styles.guideSectionTitle}>
+                    E. Department Comparison
+                  </Text>
+                  <Text style={styles.guideSectionBody}>
+                    Departments are grouped by their official code (e.g., CCJE).
+                    The grouped bar chart compares raw counts: average score,
+                    journals, LSN students, and assessments. The radar chart
+                    normalizes each metric to a 0–100 relative scale so
+                    departments of different sizes can be compared fairly.
+                    Participation rate = students assessed ÷ students tracked in
+                    the department.
+                  </Text>
+                </View>
+                <View style={styles.guideSection}>
+                  <Text style={styles.guideSectionTitle}>
+                    F. Statistical Interpretation
+                  </Text>
+                  <Text style={styles.guideSectionBody}>
+                    Pearson's r measures the strength and direction of a linear
+                    relationship between two variables (ranges −1 to +1; |r|
+                    under 0.3 is weak, 0.3–0.6 moderate, above 0.6 strong).
+                    Trend percentages compare the current value with an
+                    estimated prior-period baseline and are directional
+                    guidance only. Results are aggregate, anonymized summaries
+                    for program review — they never diagnose or single out any
+                    student.
+                  </Text>
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
 
         <Modal
           visible={isCreateAdminModalVisible}
@@ -4222,6 +4693,23 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 18,
   },
+  heroGuideBtn: {
+    marginLeft: "auto",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.28)",
+  },
+  heroGuideBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
+  },
   analyticsHeroIcon: {
     width: 42,
     height: 42,
@@ -4321,6 +4809,12 @@ const styles = StyleSheet.create({
     boxShadow: "0px 4px 20px rgba(0, 0, 0, 0.04)",
   },
   stateText: { marginTop: 12, color: "#334155", fontSize: 14 },
+  stateHintText: {
+    marginTop: 6,
+    color: "#8B5CF6",
+    fontSize: 13,
+    fontWeight: "600",
+  },
   sectionHeader: {
     color: "#2D1B69",
     fontSize: 18,
@@ -4361,6 +4855,54 @@ const styles = StyleSheet.create({
   },
   yearLevelChipTextActive: {
     color: "white",
+  },
+  // ─── Filter feedback (active filters + clear) ────────────────────────────
+  filterFeedbackRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 16,
+    paddingHorizontal: 2,
+  },
+  filterFeedbackLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  filterFeedbackText: {
+    fontSize: 12,
+    color: "#6D5BBF",
+    fontWeight: "600",
+  },
+  filterFeedbackRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  activeFilterPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    backgroundColor: "#EDE9FE",
+  },
+  activeFilterPillText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#6D28D9",
+  },
+  clearFilterBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  clearFilterText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#8A63D2",
   },
   deptChip: {
     paddingHorizontal: 12,
@@ -4596,6 +5138,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800",
     color: "#581C87",
+  },
+  deptKpiCardFull: {
+    fontSize: 11,
+    color: "#8A63D2",
+    fontWeight: "600",
+    marginTop: 2,
+    marginBottom: 4,
   },
   deptKpiMetricsGrid: {
     flexDirection: "row",
@@ -4852,6 +5401,32 @@ const styles = StyleSheet.create({
     color: "#4B5563",
     fontSize: 13,
     lineHeight: 21,
+  },
+  // ─── Structured insight sections (Key Finding / What This Means / …) ─────
+  insightSections: {
+    marginTop: 10,
+    gap: 10,
+  },
+  insightSectionBlock: {
+    backgroundColor: "#F8F7FC",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: "#8A63D2",
+  },
+  insightSectionLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#8A63D2",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  insightSectionText: {
+    color: "#334155",
+    fontSize: 13,
+    lineHeight: 20,
   },
   widgetInsightText: {
     color: "#4B5563",
@@ -5378,6 +5953,40 @@ const styles = StyleSheet.create({
   },
   modalScrollContent: {
     padding: 24,
+  },
+  // ─── MindCare Analytics Guide modal ──────────────────────────────────────
+  guideSection: {
+    marginBottom: 22,
+  },
+  guideSectionTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#4C1D95",
+    marginBottom: 6,
+  },
+  guideSectionBody: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#4B5563",
+    marginTop: 6,
+  },
+  guideTermRow: {
+    marginBottom: 8,
+    backgroundColor: "#F8F7FC",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  guideTerm: {
+    fontSize: 12.5,
+    fontWeight: "800",
+    color: "#581C87",
+    marginBottom: 2,
+  },
+  guideTermDesc: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: "#4B5563",
   },
   removeButton: {
     flexDirection: "row",

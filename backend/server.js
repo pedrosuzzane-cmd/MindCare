@@ -2584,6 +2584,326 @@ app.post("/api/ai-proxy", async (req, res) => {
   return res.status(400).json({ error: "Unsupported AI provider." });
 });
 
+// ── Record Support Action (authoritative, atomic) ────────────────────────────
+// Mirrors services/studentTypes.ts. The backend is the single authoritative
+// writer so the workflow record, student support status, audit trail, and the
+// student inbox notification are written atomically in ONE transaction. The
+// client sends a stable requestId (used as the workflow doc ID) so a network
+// retry cannot create duplicate records or duplicate inbox messages.
+const SUPPORT_ACTION_VALUES = [
+  "send_wellness_checkin",
+  "guidance_consultation",
+  "schedule_follow_up",
+  "provide_resources",
+  "monitor_only",
+  "contact_recommended",
+  "resolved",
+  "no_action",
+];
+
+const SUPPORT_STATUS_FROM_ACTION = {
+  send_wellness_checkin: "contact_initiated",
+  guidance_consultation: "support_offered",
+  schedule_follow_up: "follow_up_scheduled",
+  provide_resources: "support_offered",
+  monitor_only: "monitor",
+  contact_recommended: "outreach_recommended",
+  resolved: "resolved",
+  no_action: "no_action",
+};
+
+const SUPPORT_STATUS_LABELS = {
+  no_action: "No Active Support",
+  monitor: "Monitor",
+  outreach_recommended: "Outreach Recommended",
+  contact_initiated: "Contact Initiated",
+  support_offered: "Support Offered",
+  follow_up_scheduled: "Follow-up Scheduled",
+  resolved: "Resolved",
+  closed: "Closed",
+};
+
+// Student-facing inbox message per action. Only the action and the follow-up
+// date are ever shown — administrative notes and risk details are never sent.
+function buildSupportMessage(action, followUpDate) {
+  const date = followUpDate
+    ? followUpDate.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
+    : null;
+  switch (action) {
+    case "send_wellness_checkin":
+      return "Wellness Check-In — A MindCare guidance staff member will reach out for a brief wellness check-in.";
+    case "guidance_consultation":
+      return "Guidance Consultation — A MindCare counselor is available to support you. You may message your counselor anytime.";
+    case "schedule_follow_up":
+      return `Support Follow-up Scheduled — Your guidance support follow-up has been scheduled for ${date}.`;
+    case "provide_resources":
+      return "Support Resources — MindCare has prepared wellness resources to assist you. Your guidance office can share them with you.";
+    case "monitor_only":
+      return "Monitoring — Our guidance team is keeping a gentle watch to make sure you are doing well.";
+    case "contact_recommended":
+      return "Support Recommendation — Our guidance team recommends reaching out for support. You are welcome to message your counselor anytime.";
+    case "resolved":
+      return "All Clear — Your support case has been marked as resolved. Thank you for your cooperation.";
+    default:
+      return "";
+  }
+}
+
+function buildConversationId(uidA, uidB) {
+  return [uidA, uidB].sort().join("_");
+}
+
+app.post("/api/record-support-action", async (req, res) => {
+  if (!admin) {
+    return res
+      .status(500)
+      .json({ error: "Backend database is not available." });
+  }
+
+  const idToken = req.headers.authorization?.split("Bearer ")[1];
+  if (!idToken) {
+    return res.status(403).json({ error: "Unauthorized: No token provided." });
+  }
+
+  let actor;
+  try {
+    actor = await admin.auth().verifyIdToken(idToken);
+  } catch {
+    return res.status(403).json({ error: "Unauthorized: Invalid token." });
+  }
+
+  const firestore = admin.firestore();
+  const adminSnap = await firestore
+    .collection("admins")
+    .doc(actor.uid)
+    .get()
+    .catch(() => null);
+  const isAuthorized =
+    actor.admin === true ||
+    actor.superAdmin === true ||
+    (adminSnap && adminSnap.exists);
+  if (!isAuthorized) {
+    return res
+      .status(403)
+      .json({ error: "Unauthorized: Admin privileges required." });
+  }
+
+  const {
+    studentId,
+    action,
+    assignedTo,
+    followUpDate,
+    reason,
+    requestId,
+  } = req.body || {};
+
+  // ── Validation ──
+  if (!studentId || typeof studentId !== "string") {
+    return res.status(400).json({ error: "Missing student ID." });
+  }
+  if (!SUPPORT_ACTION_VALUES.includes(action)) {
+    return res.status(400).json({ error: "Invalid support action." });
+  }
+  if (typeof requestId !== "string" || !/^[A-Za-z0-9_-]{8,64}$/.test(requestId)) {
+    return res.status(400).json({ error: "Invalid request ID." });
+  }
+  if (assignedTo != null && typeof assignedTo !== "string") {
+    return res.status(400).json({ error: "Invalid assigned counselor." });
+  }
+  const reasonText =
+    typeof reason === "string" ? reason.trim().slice(0, 2000) : "";
+  if (reasonText.length > 2000) {
+    return res
+      .status(400)
+      .json({ error: "Notes are too long (max 2000 characters)." });
+  }
+
+  let followUpTs = null;
+  if (action === "schedule_follow_up") {
+    if (!followUpDate || isNaN(Date.parse(followUpDate))) {
+      return res
+        .status(400)
+        .json({ error: "A valid follow-up date is required." });
+    }
+    followUpTs = admin.firestore.Timestamp.fromMillis(Date.parse(followUpDate));
+  } else if (followUpDate && !isNaN(Date.parse(followUpDate))) {
+    followUpTs = admin.firestore.Timestamp.fromMillis(Date.parse(followUpDate));
+  }
+
+  const assigneeUid = assignedTo || actor.uid;
+  const actorName =
+    (adminSnap && adminSnap.exists
+      ? adminSnap.data().displayName || adminSnap.data().fullName
+      : null) || actor.name || null;
+
+  let assigneeName = actorName;
+  if (assigneeUid !== actor.uid) {
+    const assigneeSnap = await firestore
+      .collection("admins")
+      .doc(assigneeUid)
+      .get()
+      .catch(() => null);
+    if (!assigneeSnap || !assigneeSnap.exists) {
+      return res
+        .status(400)
+        .json({ error: "Assigned counselor is not a valid administrator." });
+    }
+    assigneeName =
+      assigneeSnap.data().displayName || assigneeSnap.data().fullName || null;
+  }
+
+  const workflowId = requestId;
+  const workflowRef = firestore.collection("supportWorkflows").doc(workflowId);
+  const studentRef = firestore.collection("users").doc(studentId);
+  const auditRef = firestore
+    .collection("auditLogs")
+    .doc(`support_${workflowId}`);
+  const conversationRef = firestore
+    .collection("conversations")
+    .doc(buildConversationId(studentId, assigneeUid));
+  const messageRef = conversationRef
+    .collection("messages")
+    .doc(`support_${workflowId}`);
+  const serverNow = admin.firestore.FieldValue.serverTimestamp();
+  const messageText = buildSupportMessage(
+    action,
+    followUpTs ? followUpTs.toDate() : null,
+  );
+
+  try {
+    const outcome = await firestore.runTransaction(async (tx) => {
+      const existingWorkflow = await tx.get(workflowRef);
+      if (existingWorkflow.exists) {
+        return { alreadyExists: true };
+      }
+
+      const [studentSnap, convoSnap] = await Promise.all([
+        tx.get(studentRef),
+        tx.get(conversationRef),
+      ]);
+      if (!studentSnap.exists) {
+        const err = new Error("Student not found.");
+        err.statusCode = 404;
+        throw err;
+      }
+
+      const studentData = studentSnap.data();
+      const studentName =
+        studentData.fullName || studentData.displayName || "Student";
+      const department = studentData.department || "Unspecified";
+      const supportStatus = SUPPORT_STATUS_FROM_ACTION[action];
+      const newValue =
+        `${SUPPORT_STATUS_LABELS[supportStatus]} — ${
+          reasonText || "Support action recorded"
+        }`;
+
+      // 1. Support workflow record (doc ID = requestId → idempotent retries).
+      tx.set(workflowRef, {
+        studentId,
+        studentName,
+        department,
+        createdBy: actor.uid,
+        createdByName: actorName,
+        assignedTo: assigneeUid,
+        assignedToName: assigneeName,
+        actionType: action,
+        reason: reasonText || "Support workflow",
+        note: null,
+        followUpDate: followUpTs,
+        status: "open",
+        closedAt: null,
+        closedBy: null,
+        createdAt: serverNow,
+        updatedAt: serverNow,
+      });
+
+      // 2. Mirror the support status onto the student document.
+      tx.update(studentRef, {
+        supportStatus: supportStatus,
+        supportAssignedTo: assigneeUid,
+        supportAssignedName: assigneeName,
+        followUpDate: followUpTs,
+        supportUpdatedAt: serverNow,
+        updatedAt: serverNow,
+      });
+
+      // 3. Append-only audit entry.
+      tx.set(auditRef, {
+        actorUid: actor.uid,
+        actorName,
+        action: "support_workflow_created",
+        targetStudentId: studentId,
+        targetStudentName: studentName,
+        previousValue: null,
+        newValue,
+        reason: null,
+        createdAtMs: Date.now(),
+        createdAt: serverNow,
+      });
+
+      // 4. Inbox notification — reuse the existing admin↔student conversation.
+      if (action !== "no_action" && messageText) {
+        if (convoSnap.exists) {
+          const convoData = convoSnap.data();
+          const unread = (convoData.unreadBy || []).filter(
+            (u) => u !== actor.uid,
+          );
+          if (!unread.includes(studentId)) unread.push(studentId);
+          tx.update(conversationRef, {
+            lastMessage: messageText,
+            lastMessageAt: Date.now(),
+            unreadBy: unread,
+          });
+        } else {
+          tx.set(conversationRef, {
+            studentId,
+            adminId: assigneeUid,
+            studentName,
+            adminName: assigneeName || "Administrator",
+            participants: [studentId, assigneeUid],
+            lastMessage: messageText,
+            lastMessageAt: Date.now(),
+            unreadBy: [studentId],
+            createdAt: Date.now(),
+          });
+        }
+        tx.set(messageRef, {
+          senderId: assigneeUid,
+          senderName: assigneeName,
+          text: messageText,
+          createdAt: Date.now(),
+          isAdmin: true,
+          deleted: false,
+          moderationStatus: "safe",
+          kind: "support_action",
+          supportTitle: SUPPORT_STATUS_LABELS[supportStatus],
+          relatedWorkflowId: workflowId,
+        });
+      }
+
+      return { alreadyExists: false };
+    });
+
+    if (outcome.alreadyExists) {
+      return res.json({ ok: true, workflowId, alreadyExists: true });
+    }
+    return res.json({ ok: true, workflowId, alreadyExists: false });
+  } catch (err) {
+    const statusCode = err.statusCode || 500;
+    console.error("record-support-action error:", err.message);
+    return res.status(statusCode).json({
+      error:
+        statusCode === 404
+          ? "Student not found."
+          : "Failed to record the support action. Please try again.",
+    });
+  }
+});
+
 // 3. Keep app.listen at the very bottom of the file
 app.listen(port, () => {
   console.log(`Backend server running on http://localhost:${port}`);

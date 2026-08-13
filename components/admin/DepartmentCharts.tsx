@@ -338,8 +338,8 @@ const styles = StyleSheet.create({
   },
   mobileBarLabel: {
     fontSize: 11,
-    fontWeight: "700",
-    color: "#475569",
+    fontWeight: "800",
+    color: "#334155",
     marginBottom: 4,
   },
   mobileBarCol: {

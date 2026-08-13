@@ -11,6 +11,12 @@ export interface Message {
   deleted?: boolean; // Soft-delete: shows placeholder instead of text
   senderRole?: "student" | "admin"; // Generic role flag for peer conversations
   moderationStatus?: "safe" | "flagged" | "blocked"; // Content moderation result
+  /** Marks system-generated support notification messages (e.g. recorded support actions). */
+  kind?: "support_action";
+  /** Human-readable support status title shown for support-action messages. */
+  supportTitle?: string;
+  /** Workflow record ID the message was generated from. */
+  relatedWorkflowId?: string;
 }
 
 /** Client-only fields added during optimistic send (not in Firestore). */

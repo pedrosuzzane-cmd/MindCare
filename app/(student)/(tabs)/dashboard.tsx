@@ -425,7 +425,7 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAF9FD",
+    backgroundColor: "#0F0D15",
   },
   background: {
     flex: 1,
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#F4EEFF",
+    backgroundColor: "#1E1B2E",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 8,
@@ -487,12 +487,12 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#F4EEFF",
+    backgroundColor: "#1E1B2E",
     justifyContent: "center",
     alignItems: "center",
   },
   menuButtonPressed: {
-    backgroundColor: "#E9DDFF",
+    backgroundColor: "#2A2640",
   },
   greetingSection: {
     marginBottom: 18,
@@ -500,20 +500,20 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 26,
     fontWeight: "700",
-    color: "#242038",
+    color: "#FFFFFF",
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,
     lineHeight: 20,
-    color: "#737083",
+    color: "#9CA3AF",
   },
   checkinCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#1E1B2E",
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#F0EBFA",
+    borderColor: "rgba(139, 92, 246, 0.2)",
     // @ts-ignore — web-only shadow property
     boxShadow: "0px 2px 12px rgba(124, 77, 204, 0.06)",
     elevation: 2,
@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
   checkinTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#242038",
+    color: "#FFFFFF",
   },
   checkinHint: {
     fontSize: 11,
@@ -536,7 +536,7 @@ const styles = StyleSheet.create({
   },
   checkinSubtitle: {
     fontSize: 13,
-    color: "#737083",
+    color: "#9CA3AF",
     marginTop: 2,
     marginBottom: 12,
   },
@@ -548,12 +548,12 @@ const styles = StyleSheet.create({
     width: 40,
     height: 46,
     borderRadius: 14,
-    backgroundColor: "#F7F3FF",
+    backgroundColor: "#2A2640",
     justifyContent: "center",
     alignItems: "center",
   },
   moodChipPressed: {
-    backgroundColor: "#EDE4FF",
+    backgroundColor: "#3A3460",
   },
   moodChipEmoji: {
     fontSize: 22,
@@ -610,9 +610,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
     borderRadius: 20,
     padding: 16,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#1E1B2E",
     borderWidth: 1,
-    borderColor: "#F0EBFA",
+    borderColor: "rgba(139, 92, 246, 0.2)",
     // @ts-ignore — web-only shadow property
     boxShadow: "0px 2px 12px rgba(124, 77, 204, 0.06)",
     elevation: 2,
@@ -635,13 +635,13 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#242038",
+    color: "#FFFFFF",
     flexShrink: 1,
   },
   cardDescription: {
     fontSize: 13,
     lineHeight: 18,
-    color: "#737083",
+    color: "#9CA3AF",
     flexShrink: 1,
   },
   quoteContainer: {
@@ -650,15 +650,15 @@ const styles = StyleSheet.create({
     gap: 10,
     borderRadius: 18,
     padding: 16,
-    backgroundColor: "#F7F3FF",
+    backgroundColor: "#1E1B2E",
     borderWidth: 1,
-    borderColor: "#EFE7FB",
+    borderColor: "rgba(139, 92, 246, 0.2)",
   },
   quoteIcon: {
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#2A2640",
     justifyContent: "center",
     alignItems: "center",
     marginTop: 2,
@@ -667,6 +667,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     lineHeight: 21,
-    color: "#7C4DCC",
+    color: "#D1D5DB",
   },
 });

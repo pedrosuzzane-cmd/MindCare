@@ -19,6 +19,10 @@ import {
   Scatter,
   ZAxis,
 } from "recharts";
+import {
+  formatDepartmentName,
+  getDepartmentCode,
+} from "@/utils/departmentMeta";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 export interface DeptComparisonMetric {
@@ -51,17 +55,38 @@ function normalize(value: number, min: number, max: number): number {
   return ((value - min) / (max - min)) * 100;
 }
 
+function concernLabel(risk: string): string {
+  if (risk === "low") return "Lower concern";
+  if (risk === "high") return "Elevated concern";
+  return "Moderate concern";
+}
+
 // ─── Custom Tooltip ────────────────────────────────────────────────────────
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
+  const first = payload[0]?.payload;
+  const isBar = typeof first?.dept === "string";
+  const deptCode = isBar ? String(label) : String(payload[0]?.name ?? label);
+  const title = formatDepartmentName(deptCode);
   return (
     <View style={styles.tooltip}>
-      <Text style={styles.tooltipLabel}>{label}</Text>
+      <Text style={styles.tooltipLabel}>{title}</Text>
+      {!isBar && label ? (
+        <Text style={styles.tooltipMuted}>{label} (normalized 0–100)</Text>
+      ) : null}
       {payload.map((p: any, i: number) => (
         <Text key={i} style={[styles.tooltipValue, { color: p.color }]}>
           {p.name}: {typeof p.value === "number" ? p.value.toFixed(1) : p.value}
         </Text>
       ))}
+      {isBar && typeof first.participationRate === "number" && (
+        <Text style={styles.tooltipMuted}>
+          Participation: {Math.round(first.participationRate * 100)}%
+        </Text>
+      )}
+      <Text style={styles.tooltipNote}>
+        Shows the latest recorded data; correlation never implies causation.
+      </Text>
     </View>
   );
 };
@@ -71,8 +96,13 @@ const ScatterTooltip = ({ active, payload }: any) => {
   const d = payload[0].payload;
   return (
     <View style={styles.tooltip}>
-      <Text style={styles.tooltipLabel}>{d.department} · Risk: {d.riskLevel}</Text>
-      <Text style={styles.tooltipValue}>Avg Score: {d.avgScore}</Text>
+      <Text style={styles.tooltipLabel}>
+        {formatDepartmentName(d.department)}
+      </Text>
+      <Text style={styles.tooltipValue}>
+        Concern: {concernLabel(d.riskLevel)}
+      </Text>
+      <Text style={styles.tooltipValue}>Avg Score: {d.avgScore} (0–80)</Text>
       <Text style={styles.tooltipValue}>Journals: {d.journalCount}</Text>
     </View>
   );
@@ -103,6 +133,7 @@ export function DepartmentComparisonChart({ data }: ComparisonChartProps) {
         "Journals": d.journalCount,
         "LSN": d.lsnCount,
         "Assessments": d.assessmentCount,
+        participationRate: d.participationRate,
       })),
     [data],
   );
@@ -181,16 +212,16 @@ export function DepartmentComparisonChart({ data }: ComparisonChartProps) {
       {chartMode === "bar" ? (
         <ResponsiveContainer width="100%" height={360}>
           <BarChart data={barData} margin={{ top: 20, right: 20, left: 0, bottom: 60 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#EEF2F7" />
             <XAxis
               dataKey="dept"
-              tick={{ fill: "#475569", fontSize: 12, fontWeight: "600" }}
+              tick={{ fill: "#334155", fontSize: 13, fontWeight: "700" }}
               axisLine={{ stroke: "#E2E8F0" }}
               tickLine={false}
             />
-            <YAxis tick={{ fill: "#94A3B8", fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fill: "#475569", fontSize: 11.5 }} axisLine={false} tickLine={false} />
             <Tooltip content={<CustomTooltip />} />
-            <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
+            <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 13, paddingTop: 12, color: "#334155" }} />
             <Bar dataKey="Avg Score" fill="#8A63D2" radius={[4, 4, 0, 0]} maxBarSize={24} />
             <Bar dataKey="Journals" fill="#16A34A" radius={[4, 4, 0, 0]} maxBarSize={24} />
             <Bar dataKey="LSN" fill="#D97706" radius={[4, 4, 0, 0]} maxBarSize={24} />
@@ -200,19 +231,19 @@ export function DepartmentComparisonChart({ data }: ComparisonChartProps) {
       ) : (
         <ResponsiveContainer width="100%" height={400}>
           <ReRadarChart data={radarData} margin={{ top: 20, right: 40, bottom: 20, left: 40 }}>
-            <PolarGrid stroke="#E2E8F0" />
+            <PolarGrid stroke="#EEF2F7" />
             <PolarAngleAxis
               dataKey="metric"
-              tick={{ fill: "#475569", fontSize: 11, fontWeight: "600" }}
+              tick={{ fill: "#334155", fontSize: 12, fontWeight: "700" }}
             />
             <PolarRadiusAxis
               angle={90}
               domain={[0, 100]}
-              tick={{ fill: "#94A3B8", fontSize: 10 }}
+              tick={{ fill: "#475569", fontSize: 10.5 }}
               tickCount={5}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
+            <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 13, paddingTop: 12, color: "#334155" }} />
             {data.map((d, i) => (
               <Radar
                 key={d.deptAbbr}
@@ -243,11 +274,6 @@ interface ScatterPlotProps {
   points: ScatterPoint[];
 }
 
-function deptAbbr(full: string): string {
-  const match = full.match(/\(([^)]+)\)/);
-  return match ? match[1] : full.split(" ").slice(0, 3).join(" ");
-}
-
 export function DepartmentCorrelationScatter({ points }: ScatterPlotProps) {
   const deptColors: Record<string, string> = {};
   const uniqueDepts = [...new Set(points.map((p) => p.department))];
@@ -260,11 +286,11 @@ export function DepartmentCorrelationScatter({ points }: ScatterPlotProps) {
     <View>
       <ResponsiveContainer width="100%" height={400}>
         <ScatterChart margin={{ top: 20, right: 30, left: 10, bottom: 50 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+          <CartesianGrid strokeDasharray="3 3" stroke="#EEF2F7" />
           <XAxis
             dataKey="journalCount"
             name="Journal Entries"
-            tick={{ fill: "#475569", fontSize: 11 }}
+            tick={{ fill: "#334155", fontSize: 11.5 }}
             axisLine={{ stroke: "#E2E8F0" }}
             tickLine={false}
           />
@@ -272,11 +298,11 @@ export function DepartmentCorrelationScatter({ points }: ScatterPlotProps) {
             dataKey="avgScore"
             name="Avg Assessment Score"
             domain={[0, 80]}
-            tick={{ fill: "#475569", fontSize: 11 }}
+            tick={{ fill: "#334155", fontSize: 11.5 }}
             axisLine={false}
             tickLine={false}
             label={{
-              value: "Avg Score →",
+              value: "Concern Indicator →",
               angle: -90,
               position: "insideLeft",
               style: { fill: "#64748B", fontSize: 12, fontWeight: "600" },
@@ -288,7 +314,7 @@ export function DepartmentCorrelationScatter({ points }: ScatterPlotProps) {
           {uniqueDepts.map((dept) => (
             <Scatter
               key={dept}
-              name={deptAbbr(dept)}
+              name={getDepartmentCode(dept)}
               data={points.filter((p) => p.department === dept)}
               fill={deptColors[dept]}
               opacity={0.7}
@@ -301,22 +327,24 @@ export function DepartmentCorrelationScatter({ points }: ScatterPlotProps) {
         <View style={styles.scatterRiskLegend}>
           <View style={styles.riskDotRow}>
             <View style={[styles.riskDot, { backgroundColor: RISK_COLORS.low }]} />
-            <Text style={styles.riskDotLabel}>Low Risk</Text>
+            <Text style={styles.riskDotLabel}>Lower concern</Text>
           </View>
           <View style={styles.riskDotRow}>
             <View style={[styles.riskDot, { backgroundColor: RISK_COLORS.normal }]} />
-            <Text style={styles.riskDotLabel}>Moderate</Text>
+            <Text style={styles.riskDotLabel}>Moderate concern</Text>
           </View>
           <View style={styles.riskDotRow}>
             <View style={[styles.riskDot, { backgroundColor: RISK_COLORS.high }]} />
-            <Text style={styles.riskDotLabel}>High Risk</Text>
+            <Text style={styles.riskDotLabel}>Elevated concern</Text>
           </View>
         </View>
       </View>
       <View style={styles.chartFooter}>
         <Text style={styles.chartFooterNote}>
-          Each dot represents a student. X-axis = journal frequency, Y-axis = assessment severity.
-          Use this plot to identify clusters and outliers needing intervention.
+          Each dot represents a student. X-axis = journal frequency, Y-axis =
+          latest concern indicator (WEMWBS score, 0–80). Use this plot to
+          identify clusters and outliers needing follow-up. Correlation does
+          not establish causation.
         </Text>
       </View>
     </View>
@@ -351,27 +379,42 @@ const styles = StyleSheet.create({
     color: "white",
   },
   tooltip: {
-    backgroundColor: "white",
+    backgroundColor: "#2A1745",
     borderRadius: 10,
     padding: 10,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#6D28D9",
     elevation: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.2,
     shadowRadius: 12,
+    maxWidth: 260,
   },
   tooltipLabel: {
     fontSize: 13,
-    fontWeight: "700",
-    color: "#0F172A",
+    fontWeight: "800",
+    color: "#F8FAFC",
     marginBottom: 4,
   },
   tooltipValue: {
     fontSize: 12,
     fontWeight: "600",
+    color: "#D1D5DB",
     marginTop: 2,
+  },
+  tooltipMuted: {
+    fontSize: 11,
+    color: "#A1A1AA",
+    marginTop: 4,
+    fontWeight: "600",
+  },
+  tooltipNote: {
+    fontSize: 10,
+    color: "#A1A1AA",
+    fontStyle: "italic",
+    marginTop: 6,
+    lineHeight: 14,
   },
   chartFooter: {
     marginTop: 12,
