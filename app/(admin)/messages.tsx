@@ -638,7 +638,7 @@ export default function AdminMessagesScreen() {
                   />
                 )}
                 contentContainerStyle={styles.userList}
-                showsVerticalScrollIndicator={false}
+                showsVerticalScrollIndicator={true}
               />
             )}
           </>
@@ -671,7 +671,7 @@ export default function AdminMessagesScreen() {
                 keyExtractor={(item) => item.id}
                 renderItem={renderMessage}
                 contentContainerStyle={styles.messagesList}
-                showsVerticalScrollIndicator={false}
+                showsVerticalScrollIndicator={true}
                 onContentSizeChange={() => scrollToBottom(false)}
               />
             )}

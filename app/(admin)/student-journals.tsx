@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -145,6 +145,15 @@ export default function StudentJournalsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [localInsights, setLocalInsights] = useState<Record<string, string>>({});
   const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const listRef = useRef<FlatList<JournalEntryDoc>>(null);
+
+  // Always start at the top so navigation never lands mid-list.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }, 60);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     if (!studentId) return;
@@ -290,11 +299,12 @@ export default function StudentJournalsScreen() {
         </View>
       ) : (
         <FlatList
+          ref={listRef}
           data={entries}
           keyExtractor={(item) => item.id}
           renderItem={renderEntry}
           contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={true}
         />
       )}
     </SafeAreaView>

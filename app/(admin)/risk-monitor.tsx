@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { collection, getDocs } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -86,6 +86,15 @@ export default function RiskMonitorScreen() {
   const [flags, setFlags] = useState<RiskFlag[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const listRef = useRef<FlatList<RiskFlag>>(null);
+
+  // Always start at the top so navigation never lands mid-list.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }, 60);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -292,11 +301,12 @@ export default function RiskMonitorScreen() {
             </View>
           ) : (
             <FlatList
+              ref={listRef}
               data={flags}
               keyExtractor={(item) => `${item.studentUid}-${item.entryId}`}
               renderItem={renderFlag}
               contentContainerStyle={styles.list}
-              showsVerticalScrollIndicator={false}
+              showsVerticalScrollIndicator={true}
             />
           )}
         </>

@@ -6,7 +6,7 @@ import { getDepartmentCode } from "@/utils/departmentMeta";
 import { useAuth } from "@/hooks/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -26,6 +26,15 @@ export default function RiskTrendsScreen() {
   const [loading, setLoading] = useState(true);
   const [studentSummaries, setStudentSummaries] = useState<StudentSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+
+  // Always start at the top so navigation never lands mid-page.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }, 60);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -156,8 +165,9 @@ export default function RiskTrendsScreen() {
         </View>
 
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={[styles.scrollContent, isWide && { padding: responsivePadding }]}
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={true}
         >
           <View style={[styles.kpiRow, isWide && styles.kpiRowWide]}>
             <View style={styles.kpiCard}>

@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -75,6 +75,15 @@ export default function SafeguardingScreen() {
   const [selectedCase, setSelectedCase] = useState<SafeguardingCase | null>(null);
   const [noteText, setNoteText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const listRef = useRef<FlatList<SafeguardingCase>>(null);
+
+  // Always start at the top so navigation never lands mid-list.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }, 60);
+    return () => clearTimeout(t);
+  }, []);
 
   const actor = useMemo(
     () => ({
@@ -299,9 +308,11 @@ export default function SafeguardingScreen() {
           </View>
 
           <FlatList
+            ref={listRef}
             data={visibleCases}
             keyExtractor={(item) => item.id}
             renderItem={renderCaseCard}
+            showsVerticalScrollIndicator={true}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#8A63D2" />
             }

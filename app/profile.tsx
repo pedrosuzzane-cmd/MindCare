@@ -1,6 +1,7 @@
 import { auth, db } from "@/constants/firebase";
 import { useAuth } from "@/hooks/AuthContext";
 import { useMindCareTheme } from "@/contexts/ThemeContext";
+import { MindCareTheme } from "@/constants/theme";
 import { changeProfileImage, uploadProfileImageFromFile } from "@/services/userService";
 import { uploadDocumentToCloudinary } from "@/services/cloudinaryUpload";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,7 +10,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { onAuthStateChanged, sendEmailVerification } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -24,10 +25,72 @@ import {
     StyleSheet,
     Text,
     TextInput,
+    useWindowDimensions,
     View,
 } from "react-native";
 
 const HEADER_HEIGHT = 280;
+const CONTENT_MAX_WIDTH = 1100;
+
+/** Compact label + value row used inside profile cards. */
+function InfoRow({
+  label,
+  value,
+  children,
+  last,
+}: {
+  label: string;
+  value?: string;
+  /** When provided (edit mode), renders the row in input layout instead. */
+  children?: ReactNode;
+  last?: boolean;
+}) {
+  const { theme } = useMindCareTheme();
+  return (
+    <View style={[s.kvBlock, last && s.kvBlockLast]}>
+      {children ? (
+        <>
+          <Text style={[s.kvLabel, { color: theme.secondaryText }]}>{label}</Text>
+          {children}
+        </>
+      ) : (
+        <View style={s.kvRow}>
+          <Text style={[s.kvLabel, { color: theme.secondaryText }]}>{label}</Text>
+          <Text style={[s.kvValue, { color: theme.text }]} numberOfLines={2}>
+            {value || "-"}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+/** Compact verification pill. Status is conveyed by text + icon, not color alone. */
+function VerifyBadge({ verified, theme }: { verified: boolean; theme: MindCareTheme }) {
+  const color = verified
+    ? "#22C55E"
+    : theme.mode === "dark"
+      ? "#F0A94A"
+      : "#B45309";
+  const bg = verified
+    ? "rgba(34,197,94,0.12)"
+    : theme.mode === "dark"
+      ? "rgba(240,169,74,0.14)"
+      : "rgba(217,119,6,0.12)";
+  const borderColor = verified
+    ? "rgba(34,197,94,0.25)"
+    : theme.mode === "dark"
+      ? "rgba(240,169,74,0.30)"
+      : "rgba(217,119,6,0.30)";
+  return (
+    <View style={[s.verifyBadge, { backgroundColor: bg, borderColor }]}>
+      <Ionicons name={verified ? "checkmark" : "warning"} size={11} color={color} />
+      <Text style={[s.verifyBadgeText, { color }]}>
+        {verified ? "Verified" : "Not verified"}
+      </Text>
+    </View>
+  );
+}
 
 export default function ProfileScreen() {
   const { role } = useAuth();
@@ -44,6 +107,9 @@ export default function ProfileScreen() {
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const { width: screenWidth } = useWindowDimensions();
+  const isWide = screenWidth >= 900;
 
   const [fullName, setFullName] = useState("");
   const [contactNo, setContactNo] = useState("");
@@ -101,6 +167,15 @@ export default function ProfileScreen() {
 
     return () => unsub();
   }, [role]);
+
+  // Always start at the top when the profile opens so navigation never leaves
+  // the reader halfway down the page.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }, 60);
+    return () => clearTimeout(t);
+  }, []);
 
   const handleBack = () => router.back();
 
@@ -289,6 +364,14 @@ export default function ProfileScreen() {
       })
     : null;
 
+  const lastUpdated = profile?.updatedAt
+    ? new Date(profile.updatedAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : null;
+
   if (loading) {
     return (
       <SafeAreaView style={[s.container, { backgroundColor: theme.background }]}>
@@ -310,14 +393,15 @@ export default function ProfileScreen() {
           end={{ x: 1, y: 1 }}
           style={s.headerGradient}
         >
-          {/* Top nav row */}
-          <View style={s.topNav}>
-            <Pressable style={s.navBtn} onPress={handleBack}>
-              <Ionicons name="arrow-back" size={24} color="white" />
-            </Pressable>
-            <Text style={s.navTitle}>Details</Text>
-            <View style={{ width: 40 }} />
-          </View>
+          <View style={s.headerInner}>
+            {/* Top nav row */}
+            <View style={s.topNav}>
+              <Pressable style={s.navBtn} onPress={handleBack}>
+                <Ionicons name="arrow-back" size={24} color="white" />
+              </Pressable>
+              <Text style={s.navTitle}>Details</Text>
+              <View style={{ width: 40 }} />
+            </View>
 
           {/* Avatar */}
           <Pressable style={s.avatarContainer} onPress={handleAvatarPress}>
@@ -376,356 +460,311 @@ export default function ProfileScreen() {
             <Text style={s.memberSince}>Member since {memberSince}</Text>
           )}
 
-          {/* Quick action buttons */}
-          <View style={s.quickActions}>
-            <Pressable style={s.quickActionBtn} onPress={() => Linking.openURL("mailto:support@mindcare.app")}>
-              <Ionicons name="mail" size={20} color="#7B2CBF" />
-            </Pressable>
-            <Pressable style={s.quickActionBtn} onPress={() => Linking.openURL("tel:911")}>
-              <Ionicons name="call" size={20} color="#7B2CBF" />
-            </Pressable>
-            <Pressable style={s.quickActionBtn} onPress={() => router.push("/(student)/(tabs)/messages")}>
-              <Ionicons name="chatbubble" size={20} color="#7B2CBF" />
-            </Pressable>
+            {/* Quick action buttons */}
+            <View style={s.quickActions}>
+              <Pressable style={s.quickActionBtn} onPress={() => Linking.openURL("mailto:support@mindcare.app")}>
+                <Ionicons name="mail" size={20} color="#7B2CBF" />
+              </Pressable>
+              <Pressable style={s.quickActionBtn} onPress={() => Linking.openURL("tel:911")}>
+                <Ionicons name="call" size={20} color="#7B2CBF" />
+              </Pressable>
+              <Pressable style={s.quickActionBtn} onPress={() => router.push("/(student)/(tabs)/messages")}>
+                <Ionicons name="chatbubble" size={20} color="#7B2CBF" />
+              </Pressable>
+            </View>
           </View>
         </LinearGradient>
 
         {/* ─── White Content Body ────────────────────────────────────── */}
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={s.bodyContent}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={true}
         >
-          {/* ── Email Section ── */}
-          <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <View style={s.sectionHeader}>
-              <View style={[s.sectionIcon, { backgroundColor: "#EDE9FE" }]}>
-                <Ionicons name="mail-outline" size={18} color="#7B2CBF" />
-              </View>
-              <Text style={[s.sectionTitle, { color: theme.text }]}>Email</Text>
-            </View>
-            <View style={s.fieldRow}>
-              <Ionicons name="mail-open-outline" size={16} color="#94A3B8" />
-              <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.email || "-"}</Text>
-            </View>
-
-            {/* Email Verification Status */}
-            {emailVerified ? (
-              <View style={s.verifiedContainer}>
-                <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
-                <Text style={s.verifiedText}>Email Verified</Text>
-              </View>
-            ) : (
-              <View style={s.unverifiedContainer}>
-                <View style={s.unverifiedRow}>
-                  <Ionicons name="alert-circle" size={18} color="#B06000" />
-                  <Text style={s.warningText}>
-                    Your email is not verified yet.
-                  </Text>
-                </View>
-                <Pressable
-                  style={[
-                    s.verifyButton,
-                    verificationSending && { opacity: 0.6 },
-                  ]}
-                  onPress={handleVerifyEmail}
-                  disabled={verificationSending}
-                >
-                  {verificationSending ? (
-                    <ActivityIndicator size="small" color="white" />
-                  ) : (
-                    <Text style={s.verifyButtonText}>
-                      Verify Email Now
-                    </Text>
-                  )}
-                </Pressable>
-              </View>
-            )}
-          </View>
-
-          {/* ── Phone Section ── */}
-          <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <View style={s.sectionHeader}>
-              <View style={[s.sectionIcon, { backgroundColor: "#DBEAFE" }]}>
-                <Ionicons name="call-outline" size={18} color="#2563EB" />
-              </View>
-              <Text style={[s.sectionTitle, { color: theme.text }]}>Phone Number</Text>
-            </View>
-            {editing ? (
-              <TextInput
-                style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
-                value={contactNo}
-                onChangeText={(t) => setContactNo(t.replace(/[^0-9+\-() ]/g, ""))}
-                keyboardType="phone-pad"
-                placeholder="Enter contact number"
-                placeholderTextColor="#94A3B8"
-              />
-            ) : (
-              <View style={s.fieldRow}>
-                <Ionicons name="phone-portrait-outline" size={16} color="#94A3B8" />
-                <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.contactNo || "-"}</Text>
-              </View>
-            )}
-          </View>
-
-          {/* ── Team / Department Section ── */}
-          <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <View style={s.sectionHeader}>
-              <View style={[s.sectionIcon, { backgroundColor: "#D1FAE5" }]}>
-                <Ionicons name="people-outline" size={18} color="#059669" />
-              </View>
-              <Text style={[s.sectionTitle, { color: theme.text }]}>Department</Text>
-            </View>
-            <View style={s.fieldRow}>
-              <Ionicons name="school-outline" size={16} color="#94A3B8" />
-              <Text style={[s.fieldValue, { color: theme.text }]}>{deptLabel}</Text>
-              <Ionicons name="chevron-forward" size={16} color="#CBD5E1" style={{ marginLeft: "auto" }} />
-            </View>
-          </View>
-
-          {/* ── Identity Section ── */}
-          <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <View style={s.sectionHeader}>
-              <View style={[s.sectionIcon, { backgroundColor: "#FEF3C7" }]}>
-                <Ionicons name="person-outline" size={18} color="#D97706" />
-              </View>
-              <Text style={[s.sectionTitle, { color: theme.text }]}>Personal Information</Text>
-            </View>
-
-            {/* Full Name */}
-            <Text style={[s.fieldLabel, { color: theme.secondaryText }]}>Full Name</Text>
-            {editing && isAdmin ? (
-              <TextInput
-                style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
-                value={fullName}
-                onChangeText={setFullName}
-              />
-            ) : (
-              <View style={s.fieldRow}>
-                <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.fullName || "-"}</Text>
-              </View>
-            )}
-
-            {/* Gender Identity */}
-            <Text style={[s.fieldLabel, { color: theme.secondaryText }]}>Gender Identity</Text>
-            {editing && isAdmin ? (
-              <TextInput
-                style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
-                value={genderIdentity}
-                onChangeText={setGenderIdentity}
-              />
-            ) : (
-              <View style={s.fieldRow}>
-                <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.genderIdentity || "-"}</Text>
-              </View>
-            )}
-
-            {/* Nationality */}
-            <Text style={[s.fieldLabel, { color: theme.secondaryText }]}>Nationality</Text>
-            {editing && isAdmin ? (
-              <TextInput
-                style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
-                value={nationality}
-                onChangeText={setNationality}
-              />
-            ) : (
-              <View style={s.fieldRow}>
-                <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.nationality || "-"}</Text>
-              </View>
-            )}
-
-            {/* Address */}
-            <Text style={[s.fieldLabel, { color: theme.secondaryText }]}>Address</Text>
-            {editing ? (
-              <TextInput
-                style={[s.input, { minHeight: 80, backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
-                value={address}
-                onChangeText={setAddress}
-                multiline
-                placeholder="Enter address"
-                placeholderTextColor="#94A3B8"
-              />
-            ) : (
-              <View style={s.fieldRow}>
-                <Text style={[s.fieldValue, { color: theme.text }]}>{address || "-"}</Text>
-              </View>
-            )}
-          </View>
-
-          {/* ── Academic / Admin Info ── */}
-          {isAdmin ? (
-            <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <View style={s.sectionHeader}>
-                <View style={[s.sectionIcon, { backgroundColor: "#E0E7FF" }]}>
-                  <Ionicons name="briefcase-outline" size={18} color="#4F46E5" />
-                </View>
-                <Text style={[s.sectionTitle, { color: theme.text }]}>Admin Details</Text>
-              </View>
-
-              <Text style={[s.fieldLabel, { color: theme.secondaryText }]}>ID No.</Text>
-              {editing ? (
-                <TextInput
-                  style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
-                  value={schoolId}
-                  onChangeText={(t) => setSchoolId(formatSchoolId(t))}
-                  placeholder="XX-XXXX-XXX"
-                  placeholderTextColor="#94A3B8"
-                  maxLength={11}
-                />
-              ) : (
-                <View style={s.fieldRow}>
-                  <Text style={[s.fieldValue, { color: theme.text }]}>
-                    {formatSchoolId(profile?.schoolId || "") || "-"}
-                  </Text>
-                </View>
-              )}
-
-              <Text style={[s.fieldLabel, { color: theme.secondaryText }]}>College / University</Text>
-              {editing ? (
-                <TextInput
-                  style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
-                  value={college}
-                  onChangeText={setCollege}
-                  placeholder="e.g. University of the Cordilleras (UC)"
-                  placeholderTextColor="#94A3B8"
-                />
-              ) : (
-                <View style={s.fieldRow}>
-                  <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.college || "-"}</Text>
-                </View>
-              )}
-
-              <Text style={[s.fieldLabel, { color: theme.secondaryText }]}>Position</Text>
-              {editing ? (
-                <TextInput
-                  style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
-                  value={position}
-                  onChangeText={setPosition}
-                />
-              ) : (
-                <View style={s.fieldRow}>
-                  <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.position || "-"}</Text>
-                </View>
-              )}
-            </View>
-          ) : (
-            <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <View style={s.sectionHeader}>
-                <View style={[s.sectionIcon, { backgroundColor: "#E0E7FF" }]}>
-                  <Ionicons name="book-outline" size={18} color="#4F46E5" />
-                </View>
-                <Text style={[s.sectionTitle, { color: theme.text }]}>Academic Information</Text>
-              </View>
-
-              <View style={s.fieldRow}>
-                <Ionicons name="card-outline" size={16} color="#94A3B8" />
-                <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.schoolId || "-"}</Text>
-              </View>
-
-              <View style={s.fieldRow}>
-                <Ionicons name="library-outline" size={16} color="#94A3B8" />
-                <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.academicProgram || "-"}</Text>
-              </View>
-
-              <View style={s.fieldRow}>
-                <Ionicons name="layers-outline" size={16} color="#94A3B8" />
-                <Text style={[s.fieldValue, { color: theme.text }]}>{profile?.yearLevel || "-"}</Text>
-              </View>
-            </View>
-          )}
-
-          {/* ── Security Activity ── */}
-          <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <View style={s.sectionHeader}>
-              <View style={[s.sectionIcon, { backgroundColor: "#EDE9FE" }]}>
-                <Ionicons name="shield-checkmark-outline" size={18} color="#7B2CBF" />
-              </View>
-              <Text style={[s.sectionTitle, { color: theme.text }]}>Security Activity</Text>
-            </View>
-            <Pressable onPress={() => router.push("/security-log")}>
-              <View style={s.fieldRow}>
-                <Ionicons name="time-outline" size={16} color="#94A3B8" />
-                <Text style={[s.fieldValue, { color: theme.text }]}>
-                  Review sign-ins and account security events
-                </Text>
-                <Ionicons name="chevron-forward" size={16} color="#CBD5E1" style={{ marginLeft: "auto" }} />
-              </View>
-            </Pressable>
-          </View>
-
-          {/* ── LSN Document Section (students only) ── */}
-          {!isAdmin && (
-            <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <View style={s.sectionHeader}>
-                <View style={[s.sectionIcon, { backgroundColor: "#FCE7F3" }]}>
-                  <Ionicons name="document-text-outline" size={18} color="#DB2777" />
-                </View>
-                <Text style={[s.sectionTitle, { color: theme.text }]}>LSN Document</Text>
-              </View>
-
-              {profile?.lsnDocument ? (
-                <>
-                  <View style={s.fieldRow}>
-                    <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
-                    <Text style={s.fieldValue} numberOfLines={1}>
-                      {profile.lsnDocument.fileName || "Document uploaded"}
-                    </Text>
+          <View style={s.bodyInner}>
+            <View style={[s.gridRow, isWide && s.gridRowWide]}>
+              {/* ── LEFT column: Personal + Contact ─────────────────── */}
+              <View style={[s.gridCol, isWide && s.gridColWide]}>
+                {/* Personal Information */}
+                <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <View style={s.sectionHeader}>
+                    <View style={[s.sectionIcon, { backgroundColor: theme.softPurple }]}>
+                      <Ionicons name="person-outline" size={18} color={theme.primary} />
+                    </View>
+                    <Text style={[s.sectionTitle, { color: theme.text }]}>Personal Information</Text>
                   </View>
-                  <Pressable
-                    style={s.lsnReplaceBtn}
-                    onPress={handlePickLsnDocument}
+
+                  <InfoRow
+                    label="Full Name"
+                    value={profile?.fullName}
+                    last={false}
                   >
-                    <Ionicons name="refresh" size={16} color="#7B2CBF" />
-                    <Text style={s.lsnReplaceText}>Replace Document</Text>
-                  </Pressable>
-                </>
-              ) : profile?.isLSN || lsnDocPickResult ? (
-                <>
-                  {lsnDocPickResult && !lsnDocPickResult.canceled ? (
-                    <View style={s.fieldRow}>
-                      <Ionicons name="document-outline" size={18} color="#7B2CBF" />
-                      <Text style={s.fieldValue} numberOfLines={1}>
-                        {(lsnDocPickResult.assets[0] as any).name}
+                    {editing && isAdmin ? (
+                      <TextInput
+                        style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
+                        value={fullName}
+                        onChangeText={setFullName}
+                      />
+                    ) : undefined}
+                  </InfoRow>
+                  <InfoRow
+                    label="Gender Identity"
+                    value={profile?.genderIdentity}
+                    last={false}
+                  >
+                    {editing && isAdmin ? (
+                      <TextInput
+                        style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
+                        value={genderIdentity}
+                        onChangeText={setGenderIdentity}
+                      />
+                    ) : undefined}
+                  </InfoRow>
+                  <InfoRow
+                    label="Nationality"
+                    value={profile?.nationality}
+                    last={false}
+                  >
+                    {editing && isAdmin ? (
+                      <TextInput
+                        style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
+                        value={nationality}
+                        onChangeText={setNationality}
+                      />
+                    ) : undefined}
+                  </InfoRow>
+                  <InfoRow label="Address" value={address} last>
+                    {editing ? (
+                      <TextInput
+                        style={[s.input, { minHeight: 80, backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
+                        value={address}
+                        onChangeText={setAddress}
+                        multiline
+                        placeholder="Enter address"
+                        placeholderTextColor="#94A3B8"
+                      />
+                    ) : undefined}
+                  </InfoRow>
+                </View>
+
+                {/* Contact Information */}
+                <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <View style={s.sectionHeader}>
+                    <View style={[s.sectionIcon, { backgroundColor: theme.softPurple }]}>
+                      <Ionicons name="mail-outline" size={18} color={theme.primary} />
+                    </View>
+                    <Text style={[s.sectionTitle, { color: theme.text }]}>Contact Information</Text>
+                  </View>
+
+                  <View style={s.kvBlock}>
+                    <View style={s.kvRow}>
+                      <Text style={[s.kvLabel, { color: theme.secondaryText }]}>Email</Text>
+                      <Text style={[s.kvValue, { color: theme.text }]} numberOfLines={1}>
+                        {profile?.email || "-"}
                       </Text>
                     </View>
-                  ) : (
-                    <Text style={s.lsnHintText}>
-                      Your LSN document was not uploaded during registration. Please upload it here.
-                    </Text>
-                  )}
+                    <View style={s.emailMetaRow}>
+                      <VerifyBadge verified={emailVerified} theme={theme} />
+                      {!emailVerified ? (
+                        verificationSending ? (
+                          <ActivityIndicator size="small" color={theme.primary} />
+                        ) : (
+                          <Pressable style={s.verifyAction} onPress={handleVerifyEmail}>
+                            <Text style={[s.verifyActionText, { color: theme.primary }]}>Verify email</Text>
+                          </Pressable>
+                        )
+                      ) : null}
+                    </View>
+                  </View>
 
-                  {lsnDocUploading ? (
-                    <View style={s.lsnProgressRow}>
-                      <View style={s.lsnProgressBar}>
-                        <View style={[s.lsnProgressFill, { width: `${lsnDocUploadProgress}%` }]} />
+                  <InfoRow label="Phone Number" value={profile?.contactNo} last>
+                    {editing ? (
+                      <TextInput
+                        style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
+                        value={contactNo}
+                        onChangeText={(t) => setContactNo(t.replace(/[^0-9+\-() ]/g, ""))}
+                        keyboardType="phone-pad"
+                        placeholder="Enter contact number"
+                        placeholderTextColor="#94A3B8"
+                      />
+                    ) : undefined}
+                  </InfoRow>
+                </View>
+              </View>
+
+              {/* ── RIGHT column: Admin/Academic + Account ─────────── */}
+              <View style={[s.gridCol, isWide && s.gridColWide]}>
+                {isAdmin ? (
+                  <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                    <View style={s.sectionHeader}>
+                      <View style={[s.sectionIcon, { backgroundColor: theme.softPurple }]}>
+                        <Ionicons name="briefcase-outline" size={18} color={theme.primary} />
                       </View>
-                      <Text style={s.lsnProgressText}>{lsnDocUploadProgress}%</Text>
+                      <Text style={[s.sectionTitle, { color: theme.text }]}>Administrator Details</Text>
                     </View>
-                  ) : (
-                    <View style={s.lsnActions}>
-                      <Pressable style={s.lsnPickBtn} onPress={handlePickLsnDocument}>
-                        <Ionicons name="cloud-upload-outline" size={18} color="#7B2CBF" />
-                        <Text style={s.lsnPickText}>
-                          {lsnDocPickResult ? "Choose Different File" : "Pick Document"}
-                        </Text>
-                      </Pressable>
-                      {lsnDocPickResult && !lsnDocPickResult.canceled && (
-                        <Pressable style={s.lsnUploadBtn} onPress={handleUploadLsnDocument}>
-                          <Text style={s.lsnUploadText}>Upload</Text>
-                        </Pressable>
-                      )}
-                    </View>
-                  )}
-                </>
-              ) : (
-                <Text style={s.lsnHintText}>
-                  No LSN document on file. If you have special needs, contact your guidance office.
-                </Text>
-              )}
-            </View>
-          )}
 
-          <View style={{ height: 100 }} />
+                    <InfoRow
+                      label="ID No."
+                      value={formatSchoolId(profile?.schoolId || "") || undefined}
+                      last={false}
+                    >
+                      {editing ? (
+                        <TextInput
+                          style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
+                          value={schoolId}
+                          onChangeText={(t) => setSchoolId(formatSchoolId(t))}
+                          placeholder="XX-XXXX-XXX"
+                          placeholderTextColor="#94A3B8"
+                          maxLength={11}
+                        />
+                      ) : undefined}
+                    </InfoRow>
+                    <InfoRow
+                      label="College / University"
+                      value={profile?.college}
+                      last={false}
+                    >
+                      {editing ? (
+                        <TextInput
+                          style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
+                          value={college}
+                          onChangeText={setCollege}
+                          placeholder="e.g. University of the Cordilleras (UC)"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      ) : undefined}
+                    </InfoRow>
+                    <InfoRow label="Position" value={profile?.position} last>
+                      {editing ? (
+                        <TextInput
+                          style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
+                          value={position}
+                          onChangeText={setPosition}
+                        />
+                      ) : undefined}
+                    </InfoRow>
+                  </View>
+                ) : (
+                  <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                    <View style={s.sectionHeader}>
+                      <View style={[s.sectionIcon, { backgroundColor: theme.softPurple }]}>
+                        <Ionicons name="book-outline" size={18} color={theme.primary} />
+                      </View>
+                      <Text style={[s.sectionTitle, { color: theme.text }]}>Academic Information</Text>
+                    </View>
+
+                    <InfoRow label="Student ID" value={profile?.schoolId} last={false} />
+                    <InfoRow label="Program" value={profile?.academicProgram} last={false} />
+                    <InfoRow label="Year Level" value={profile?.yearLevel} last />
+                  </View>
+                )}
+
+                {/* Account Information */}
+                <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <View style={s.sectionHeader}>
+                    <View style={[s.sectionIcon, { backgroundColor: theme.softPurple }]}>
+                      <Ionicons name="shield-checkmark-outline" size={18} color={theme.primary} />
+                    </View>
+                    <Text style={[s.sectionTitle, { color: theme.text }]}>Account Information</Text>
+                  </View>
+
+                  <InfoRow label="Role" value={roleLabel} last={false} />
+                  <InfoRow label="Member since" value={memberSince ?? undefined} last={false} />
+                  <InfoRow label="Last updated" value={lastUpdated ?? undefined} last={false} />
+                  <Pressable
+                    onPress={() => router.push("/security-log")}
+                    accessibilityRole="button"
+                    accessibilityLabel="Review security activity"
+                  >
+                    <View style={s.kvBlockLast}>
+                      <View style={s.kvRow}>
+                        <Text style={[s.kvLabel, { color: theme.secondaryText }]}>Security Activity</Text>
+                        <View style={s.linkValue}>
+                          <Text style={[s.kvValue, { color: theme.primary }]}>Review sign-ins</Text>
+                          <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+                        </View>
+                      </View>
+                    </View>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+
+            {/* ── LSN Document Section (students only) ── */}
+            {!isAdmin && (
+              <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <View style={s.sectionHeader}>
+                  <View style={[s.sectionIcon, { backgroundColor: "#FCE7F3" }]}>
+                    <Ionicons name="document-text-outline" size={18} color="#DB2777" />
+                  </View>
+                  <Text style={[s.sectionTitle, { color: theme.text }]}>LSN Document</Text>
+                </View>
+
+                {profile?.lsnDocument ? (
+                  <>
+                    <View style={s.fieldRow}>
+                      <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
+                      <Text style={s.fieldValue} numberOfLines={1}>
+                        {profile.lsnDocument.fileName || "Document uploaded"}
+                      </Text>
+                    </View>
+                    <Pressable
+                      style={s.lsnReplaceBtn}
+                      onPress={handlePickLsnDocument}
+                    >
+                      <Ionicons name="refresh" size={16} color="#7B2CBF" />
+                      <Text style={s.lsnReplaceText}>Replace Document</Text>
+                    </Pressable>
+                  </>
+                ) : profile?.isLSN || lsnDocPickResult ? (
+                  <>
+                    {lsnDocPickResult && !lsnDocPickResult.canceled ? (
+                      <View style={s.fieldRow}>
+                        <Ionicons name="document-outline" size={18} color="#7B2CBF" />
+                        <Text style={s.fieldValue} numberOfLines={1}>
+                          {(lsnDocPickResult.assets[0] as any).name}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={s.lsnHintText}>
+                        Your LSN document was not uploaded during registration. Please upload it here.
+                      </Text>
+                    )}
+
+                    {lsnDocUploading ? (
+                      <View style={s.lsnProgressRow}>
+                        <View style={s.lsnProgressBar}>
+                          <View style={[s.lsnProgressFill, { width: `${lsnDocUploadProgress}%` }]} />
+                        </View>
+                        <Text style={s.lsnProgressText}>{lsnDocUploadProgress}%</Text>
+                      </View>
+                    ) : (
+                      <View style={s.lsnActions}>
+                        <Pressable style={s.lsnPickBtn} onPress={handlePickLsnDocument}>
+                          <Ionicons name="cloud-upload-outline" size={18} color="#7B2CBF" />
+                          <Text style={s.lsnPickText}>
+                            {lsnDocPickResult ? "Choose Different File" : "Pick Document"}
+                          </Text>
+                        </Pressable>
+                        {lsnDocPickResult && !lsnDocPickResult.canceled && (
+                          <Pressable style={s.lsnUploadBtn} onPress={handleUploadLsnDocument}>
+                            <Text style={s.lsnUploadText}>Upload</Text>
+                          </Pressable>
+                        )}
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  <Text style={s.lsnHintText}>
+                    No LSN document on file. If you have special needs, contact your guidance office.
+                  </Text>
+                )}
+              </View>
+            )}
+
+            <View style={{ height: 120 }} />
+          </View>
         </ScrollView>
 
         {/* ─── Bottom Action Bar ─────────────────────────────────────── */}
@@ -815,11 +854,16 @@ const s = StyleSheet.create({
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
   },
+  headerInner: {
+    width: "100%",
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: "center",
+    paddingHorizontal: 20,
+  },
   topNav: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 12,
   },
@@ -921,15 +965,39 @@ const s = StyleSheet.create({
 
   /* ── Body ────────────────────────────────────────────────────────── */
   bodyContent: {
-    paddingHorizontal: 20,
     paddingTop: 24,
+  },
+  bodyInner: {
+    width: "100%",
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: "center",
+    paddingHorizontal: 20,
+  },
+
+  /* ── Responsive two-column grid ─────────────────────────────────── */
+  gridRow: {
+    flexDirection: "column",
+    gap: 16,
+  },
+  gridRowWide: {
+    flexDirection: "row",
+    gap: 20,
+    alignItems: "flex-start",
+  },
+  gridCol: {
+    width: "100%",
+  },
+  gridColWide: {
+    flex: 1,
+    width: "auto",
+    minWidth: 0,
   },
 
   /* ── Section Cards ───────────────────────────────────────────────── */
   sectionCard: {
     backgroundColor: "white",
     borderRadius: 20,
-    padding: 20,
+    padding: 18,
     marginBottom: 16,
     // @ts-ignore
     boxShadow: "0px 2px 12px rgba(138, 99, 210, 0.06)",
@@ -956,15 +1024,6 @@ const s = StyleSheet.create({
   },
 
   /* ── Fields ───────────────────────────────────────────────────────── */
-  fieldLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#94A3B8",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    marginTop: 14,
-    marginBottom: 4,
-  },
   fieldRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -979,49 +1038,66 @@ const s = StyleSheet.create({
     fontWeight: "500",
     flex: 1,
   },
-  verifiedContainer: {
+
+  /* ── Compact key/value rows ─────────────────────────────────────── */
+  kvBlock: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(167, 139, 250, 0.10)",
+  },
+  kvBlockLast: {
+    paddingVertical: 12,
+  },
+  kvRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    backgroundColor: "#E6F4EA",
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginTop: 10,
+    justifyContent: "space-between",
+    gap: 12,
   },
-  verifiedText: {
-    color: "#137333",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  unverifiedContainer: {
-    backgroundColor: "#FEF7E0",
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 10,
-    gap: 10,
-  },
-  unverifiedRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  warningText: {
-    color: "#B06000",
+  kvLabel: {
     fontSize: 13,
     fontWeight: "600",
-    flex: 1,
+    flexShrink: 0,
   },
-  verifyButton: {
-    backgroundColor: "#8A63D2",
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  verifyButtonText: {
-    color: "#FFF",
+  kvValue: {
     fontSize: 14,
+    fontWeight: "600",
+    flex: 1,
+    textAlign: "right",
+  },
+  linkValue: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  emailMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 6,
+  },
+  verifyBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+  },
+  verifyBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  verifyAction: {
+    paddingVertical: 2,
+    paddingHorizontal: 2,
+  },
+  verifyActionText: {
+    fontSize: 12,
     fontWeight: "700",
   },
   input: {

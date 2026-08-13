@@ -378,6 +378,15 @@ export default function StudentManagementScreen() {
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
+  const scrollRef = useRef<ScrollView>(null);
+
+  // Always start at the top so navigation never lands mid-list.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }, 60);
+    return () => clearTimeout(t);
+  }, []);
 
   // Edit (status / department / year) modal
   const [editModal, setEditModal] = useState<{
@@ -1125,9 +1134,10 @@ export default function StudentManagementScreen() {
       </LinearGradient>
 
       <ScrollView
+        ref={scrollRef}
         style={{ flex: 1 }}
         contentContainerStyle={[styles.content, { paddingBottom: selected.size > 0 ? 110 : insets.bottom + 20 }]}
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={true}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl

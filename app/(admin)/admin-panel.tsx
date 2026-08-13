@@ -600,6 +600,15 @@ export default function AdminPanelScreen() {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const scrollYRef = useRef(0);
 
+  // Always start at the top when the dashboard opens so navigation never
+  // leaves the reader halfway down the page.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }, 60);
+    return () => clearTimeout(t);
+  }, []);
+
   // Consolidated state for student list modals
   const [studentListModal, setStudentListModal] = useState<{
     visible: boolean;

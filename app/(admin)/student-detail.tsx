@@ -400,6 +400,15 @@ export default function StudentDetailScreen() {
   const [assessments, setAssessments] = useState<AssessmentRecord[]>([]);
   const [hoveredTrendIdx, setHoveredTrendIdx] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<ScrollView>(null);
+
+  // Always start at the top so navigation never lands mid-page.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }, 60);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     // Prevent execution until uid is fully parsed from route parameters
@@ -1002,8 +1011,9 @@ export default function StudentDetailScreen() {
           </View>
         ) : (
           <ScrollView
+            ref={scrollRef}
             contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator={true}
           >
             {/* Profile Summary Card */}
             <View style={styles.profileCard}>
