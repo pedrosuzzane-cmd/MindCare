@@ -342,7 +342,8 @@ export function DepartmentCorrelationScatter({ points }: ScatterPlotProps) {
       <View style={styles.chartFooter}>
         <Text style={styles.chartFooterNote}>
           Each dot represents a student. X-axis = journal frequency, Y-axis =
-          latest concern indicator (WEMWBS score, 0–80). Use this plot to
+          latest in-app assessment score (0–80; higher = more concern
+          indicators). Use this plot to
           identify clusters and outliers needing follow-up. Correlation does
           not establish causation.
         </Text>

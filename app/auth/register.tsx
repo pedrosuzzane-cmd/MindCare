@@ -229,13 +229,15 @@ const COLLEGE_DEPARTMENTS: Record<string, Record<string, string[]>> = {
       "Bachelor of Science in Criminology (BSCrim)",
       "Bachelor of Science in Industrial Security Management (BSISM)",
     ],
-    "College of Engineering and Architecture (CEA)": [
-      "Bachelor of Science in Architecture (BS Arch)",
+    "College of Engineering (COE)": [
       "Bachelor of Science in Civil Engineering (BSCE)",
       "Bachelor of Science in Computer Engineering (BSCpE)",
       "Bachelor of Science in Electrical Engineering (BSEE)",
       "Bachelor of Science in Electronics Engineering (BSECE)",
       "Bachelor of Science in Mechanical Engineering (BSME)",
+    ],
+    "College of Architecture and Fine Arts (CAFA)": [
+      "Bachelor of Science in Architecture (BS Arch)",
     ],
     "College of Arts and Sciences (CAS)": [
       "Bachelor of Arts in Communication (AB Comm)",

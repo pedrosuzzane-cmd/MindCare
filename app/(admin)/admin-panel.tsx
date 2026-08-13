@@ -78,7 +78,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context"; // This was already correct
 
-const DEPARTMENTS = ["CITCS", "COA", "CCJE", "CTE", "CN", "CEA", "CHTM"];
+const DEPARTMENTS = ["CITCS", "COA", "CCJE", "CTE", "CON", "COE", "CAFA", "CHTM"];
 
 const COLLEGES = [
   "Saint Louis University (SLU)",
@@ -3554,7 +3554,7 @@ export default function AdminPanelScreen() {
                       },
                       {
                         label: "Average Wellness Score",
-                        text: "Sum of latest assessment scores ÷ number of assessed students. Scores use the WEMWBS scale (0–80).",
+                        text: "Sum of the latest assessment scores ÷ number of assessed students. Scores come from the in-app 20-item self-assessment (raw total 0–80). This is a custom indicator, not a standardized clinical scale.",
                       },
                     ]}
                   />
@@ -3801,8 +3801,9 @@ export default function AdminPanelScreen() {
                         </Text>
                       </View>
                       <Text style={styles.thresholdDescription}>
-                        Each student's concern indicator is calculated from their
-                        latest WEMWBS assessment score (out of 80):
+                        Each student's concern indicator is calculated from the
+                        raw total of their latest in-app 20-item assessment
+                        (0–80; higher score = more concern indicators):
                       </Text>
                       <View style={styles.thresholdBlock}>
                         <View style={styles.thresholdBlockHeader}>
@@ -3899,7 +3900,7 @@ export default function AdminPanelScreen() {
                         lines={[
                           {
                             label: "Average Wellness Score",
-                            text: "Sum of the department's latest assessment scores ÷ number of assessed students. Scores are on the WEMWBS scale (0–80).",
+                            text: "Sum of the department's latest assessment scores ÷ number of assessed students. Scores come from the in-app 20-item self-assessment (raw total 0–80).",
                           },
                           {
                             label: "Wellness Index",
@@ -4108,11 +4109,13 @@ export default function AdminPanelScreen() {
                 <View style={styles.guideSection}>
                   <Text style={styles.guideSectionTitle}>B. Wellness Score</Text>
                   <Text style={styles.guideSectionBody}>
-                    The wellness score is a student's latest WEMWBS assessment
-                    on a scale from 0 to 80. A higher score signals higher
-                    concern indicators and triggers review. Average wellness
-                    score = sum of latest scores ÷ number of students with an
-                    assessment.
+                    The assessment score is the raw total of a student's latest
+                    in-app 20-item self-assessment (each item 0–4, reverse-scored
+                    where applicable), ranging 0–80. It is a custom wellness
+                    indicator — not a standardized clinical scale. A higher score
+                    signals more concern indicators and triggers review. Average
+                    wellness score = sum of latest scores ÷ number of students
+                    with an assessment.
                   </Text>
                 </View>
                 <View style={styles.guideSection}>

@@ -2,6 +2,7 @@ import { DonutGauge } from "@/components/admin/DonutGauge";
 import type { StackedBarItem } from "@/components/admin/StackedBarChart";
 import { listenForAdminDashboardData } from "@/services/adminFirestoreService";
 import type { StudentSummary } from "@/services/adminFirestoreService";
+import { getDepartmentCode } from "@/utils/departmentMeta";
 import { useAuth } from "@/hooks/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -13,7 +14,7 @@ const POSITIVE_MOODS = new Set(["happy", "calm", "relaxed", "good"]);
 const NEUTRAL_MOODS = new Set(["neutral"]);
 const DISTRESSED_MOODS = new Set(["worried", "sad", "overwhelmed", "exhausted", "stressed", "burnout", "mad", "fearful", "flushed", "very-upset"]);
 
-const DEPARTMENTS = ["CITCS", "COA", "CCJE", "CTE", "CN", "CEA", "CHTM"];
+const DEPARTMENTS = ["CITCS", "COA", "CCJE", "CTE", "CON", "COE", "CAFA", "CHTM"];
 const MOOD_BAR_COLORS = { positive: "#22C55E", neutral: "#F59E0B", distressed: "#EF4444" };
 
 const getDeptAbbreviation = (fullName: string): string => {
@@ -72,7 +73,7 @@ export default function MoodAnalyticsScreen() {
     DEPARTMENTS.forEach((d) => deptMap.set(d, { positive: 0, neutral: 0, distressed: 0 }));
 
     studentSummaries.forEach((s) => {
-      const dept = s.department || "Unspecified";
+      const dept = getDepartmentCode(s.department);
       if (!deptMap.has(dept)) {
         deptMap.set(dept, { positive: 0, neutral: 0, distressed: 0 });
       }

@@ -2,6 +2,7 @@ import { BoxWhiskerChart } from "@/components/admin/BoxWhiskerChart";
 import type { BoxWhiskerDataPoint } from "@/components/admin/BoxWhiskerChart";
 import { listenForAdminDashboardData } from "@/services/adminFirestoreService";
 import type { StudentSummary } from "@/services/adminFirestoreService";
+import { getDepartmentCode } from "@/utils/departmentMeta";
 import { useAuth } from "@/hooks/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -9,7 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const DEPARTMENTS = ["CITCS", "COA", "CCJE", "CTE", "CN", "CEA", "CHTM"];
+const DEPARTMENTS = ["CITCS", "COA", "CCJE", "CTE", "CON", "COE", "CAFA", "CHTM"];
 
 const getBoxColor = (median: number): string => {
   if (median <= 20) return "#22C55E";
@@ -48,8 +49,7 @@ export default function RiskTrendsScreen() {
 
     studentSummaries.forEach((s) => {
       if (s.latestTotalScore == null) return;
-      const dept = s.department || "Unspecified";
-      const abbr = dept.split("(").pop()?.replace(")", "") || dept;
+      const abbr = getDepartmentCode(s.department);
       if (deptScores.has(abbr)) {
         deptScores.get(abbr)!.push(s.latestTotalScore);
       }
@@ -206,9 +206,12 @@ export default function RiskTrendsScreen() {
               <Text style={styles.explanationTitle}>Administrator Guide: Understanding Wellness Score Variance & Scoring</Text>
             </View>
 
-            <Text style={styles.guideSectionTitle}>The Core Score (WEMWBS Scale)</Text>
+            <Text style={styles.guideSectionTitle}>The Core Score (In-App Assessment Scale)</Text>
             <Text style={styles.guideText}>
-              Each student's assessment score is evaluated out of <Text style={{ fontWeight: "700" }}>80 points</Text> based on standardized mental well-being metrics.
+              Each student's assessment score is the raw total of their latest
+              in-app 20-item self-assessment (each item 0–4, reverse-scored where
+              applicable), out of <Text style={{ fontWeight: "700" }}>80 points</Text>.
+              It is a custom wellness indicator, not a standardized clinical scale.
             </Text>
               <View style={styles.guideScaleRow}>
                 <View style={[styles.guideScaleItem, { backgroundColor: "#DCFCE7", borderColor: "#22C55E" }]}>

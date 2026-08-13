@@ -91,31 +91,46 @@ function renderMobileBar(data: DeptComparisonMetric[]) {
   const groupWidth = Math.max(56, Math.min(72, Math.floor(480 / deptCount)));
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mobileScroll}>
-      <View style={[styles.mobileBarContainer, { gap: Math.max(4, Math.min(16, 40 / deptCount)) }]}>
-        {data.map((d) => (
-          <View key={d.deptAbbr} style={[styles.mobileBarGroup, { width: groupWidth }]}>
-            <Text style={styles.mobileBarLabel}>{d.deptAbbr}</Text>
-            <View style={styles.mobileBarCol}>
-              <View style={[styles.mobileBar, { height: Math.max(4, (d.avgScore / maxScore) * 100), backgroundColor: "#8A63D2" }]} />
-              <Text style={styles.mobileBarVal}>{d.avgScore.toFixed(0)}</Text>
+    <>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mobileScroll}>
+        <View style={[styles.mobileBarContainer, { gap: Math.max(4, Math.min(16, 40 / deptCount)) }]}>
+          {data.map((d) => (
+            <View key={d.deptAbbr} style={[styles.mobileBarGroup, { width: groupWidth }]}>
+              <Text style={styles.mobileBarLabel}>{d.deptAbbr}</Text>
+              <View style={styles.mobileBarCol}>
+                <View style={[styles.mobileBar, { height: Math.max(4, (d.avgScore / maxScore) * 100), backgroundColor: "#8A63D2" }]} />
+                <Text style={styles.mobileBarVal}>{d.avgScore.toFixed(0)}</Text>
+              </View>
+              <View style={styles.mobileBarCol}>
+                <View style={[styles.mobileBar, { height: Math.max(4, (d.journalCount / maxJournal) * 100), backgroundColor: "#16A34A" }]} />
+                <Text style={styles.mobileBarVal}>{d.journalCount}</Text>
+              </View>
+              <View style={styles.mobileBarCol}>
+                <View style={[styles.mobileBar, { height: Math.max(4, (d.lsnCount / maxLsn) * 100), backgroundColor: "#D97706" }]} />
+                <Text style={styles.mobileBarVal}>{d.lsnCount}</Text>
+              </View>
+              <View style={styles.mobileBarCol}>
+                <View style={[styles.mobileBar, { height: Math.max(4, (d.assessmentCount / maxAssessment) * 100), backgroundColor: "#0EA5E9" }]} />
+                <Text style={styles.mobileBarVal}>{d.assessmentCount}</Text>
+              </View>
             </View>
-            <View style={styles.mobileBarCol}>
-              <View style={[styles.mobileBar, { height: Math.max(4, (d.journalCount / maxJournal) * 100), backgroundColor: "#16A34A" }]} />
-              <Text style={styles.mobileBarVal}>{d.journalCount}</Text>
-            </View>
-            <View style={styles.mobileBarCol}>
-              <View style={[styles.mobileBar, { height: Math.max(4, (d.lsnCount / maxLsn) * 100), backgroundColor: "#D97706" }]} />
-              <Text style={styles.mobileBarVal}>{d.lsnCount}</Text>
-            </View>
-            <View style={styles.mobileBarCol}>
-              <View style={[styles.mobileBar, { height: Math.max(4, (d.assessmentCount / maxAssessment) * 100), backgroundColor: "#0EA5E9" }]} />
-              <Text style={styles.mobileBarVal}>{d.assessmentCount}</Text>
-            </View>
+          ))}
+        </View>
+      </ScrollView>
+      <View style={styles.mobileBarLegend}>
+        {[
+          { label: "Avg Score", color: "#8A63D2" },
+          { label: "Journals", color: "#16A34A" },
+          { label: "LSN", color: "#D97706" },
+          { label: "Assessments", color: "#0EA5E9" },
+        ].map((m) => (
+          <View key={m.label} style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: m.color }]} />
+            <Text style={styles.legendLabel}>{m.label}</Text>
           </View>
         ))}
       </View>
-    </ScrollView>
+    </>
   );
 }
 
@@ -324,6 +339,29 @@ const styles = StyleSheet.create({
   },
   mobileScroll: {
     marginBottom: 8,
+  },
+  mobileBarLegend: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 4,
+    paddingHorizontal: 4,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendLabel: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: "#64748B",
   },
   mobileBarContainer: {
     flexDirection: "row",

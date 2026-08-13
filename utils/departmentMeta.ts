@@ -7,7 +7,8 @@ const DEPARTMENT_FULL_NAMES: Record<string, string> = {
   COA: "College of Accountancy (COA)",
   CBA: "College of Business Administration (CBA)",
   CCJE: "College of Criminal Justice Education (CCJE)",
-  CEA: "College of Engineering and Architecture (CEA)",
+  COE: "College of Engineering (COE)",
+  CAFA: "College of Architecture and Fine Arts (CAFA)",
   CAS: "College of Arts and Sciences (CAS)",
   CTE: "College of Teacher Education (CTE)",
   CHTM: "College of Hospitality and Tourism Management (CHTM)",
@@ -17,6 +18,7 @@ const DEPARTMENT_FULL_NAMES: Record<string, string> = {
 // Legacy or non-standard codes that map onto the same department.
 const DEPARTMENT_CODE_ALIASES: Record<string, string> = {
   CN: "CON",
+  CEA: "COE",
 };
 
 /**
