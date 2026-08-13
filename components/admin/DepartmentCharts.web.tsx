@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useMemo } from "react";
+import { StyleSheet, Text, View } from "react-native";
 import {
   BarChart,
   Bar,
@@ -10,11 +10,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  RadarChart as ReRadarChart,
-  Radar,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
   ScatterChart,
   Scatter,
   ZAxis,
@@ -52,11 +47,6 @@ const RISK_COLORS: Record<string, string> = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
-function normalize(value: number, min: number, max: number): number {
-  if (max === min) return 50;
-  return ((value - min) / (max - min)) * 100;
-}
-
 function concernLabel(risk: string): string {
   if (risk === "low") return "Lower concern";
   if (risk === "high") return "Elevated concern";
@@ -67,26 +57,21 @@ function concernLabel(risk: string): string {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   const first = payload[0]?.payload;
-  const isBar = typeof first?.dept === "string";
-  const deptCode = isBar ? String(label) : String(payload[0]?.name ?? label);
-  const title = formatDepartmentName(deptCode);
+  const title = formatDepartmentName(String(label));
   return (
     <View style={styles.tooltip}>
       <Text style={styles.tooltipLabel}>{title}</Text>
-      {!isBar && label ? (
-        <Text style={styles.tooltipMuted}>{label} (normalized 0–100)</Text>
-      ) : null}
       {payload.map((p: any, i: number) => (
         <Text key={i} style={[styles.tooltipValue, { color: p.color }]}>
           {p.name}: {typeof p.value === "number" ? p.value.toFixed(1) : p.value}
         </Text>
       ))}
-      {isBar && typeof first.participationRate === "number" && (
+      {typeof first.participationRate === "number" && (
         <Text style={styles.tooltipMuted}>
           Participation: {Math.round(first.participationRate * 100)}%
         </Text>
       )}
-      {isBar && typeof first.trackedStudents === "number" && (
+      {typeof first.trackedStudents === "number" && (
         <Text style={styles.tooltipMuted}>
           Tracked / assessed students: {first.trackedStudents} /{" "}
           {first.assessedStudents ?? "—"}
@@ -122,8 +107,6 @@ interface ComparisonChartProps {
 }
 
 export function DepartmentComparisonChart({ data }: ComparisonChartProps) {
-  const [chartMode, setChartMode] = useState<"bar" | "radar">("bar");
-
   if (data.length === 0) {
     return (
       <View style={styles.emptyCard}>
@@ -148,131 +131,30 @@ export function DepartmentComparisonChart({ data }: ComparisonChartProps) {
     [data],
   );
 
-  const radarData = useMemo(() => {
-    const scores = data.map((d) => d.avgScore);
-    const journals = data.map((d) => d.journalCount);
-    const lsns = data.map((d) => d.lsnCount);
-    const assess = data.map((d) => d.assessmentCount);
-    const rates = data.map((d) => d.participationRate);
-    const minScore = Math.min(...scores);
-    const maxScoreR = Math.max(...scores);
-    const minJ = Math.min(...journals);
-    const maxJ = Math.max(...journals);
-    const minL = Math.min(...lsns);
-    const maxL = Math.max(...lsns);
-    const minA = Math.min(...assess);
-    const maxA = Math.max(...assess);
-    const minR = Math.min(...rates);
-    const maxR = Math.max(...rates);
-    return [
-      {
-        metric: "Avg Score",
-        ...Object.fromEntries(
-          data.map((d) => [d.deptAbbr, normalize(d.avgScore, minScore, maxScoreR)]),
-        ),
-      },
-      {
-        metric: "Journals",
-        ...Object.fromEntries(
-          data.map((d) => [d.deptAbbr, normalize(d.journalCount, minJ, maxJ)]),
-        ),
-      },
-      {
-        metric: "LSN Count",
-        ...Object.fromEntries(
-          data.map((d) => [d.deptAbbr, normalize(d.lsnCount, minL, maxL)]),
-        ),
-      },
-      {
-        metric: "Assessments",
-        ...Object.fromEntries(
-          data.map((d) => [d.deptAbbr, normalize(d.assessmentCount, minA, maxA)]),
-        ),
-      },
-      {
-        metric: "Participation",
-        ...Object.fromEntries(
-          data.map((d) => [d.deptAbbr, normalize(d.participationRate, minR, maxR)]),
-        ),
-      },
-    ];
-  }, [data]);
-
-  const RADAR_COLORS = ["#8A63D2", "#16A34A", "#D97706", "#EF4444", "#0EA5E9", "#EC4899"];
-
   return (
     <View>
-      <View style={styles.chartToggle}>
-        <Pressable
-          style={[styles.toggleBtn, chartMode === "bar" && styles.toggleBtnActive]}
-          onPress={() => setChartMode("bar")}
-        >
-          <Ionicons name="bar-chart" size={14} color={chartMode === "bar" ? "white" : "#8A63D2"} />
-          <Text style={[styles.toggleText, chartMode === "bar" && styles.toggleTextActive]}>Grouped Bar</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.toggleBtn, chartMode === "radar" && styles.toggleBtnActive]}
-          onPress={() => setChartMode("radar")}
-        >
-          <Ionicons name="git-network" size={14} color={chartMode === "radar" ? "white" : "#8A63D2"} />
-          <Text style={[styles.toggleText, chartMode === "radar" && styles.toggleTextActive]}>Radar</Text>
-        </Pressable>
-      </View>
-
-      {chartMode === "bar" ? (
-        <ResponsiveContainer width="100%" height={360}>
-          <BarChart data={barData} margin={{ top: 20, right: 20, left: 0, bottom: 60 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#EEF2F7" />
-            <XAxis
-              dataKey="dept"
-              tick={{ fill: "#334155", fontSize: 13, fontWeight: "700" }}
-              axisLine={{ stroke: "#E2E8F0" }}
-              tickLine={false}
-            />
-            <YAxis tick={{ fill: "#475569", fontSize: 11.5 }} axisLine={false} tickLine={false} />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 13, paddingTop: 12, color: "#334155" }} />
-            <Bar dataKey="Avg Score" fill="#8A63D2" radius={[4, 4, 0, 0]} maxBarSize={24} />
-            <Bar dataKey="Journals" fill="#16A34A" radius={[4, 4, 0, 0]} maxBarSize={24} />
-            <Bar dataKey="LSN" fill="#D97706" radius={[4, 4, 0, 0]} maxBarSize={24} />
-            <Bar dataKey="Assessments" fill="#0EA5E9" radius={[4, 4, 0, 0]} maxBarSize={24} />
-          </BarChart>
-        </ResponsiveContainer>
-      ) : (
-        <ResponsiveContainer width="100%" height={400}>
-          <ReRadarChart data={radarData} margin={{ top: 20, right: 40, bottom: 20, left: 40 }}>
-            <PolarGrid stroke="#EEF2F7" />
-            <PolarAngleAxis
-              dataKey="metric"
-              tick={{ fill: "#334155", fontSize: 12, fontWeight: "700" }}
-            />
-            <PolarRadiusAxis
-              angle={90}
-              domain={[0, 100]}
-              tick={{ fill: "#475569", fontSize: 10.5 }}
-              tickCount={5}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 13, paddingTop: 12, color: "#334155" }} />
-            {data.map((d, i) => (
-              <Radar
-                key={d.deptAbbr}
-                name={d.deptAbbr}
-                dataKey={d.deptAbbr}
-                stroke={RADAR_COLORS[i % RADAR_COLORS.length]}
-                fill={RADAR_COLORS[i % RADAR_COLORS.length]}
-                fillOpacity={0.15}
-              />
-            ))}
-          </ReRadarChart>
-        </ResponsiveContainer>
-      )}
+      <ResponsiveContainer width="100%" height={360}>
+        <BarChart data={barData} margin={{ top: 20, right: 20, left: 0, bottom: 60 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#EEF2F7" />
+          <XAxis
+            dataKey="dept"
+            tick={{ fill: "#334155", fontSize: 13, fontWeight: "700" }}
+            axisLine={{ stroke: "#E2E8F0" }}
+            tickLine={false}
+          />
+          <YAxis tick={{ fill: "#475569", fontSize: 11.5 }} axisLine={false} tickLine={false} />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 13, paddingTop: 12, color: "#334155" }} />
+          <Bar dataKey="Avg Score" fill="#8A63D2" radius={[4, 4, 0, 0]} maxBarSize={24} />
+          <Bar dataKey="Journals" fill="#16A34A" radius={[4, 4, 0, 0]} maxBarSize={24} />
+          <Bar dataKey="LSN" fill="#D97706" radius={[4, 4, 0, 0]} maxBarSize={24} />
+          <Bar dataKey="Assessments" fill="#0EA5E9" radius={[4, 4, 0, 0]} maxBarSize={24} />
+        </BarChart>
+      </ResponsiveContainer>
 
       <View style={styles.chartFooter}>
         <Text style={styles.chartFooterNote}>
-          {chartMode === "bar"
-            ? "Grouped bars comparing departments across key wellness metrics."
-            : "Radar chart showing relative performance across 5 dimensions (normalized 0-100)."}
+          Grouped bars comparing departments across key wellness metrics.
         </Text>
       </View>
     </View>
@@ -364,31 +246,6 @@ export function DepartmentCorrelationScatter({ points }: ScatterPlotProps) {
 
 // ─── Styles ────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  chartToggle: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 16,
-  },
-  toggleBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#F3EEFF",
-  },
-  toggleBtnActive: {
-    backgroundColor: "#8A63D2",
-  },
-  toggleText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#8A63D2",
-  },
-  toggleTextActive: {
-    color: "white",
-  },
   tooltip: {
     backgroundColor: "#2A1745",
     borderRadius: 10,

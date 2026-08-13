@@ -1,12 +1,12 @@
 /**
  * Student Inbox tab.
  *
- * Three views:
- *   inbox     — real conversation list (peer + admin/guidance) with unread
- *               badges, latest-message previews, human-friendly timestamps,
- *               and All / Unread / Peers / Guidance filters.
- *   directory — "New Message" flow: Peers / Admins user directory + search.
- *   chat      — the existing conversation screen (unchanged flow).
+ * Two views:
+ *   inbox — real-time conversation list (peer + admin/guidance) with unread
+ *           badges, latest-message previews, human-friendly timestamps, and
+ *           All / Unread / Peers / Guidance filters. This is a history/message
+ *           list — it does not create conversations.
+ *   chat  — the existing conversation screen (unchanged flow).
  *
  * This file only adds presentation around the existing messaging service.
  * Message sending/receiving, Firebase structure, routing, and the chat
@@ -25,6 +25,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   SectionList,
   StyleSheet,
   Text,
@@ -41,10 +42,7 @@ import {
 } from "@/hooks/useStudentProfile";
 import {
   blockUser,
-  fetchAllUsers,
   getBlockedUsers,
-  getOrCreateConversation,
-  getOrCreatePeerConversation,
   getPeerName,
   hideConversation,
   listenForConversations,
@@ -58,11 +56,9 @@ import type {
   Conversation,
   Message,
   OptimisticMessage,
-  StudentSearchResult,
 } from "@/types/messaging";
 
-type ViewMode = "inbox" | "directory" | "chat";
-type DirectoryTab = "peers" | "admins";
+type ViewMode = "inbox" | "chat";
 type InboxFilter = "all" | "unread" | "peers" | "guidance";
 
 const REMINDER_BANNER =
@@ -174,13 +170,6 @@ export default function InboxTab() {
   const [profiles, setProfiles] = useState<Record<string, StudentProfile>>({});
   const [blockedUids, setBlockedUids] = useState<string[]>([]);
 
-  // ── Directory state ──
-  const [directoryTab, setDirectoryTab] = useState<DirectoryTab>("peers");
-  const [peers, setPeers] = useState<StudentSearchResult[]>([]);
-  const [admins, setAdmins] = useState<StudentSearchResult[]>([]);
-  const [directoryLoading, setDirectoryLoading] = useState(true);
-  const [directoryFilter, setDirectoryFilter] = useState("");
-
   // ── Chat state ──
   const [activeConversation, setActiveConversation] =
     useState<Conversation | null>(null);
@@ -269,28 +258,6 @@ export default function InboxTab() {
     };
     load();
   }, [conversations, profiles, user?.uid, viewMode]);
-
-  // ── Directory: fetch users when entering "New Message" ──
-  useEffect(() => {
-    if (viewMode !== "directory" || !user?.uid) return;
-    let cancelled = false;
-    async function load() {
-      setDirectoryLoading(true);
-      const [peerList, adminList] = await Promise.all([
-        fetchAllUsers(user!.uid, "users"),
-        fetchAllUsers(user!.uid, "admins"),
-      ]);
-      if (!cancelled) {
-        setPeers(peerList);
-        setAdmins(adminList);
-        setDirectoryLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [viewMode, user?.uid]);
 
   // ── Chat: listen for messages ──
   useEffect(() => {
@@ -403,16 +370,6 @@ export default function InboxTab() {
   const unreadCount = conversations.filter((c) =>
     c.unreadBy?.includes(user?.uid || ""),
   ).length;
-
-  const filterByName = (list: StudentSearchResult[]) =>
-    list.filter(
-      (u) =>
-        !directoryFilter.trim() ||
-        u.fullName.toLowerCase().includes(directoryFilter.toLowerCase()) ||
-        (u.department || "")
-          .toLowerCase()
-          .includes(directoryFilter.toLowerCase()),
-    );
 
   // ── Open a chat from the inbox list ──
   const openChat = (conversation: Conversation) => {
@@ -628,61 +585,6 @@ export default function InboxTab() {
     );
   };
 
-  // ── Start a chat from the directory card tap ──
-  const startChat = async (item: StudentSearchResult, isPeer: boolean) => {
-    try {
-      const myName = user?.displayName || "Student";
-      if (isPeer) {
-        const convId = await getOrCreatePeerConversation(
-          user!.uid,
-          item.uid,
-          myName,
-          item.fullName,
-        );
-        setActiveConversation({
-          id: convId,
-          studentId: "",
-          adminId: "",
-          studentName: "",
-          adminName: "",
-          lastMessage: "",
-          lastMessageAt: Date.now(),
-          unreadBy: [],
-          type: "peer",
-          participants: [user!.uid, item.uid],
-          participantNames: {
-            [user!.uid]: myName,
-            [item.uid]: item.fullName,
-          },
-        });
-      } else {
-        const convId = await getOrCreateConversation(
-          user!.uid,
-          item.uid,
-          myName,
-          item.fullName,
-        );
-        setActiveConversation({
-          id: convId,
-          studentId: user!.uid,
-          adminId: item.uid,
-          studentName: myName,
-          adminName: item.fullName,
-          lastMessage: "",
-          lastMessageAt: Date.now(),
-          unreadBy: [],
-        });
-      }
-      setChatPartnerName(item.fullName);
-      setMessages([]);
-      setOptimistic([]);
-      setChatLoading(true);
-      setViewMode("chat");
-    } catch (err) {
-      console.error("Failed to start conversation:", err);
-    }
-  };
-
   const handleSend = useCallback(async () => {
     if (!inputText.trim() || !activeConversation || !user?.uid || sending)
       return;
@@ -756,8 +658,6 @@ export default function InboxTab() {
       setActiveConversation(null);
       setMessages([]);
       setOptimistic([]);
-    } else if (viewMode === "directory") {
-      setViewMode("inbox");
     }
   };
 
@@ -852,7 +752,7 @@ export default function InboxTab() {
             style={[styles.convPreview, hasUnread && styles.convPreviewBold]}
             numberOfLines={1}
           >
-            {item.lastMessage || "Start the conversation"}
+            {item.lastMessage || "No messages yet"}
           </Text>
         </View>
 
@@ -880,7 +780,12 @@ export default function InboxTab() {
         )}
       </View>
 
-      <View style={styles.filterBar}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterBar}
+        contentContainerStyle={styles.filterBarRow}
+      >
         {FILTERS.map((f) => {
           const sel = inboxFilter === f.key;
           return (
@@ -895,7 +800,7 @@ export default function InboxTab() {
               <Ionicons
                 name={f.icon as any}
                 size={14}
-                color={sel ? "#8A63D2" : "#94A3B8"}
+                color={sel ? "#FFFFFF" : "#94A3B8"}
               />
               <Text
                 style={[styles.filterText, sel && styles.filterTextActive]}
@@ -917,7 +822,7 @@ export default function InboxTab() {
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
 
       {inboxLoading ? (
         <View style={styles.emptyState}>
@@ -927,20 +832,10 @@ export default function InboxTab() {
       ) : conversations.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="chatbubbles-outline" size={48} color="#9CA3AF" />
-          <Text style={styles.emptyTitle}>Start the conversation</Text>
+          <Text style={styles.emptyTitle}>No conversations yet</Text>
           <Text style={styles.emptyText}>
-            You're in a private space to talk. Share what's on your mind, ask
-            for support, or simply start a conversation with a peer or
-            university guidance.
+            Your messages will appear here.
           </Text>
-          <Pressable
-            style={styles.primaryBtn}
-            onPress={() => setViewMode("directory")}
-          >
-            <Ionicons name="create-outline" size={18} color="white" />
-            <Text style={styles.primaryBtnText}>Start a conversation</Text>
-          </Pressable>
-          <Text style={styles.privacyNote}>{INBOX_PRIVACY_NOTE}</Text>
         </View>
       ) : filteredConversations.length === 0 ? (
         <View style={styles.emptyState}>
@@ -963,23 +858,23 @@ export default function InboxTab() {
             {inboxQuery
               ? "No matches"
               : inboxFilter === "unread"
-                ? "You're all caught up"
+                ? "You're all caught up!"
                 : inboxFilter === "peers"
                   ? "No peer conversations yet"
                   : inboxFilter === "guidance"
-                    ? "No guidance messages yet"
-                    : "No conversations"}
+                    ? "No guidance conversations yet"
+                    : "No conversations yet"}
           </Text>
           <Text style={styles.emptyText}>
             {inboxQuery
               ? `No conversations match "${inboxQuery}".`
               : inboxFilter === "unread"
-                ? "You have no unread conversations right now."
+                ? "There are no unread messages."
                 : inboxFilter === "peers"
-                  ? "Start a conversation with a fellow student to get started."
+                  ? "Messages from other students will appear here."
                   : inboxFilter === "guidance"
-                    ? "Reach out to university guidance for support."
-                    : "Try another filter or start a new conversation."}
+                    ? "Messages from your guidance team will appear here."
+                    : "Your messages will appear here."}
           </Text>
         </View>
       ) : (
@@ -1020,167 +915,6 @@ export default function InboxTab() {
         />
       )}
     </>
-  );
-
-  // ─── Directory ("New Message") view ────────────────────────────────────────
-  const renderDirectory = () => {
-    const currentList =
-      directoryTab === "peers" ? filterByName(peers) : filterByName(admins);
-    return (
-      <>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color="#94A3B8" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search by name or department..."
-            placeholderTextColor="#94A3B8"
-            value={directoryFilter}
-            onChangeText={setDirectoryFilter}
-          />
-          {directoryFilter.length > 0 && (
-            <Pressable onPress={() => setDirectoryFilter("")}>
-              <Ionicons name="close-circle" size={18} color="#94A3B8" />
-            </Pressable>
-          )}
-        </View>
-
-        <View style={styles.tabBar}>
-          <Pressable
-            style={[styles.tab, directoryTab === "peers" && styles.tabActive]}
-            onPress={() => {
-              setDirectoryTab("peers");
-              setDirectoryFilter("");
-            }}
-          >
-            <Ionicons
-              name="people"
-              size={16}
-              color={directoryTab === "peers" ? "#8A63D2" : "#94A3B8"}
-            />
-            <Text
-              style={[
-                styles.tabText,
-                directoryTab === "peers" && styles.tabTextActive,
-              ]}
-            >
-              Peers
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.tab, directoryTab === "admins" && styles.tabActive]}
-            onPress={() => {
-              setDirectoryTab("admins");
-              setDirectoryFilter("");
-            }}
-          >
-            <Ionicons
-              name="shield-checkmark"
-              size={16}
-              color={directoryTab === "admins" ? "#8A63D2" : "#94A3B8"}
-            />
-            <Text
-              style={[
-                styles.tabText,
-                directoryTab === "admins" && styles.tabTextActive,
-              ]}
-            >
-              Admins
-            </Text>
-          </Pressable>
-        </View>
-
-        {directoryLoading ? (
-          <View style={styles.emptyState}>
-            <ActivityIndicator size="large" color="#8A63D2" />
-            <Text style={styles.emptyText}>Loading users...</Text>
-          </View>
-        ) : currentList.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons
-              name={
-                directoryTab === "peers"
-                  ? "people-outline"
-                  : "shield-checkmark-outline"
-              }
-              size={48}
-              color="#9CA3AF"
-            />
-            <Text style={styles.emptyTitle}>
-              {directoryFilter
-                ? "No users found"
-                : directoryTab === "peers"
-                  ? "No peers yet"
-                  : "No admins yet"}
-            </Text>
-            <Text style={styles.emptyText}>
-              {directoryFilter
-                ? "Try a different search term."
-                : directoryTab === "peers"
-                  ? "Other students will appear here once they join."
-                  : "Counselors will appear here once they register."}
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={currentList}
-            keyExtractor={(item) => item.uid}
-            renderItem={({ item }) =>
-              renderUserCard({ item, isPeer: directoryTab === "peers" })
-            }
-            contentContainerStyle={styles.userList}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
-      </>
-    );
-  };
-
-  const renderUserCard = ({
-    item,
-    isPeer,
-  }: {
-    item: StudentSearchResult;
-    isPeer: boolean;
-  }) => (
-    <Pressable style={styles.userCard} onPress={() => startChat(item, isPeer)}>
-      <View
-        style={[
-          styles.userAvatar,
-          isPeer ? styles.userAvatarPeer : styles.userAvatarAdmin,
-        ]}
-      >
-        {item.profileImage ? (
-          <Image
-            source={{ uri: item.profileImage }}
-            style={{ width: 44, height: 44, borderRadius: 22 }}
-          />
-        ) : (
-          <Ionicons
-            name={isPeer ? "person" : "shield-checkmark"}
-            size={22}
-            color={isPeer ? "#8A63D2" : "#6D5BBF"}
-          />
-        )}
-      </View>
-      <View style={styles.userInfo}>
-        <Text style={styles.userName} numberOfLines={1}>
-          {item.fullName}
-        </Text>
-        <Text style={styles.userRole} numberOfLines={1}>
-          {item.department || (isPeer ? "Student" : "Counselor")}
-          {item.yearLevel ? ` \u00B7 ${item.yearLevel}` : ""}
-        </Text>
-        {!isPeer && (
-          <View style={styles.verifiedPill}>
-            <Ionicons name="shield-checkmark" size={11} color="#6D5BBF" />
-            <Text style={styles.verifiedPillText}>
-              Verified University Support
-            </Text>
-          </View>
-        )}
-      </View>
-      <Ionicons name="chatbubble-outline" size={18} color="#8A63D2" />
-    </Pressable>
   );
 
   // ─── Chat view (unchanged flow) ────────────────────────────────────────────
@@ -1319,11 +1053,7 @@ export default function InboxTab() {
                 ))}
               <View style={styles.headerTitleCol}>
                 <Text style={styles.headerTitle} numberOfLines={1}>
-                  {viewMode === "chat"
-                    ? headerName
-                    : viewMode === "directory"
-                      ? "New Message"
-                      : "Inbox"}
+                  {viewMode === "chat" ? headerName : "Inbox"}
                 </Text>
                 {viewMode === "chat" && chatMeta.role ? (
                   <View style={styles.headerMetaRow}>
@@ -1341,15 +1071,7 @@ export default function InboxTab() {
               </View>
             </View>
             {viewMode === "inbox" ? (
-              <Pressable
-                style={styles.backBtn}
-                onPress={() => {
-                  setDirectoryFilter("");
-                  setViewMode("directory");
-                }}
-              >
-                <Ionicons name="create-outline" size={22} color="#7C4DCC" />
-              </Pressable>
+              <View style={{ width: 40 }} />
             ) : viewMode === "chat" ? (
               <View style={styles.headerActions}>
                 <Pressable
@@ -1391,11 +1113,7 @@ export default function InboxTab() {
           )}
         </View>
 
-        {viewMode === "inbox"
-          ? renderInbox()
-          : viewMode === "directory"
-            ? renderDirectory()
-            : renderChat()}
+        {viewMode === "inbox" ? renderInbox() : renderChat()}
       </KeyboardAvoidingView>
 
       {/* ─── Conversation info modal ─────────────────────────────── */}
@@ -1727,12 +1445,11 @@ const styles = StyleSheet.create({
     borderColor: "rgba(139, 92, 246, 0.2)",
   },
   searchInput: { flex: 1, fontSize: 15, color: "#FFFFFF", paddingVertical: 0 },
-  filterBar: {
+  filterBar: { marginBottom: 8 },
+  filterBarRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: 16,
     gap: 8,
-    marginBottom: 8,
+    paddingHorizontal: 16,
   },
   filterPill: {
     flexDirection: "row",
@@ -1746,9 +1463,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(139, 92, 246, 0.2)",
   },
-  filterPillActive: { backgroundColor: "rgba(139, 92, 246, 0.2)", borderColor: "#8B5CF6" },
+  filterPillActive: { backgroundColor: "#6D28D9", borderColor: "#6D28D9" },
   filterText: { fontSize: 13, fontWeight: "500", color: "#9CA3AF" },
-  filterTextActive: { color: "#A78BFA", fontWeight: "600" },
+  filterTextActive: { color: "#FFFFFF", fontWeight: "700" },
   filterCount: {
     minWidth: 20,
     height: 20,
@@ -1758,7 +1475,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "#2A2740",
   },
-  filterCountActive: { backgroundColor: "#6D28D9" },
+  filterCountActive: { backgroundColor: "rgba(255, 255, 255, 0.22)" },
   filterCountText: { fontSize: 11, fontWeight: "700", color: "#94A3B8" },
   filterCountTextActive: { color: "#FFFFFF" },
 
@@ -1865,47 +1582,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
 
-  // Directory
-  tabBar: { flexDirection: "row", paddingHorizontal: 16, gap: 8, marginBottom: 8 },
-  tab: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: "#1E1B2E",
-    borderWidth: 1,
-    borderColor: "rgba(139, 92, 246, 0.2)",
-  },
-  tabActive: { backgroundColor: "rgba(139, 92, 246, 0.2)", borderColor: "#8B5CF6" },
-  tabText: { fontSize: 14, fontWeight: "500", color: "#9CA3AF" },
-  tabTextActive: { color: "#A78BFA", fontWeight: "600" },
-  userList: { paddingHorizontal: 16, paddingBottom: 24 },
-  userCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#1E1B2E",
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: "rgba(139, 92, 246, 0.2)",
-    gap: 12,
-  },
-  userAvatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  userAvatarPeer: { backgroundColor: "rgba(139, 92, 246, 0.2)" },
-  userAvatarAdmin: { backgroundColor: "rgba(139, 92, 246, 0.15)" },
-  userInfo: { flex: 1 },
-  userName: { fontSize: 15, fontWeight: "600", color: "#FFFFFF" },
-  userRole: { fontSize: 13, color: "#9CA3AF", marginTop: 2 },
-
   // Empty state
   emptyState: {
     flex: 1,
@@ -1923,17 +1599,6 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     marginTop: 4,
   },
-  primaryBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#8B5CF6",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
-    marginTop: 8,
-  },
-  primaryBtnText: { color: "white", fontSize: 15, fontWeight: "600" },
 
   // Reminder banner
   reminderBanner: {

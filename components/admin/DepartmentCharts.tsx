@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React from "react";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 export interface DeptComparisonMetric {
@@ -23,16 +23,12 @@ export interface ScatterPoint {
   riskLevel: "low" | "normal" | "high";
 }
 
-const RADAR_COLORS = ["#8A63D2", "#16A34A", "#D97706", "#EF4444", "#0EA5E9", "#EC4899"];
-
 // ─── Component: DepartmentComparisonChart ──────────────────────────────────
 interface ComparisonChartProps {
   data: DeptComparisonMetric[];
 }
 
 export function DepartmentComparisonChart({ data }: ComparisonChartProps) {
-  const [chartMode, setChartMode] = useState<"bar" | "radar">("bar");
-
   if (data.length === 0) {
     return (
       <View style={styles.emptyCard}>
@@ -42,25 +38,7 @@ export function DepartmentComparisonChart({ data }: ComparisonChartProps) {
     );
   }
 
-  return (
-    <View>
-      <View style={styles.chartToggle}>
-        <Pressable
-          style={[styles.toggleBtn, chartMode === "bar" && styles.toggleBtnActive]}
-          onPress={() => setChartMode("bar")}
-        >
-          <Text style={[styles.toggleText, chartMode === "bar" && styles.toggleTextActive]}>Grouped Bar</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.toggleBtn, chartMode === "radar" && styles.toggleBtnActive]}
-          onPress={() => setChartMode("radar")}
-        >
-          <Text style={[styles.toggleText, chartMode === "radar" && styles.toggleTextActive]}>Radar</Text>
-        </Pressable>
-      </View>
-      {chartMode === "bar" ? renderMobileBar(data) : renderMobileRadar(data, RADAR_COLORS)}
-    </View>
-  );
+  return <View>{renderMobileBar(data)}</View>;
 }
 
 // ─── Component: DepartmentCorrelationScatter ───────────────────────────────
@@ -133,48 +111,6 @@ function renderMobileBar(data: DeptComparisonMetric[]) {
         ))}
       </View>
     </>
-  );
-}
-
-function renderMobileRadar(data: DeptComparisonMetric[], colors: string[]) {
-  const maxScore = Math.max(...data.map((d) => d.avgScore), 1);
-  const maxJournal = Math.max(...data.map((d) => d.journalCount), 1);
-  const maxLsn = Math.max(...data.map((d) => d.lsnCount), 1);
-  const maxAssessment = Math.max(...data.map((d) => d.assessmentCount), 1);
-
-  const normalized = (val: number, max: number) => max > 0 ? (val / max) * 100 : 0;
-
-  return (
-    <View style={styles.mobileRadarTable}>
-      <View style={styles.mobileRadarHeader}>
-        <Text style={styles.mobileRadarHeaderCell}>Metric</Text>
-        {data.map((d) => (
-          <Text key={d.deptAbbr} style={[styles.mobileRadarHeaderCell, { color: colors[data.indexOf(d) % colors.length] }]}>
-            {d.deptAbbr}
-          </Text>
-        ))}
-      </View>
-      {[
-        { label: "Avg Score", get: (d: DeptComparisonMetric) => `${d.avgScore.toFixed(1)} (${normalized(d.avgScore, maxScore).toFixed(0)}%)` },
-        { label: "Journals", get: (d: DeptComparisonMetric) => `${d.journalCount} (${normalized(d.journalCount, maxJournal).toFixed(0)}%)` },
-        { label: "LSN Count", get: (d: DeptComparisonMetric) => `${d.lsnCount} (${normalized(d.lsnCount, maxLsn).toFixed(0)}%)` },
-        { label: "Assessments", get: (d: DeptComparisonMetric) => `${d.assessmentCount} (${normalized(d.assessmentCount, maxAssessment).toFixed(0)}%)` },
-        { label: "Participation", get: (d: DeptComparisonMetric) => `${(d.participationRate * 100).toFixed(0)}%` },
-        { label: "Tracked / Assessed", get: (d: DeptComparisonMetric) => `${d.trackedStudents ?? "—"} / ${d.assessedStudents ?? "—"}` },
-      ].map((m) => (
-        <View key={m.label} style={styles.mobileRadarRow}>
-          <Text style={styles.mobileRadarCell}>{m.label}</Text>
-          {data.map((d) => (
-            <Text key={d.deptAbbr} style={styles.mobileRadarCell}>{m.get(d)}</Text>
-          ))}
-        </View>
-      ))}
-      <View style={styles.radarFootnote}>
-        <Text style={styles.chartFooterNote}>
-          Percentages show each value normalized against the max in its category for fair cross-metric comparison.
-        </Text>
-      </View>
-    </View>
   );
 }
 
@@ -266,31 +202,6 @@ function renderMobileScatter(points: ScatterPoint[], deptColors: Record<string, 
 
 // ─── Styles ────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  chartToggle: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 16,
-  },
-  toggleBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#F3EEFF",
-  },
-  toggleBtnActive: {
-    backgroundColor: "#8A63D2",
-  },
-  toggleText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#8A63D2",
-  },
-  toggleTextActive: {
-    color: "white",
-  },
   chartFooter: {
     marginTop: 12,
     paddingHorizontal: 4,
@@ -396,41 +307,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#64748B",
   },
-  mobileRadarTable: {
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-  mobileRadarHeader: {
-    flexDirection: "row",
-    backgroundColor: "#F8F6FC",
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
-  },
-  mobileRadarHeaderCell: {
-    flex: 1,
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#475569",
-    textAlign: "center",
-  },
-  mobileRadarRow: {
-    flexDirection: "row",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
-  },
-  mobileRadarCell: {
-    flex: 1,
-    fontSize: 11,
-    color: "#334155",
-    textAlign: "center",
-    fontWeight: "500",
-  },
   mobileScatterGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -448,10 +324,5 @@ const styles = StyleSheet.create({
   mobileScatterDot: {
     fontSize: 10,
     color: "white",
-  },
-  radarFootnote: {
-    padding: 8,
-    borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
   },
 });

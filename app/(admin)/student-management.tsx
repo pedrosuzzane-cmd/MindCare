@@ -48,7 +48,6 @@ import {
   LIFECYCLE_LABELS,
   LIFECYCLE_STATUSES,
   SUPPORT_ACTION_LABELS,
-  SUPPORT_ACTIONS,
   SUPPORT_COLORS,
   SUPPORT_LABELS,
   SUPPORT_STATUSES,
@@ -70,6 +69,42 @@ const RISK_COLORS: Record<RiskLevel, string> = {
   normal: "#D97706",
   high: "#DB2777",
 };
+
+const CONCERN_LABELS: Record<RiskLevel, string> = {
+  low: "Low",
+  normal: "Moderate",
+  high: "Elevated",
+};
+
+// Support actions grouped by purpose. Pure UI organization — the underlying
+// actions and their status mapping are unchanged.
+const ACTION_GROUPS: { title: string; actions: SupportActionType[] }[] = [
+  { title: "Immediate / Communication", actions: ["contact_recommended", "send_wellness_checkin"] },
+  { title: "Support", actions: ["guidance_consultation", "provide_resources"] },
+  { title: "Follow-up / Monitoring", actions: ["schedule_follow_up", "monitor_only"] },
+  { title: "Closure", actions: ["resolved", "no_action"] },
+];
+
+const SUPPORT_REASON_OPTIONS = [
+  "Elevated assessment",
+  "Repeated concern",
+  "Student requested support",
+  "Follow-up due",
+  "Engagement concern",
+  "Other",
+];
+
+const CONTACT_METHOD_OPTIONS = ["Email", "Phone", "In-person", "Messaging app"];
+
+const RESOURCE_OPTIONS = [
+  "Self-help articles",
+  "Relaxation exercises",
+  "Peer support groups",
+  "Counselor referral",
+  "Crisis resources",
+];
+
+const MONITOR_PERIOD_OPTIONS = [7, 30, 60];
 
 const YEAR_OPTIONS = [
   "1st Year",
@@ -142,6 +177,56 @@ function daysSince(date?: Date | null): number | null {
 function isFollowUpOverdue(date?: Date | null): boolean {
   if (!date) return false;
   return date.getTime() < Date.now();
+}
+
+/**
+ * Combines the structured reason tags, action-specific context, and the private
+ * internal note into the single workflow `reason` string. The student inbox
+ * notification is built from the action alone (see backend), so this text is
+ * only ever visible to admins via the workflow record and audit log.
+ */
+function buildReasonSummary(opts: {
+  reasons: string[];
+  contactMethod: string | null;
+  resources: string[];
+  monitorDays: number | null;
+  notes: string;
+}): string {
+  const parts: string[] = [];
+  if (opts.reasons.length) parts.push(`Reasons: ${opts.reasons.join(", ")}`);
+  if (opts.contactMethod) parts.push(`Contact method: ${opts.contactMethod}`);
+  if (opts.resources.length)
+    parts.push(`Resources provided: ${opts.resources.join(", ")}`);
+  if (opts.monitorDays) parts.push(`Monitoring period: ${opts.monitorDays} days`);
+  const note = opts.notes.trim();
+  if (note) parts.push(`Notes: ${note}`);
+  return parts.join(" | ") || "Support workflow";
+}
+
+/** Whether the minimum required fields for the selected action are satisfied. */
+function canSaveWorkflow(a: {
+  action: SupportActionType | null;
+  followUp: Date | null;
+  assignee: string;
+  contactMethod: string | null;
+  resources: string[];
+  monitorDays: number | null;
+}): boolean {
+  if (!a.action) return false;
+  switch (a.action) {
+    case "send_wellness_checkin":
+      return !!a.contactMethod;
+    case "guidance_consultation":
+      return !!a.assignee;
+    case "schedule_follow_up":
+      return !!a.followUp && !!a.assignee;
+    case "provide_resources":
+      return a.resources.length > 0;
+    case "monitor_only":
+      return !!a.monitorDays;
+    default:
+      return true;
+  }
 }
 
 // ─── Small UI pieces ────────────────────────────────────────────────────────
@@ -321,7 +406,10 @@ export default function StudentManagementScreen() {
   const [wfTarget, setWfTarget] = useState<string | null>(null);
   const [wfAction, setWfAction] = useState<SupportActionType | null>(null);
   const [wfReason, setWfReason] = useState("");
-  const [wfNote, setWfNote] = useState("");
+  const [wfReasons, setWfReasons] = useState<string[]>([]);
+  const [wfContactMethod, setWfContactMethod] = useState<string | null>(null);
+  const [wfResources, setWfResources] = useState<string[]>([]);
+  const [wfMonitorDays, setWfMonitorDays] = useState<number | null>(null);
   const [wfAssignee, setWfAssignee] = useState("");
   const [wfFollowUp, setWfFollowUp] = useState<Date | null>(null);
   const [wfSaving, setWfSaving] = useState(false);
@@ -694,23 +782,25 @@ export default function StudentManagementScreen() {
     setWfBulk(targets.length > 1);
     setWfTarget(targets[0] ?? null);
     setWfAction(presetAction ?? null);
-    setWfNote("");
+    setWfReason("");
+    setWfReasons([]);
+    setWfContactMethod(null);
+    setWfResources([]);
+    setWfMonitorDays(null);
     setWfFollowUp(null);
     setWfError(null);
     setWfAssignee(user?.uid ?? "");
     wfRequestIds.current = new Map();
     const first = entryById(targets[0]);
     if (first) {
-      const reasons: string[] = [];
-      if (first.latestRiskLevel === "high") reasons.push("Repeated elevated concern indicators were recorded.");
-      if ((first.supportStatus ?? "no_action") === "outreach_recommended") reasons.push("Outreach was recommended after a review of indicators.");
-      if (first.assessmentsCount === 0 || first.latestAssessmentDate === undefined) reasons.push("No assessment has been recorded yet.");
+      const presets: string[] = [];
+      if (first.latestRiskLevel === "high") presets.push("Elevated assessment");
+      if ((first.supportStatus ?? "no_action") === "outreach_recommended") presets.push("Repeated concern");
+      if (first.assessmentsCount === 0 || first.latestAssessmentDate === undefined) presets.push("Engagement concern");
       if (isFollowUpOverdue(first.followUpDate)) {
-        reasons.push("A scheduled follow-up is overdue.");
+        presets.push("Follow-up due");
       }
-      setWfReason(reasons.length ? reasons.join(" ") : "Standard check-in to review current wellbeing.");
-    } else {
-      setWfReason("");
+      setWfReasons(presets);
     }
     setWfOpen(true);
   };
@@ -726,13 +816,40 @@ export default function StudentManagementScreen() {
       setWfError("No student selected.");
       return;
     }
+    if (wfAction === "send_wellness_checkin" && !wfContactMethod) {
+      setWfError("Please select a contact method.");
+      return;
+    }
+    if (wfAction === "guidance_consultation" && !wfAssignee) {
+      setWfError("Please assign a counselor.");
+      return;
+    }
     if (wfAction === "schedule_follow_up" && !wfFollowUp) {
       setWfError("Please select a follow-up date.");
+      return;
+    }
+    if (wfAction === "schedule_follow_up" && !wfAssignee) {
+      setWfError("Please assign a counselor for the follow-up.");
+      return;
+    }
+    if (wfAction === "provide_resources" && wfResources.length === 0) {
+      setWfError("Please select at least one resource.");
+      return;
+    }
+    if (wfAction === "monitor_only" && !wfMonitorDays) {
+      setWfError("Please select a monitoring period.");
       return;
     }
     setWfSaving(true);
     setWfError(null);
     const assigneeName = admins.find((a) => a.uid === wfAssignee)?.name ?? "Administrator";
+    const reason = buildReasonSummary({
+      reasons: wfReasons,
+      contactMethod: wfAction === "send_wellness_checkin" ? wfContactMethod : null,
+      resources: wfAction === "provide_resources" ? wfResources : [],
+      monitorDays: wfAction === "monitor_only" ? wfMonitorDays : null,
+      notes: wfReason,
+    });
     try {
       for (const uid of targets) {
         const s = entryById(uid);
@@ -747,8 +864,12 @@ export default function StudentManagementScreen() {
           action: wfAction,
           assignedTo: wfAssignee || user?.uid || "",
           assignedToName: wfAssignee ? assigneeName : actor?.name,
-          followUpDate: wfFollowUp,
-          reason: wfReason.trim() || "Support workflow",
+          followUpDate:
+            wfAction === "schedule_follow_up" ||
+            wfAction === "guidance_consultation"
+              ? wfFollowUp
+              : null,
+          reason,
           requestId,
         });
       }
@@ -953,6 +1074,16 @@ export default function StudentManagementScreen() {
       </View>
     );
   }
+
+  const wfValid = canSaveWorkflow({
+    action: wfAction,
+    followUp: wfFollowUp,
+    assignee: wfAssignee,
+    contactMethod: wfContactMethod,
+    resources: wfResources,
+    monitorDays: wfMonitorDays,
+  });
+  const wfCanSave = wfValid && !wfSaving;
 
   return (
     <View style={styles.root}>
@@ -1859,37 +1990,66 @@ export default function StudentManagementScreen() {
               )}
 
               <Text style={styles.fieldLabel}>Support action</Text>
-              {SUPPORT_ACTIONS.map((action) => {
-                const selectedAction = wfAction === action;
-                return (
-                  <Pressable
-                    key={action}
-                    style={[styles.wfActionRow, selectedAction && styles.wfActionRowActive]}
-                    onPress={() => setWfAction(action)}
-                  >
-                    <View
-                      style={[
-                        styles.wfActionRadio,
-                        selectedAction && styles.wfActionRadioActive,
-                      ]}
-                    >
-                      {selectedAction ? <View style={styles.wfActionRadioDot} /> : null}
-                    </View>
-                    <Text
-                      style={[
-                        styles.wfActionLabel,
-                        selectedAction && styles.wfActionLabelActive,
-                      ]}
-                    >
-                      {SUPPORT_ACTION_LABELS[action]}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+              {ACTION_GROUPS.map((group) => (
+                <View key={group.title}>
+                  <Text style={styles.groupHeader}>{group.title}</Text>
+                  {group.actions.map((action) => {
+                    const selectedAction = wfAction === action;
+                    return (
+                      <Pressable
+                        key={action}
+                        style={[styles.wfActionRow, selectedAction && styles.wfActionRowActive]}
+                        onPress={() => setWfAction(action)}
+                      >
+                        <View
+                          style={[
+                            styles.wfActionRadio,
+                            selectedAction && styles.wfActionRadioActive,
+                          ]}
+                        >
+                          {selectedAction ? <View style={styles.wfActionRadioDot} /> : null}
+                        </View>
+                        <Text
+                          style={[
+                            styles.wfActionLabel,
+                            selectedAction && styles.wfActionLabelActive,
+                          ]}
+                        >
+                          {SUPPORT_ACTION_LABELS[action]}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ))}
 
-              {wfAction === "schedule_follow_up" ? (
+              {wfAction === "send_wellness_checkin" ? (
                 <View>
-                  <Text style={styles.fieldLabel}>Follow-up date</Text>
+                  <Text style={styles.fieldLabel}>Contact method</Text>
+                  <View style={styles.assigneeRow}>
+                    {CONTACT_METHOD_OPTIONS.map((m) => {
+                      const active = wfContactMethod === m;
+                      return (
+                        <Pressable
+                          key={m}
+                          style={[styles.assigneeChip, active && styles.assigneeChipActive]}
+                          onPress={() => setWfContactMethod(active ? null : m)}
+                        >
+                          <Text style={[styles.assigneeChipText, active && styles.assigneeChipTextActive]}>
+                            {m}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : null}
+
+              {wfAction === "guidance_consultation" || wfAction === "schedule_follow_up" ? (
+                <View>
+                  <Text style={styles.fieldLabel}>
+                    {wfAction === "schedule_follow_up" ? "Follow-up date" : "Follow-up date (optional)"}
+                  </Text>
                   <View style={styles.quickDates}>
                     {[
                       { label: "Today", date: new Date() },
@@ -1944,15 +2104,160 @@ export default function StudentManagementScreen() {
                 </View>
               ) : null}
 
-              <Text style={styles.fieldLabel}>Reason / notes</Text>
+              {wfAction === "provide_resources" ? (
+                <View>
+                  <Text style={styles.fieldLabel}>Resources provided</Text>
+                  <View style={styles.assigneeRow}>
+                    {RESOURCE_OPTIONS.map((r) => {
+                      const on = wfResources.includes(r);
+                      return (
+                        <Pressable
+                          key={r}
+                          style={[styles.assigneeChip, on && styles.assigneeChipActive]}
+                          onPress={() =>
+                            setWfResources((prev) =>
+                              on ? prev.filter((x) => x !== r) : [...prev, r],
+                            )
+                          }
+                        >
+                          <View style={styles.tagChipInner}>
+                            {on ? <Ionicons name="checkmark" size={13} color="#6D28D9" /> : null}
+                            <Text style={[styles.assigneeChipText, on && styles.assigneeChipTextActive]}>
+                              {r}
+                            </Text>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : null}
+
+              {wfAction === "monitor_only" ? (
+                <View>
+                  <Text style={styles.fieldLabel}>Monitoring period</Text>
+                  <View style={styles.assigneeRow}>
+                    {MONITOR_PERIOD_OPTIONS.map((d) => {
+                      const active = wfMonitorDays === d;
+                      return (
+                        <Pressable
+                          key={d}
+                          style={[styles.assigneeChip, active && styles.assigneeChipActive]}
+                          onPress={() => setWfMonitorDays(active ? null : d)}
+                        >
+                          <Text style={[styles.assigneeChipText, active && styles.assigneeChipTextActive]}>
+                            {d} days
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : null}
+
+              <Text style={styles.fieldLabel}>Reason</Text>
+              <View style={styles.assigneeRow}>
+                {SUPPORT_REASON_OPTIONS.map((r) => {
+                  const on = wfReasons.includes(r);
+                  return (
+                    <Pressable
+                      key={r}
+                      style={[styles.assigneeChip, on && styles.assigneeChipActive]}
+                      onPress={() =>
+                        setWfReasons((prev) =>
+                          on ? prev.filter((x) => x !== r) : [...prev, r],
+                        )
+                      }
+                    >
+                      <View style={styles.tagChipInner}>
+                        {on ? <Ionicons name="checkmark" size={13} color="#6D28D9" /> : null}
+                        <Text style={[styles.assigneeChipText, on && styles.assigneeChipTextActive]}>
+                          {r}
+                        </Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.fieldLabel}>Internal notes</Text>
+              <Text style={styles.fieldHint}>
+                Private — never sent to the student. Only admins can see this.
+              </Text>
               <TextInput
                 style={[styles.reasonInput, styles.wfReason]}
-                placeholder="Administrative notes for this action…"
+                placeholder={wfAction === "resolved" ? "What was resolved?…" : "Optional administrative notes…"}
                 placeholderTextColor="#9CA3AF"
                 multiline
                 value={wfReason}
                 onChangeText={setWfReason}
               />
+
+              {wfAction ? (
+                <View style={styles.summaryBox}>
+                  <Text style={styles.summaryTitle}>Support summary</Text>
+                  <View style={styles.summaryRow}>
+                    <Ionicons name="flash-outline" size={14} color="#6D28D9" />
+                    <Text style={styles.summaryText}>{SUPPORT_ACTION_LABELS[wfAction]}</Text>
+                  </View>
+                  {(wfAction === "guidance_consultation" || wfAction === "schedule_follow_up") && wfAssignee ? (
+                    <View style={styles.summaryRow}>
+                      <Ionicons name="person-circle-outline" size={14} color="#6D28D9" />
+                      <Text style={styles.summaryText}>
+                        Counselor: {admins.find((a) => a.uid === wfAssignee)?.name ?? "Administrator"}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {(wfAction === "guidance_consultation" || wfAction === "schedule_follow_up") && wfFollowUp ? (
+                    <View style={styles.summaryRow}>
+                      <Ionicons name="calendar-outline" size={14} color="#6D28D9" />
+                      <Text style={styles.summaryText}>Follow-up: {formatDate(wfFollowUp)}</Text>
+                    </View>
+                  ) : null}
+                  {wfAction === "send_wellness_checkin" && wfContactMethod ? (
+                    <View style={styles.summaryRow}>
+                      <Ionicons name="call-outline" size={14} color="#6D28D9" />
+                      <Text style={styles.summaryText}>Contact method: {wfContactMethod}</Text>
+                    </View>
+                  ) : null}
+                  {wfAction === "provide_resources" && wfResources.length > 0 ? (
+                    <View style={styles.summaryRow}>
+                      <Ionicons name="book-outline" size={14} color="#6D28D9" />
+                      <Text style={styles.summaryText}>Resources: {wfResources.join(", ")}</Text>
+                    </View>
+                  ) : null}
+                  {wfAction === "monitor_only" && wfMonitorDays ? (
+                    <View style={styles.summaryRow}>
+                      <Ionicons name="timer-outline" size={14} color="#6D28D9" />
+                      <Text style={styles.summaryText}>Monitoring: {wfMonitorDays} days</Text>
+                    </View>
+                  ) : null}
+                  {wfReasons.length > 0 ? (
+                    <View style={styles.summaryRow}>
+                      <Ionicons name="flag-outline" size={14} color="#6D28D9" />
+                      <Text style={styles.summaryText}>Reasons: {wfReasons.join(", ")}</Text>
+                    </View>
+                  ) : null}
+                  {wfReason.trim() ? (
+                    <View style={styles.summaryRow}>
+                      <Ionicons name="document-text-outline" size={14} color="#6D28D9" />
+                      <Text style={styles.summaryText}>Private note recorded (not sent to student)</Text>
+                    </View>
+                  ) : null}
+                  <View style={styles.summaryNotify}>
+                    <Ionicons
+                      name={wfAction === "no_action" ? "eye-off-outline" : "mail-outline"}
+                      size={14}
+                      color="#6B7280"
+                    />
+                    <Text style={styles.summaryNotifyText}>
+                      {wfAction === "no_action"
+                        ? "Student notification: None"
+                        : "Student notification: Will be sent to Inbox"}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
 
               {!wfBulk && wfTarget ? (
                 <SupportHistory
@@ -1968,8 +2273,8 @@ export default function StudentManagementScreen() {
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </Pressable>
               <Pressable
-                style={[styles.primaryBtn, (!wfAction || wfSaving) && styles.btnDisabled]}
-                disabled={!wfAction || wfSaving}
+                style={[styles.primaryBtn, !wfValid && styles.primaryBtnDisabled]}
+                disabled={!wfCanSave}
                 onPress={saveWorkflow}
               >
                 {wfSaving ? (
@@ -1980,7 +2285,9 @@ export default function StudentManagementScreen() {
                     </Text>
                   </View>
                 ) : (
-                  <Text style={styles.primaryBtnText}>Save Support Action</Text>
+                  <Text style={[styles.primaryBtnText, !wfValid && styles.primaryBtnTextDisabled]}>
+                    Save Support Action
+                  </Text>
                 )}
               </Pressable>
             </View>
@@ -2156,6 +2463,7 @@ export default function StudentManagementScreen() {
  * administrative support metadata only — no journal content is shown here.
  */
 function StudentContext({ student }: { student?: StudentManagementEntry }) {
+  const [showConcernInfo, setShowConcernInfo] = useState(false);
   if (!student) {
     return <Text style={styles.emptyText}>No student selected.</Text>;
   }
@@ -2170,16 +2478,16 @@ function StudentContext({ student }: { student?: StudentManagementEntry }) {
           <Text style={styles.avatarTextLarge}>{initials(student.name)}</Text>
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.reviewName}>{student.name}</Text>
-          <Text style={styles.reviewSub}>
+          <Text style={styles.reviewName} numberOfLines={1}>{student.name}</Text>
+          <Text style={styles.reviewSub} numberOfLines={1}>
             {student.schoolId} · {student.department || "—"} · {student.yearLevel || "—"}
           </Text>
         </View>
       </View>
-      <View style={styles.reviewGrid}>
-        <View style={styles.reviewCell}>
-          <Text style={styles.reviewLabel}>Latest assessment</Text>
-          <Text style={styles.reviewValue}>
+      <View style={styles.contextChips}>
+        <View style={styles.contextChip}>
+          <Text style={styles.contextChipLabel}>Assessment</Text>
+          <Text style={styles.contextChipValue}>
             {lastAssessed === null
               ? "None"
               : lastAssessed === 0
@@ -2187,19 +2495,31 @@ function StudentContext({ student }: { student?: StudentManagementEntry }) {
                 : `${lastAssessed}d ago`}
           </Text>
         </View>
-        <View style={styles.reviewCell}>
-          <Text style={styles.reviewLabel}>Assessment risk</Text>
-          <Badge label={RISK_LABELS[risk]} color={RISK_COLORS[risk]} />
+        <Pressable style={styles.contextChip} onPress={() => setShowConcernInfo((v) => !v)}>
+          <Text style={styles.contextChipLabel}>
+            Concern
+            <Ionicons name="information-circle-outline" size={12} color="#6B7280" />
+          </Text>
+          <Text style={[styles.contextChipValue, { color: RISK_COLORS[risk] }]}>
+            ● {CONCERN_LABELS[risk]}
+          </Text>
+        </Pressable>
+        <View style={styles.contextChip}>
+          <Text style={styles.contextChipLabel}>Support</Text>
+          <Text style={styles.contextChipValue} numberOfLines={1}>
+            {SUPPORT_LABELS[support]}
+          </Text>
         </View>
-        <View style={styles.reviewCell}>
-          <Text style={styles.reviewLabel}>Support status</Text>
-          <Badge label={SUPPORT_LABELS[support]} color={SUPPORT_COLORS[support]} />
-        </View>
-        <View style={styles.reviewCell}>
-          <Text style={styles.reviewLabel}>Follow-up</Text>
-          <Text style={styles.reviewValue}>{formatDate(student.followUpDate)}</Text>
+        <View style={styles.contextChip}>
+          <Text style={styles.contextChipLabel}>Follow-up</Text>
+          <Text style={styles.contextChipValue}>{formatDate(student.followUpDate)}</Text>
         </View>
       </View>
+      {showConcernInfo ? (
+        <Text style={styles.concernHint}>
+          Assessment-derived indicator. Not a clinical diagnosis.
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -2438,9 +2758,17 @@ function StudentProfileModal({
             <View style={styles.profileActions}>
               <Pressable
                 style={styles.outlineBtn}
-                onPress={() => router.push({ pathname: "./student-detail", params: { uid: student.uid } })}
+                onPress={() =>
+                  router.push({
+                    pathname: "/(admin)/student-journals",
+                    params: {
+                      studentId: student.uid,
+                      studentName: student.name,
+                    },
+                  })
+                }
               >
-                <Ionicons name="eye-outline" size={16} color="#6D28D9" />
+                <Ionicons name="journal-outline" size={16} color="#6D28D9" />
                 <Text style={styles.outlineBtnText}>Full journal history</Text>
               </Pressable>
             </View>
@@ -3272,6 +3600,12 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#FFFFFF",
   },
+  primaryBtnDisabled: {
+    backgroundColor: "#E6E1F2",
+  },
+  primaryBtnTextDisabled: {
+    color: "#9A94B0",
+  },
   optionRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -3352,6 +3686,21 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
+  fieldHint: {
+    fontSize: 11,
+    color: "#9CA3AF",
+    marginTop: -4,
+    marginBottom: 4,
+  },
+  groupHeader: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#6B7280",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginTop: 12,
+    marginBottom: 6,
+  },
   pickerPlaceholder: {
     fontSize: 13,
     color: "#9CA3AF",
@@ -3417,6 +3766,11 @@ const styles = StyleSheet.create({
   },
   assigneeChipTextActive: {
     color: "#6D28D9",
+  },
+  tagChipInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   // Bulk support note
   bulkNote: {
@@ -3513,28 +3867,85 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#6B7280",
   },
-  reviewGrid: {
+  // Compact safety-context strip (support modal)
+  contextChips: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginTop: 12,
+    gap: 6,
+    marginTop: 10,
   },
-  reviewCell: {
-    flexBasis: "45%",
+  contextChip: {
     flexGrow: 1,
-    backgroundColor: "#F9FAFB",
-    borderRadius: 10,
-    padding: 10,
+    flexBasis: "45%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#EEECF7",
+    paddingHorizontal: 8,
+    paddingVertical: 6,
   },
-  reviewLabel: {
-    fontSize: 11,
+  contextChipLabel: {
+    fontSize: 10,
+    fontWeight: "700",
     color: "#6B7280",
-    marginBottom: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+    marginBottom: 2,
   },
-  reviewValue: {
-    fontSize: 14,
+  contextChipValue: {
+    fontSize: 13,
     fontWeight: "800",
     color: "#1E1B4B",
+  },
+  concernHint: {
+    fontSize: 11,
+    color: "#6B7280",
+    fontStyle: "italic",
+    marginTop: 8,
+  },
+  // Support summary (pre-save recap)
+  summaryBox: {
+    backgroundColor: "#F5F0FF",
+    borderWidth: 1,
+    borderColor: "#E9DCFC",
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 14,
+  },
+  summaryTitle: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#6D28D9",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginBottom: 5,
+  },
+  summaryText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#4B5563",
+    lineHeight: 17,
+  },
+  summaryNotify: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 6,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#E9DCFC",
+  },
+  summaryNotifyText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#6B7280",
   },
   // Support history (append-only)
   supportHistoryBox: {

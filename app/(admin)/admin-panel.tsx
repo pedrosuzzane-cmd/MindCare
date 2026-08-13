@@ -4092,13 +4092,9 @@ export default function AdminPanelScreen() {
                             label: "Participation Rate",
                             text: "Students in the department who completed at least one assessment ÷ total tracked students in that department × 100.",
                           },
-                          {
-                            label: "Radar Normalization",
-                            text: "The radar chart normalizes each metric to a 0–100 relative scale so departments of different sizes can be compared fairly.",
-                          },
                         ]}
                       />
-                      {/* Grouped bar / radar chart */}
+                      {/* Grouped bar chart */}
                       {deptComparisonChartData.length > 1 && (
                         <View style={styles.insightsEnlargedCard}>
                           <View style={styles.insightsEnlargedHeader}>
@@ -4274,11 +4270,8 @@ export default function AdminPanelScreen() {
                   <Text style={styles.guideSectionBody}>
                     Departments are grouped by their official code (e.g., CCJE).
                     The grouped bar chart compares raw counts: average score,
-                    journals, LSN students, and assessments. The radar chart
-                    normalizes each metric to a 0–100 relative scale so
-                    departments of different sizes can be compared fairly.
-                    Participation rate = students assessed ÷ students tracked in
-                    the department.
+                    journals, LSN students, and assessments. Participation rate
+                    = students assessed ÷ students tracked in the department.
                   </Text>
                 </View>
                 <View style={styles.guideSection}>
