@@ -876,15 +876,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerGradient: {
-    paddingBottom: 20,
+    paddingBottom: 10,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
+    paddingTop: 10,
+    paddingBottom: 8,
   },
   backButton: {
     width: 40,
@@ -902,7 +902,7 @@ const styles = StyleSheet.create({
   },
   subtitleContainer: {
     paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingBottom: 8,
   },
   subtitle: {
     fontSize: 15,
@@ -915,7 +915,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 14,
     paddingBottom: 24,
   },
   offlineBanner: {

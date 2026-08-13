@@ -15,6 +15,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSidePanel } from "@/contexts/SidePanelContext";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 import GeminiChat from "@/components/GeminiChat";
 import { auth, db } from "@/constants/firebase";
 import { useAchievements } from "@/hooks/useAchievements";
@@ -96,6 +98,8 @@ const WELLNESS_MESSAGES = [
 export default function DashboardScreen() {
   const { user, role } = useAuth();
   const { toggle: toggleSidePanel } = useSidePanel();
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
 
   const { achievements, totalEarned } = useAchievements();
   const { entries } = useJournal();
@@ -316,7 +320,7 @@ export default function DashboardScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Open menu"
                 >
-                  <Ionicons name="menu" size={24} color="#8A63D2" />
+                  <Ionicons name="menu" size={24} color={theme.primary} />
                 </Pressable>
               </View>
             </View>
@@ -358,19 +362,19 @@ export default function DashboardScreen() {
                 icon="book"
                 value={String(weekJournalCount)}
                 label="Reflections this week"
-                tint="#7C4DCC"
+                tint={theme.accent.purple}
               />
               <MicroStat
                 icon="trophy"
                 value={`${totalEarned}/${totalAchievements}`}
                 label="Achievements unlocked"
-                tint="#D97706"
+                tint={theme.accent.amber}
               />
               <MicroStat
                 icon="notifications"
                 value={String(activeReminderCount)}
                 label="Active reminders"
-                tint="#0F766E"
+                tint={theme.accent.teal}
               />
               <MicroStat
                 icon="clipboard"
@@ -382,7 +386,7 @@ export default function DashboardScreen() {
                       : `${daysSinceAssessment}d ago`
                 }
                 label="Last check-in"
-                tint="#B56576"
+                tint={theme.accent.rose}
               />
             </View>
 
@@ -408,7 +412,7 @@ export default function DashboardScreen() {
             {/* Wellness Message */}
             <View style={styles.quoteContainer}>
               <View style={styles.quoteIcon}>
-                <Ionicons name="leaf" size={16} color="#8A63D2" />
+                <Ionicons name="leaf" size={16} color={theme.primary} />
               </View>
               <Text style={styles.quote}>{dailyMessage}</Text>
             </View>
@@ -422,251 +426,252 @@ export default function DashboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0F0D15",
-  },
-  background: {
-    flex: 1,
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 110,
-    alignItems: "center",
-  },
-  scrollContentDesktop: {
-    paddingHorizontal: 32,
-  },
-  contentColumn: {
-    width: "100%",
-    maxWidth: 720,
-  },
-  contentColumnDesktop: {
-    maxWidth: 720,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingTop: 12,
-    paddingBottom: 20,
-  },
-  logoContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  logoIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#1E1B2E",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 8,
-    overflow: "hidden",
-  },
-  logoIconImage: {
-    width: 24,
-    height: 24,
-  },
-  logoText: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#8A63D2",
-  },
-  rightButtons: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  menuButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#1E1B2E",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  menuButtonPressed: {
-    backgroundColor: "#2A2640",
-  },
-  greetingSection: {
-    marginBottom: 18,
-  },
-  greeting: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#9CA3AF",
-  },
-  checkinCard: {
-    backgroundColor: "#1E1B2E",
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "rgba(139, 92, 246, 0.2)",
-    // @ts-ignore — web-only shadow property
-    boxShadow: "0px 2px 12px rgba(124, 77, 204, 0.06)",
-    elevation: 2,
-    marginBottom: 18,
-  },
-  checkinHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  checkinTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
-  checkinHint: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#8A63D2",
-  },
-  checkinSubtitle: {
-    fontSize: 13,
-    color: "#9CA3AF",
-    marginTop: 2,
-    marginBottom: 12,
-  },
-  moodRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  moodChip: {
-    width: 40,
-    height: 46,
-    borderRadius: 14,
-    backgroundColor: "#2A2640",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  moodChipPressed: {
-    backgroundColor: "#3A3460",
-  },
-  moodChipEmoji: {
-    fontSize: 22,
-  },
-  microRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 12,
-    marginBottom: 16,
-  },
-  microStat: {
-    width: "48%",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderRadius: 16,
-    padding: 16,
-    gap: 10,
-    backgroundColor: "#1E1B2E",
-    borderWidth: 1,
-    borderColor: "rgba(139, 92, 246, 0.2)",
-  },
-  microIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  microText: {
-    flex: 1,
-    flexShrink: 1,
-  },
-  microValue: {
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  microLabel: {
-    fontSize: 11,
-    color: "#A79FC4",
-  },
-  cardsContainer: {
-    gap: 14,
-    marginBottom: 22,
-  },
-  cardRow: {
-    flexDirection: "row",
-    alignItems: "stretch",
-    gap: 14,
-  },
-  card: {
-    flex: 1,
-    minWidth: 0,
-    borderRadius: 20,
-    padding: 16,
-    backgroundColor: "#1E1B2E",
-    borderWidth: 1,
-    borderColor: "rgba(139, 92, 246, 0.2)",
-    // @ts-ignore — web-only shadow property
-    boxShadow: "0px 2px 12px rgba(124, 77, 204, 0.06)",
-    elevation: 2,
-    gap: 10,
-  },
-  cardPressed: {
-    opacity: 0.85,
-  },
-  cardEmoji: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    justifyContent: "center",
-    alignItems: "center",
-    alignSelf: "flex-start",
-  },
-  cardEmojiText: {
-    fontSize: 22,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    flexShrink: 1,
-  },
-  cardDescription: {
-    fontSize: 13,
-    lineHeight: 18,
-    color: "#9CA3AF",
-    flexShrink: 1,
-  },
-  quoteContainer: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    borderRadius: 18,
-    padding: 16,
-    backgroundColor: "#1E1B2E",
-    borderWidth: 1,
-    borderColor: "rgba(139, 92, 246, 0.2)",
-  },
-  quoteIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "#2A2640",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 2,
-  },
-  quote: {
-    flex: 1,
-    fontSize: 14,
-    lineHeight: 21,
-    color: "#D1D5DB",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    background: {
+      flex: 1,
+    },
+    scrollContainer: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingHorizontal: 16,
+      paddingBottom: 110,
+      alignItems: "center",
+    },
+    scrollContentDesktop: {
+      paddingHorizontal: 32,
+    },
+    contentColumn: {
+      width: "100%",
+      maxWidth: 720,
+    },
+    contentColumnDesktop: {
+      maxWidth: 720,
+    },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingTop: 12,
+      paddingBottom: 20,
+    },
+    logoContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    logoIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: theme.card,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 8,
+      overflow: "hidden",
+    },
+    logoIconImage: {
+      width: 24,
+      height: 24,
+    },
+    logoText: {
+      fontSize: 20,
+      fontWeight: "800",
+      color: theme.primary,
+    },
+    rightButtons: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    menuButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: theme.card,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    menuButtonPressed: {
+      backgroundColor: theme.secondaryCard,
+    },
+    greetingSection: {
+      marginBottom: 18,
+    },
+    greeting: {
+      fontSize: 26,
+      fontWeight: "700",
+      color: theme.text,
+      marginBottom: 4,
+    },
+    subtitle: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: theme.secondaryText,
+    },
+    checkinCard: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: theme.border,
+      // @ts-ignore — web-only shadow property
+      boxShadow: `0px 2px 12px ${theme.shadow}`,
+      elevation: 2,
+      marginBottom: 18,
+    },
+    checkinHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    checkinTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: theme.text,
+    },
+    checkinHint: {
+      fontSize: 11,
+      fontWeight: "600",
+      color: theme.primary,
+    },
+    checkinSubtitle: {
+      fontSize: 13,
+      color: theme.secondaryText,
+      marginTop: 2,
+      marginBottom: 12,
+    },
+    moodRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
+    moodChip: {
+      width: 40,
+      height: 46,
+      borderRadius: 14,
+      backgroundColor: theme.inputBg,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    moodChipPressed: {
+      backgroundColor: theme.secondaryCard,
+    },
+    moodChipEmoji: {
+      fontSize: 22,
+    },
+    microRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      gap: 12,
+      marginBottom: 16,
+    },
+    microStat: {
+      width: "48%",
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      borderRadius: 16,
+      padding: 16,
+      gap: 10,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    microIcon: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    microText: {
+      flex: 1,
+      flexShrink: 1,
+    },
+    microValue: {
+      fontSize: 14,
+      fontWeight: "800",
+    },
+    microLabel: {
+      fontSize: 11,
+      color: theme.secondaryText,
+    },
+    cardsContainer: {
+      gap: 14,
+      marginBottom: 22,
+    },
+    cardRow: {
+      flexDirection: "row",
+      alignItems: "stretch",
+      gap: 14,
+    },
+    card: {
+      flex: 1,
+      minWidth: 0,
+      borderRadius: 20,
+      padding: 16,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+      // @ts-ignore — web-only shadow property
+      boxShadow: `0px 2px 12px ${theme.shadow}`,
+      elevation: 2,
+      gap: 10,
+    },
+    cardPressed: {
+      opacity: 0.85,
+    },
+    cardEmoji: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      justifyContent: "center",
+      alignItems: "center",
+      alignSelf: "flex-start",
+    },
+    cardEmojiText: {
+      fontSize: 22,
+    },
+    cardTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: theme.text,
+      flexShrink: 1,
+    },
+    cardDescription: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: theme.secondaryText,
+      flexShrink: 1,
+    },
+    quoteContainer: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 10,
+      borderRadius: 18,
+      padding: 16,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    quoteIcon: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: theme.inputBg,
+      justifyContent: "center",
+      alignItems: "center",
+      marginTop: 2,
+    },
+    quote: {
+      flex: 1,
+      fontSize: 14,
+      lineHeight: 21,
+      color: theme.text,
+    },
+  });

@@ -330,12 +330,12 @@ export default function InboxTab() {
     return rows;
   }, [allMessages]);
 
-  // ── Filtered conversation list ──
-  const filteredConversations = useMemo(() => {
+  // Conversations visible to the student: hidden conversations and peer
+  // conversations with a blocked participant are excluded. Guidance/admin
+  // conversations are never blocked.
+  const availableConversations = useMemo(() => {
     if (!user?.uid) return [];
-    // Exclude conversations the user hid, plus peer conversations with a
-    // blocked participant. Guidance/admin conversations are never blocked.
-    let list = conversations.filter((c) => {
+    return conversations.filter((c) => {
       if (c.hiddenBy?.includes(user.uid!)) return false;
       if (c.type === "peer") {
         const other = c.participants?.find((u) => u !== user.uid);
@@ -343,6 +343,29 @@ export default function InboxTab() {
       }
       return true;
     });
+  }, [conversations, user?.uid, blockedUids]);
+
+  // Counts for the All / Unread / Peers / Guidance filter pills.
+  const filterCounts = useMemo<Record<InboxFilter, number>>(() => {
+    if (!user?.uid) return { all: 0, unread: 0, peers: 0, guidance: 0 };
+    const peers = availableConversations.filter(
+      (c) => c.type === "peer",
+    ).length;
+    const unread = availableConversations.filter((c) =>
+      c.unreadBy?.includes(user.uid!),
+    ).length;
+    return {
+      all: availableConversations.length,
+      unread,
+      peers,
+      guidance: availableConversations.length - peers,
+    };
+  }, [availableConversations, user?.uid]);
+
+  // ── Filtered conversation list ──
+  const filteredConversations = useMemo(() => {
+    if (!user?.uid) return [];
+    let list = availableConversations;
     if (inboxFilter === "unread")
       list = list.filter((c) => c.unreadBy?.includes(user.uid!));
     if (inboxFilter === "peers") list = list.filter((c) => c.type === "peer");
@@ -366,7 +389,7 @@ export default function InboxTab() {
       });
     }
     return list;
-  }, [conversations, inboxFilter, inboxQuery, profiles, user?.uid, blockedUids]);
+  }, [availableConversations, inboxFilter, inboxQuery, profiles, user?.uid]);
 
   // Pinned conversations sort to the top of the inbox.
   const orderedConversations = useMemo(() => {
@@ -863,6 +886,9 @@ export default function InboxTab() {
           return (
             <Pressable
               key={f.key}
+              accessibilityRole="button"
+              accessibilityLabel={`Show ${f.label.toLowerCase()} conversations`}
+              accessibilityState={{ selected: sel }}
               style={[styles.filterPill, sel && styles.filterPillActive]}
               onPress={() => setInboxFilter(f.key)}
             >
@@ -876,6 +902,18 @@ export default function InboxTab() {
               >
                 {f.label}
               </Text>
+              <View
+                style={[styles.filterCount, sel && styles.filterCountActive]}
+              >
+                <Text
+                  style={[
+                    styles.filterCountText,
+                    sel && styles.filterCountTextActive,
+                  ]}
+                >
+                  {filterCounts[f.key]}
+                </Text>
+              </View>
             </Pressable>
           );
         })}
@@ -906,20 +944,42 @@ export default function InboxTab() {
         </View>
       ) : filteredConversations.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="search-outline" size={48} color="#9CA3AF" />
+          <Ionicons
+            name={
+              inboxQuery
+                ? "search-outline"
+                : inboxFilter === "unread"
+                  ? "mail-unread-outline"
+                  : inboxFilter === "peers"
+                    ? "people-outline"
+                    : inboxFilter === "guidance"
+                      ? "shield-checkmark-outline"
+                      : "chatbubbles-outline"
+            }
+            size={48}
+            color="#9CA3AF"
+          />
           <Text style={styles.emptyTitle}>
             {inboxQuery
               ? "No matches"
               : inboxFilter === "unread"
                 ? "You're all caught up"
-                : "No conversations"}
+                : inboxFilter === "peers"
+                  ? "No peer conversations yet"
+                  : inboxFilter === "guidance"
+                    ? "No guidance messages yet"
+                    : "No conversations"}
           </Text>
           <Text style={styles.emptyText}>
             {inboxQuery
               ? `No conversations match "${inboxQuery}".`
               : inboxFilter === "unread"
                 ? "You have no unread conversations right now."
-                : "Try another filter or start a new conversation."}
+                : inboxFilter === "peers"
+                  ? "Start a conversation with a fellow student to get started."
+                  : inboxFilter === "guidance"
+                    ? "Reach out to university guidance for support."
+                    : "Try another filter or start a new conversation."}
           </Text>
         </View>
       ) : (
@@ -1669,6 +1729,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 15, color: "#FFFFFF", paddingVertical: 0 },
   filterBar: {
     flexDirection: "row",
+    flexWrap: "wrap",
     paddingHorizontal: 16,
     gap: 8,
     marginBottom: 8,
@@ -1676,10 +1737,11 @@ const styles = StyleSheet.create({
   filterPill: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 5,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    minHeight: 44,
+    borderRadius: 22,
     backgroundColor: "#1E1B2E",
     borderWidth: 1,
     borderColor: "rgba(139, 92, 246, 0.2)",
@@ -1687,6 +1749,18 @@ const styles = StyleSheet.create({
   filterPillActive: { backgroundColor: "rgba(139, 92, 246, 0.2)", borderColor: "#8B5CF6" },
   filterText: { fontSize: 13, fontWeight: "500", color: "#9CA3AF" },
   filterTextActive: { color: "#A78BFA", fontWeight: "600" },
+  filterCount: {
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#2A2740",
+  },
+  filterCountActive: { backgroundColor: "#6D28D9" },
+  filterCountText: { fontSize: 11, fontWeight: "700", color: "#94A3B8" },
+  filterCountTextActive: { color: "#FFFFFF" },
 
   // Conversation list
   convList: { paddingHorizontal: 16, paddingBottom: 24 },
