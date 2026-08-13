@@ -1,174 +1,101 @@
 /**
- * Student Inbox tab.
- *
- * Two views:
- *   inbox — real-time conversation list (peer + admin/guidance) with unread
- *           badges, latest-message previews, human-friendly timestamps, and
- *           All / Unread / Peers / Guidance filters. This is a history/message
- *           list — it does not create conversations.
- *   chat  — the existing conversation screen (unchanged flow).
- *
- * This file only adds presentation around the existing messaging service.
- * Message sending/receiving, Firebase structure, routing, and the chat
- * composer are untouched.
+ * Student messaging screen — Inbox with real-time conversation list + chat room.
+ * Tapping a conversation opens the existing chat view via messagingService.
+ * Chat view features: friendly reminder banner, phone-style bubbles,
+ * optimistic send, failed message retry, long-press delete/copy, emoji picker.
+ * Inbox features: All / Unread / Peers / Guidance filter pills, search.
  */
 
 import { Ionicons } from "@expo/vector-icons";
-import { doc, getDoc } from "firebase/firestore";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
-  Alert,
+  Clipboard,
   FlatList,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
+  SafeAreaView,
   ScrollView,
-  SectionList,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { db } from "@/constants/firebase";
+import EmojiPicker from "@/components/chat/EmojiPicker";
+
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/hooks/AuthContext";
+import { useStudentProfile } from "@/hooks/useStudentProfile";
 import {
-  useStudentProfile,
-  type StudentProfile,
-} from "@/hooks/useStudentProfile";
-import {
-  blockUser,
-  getBlockedUsers,
+  deleteMessage,
   getPeerName,
-  hideConversation,
   listenForConversations,
   listenForMessages,
+  listenForTyping,
   markAsRead,
-  reportConversation,
-  sendMessage,
-  togglePinConversation,
+  sendMessage as sendMsg,
+  startTyping,
 } from "@/services/messagingService";
+import {
+  listenForPresence,
+  setUserOffline,
+  setUserOnline,
+} from "@/services/presenceService";
 import type {
   Conversation,
   Message,
   OptimisticMessage,
 } from "@/types/messaging";
 
-type ViewMode = "inbox" | "chat";
+type ViewMode = "directory" | "chat";
 type InboxFilter = "all" | "unread" | "peers" | "guidance";
 
 const REMINDER_BANNER =
-  "Your conversations are private. Please avoid sharing passwords or sensitive personal information.";
+  "Friendly Reminder: Please keep conversations respectful, supportive, and kind.";
 
-const PRIVACY_NOTE =
-  "This is not an emergency service. If you are in crisis or need urgent help, please use the Support Hotlines.";
-
-const INBOX_PRIVACY_NOTE =
-  "Your conversations are private. Please avoid sharing passwords, account credentials, or other sensitive personal information. MindCare is not an emergency service.";
-
-const FILTERS: { key: InboxFilter; label: string; icon: string }[] = [
-  { key: "all", label: "All", icon: "chatbubbles" },
-  { key: "unread", label: "Unread", icon: "mail-unread" },
-  { key: "peers", label: "Peers", icon: "people" },
-  { key: "guidance", label: "Guidance", icon: "shield-checkmark" },
+const FILTER_OPTIONS: {
+  key: InboxFilter;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}[] = [
+  { key: "all", label: "All", icon: "chatbubbles-outline" },
+  { key: "unread", label: "Unread", icon: "mail-unread-outline" },
+  { key: "peers", label: "Peers", icon: "people-outline" },
+  { key: "guidance", label: "Guidance", icon: "shield-checkmark-outline" },
 ];
 
-function formatConversationTime(ts: number): string {
-  if (!ts) return "";
-  const d = new Date(ts);
-  const now = new Date();
-  const startOfToday = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-  ).getTime();
-  const day = new Date(
-    d.getFullYear(),
-    d.getMonth(),
-    d.getDate(),
-  ).getTime();
-  const diffDays = Math.round((startOfToday - day) / 86400000);
+const BOTTOM_THRESHOLD = 80;
 
-  if (diffDays === 0) {
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  }
-  if (diffDays === 1) {
-    return "Yesterday";
-  }
-  if (d.getFullYear() === now.getFullYear()) {
-    return d.toLocaleDateString([], { month: "short", day: "numeric" });
-  }
-  return d.toLocaleDateString([], {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function dayKey(ts: number): string {
-  const d = new Date(ts);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-}
-
-function formatDayLabel(ts: number): string {
-  const d = new Date(ts);
-  const now = new Date();
-  const startOfToday = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-  ).getTime();
-  const day = new Date(
-    d.getFullYear(),
-    d.getMonth(),
-    d.getDate(),
-  ).getTime();
-  const diffDays = Math.round((startOfToday - day) / 86400000);
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  return d.toLocaleDateString([], {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  }).toUpperCase();
-}
-
-function formatStartedDate(ts?: number): string {
-  if (!ts) return "Unknown";
-  return new Date(ts).toLocaleDateString([], {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function normalizeProfile(uid: string, data: any): StudentProfile {
-  return {
-    uid,
-    fullName: data.fullName || data.displayName,
-    profileImage: data.profileImage,
-    department: data.department || data.position,
-    yearLevel: data.yearLevel,
-  };
-}
-
-export default function InboxTab() {
+export default function StudentMessagesScreen() {
   const { user } = useAuth();
+  const userId = user?.uid;
+  const insets = useSafeAreaInsets();
+  const { theme } = useMindCareTheme();
 
   // ── View state ──
-  const [viewMode, setViewMode] = useState<ViewMode>("inbox");
+  const [viewMode, setViewMode] = useState<ViewMode>("directory");
 
   // ── Inbox state ──
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [inboxLoading, setInboxLoading] = useState(true);
-  const [inboxFilter, setInboxFilter] = useState<InboxFilter>("all");
-  const [inboxQuery, setInboxQuery] = useState("");
-  const [profiles, setProfiles] = useState<Record<string, StudentProfile>>({});
-  const [blockedUids, setBlockedUids] = useState<string[]>([]);
+  const [activeFilter, setActiveFilter] = useState<InboxFilter>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // ── Chat state ──
   const [activeConversation, setActiveConversation] =
@@ -179,8 +106,6 @@ export default function InboxTab() {
   const [inputText, setInputText] = useState("");
   const [sending, setSending] = useState(false);
   const [chatLoading, setChatLoading] = useState(true);
-  const [infoVisible, setInfoVisible] = useState(false);
-  const [menuVisible, setMenuVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   const scrollToBottom = useCallback((animated = true) => {
@@ -189,737 +114,573 @@ export default function InboxTab() {
     }, 50);
   }, []);
 
-  // ── Live partner profile for the chat header ──
-  const partnerUid = useMemo(() => {
-    if (viewMode !== "chat" || !activeConversation) return undefined;
-    if (activeConversation.type === "peer") {
-      return activeConversation.participants?.find((u) => u !== user?.uid);
-    }
-    return activeConversation.adminId || undefined;
-  }, [viewMode, activeConversation, user?.uid]);
+  // ── Context menu state ──
+  const [contextVisible, setContextVisible] = useState(false);
+  const [contextMsg, setContextMsg] = useState<Message | null>(null);
+  const [showEmoji, setShowEmoji] = useState(false);
 
-  const liveProfile = useStudentProfile(partnerUid);
-  const headerName = liveProfile?.fullName || chatPartnerName;
+  // ── Presence state ──
+  const [partnerOnline, setPartnerOnline] = useState(false);
+  const [presenceMap, setPresenceMap] = useState<Record<string, boolean>>({});
 
-  // ── Listen for the user's conversations (peer + admin/guidance) ──
-  useEffect(() => {
-    if (!user?.uid || viewMode !== "inbox") return;
-    const unsub = listenForConversations(
-      user.uid,
-      "student",
-      (convs) => {
-        setConversations(convs);
-        setInboxLoading(false);
-      },
-      () => setInboxLoading(false),
-    );
-    return () => unsub();
-  }, [user?.uid, viewMode]);
+  // ── Typing state ──
+  const [partnerTyping, setPartnerTyping] = useState(false);
 
-  // ── Load the list of users blocked by the student ──
-  useEffect(() => {
-    if (!user?.uid) return;
-    let cancelled = false;
-    getBlockedUsers(user.uid).then((uids) => {
-      if (!cancelled) setBlockedUids(uids);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.uid]);
+  // ── Scroll state ──
+  const [isNearBottom, setIsNearBottom] = useState(true);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
-  // ── Resolve partner profiles (name, department, avatar) for list rows ──
-  useEffect(() => {
-    if (!user?.uid || viewMode !== "inbox") return;
-    const uids = new Set<string>();
-    conversations.forEach((c) => {
-      const other =
-        c.type === "peer"
-          ? c.participants?.find((u) => u !== user.uid)
-          : c.adminId;
-      if (other) uids.add(other);
-    });
+  // ── Track scroll position to decide when to show the scroll-to-bottom button ──
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { contentOffset, contentSize, layoutMeasurement } =
+        event.nativeEvent;
+      const distanceFromBottom =
+        contentSize.height - (contentOffset.y + layoutMeasurement.height);
+      const near = distanceFromBottom <= BOTTOM_THRESHOLD;
+      setIsNearBottom(near);
+      setShowScrollToBottom(!near);
+    },
+    [],
+  );
 
-    const load = async () => {
-      const map: Record<string, StudentProfile> = {};
-      for (const uid of uids) {
-        if (profiles[uid]) continue;
-        let snap = await getDoc(doc(db, "users", uid));
-        if (snap.exists()) {
-          map[uid] = normalizeProfile(uid, snap.data());
-        } else {
-          snap = await getDoc(doc(db, "admins", uid));
-          if (snap.exists()) map[uid] = normalizeProfile(uid, snap.data());
-        }
-      }
-      if (Object.keys(map).length > 0) {
-        setProfiles((prev) => ({ ...prev, ...map }));
-      }
-    };
-    load();
-  }, [conversations, profiles, user?.uid, viewMode]);
+  const jumpToBottom = useCallback(() => {
+    setIsNearBottom(true);
+    setShowScrollToBottom(false);
+    scrollToBottom(true);
+  }, [scrollToBottom]);
 
-  // ── Chat: listen for messages ──
-  useEffect(() => {
-    if (!activeConversation?.id) return;
-    const unsub = listenForMessages(activeConversation.id, (msgs) => {
-      setMessages(msgs);
-      setChatLoading(false);
-      markAsRead(activeConversation.id, user!.uid);
-      setOptimistic((prev) =>
-        prev.filter((o) => !msgs.some((m) => m.id === o.id)),
-      );
-      scrollToBottom(false);
-    });
-    return () => unsub();
-  }, [activeConversation?.id, user?.uid]);
-
+  // ── Merge Firestore messages with optimistic ones ──
   const allMessages: OptimisticMessage[] = [
     ...messages,
     ...optimistic.filter((o) => !messages.some((m) => m.id === o.id)),
   ];
 
-  // Chat rows = message rows with day-separator headers inserted between days.
-  const chatRows = useMemo(() => {
-    type Row =
-      | { kind: "date"; id: string; label: string }
-      | { kind: "msg"; id: string; msg: OptimisticMessage };
-    const rows: Row[] = [];
-    let lastDay = "";
-    allMessages.forEach((m) => {
-      const key = dayKey(m.createdAt);
-      if (key !== lastDay) {
-        rows.push({ kind: "date", id: `date-${key}`, label: formatDayLabel(m.createdAt) });
-        lastDay = key;
-      }
-      rows.push({ kind: "msg", id: m.id, msg: m });
-    });
-    return rows;
-  }, [allMessages]);
+  // ── Live partner profile (name + avatar stay current when peer updates) ──
+  const partnerUid = useMemo(() => {
+    if (viewMode !== "chat" || !activeConversation) return undefined;
+    return activeConversation.participants?.find((u) => u !== user?.uid);
+  }, [viewMode, activeConversation, user?.uid]);
+  const liveProfile = useStudentProfile(partnerUid);
 
-  // Conversations visible to the student: hidden conversations and peer
-  // conversations with a blocked participant are excluded. Guidance/admin
-  // conversations are never blocked.
-  const availableConversations = useMemo(() => {
-    if (!user?.uid) return [];
-    return conversations.filter((c) => {
-      if (c.hiddenBy?.includes(user.uid!)) return false;
-      if (c.type === "peer") {
-        const other = c.participants?.find((u) => u !== user.uid);
-        if (other && blockedUids.includes(other)) return false;
+  // Display name for the other participant of a conversation.
+  // Peer conversations use participantNames; guidance uses the admin name.
+  const getPartnerLabel = useCallback(
+    (conv: Conversation): string => {
+      if (conv.type === "peer") {
+        return getPeerName(conv, user?.uid || "");
+      }
+      return conv.adminName || conv.studentName || "Guidance";
+    },
+    [user?.uid],
+  );
+
+  // ── Filter + search (derived from the single source of truth) ──
+  const filteredConversations = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const result = conversations.filter((c) => {
+      if (activeFilter === "unread" && !c.unreadBy?.includes(user?.uid || "")) {
+        return false;
+      }
+      if (activeFilter === "peers" && c.type !== "peer") return false;
+      if (activeFilter === "guidance" && c.type === "peer") return false;
+      if (query) {
+        const name = getPartnerLabel(c).toLowerCase();
+        if (!name.includes(query)) return false;
       }
       return true;
     });
-  }, [conversations, user?.uid, blockedUids]);
+    // [INBOX DEBUG] temporary — metadata only
+    console.log("[INBOX DEBUG] activeFilter:", activeFilter);
+    console.log("[INBOX DEBUG] searchQuery:", JSON.stringify(searchQuery));
+    console.log("[INBOX DEBUG] filtered count:", result?.length);
+    return result;
+  }, [conversations, activeFilter, searchQuery, user?.uid, getPartnerLabel]);
 
-  // Counts for the All / Unread / Peers / Guidance filter pills.
-  const filterCounts = useMemo<Record<InboxFilter, number>>(() => {
-    if (!user?.uid) return { all: 0, unread: 0, peers: 0, guidance: 0 };
-    const peers = availableConversations.filter(
-      (c) => c.type === "peer",
-    ).length;
-    const unread = availableConversations.filter((c) =>
-      c.unreadBy?.includes(user.uid!),
-    ).length;
-    return {
-      all: availableConversations.length,
-      unread,
-      peers,
-      guidance: availableConversations.length - peers,
-    };
-  }, [availableConversations, user?.uid]);
-
-  // ── Filtered conversation list ──
-  const filteredConversations = useMemo(() => {
-    if (!user?.uid) return [];
-    let list = availableConversations;
-    if (inboxFilter === "unread")
-      list = list.filter((c) => c.unreadBy?.includes(user.uid!));
-    if (inboxFilter === "peers") list = list.filter((c) => c.type === "peer");
-    if (inboxFilter === "guidance")
-      list = list.filter((c) => c.type !== "peer");
-
-    const q = inboxQuery.trim().toLowerCase();
-    if (q) {
-      list = list.filter((c) => {
-        const isPeer = c.type === "peer";
-        const other = isPeer
-          ? c.participants?.find((u) => u !== user.uid)
-          : c.adminId;
-        const prof = other ? profiles[other] : undefined;
-        const name = isPeer
-          ? prof?.fullName || c.participantNames?.[other || ""] || ""
-          : prof?.fullName || c.adminName || "";
-        const dept = prof?.department || "";
-        const haystack = [name, dept, c.lastMessage].join(" ").toLowerCase();
-        return haystack.includes(q);
-      });
+  const emptyStateMessage = useMemo(() => {
+    if (conversations.length === 0) {
+      return {
+        title: "No conversations yet",
+        message:
+          "Your conversations with peers and guidance counsellors will appear here.",
+      };
     }
-    return list;
-  }, [availableConversations, inboxFilter, inboxQuery, profiles, user?.uid]);
+    if (searchQuery.trim()) {
+      return {
+        title: "No matches",
+        message: `No conversations match "${searchQuery}".`,
+      };
+    }
+    switch (activeFilter) {
+      case "unread":
+        return {
+          title: "No unread conversations",
+          message: "You're all caught up!",
+        };
+      case "peers":
+        return {
+          title: "No peer conversations",
+          message: "Peer chats will appear here once they start.",
+        };
+      case "guidance":
+        return {
+          title: "No guidance conversations",
+          message: "Guidance chats will appear here once they start.",
+        };
+      default:
+        return { title: "No conversations", message: "" };
+    }
+  }, [conversations.length, activeFilter, searchQuery]);
 
-  // Pinned conversations sort to the top of the inbox.
-  const orderedConversations = useMemo(() => {
-    const isPinned = (c: Conversation) =>
-      !!user?.uid && !!c.pinnedBy?.includes(user.uid);
-    const pinned = filteredConversations.filter(isPinned);
-    const rest = filteredConversations.filter((c) => !isPinned(c));
-    return { pinned, recent: rest };
-  }, [filteredConversations, user?.uid]);
+  // ── Real-time listener for all conversations (peer + guidance) ──
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsub = listenForConversations(user.uid, "student", (convs) => {
+      // [INBOX DEBUG] temporary — metadata only, no message bodies
+      console.log("[INBOX DEBUG] conversation count:", convs?.length);
+      console.log(
+        "[INBOX DEBUG] first conversation keys:",
+        convs?.[0] ? Object.keys(convs[0]) : [],
+      );
+      console.log(
+        "[INBOX DEBUG] first conversation metadata:",
+        convs?.[0]
+          ? {
+              id: convs[0].id,
+              participants: convs[0].participants,
+              type: convs[0].type,
+              unreadBy: convs[0].unreadBy,
+              lastMessageAt: convs[0].lastMessageAt,
+            }
+          : null,
+      );
+      setConversations(convs);
+      setInboxLoading(false);
+    });
+    return () => unsub();
+  }, [user?.uid]);
 
-  const unreadCount = conversations.filter((c) =>
-    c.unreadBy?.includes(user?.uid || ""),
-  ).length;
+  // ── Listen for presence of conversation partners ──
+  useEffect(() => {
+    if (conversations.length === 0 || !user?.uid) return;
 
-  // ── Open a chat from the inbox list ──
-  const openChat = (conversation: Conversation) => {
-    const isPeer = conversation.type === "peer";
-    const other = isPeer
-      ? conversation.participants?.find((u) => u !== user?.uid)
-      : conversation.adminId;
-    const prof = other ? profiles[other] : undefined;
-    const name = isPeer
-      ? prof?.fullName ||
-        getPeerName(conversation, user?.uid || "") ||
-        "Student"
-      : prof?.fullName || conversation.adminName || "Support";
+    const unsubs = conversations.map((conv) => {
+      const peerUid = conv.participants?.find((p) => p !== user.uid);
+      if (!peerUid) return () => {};
+      return listenForPresence(peerUid, (online) => {
+        setPresenceMap((prev) => ({ ...prev, [peerUid]: online }));
+      });
+    });
 
+    return () => unsubs.forEach((unsub) => unsub());
+  }, [conversations, user?.uid]);
+
+  // ── Listen for messages when in chat view ──
+  useEffect(() => {
+    if (!activeConversation?.id || !userId) return;
+
+    const unsub = listenForMessages(activeConversation.id, (msgs) => {
+      setMessages(msgs);
+      setChatLoading(false);
+      markAsRead(activeConversation.id, userId);
+      setOptimistic((prev) =>
+        prev.filter((o) => !msgs.some((m) => m.id === o.id)),
+      );
+      // Only follow to the bottom if the user is already near the newest
+      // message — never force-scroll while they are reading older messages.
+      if (isNearBottom) {
+        scrollToBottom(false);
+      }
+    });
+
+    return () => unsub();
+  }, [activeConversation?.id, isNearBottom, scrollToBottom, userId]);
+
+  // ── Scroll to newest message once when a conversation opens ──
+  // Reset scroll state synchronously during render (valid derived-state
+  // pattern, avoids cascading setState in the effect body).
+  const [prevConvId, setPrevConvId] = useState<string | null>(null);
+  if (activeConversation?.id && prevConvId !== activeConversation.id) {
+    setPrevConvId(activeConversation.id);
+    setIsNearBottom(true);
+    setShowScrollToBottom(false);
+  }
+  useEffect(() => {
+    if (!activeConversation?.id) return;
+    scrollToBottom(false);
+  }, [activeConversation?.id, scrollToBottom]);
+
+  // ── Set self as online on mount, offline on unmount ──
+  useEffect(() => {
+    if (!user?.uid) return;
+    setUserOnline(user.uid);
+    return () => {
+      setUserOffline(user.uid);
+    };
+  }, [user?.uid]);
+
+  // ── Listen for partner presence ──
+  useEffect(() => {
+    if (!activeConversation?.participants || !user?.uid) return;
+    const otherUid = activeConversation.participants.find(
+      (uid) => uid !== user.uid,
+    );
+    if (!otherUid) return;
+
+    const unsub = listenForPresence(otherUid, (online) => {
+      setPartnerOnline(online);
+    });
+    return () => unsub();
+  }, [activeConversation?.id, activeConversation?.participants, user?.uid]);
+
+  // ── Listen for partner typing ──
+  useEffect(() => {
+    if (!activeConversation?.id || !user?.uid) return;
+
+    const unsub = listenForTyping(activeConversation.id, user.uid, (typing) => {
+      setPartnerTyping(typing);
+    });
+    return () => unsub();
+  }, [activeConversation?.id, user?.uid]);
+
+  // ── Open a conversation from the inbox ──
+  const openConversation = (conversation: Conversation) => {
     setActiveConversation(conversation);
-    setChatPartnerName(name);
+    setChatPartnerName(getPartnerLabel(conversation));
     setMessages([]);
     setOptimistic([]);
     setChatLoading(true);
     setViewMode("chat");
   };
 
-  // ── Chat header metadata (name, role line, verified status) ──
-  const chatMeta = useMemo(() => {
-    const conv = activeConversation;
-    if (!conv || !user?.uid) return { role: "", verified: false };
-    const isPeer = conv.type === "peer";
-    const other = isPeer
-      ? conv.participants?.find((u) => u !== user.uid)
-      : conv.adminId;
-    const prof = other ? profiles[other] : liveProfile;
-    if (isPeer) {
-      return {
-        role: [prof?.department, prof?.yearLevel].filter(Boolean).join(" · "),
-        verified: false,
-      };
-    }
-    return {
-      role: prof?.department || "University Guidance Office",
-      verified: true,
-    };
-  }, [activeConversation, user?.uid, profiles, liveProfile]);
-
-  const chatStartedAt = useMemo(() => {
-    if (messages.length > 0) return messages[0]?.createdAt;
-    return activeConversation?.lastMessageAt;
-  }, [messages, activeConversation]);
-
-  // ── Pin toggle for a conversation ──
-  const handleTogglePin = async (conversation: Conversation) => {
-    if (!user?.uid) return;
-    const isPinned = !!conversation.pinnedBy?.includes(user.uid);
-    const id = conversation.id;
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === id
-          ? {
-              ...c,
-              pinnedBy: isPinned
-                ? (c.pinnedBy || []).filter((u) => u !== user.uid)
-                : [...(c.pinnedBy || []), user.uid],
-            }
-          : c,
-      ),
-    );
-    if (activeConversation?.id === id) {
-      setActiveConversation((prev) =>
-        prev
-          ? {
-              ...prev,
-              pinnedBy: isPinned
-                ? (prev.pinnedBy || []).filter((u) => u !== user.uid)
-                : [...(prev.pinnedBy || []), user.uid],
-            }
-          : prev,
-      );
-    }
-    try {
-      await togglePinConversation(id, user.uid);
-    } catch (err) {
-      console.error("Failed to toggle pin:", err);
-    }
-  };
-
-  // ── Report a conversation ──
-  const handleReport = (conversation: Conversation) => {
-    if (!user?.uid) return;
-    Alert.alert(
-      "Report conversation",
-      "Please select a reason. A counselor will review your report.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Harassment or bullying",
-          onPress: () => submitReport(conversation, "Harassment or bullying"),
-        },
-        {
-          text: "Inappropriate content",
-          onPress: () => submitReport(conversation, "Inappropriate content"),
-        },
-        {
-          text: "Spam",
-          onPress: () => submitReport(conversation, "Spam"),
-        },
-        {
-          text: "Other",
-          onPress: () => submitReport(conversation, "Other"),
-        },
-      ],
-    );
-  };
-
-  const submitReport = async (
-    conversation: Conversation,
-    reason: string,
-  ) => {
-    if (!user?.uid) return;
-    const isPeer = conversation.type === "peer";
-    const other = isPeer
-      ? conversation.participants?.find((u) => u !== user.uid)
-      : conversation.adminId;
-    if (!other) return;
-    try {
-      await reportConversation({
-        conversationId: conversation.id,
-        reporterUid: user.uid,
-        reportedUid: other,
-        type: isPeer ? "peer" : "admin",
-        reason,
-      });
-      Alert.alert(
-        "Report submitted",
-        "Thank you. A counselor will review this conversation.",
-      );
-    } catch (err) {
-      console.error("Failed to report:", err);
-      Alert.alert("Could not submit report", "Please try again later.");
-    }
-  };
-
-  // ── Block a peer (only available for peer conversations) ──
-  const handleBlock = (conversation: Conversation) => {
-    if (!user?.uid || conversation.type !== "peer") return;
-    const other = conversation.participants?.find((u) => u !== user.uid);
-    if (!other) return;
-    const name =
-      conversation.participantNames?.[other] ||
-      profiles[other]?.fullName ||
-      "this student";
-    Alert.alert(
-      "Block this student?",
-      `${name} will no longer be able to message you, and their conversation will be removed from your inbox.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Block",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await blockUser(user.uid, other);
-              setBlockedUids((prev) =>
-                prev.includes(other) ? prev : [...prev, other],
-              );
-              if (activeConversation?.id === conversation.id) {
-                setViewMode("inbox");
-                setActiveConversation(null);
-                setMessages([]);
-                setOptimistic([]);
-              }
-              Alert.alert("Blocked", `${name} has been blocked.`);
-            } catch (err) {
-              console.error("Failed to block:", err);
-            }
-          },
-        },
-      ],
-    );
-  };
-
-  // ── Delete/hide a conversation for this user only ──
-  const handleDeleteConversation = (conversation: Conversation) => {
-    if (!user?.uid) return;
-    Alert.alert(
-      "Delete conversation?",
-      "This removes the conversation from your inbox only. The other participant won't see your future messages here.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await hideConversation(conversation.id, user.uid);
-              setConversations((prev) =>
-                prev.map((c) =>
-                  c.id === conversation.id
-                    ? { ...c, hiddenBy: [...(c.hiddenBy || []), user.uid] }
-                    : c,
-                ),
-              );
-              if (activeConversation?.id === conversation.id) {
-                setViewMode("inbox");
-                setActiveConversation(null);
-                setMessages([]);
-                setOptimistic([]);
-              }
-            } catch (err) {
-              console.error("Failed to delete conversation:", err);
-            }
-          },
-        },
-      ],
-    );
-  };
-
+  // ─── Send with optimistic UI ─────────────────────────────────────────────
   const handleSend = useCallback(async () => {
-    if (!inputText.trim() || !activeConversation || !user?.uid || sending)
+    if (!inputText.trim() || !activeConversation || !userId || sending)
       return;
+
     const text = inputText.trim();
     const tempId = `temp_${Date.now()}`;
     setInputText("");
-    setOptimistic((prev) => [
-      ...prev,
-      {
-        id: tempId,
-        senderId: user.uid,
-        text,
-        createdAt: Date.now(),
-        isAdmin: false,
-        failed: false,
-      },
-    ]);
+
+    const optMsg: OptimisticMessage = {
+      id: tempId,
+      senderId: userId,
+      text,
+      createdAt: Date.now(),
+      isAdmin: false,
+      failed: false,
+    };
+    setOptimistic((prev) => [...prev, optMsg]);
     setSending(true);
+
     try {
-      const realId = await sendMessage(
+      const realId = await sendMsg(
         activeConversation.id,
         text,
-        user.uid,
+        userId,
         false,
       );
       setOptimistic((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, id: realId } : m)),
       );
-    } catch {
+    } catch (err) {
+      console.error("Failed to send:", err);
       setOptimistic((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, failed: true } : m)),
       );
     } finally {
       setSending(false);
     }
-  }, [inputText, activeConversation, user?.uid, sending]);
+  }, [inputText, activeConversation, userId, sending]);
 
-  const handleRetry = async (msg: OptimisticMessage) => {
-    if (!activeConversation || !user?.uid) return;
-    setOptimistic((prev) =>
-      prev.map((m) => (m.id === msg.id ? { ...m, failed: false } : m)),
-    );
+  // ─── Retry a failed message ──────────────────────────────────────────────
+  const handleRetry = useCallback(
+    async (msg: OptimisticMessage) => {
+      if (!activeConversation || !userId) return;
+
+      setOptimistic((prev) =>
+        prev.map((m) => (m.id === msg.id ? { ...m, failed: false } : m)),
+      );
+
+      try {
+        const realId = await sendMsg(
+          activeConversation.id,
+          msg.text,
+          userId,
+          false,
+        );
+        setOptimistic((prev) =>
+          prev.map((m) => (m.id === msg.id ? { ...m, id: realId } : m)),
+        );
+      } catch {
+        setOptimistic((prev) =>
+          prev.map((m) => (m.id === msg.id ? { ...m, failed: true } : m)),
+        );
+      }
+    },
+    [activeConversation, userId],
+  );
+
+  // ─── Context menu actions ────────────────────────────────────────────────
+  const handleCopy = () => {
+    if (contextMsg) {
+      Clipboard.setString(contextMsg.deleted ? "" : contextMsg.text);
+    }
+    setContextVisible(false);
+  };
+
+  const handleDelete = async () => {
+    if (!contextMsg || !activeConversation) return;
+    setContextVisible(false);
+
     try {
-      const realId = await sendMessage(
-        activeConversation.id,
-        msg.text,
-        user.uid,
-        false,
-      );
-      setOptimistic((prev) =>
-        prev.map((m) => (m.id === msg.id ? { ...m, id: realId } : m)),
-      );
-    } catch {
-      setOptimistic((prev) =>
-        prev.map((m) => (m.id === msg.id ? { ...m, failed: true } : m)),
-      );
+      await deleteMessage(activeConversation.id, contextMsg.id);
+    } catch (err) {
+      console.error("Failed to delete:", err);
     }
   };
 
-  const formatTime = (ts: number) => {
-    const diff = Date.now() - ts;
-    const d = new Date(ts);
-    if (diff < 86400000)
-      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    return d.toLocaleDateString([], { month: "short", day: "numeric" });
-  };
+  const formatTime = (timestamp: number) => {
+    const now = Date.now();
+    const diff = now - timestamp;
+    const date = new Date(timestamp);
 
-  const handleBack = () => {
-    if (viewMode === "chat") {
-      setViewMode("inbox");
-      setActiveConversation(null);
-      setMessages([]);
-      setOptimistic([]);
+    if (diff < 86400000) {
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     }
+    return date.toLocaleDateString([], { month: "short", day: "numeric" });
   };
 
-  // ─── Inbox: conversation row ───────────────────────────────────────────────
+  // ─── Inbox: Conversation row ─────────────────────────────────────────────
   const renderConversation = ({ item }: { item: Conversation }) => {
-    const isPeer = item.type === "peer";
-    const other = isPeer
-      ? item.participants?.find((u) => u !== user?.uid)
-      : item.adminId;
-    const prof = other ? profiles[other] : undefined;
-    const name = isPeer
-      ? prof?.fullName ||
-        item.participantNames?.[other || ""] ||
-        getPeerName(item, user?.uid || "") ||
-        "Student"
-      : prof?.fullName || item.adminName || "Support";
-    const subtitle = isPeer
-      ? [prof?.department, prof?.yearLevel].filter(Boolean).join(" · ") ||
-        "Peer"
-      : prof?.department || "University Support";
     const hasUnread = item.unreadBy?.includes(user?.uid || "");
-    const isPinned = !!user?.uid && !!item.pinnedBy?.includes(user.uid);
+    const partnerName = getPartnerLabel(item);
+    const isPeer = item.type === "peer";
+    const peerUid = item.participants?.find((u) => u !== user?.uid);
+    const isOnline = peerUid ? presenceMap[peerUid] : false;
 
     return (
-      <Pressable
-        style={[styles.convCard, hasUnread && styles.convCardUnread]}
-        onPress={() => openChat(item)}
-        onLongPress={() => handleTogglePin(item)}
-        delayLongPress={350}
-      >
-        <View
-          style={[
-            styles.convAvatar,
-            isPeer ? styles.convAvatarPeer : styles.convAvatarAdmin,
-          ]}
-        >
-          {prof?.profileImage ? (
-            <Image
-              source={{ uri: prof.profileImage }}
-              style={{ width: 46, height: 46, borderRadius: 23 }}
-            />
-          ) : (
+      <Pressable style={styles.convRow} onPress={() => openConversation(item)}>
+        <View style={styles.convAvatarWrapper}>
+          <View
+            style={[
+              styles.convAvatar,
+              isPeer ? styles.convAvatarPeer : styles.convAvatarAdmin,
+            ]}
+          >
             <Ionicons
               name={isPeer ? "person" : "shield-checkmark"}
               size={22}
               color={isPeer ? "#8A63D2" : "#6D5BBF"}
             />
-          )}
+          </View>
+          <View
+            style={[
+              styles.convPresenceDot,
+              isOnline
+                ? styles.convPresenceDotOnline
+                : styles.convPresenceDotOffline,
+            ]}
+          />
         </View>
-
         <View style={styles.convInfo}>
           <View style={styles.convTop}>
-            <View style={styles.convNameRow}>
-              {isPinned && (
-                <Ionicons name="pin" size={13} color="#8A63D2" />
-              )}
-              <Text
-                style={[styles.convName, hasUnread && styles.convNameBold]}
-                numberOfLines={1}
-              >
-                {name}
-              </Text>
-            </View>
             <Text
-              style={[
-                styles.convTime,
-                hasUnread && styles.convTimeUnread,
-              ]}
-            >
-              {item.lastMessageAt
-                ? formatConversationTime(item.lastMessageAt)
-                : ""}
-            </Text>
-          </View>
-
-          <View style={styles.convSubRow}>
-            <Text
-              style={[styles.convSubtitle, hasUnread && styles.convSubtitleUnread]}
+              style={[styles.convName, hasUnread && styles.convNameBold]}
               numberOfLines={1}
             >
-              {subtitle}
+              {partnerName}
             </Text>
-            {!isPeer && (
-              <View style={styles.verifiedPill}>
-                <Ionicons name="shield-checkmark" size={11} color="#6D5BBF" />
-                <Text style={styles.verifiedPillText}>Verified University Support</Text>
-              </View>
-            )}
+            <Text style={styles.convTime}>
+              {item.lastMessageAt ? formatTime(item.lastMessageAt) : ""}
+            </Text>
           </View>
-
           <Text
-            style={[styles.convPreview, hasUnread && styles.convPreviewBold]}
+            style={[styles.convLastMsg, hasUnread && styles.convLastMsgBold]}
             numberOfLines={1}
           >
             {item.lastMessage || "No messages yet"}
           </Text>
         </View>
-
         {hasUnread && <View style={styles.unreadDot} />}
       </Pressable>
     );
   };
 
-  // ─── Inbox view ────────────────────────────────────────────────────────────
-  const renderInbox = () => (
+  // ─── Chat: Message bubble ────────────────────────────────────────────────
+  const renderMessage = ({ item }: { item: OptimisticMessage }) => {
+    const isMine = item.senderId === user?.uid;
+    const isDeleted = item.deleted;
+    const isFailed = item.failed;
+
+    return (
+      <Pressable
+        onLongPress={() => {
+          if (!isDeleted) {
+            setContextMsg(item);
+            setContextVisible(true);
+          }
+        }}
+        delayLongPress={400}
+        style={[
+          styles.bubbleRow,
+          isMine ? styles.bubbleRowRight : styles.bubbleRowLeft,
+        ]}
+      >
+        <View
+          style={[
+            styles.bubble,
+            isMine ? styles.bubbleMine : styles.bubbleTheirs,
+            isDeleted && styles.bubbleDeleted,
+          ]}
+        >
+          {isDeleted ? (
+            <View style={styles.deletedRow}>
+              <Ionicons
+                name="ban-outline"
+                size={14}
+                color={isMine ? "rgba(255,255,255,0.5)" : "#94A3B8"}
+              />
+              <Text
+                style={[styles.deletedText, isMine && styles.deletedTextMine]}
+              >
+                This message was deleted
+              </Text>
+            </View>
+          ) : (
+            <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>
+              {item.text}
+            </Text>
+          )}
+
+          <View style={styles.bubbleFooter}>
+            <Text style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}>
+              {formatTime(item.createdAt)}
+            </Text>
+            {isFailed && (
+              <Pressable
+                style={styles.retryBtn}
+                onPress={() => handleRetry(item)}
+              >
+                <Ionicons name="refresh" size={12} color="#EF4444" />
+                <Text style={styles.retryText}>Retry</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+      </Pressable>
+    );
+  };
+
+  // ─── Back handler ────────────────────────────────────────────────────────
+  const handleBack = () => {
+    if (viewMode === "chat") {
+      setViewMode("directory");
+      setActiveConversation(null);
+      setMessages([]);
+      setOptimistic([]);
+    } else {
+      router.back();
+    }
+  };
+
+  // ─── Inbox view ──────────────────────────────────────────────────────────
+  const renderInboxView = () => (
     <>
+      {/* Search */}
       <View style={styles.searchBar}>
         <Ionicons name="search" size={18} color="#94A3B8" />
         <TextInput
           style={styles.searchInput}
           placeholder="Search conversations..."
           placeholderTextColor="#94A3B8"
-          value={inboxQuery}
-          onChangeText={setInboxQuery}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
         />
-        {inboxQuery.length > 0 && (
-          <Pressable onPress={() => setInboxQuery("")}>
+        {searchQuery.length > 0 && (
+          <Pressable onPress={() => setSearchQuery("")}>
             <Ionicons name="close-circle" size={18} color="#94A3B8" />
           </Pressable>
         )}
       </View>
 
+      {/* Filter pills */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.filterBar}
-        contentContainerStyle={styles.filterBarRow}
+        contentContainerStyle={styles.filterRow}
       >
-        {FILTERS.map((f) => {
-          const sel = inboxFilter === f.key;
+        {FILTER_OPTIONS.map((option) => {
+          const isActive = activeFilter === option.key;
           return (
             <Pressable
-              key={f.key}
-              accessibilityRole="button"
-              accessibilityLabel={`Show ${f.label.toLowerCase()} conversations`}
-              accessibilityState={{ selected: sel }}
-              style={[styles.filterPill, sel && styles.filterPillActive]}
-              onPress={() => setInboxFilter(f.key)}
+              key={option.key}
+              style={[styles.filterPill, isActive && styles.filterPillActive]}
+              onPress={() => setActiveFilter(option.key)}
             >
               <Ionicons
-                name={f.icon as any}
+                name={option.icon}
                 size={14}
-                color={sel ? "#FFFFFF" : "#94A3B8"}
+                color={isActive ? "#8A63D2" : "#94A3B8"}
               />
               <Text
-                style={[styles.filterText, sel && styles.filterTextActive]}
+                style={[
+                  styles.filterPillText,
+                  isActive && styles.filterPillTextActive,
+                ]}
               >
-                {f.label}
+                {option.label}
               </Text>
-              <View
-                style={[styles.filterCount, sel && styles.filterCountActive]}
-              >
-                <Text
-                  style={[
-                    styles.filterCountText,
-                    sel && styles.filterCountTextActive,
-                  ]}
-                >
-                  {filterCounts[f.key]}
-                </Text>
-              </View>
             </Pressable>
           );
         })}
       </ScrollView>
 
+      {/* Conversation list */}
       {inboxLoading ? (
         <View style={styles.emptyState}>
           <ActivityIndicator size="large" color="#8A63D2" />
           <Text style={styles.emptyText}>Loading conversations...</Text>
         </View>
-      ) : conversations.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="chatbubbles-outline" size={48} color="#9CA3AF" />
-          <Text style={styles.emptyTitle}>No conversations yet</Text>
-          <Text style={styles.emptyText}>
-            Your messages will appear here.
-          </Text>
-        </View>
       ) : filteredConversations.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons
             name={
-              inboxQuery
-                ? "search-outline"
-                : inboxFilter === "unread"
-                  ? "mail-unread-outline"
-                  : inboxFilter === "peers"
-                    ? "people-outline"
-                    : inboxFilter === "guidance"
-                      ? "shield-checkmark-outline"
-                      : "chatbubbles-outline"
+              activeFilter === "peers"
+                ? "people-outline"
+                : activeFilter === "guidance"
+                  ? "shield-checkmark-outline"
+                  : searchQuery.trim()
+                    ? "search-outline"
+                    : "chatbubbles-outline"
             }
             size={48}
-            color="#9CA3AF"
+            color="#D1D5DB"
           />
-          <Text style={styles.emptyTitle}>
-            {inboxQuery
-              ? "No matches"
-              : inboxFilter === "unread"
-                ? "You're all caught up!"
-                : inboxFilter === "peers"
-                  ? "No peer conversations yet"
-                  : inboxFilter === "guidance"
-                    ? "No guidance conversations yet"
-                    : "No conversations yet"}
-          </Text>
-          <Text style={styles.emptyText}>
-            {inboxQuery
-              ? `No conversations match "${inboxQuery}".`
-              : inboxFilter === "unread"
-                ? "There are no unread messages."
-                : inboxFilter === "peers"
-                  ? "Messages from other students will appear here."
-                  : inboxFilter === "guidance"
-                    ? "Messages from your guidance team will appear here."
-                    : "Your messages will appear here."}
-          </Text>
+          <Text style={styles.emptyTitle}>{emptyStateMessage.title}</Text>
+          {emptyStateMessage.message ? (
+            <Text style={styles.emptyText}>{emptyStateMessage.message}</Text>
+          ) : null}
         </View>
       ) : (
-        <SectionList
-          sections={[
-            ...(orderedConversations.pinned.length > 0
-              ? [{ title: "Pinned", data: orderedConversations.pinned }]
-              : []),
-            ...(orderedConversations.recent.length > 0
-              ? [{ title: "Recent", data: orderedConversations.recent }]
-              : []),
-          ]}
+        <FlatList
+          data={filteredConversations}
           keyExtractor={(item) => item.id}
           renderItem={renderConversation}
-          renderSectionHeader={({ section }) => (
-            <View style={styles.sectionHeader}>
-              <Ionicons
-                name={section.title === "Pinned" ? "pin" : "time-outline"}
-                size={13}
-                color="#8A63D2"
-              />
-              <Text style={styles.sectionHeaderText}>
-                {section.title.toUpperCase()}
-              </Text>
-            </View>
-          )}
-          stickySectionHeadersEnabled={false}
           contentContainerStyle={styles.convList}
           showsVerticalScrollIndicator={false}
-          ListFooterComponent={
-            <View style={styles.inboxPrivacyNote}>
-              <Ionicons name="shield-checkmark" size={14} color="#6D5BBF" />
-              <Text style={styles.inboxPrivacyNoteText}>
-                {INBOX_PRIVACY_NOTE}
-              </Text>
-            </View>
-          }
         />
       )}
     </>
   );
 
-  // ─── Chat view (unchanged flow) ────────────────────────────────────────────
-  const renderChat = () => (
+  // ─── Chat view ───────────────────────────────────────────────────────────
+  const renderChatView = () => (
     <>
+      {/* Friendly reminder banner */}
       <View style={styles.reminderBanner}>
         <Ionicons name="heart-outline" size={14} color="#6D5BBF" />
         <Text style={styles.reminderText}>{REMINDER_BANNER}</Text>
@@ -932,35 +693,98 @@ export default function InboxTab() {
         </View>
       ) : allMessages.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="chatbubble-outline" size={48} color="#9CA3AF" />
+          <Ionicons name="chatbubble-outline" size={48} color="#D1D5DB" />
           <Text style={styles.emptyTitle}>Start the conversation</Text>
           <Text style={styles.emptyText}>
-            You're in a private space to talk. You can share what's on your
-            mind, ask for support, or simply start a conversation.
+            Send a message to {chatPartnerName}.
           </Text>
-          <Text style={styles.privacyNote}>{PRIVACY_NOTE}</Text>
         </View>
       ) : (
         <FlatList
           ref={flatListRef}
-          data={chatRows}
+          data={allMessages}
           keyExtractor={(item) => item.id}
-          renderItem={renderChatRow}
+          renderItem={renderMessage}
           contentContainerStyle={styles.messagesList}
           showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           onContentSizeChange={() => scrollToBottom(false)}
         />
       )}
 
-      <View style={styles.inputBar}>
+      {/* Scroll to latest messages */}
+      {viewMode === "chat" && showScrollToBottom && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Scroll to latest messages"
+          style={[styles.scrollToBottomBtn, { backgroundColor: theme.primary }]}
+          onPress={jumpToBottom}
+        >
+          <Ionicons name="chevron-down" size={22} color={theme.onPrimary} />
+        </Pressable>
+      )}
+
+      {/* Typing indicator */}
+      {partnerTyping && (
+        <View style={styles.typingIndicator}>
+          <Text style={styles.typingText}>{chatPartnerName} is typing</Text>
+          <ActivityIndicator
+            size="small"
+            color="#8A63D2"
+            style={{ marginLeft: 6 }}
+          />
+        </View>
+      )}
+
+      {/* Emoji Picker */}
+      {showEmoji && (
+        <EmojiPicker
+          onSelect={(emoji) => {
+            setInputText((prev) => prev + emoji);
+          }}
+        />
+      )}
+
+      {/* Input */}
+      <View
+        style={[
+          styles.inputBar,
+          { paddingBottom: Math.max(insets.bottom, 10) },
+        ]}
+      >
+        <Pressable
+          style={styles.emojiBtn}
+          onPress={() => {
+            Keyboard.dismiss();
+            setShowEmoji((v) => !v);
+          }}
+        >
+          <Ionicons
+            name={showEmoji ? "keyboard" : ("happy-outline" as any)}
+            size={24}
+            color={showEmoji ? "#8A63D2" : "#94A3B8"}
+          />
+        </Pressable>
         <TextInput
           style={styles.textInput}
           placeholder="Type a message..."
           placeholderTextColor="#94A3B8"
           value={inputText}
-          onChangeText={setInputText}
+          onChangeText={(text) => {
+            setInputText(text);
+            if (activeConversation?.id && user?.uid) {
+              if (text.trim()) {
+                startTyping(activeConversation.id, user.uid);
+              }
+            }
+          }}
           multiline
           maxLength={1000}
+          onFocus={() => {
+            setShowEmoji(false);
+            scrollToBottom(true);
+          }}
         />
         <Pressable
           style={[
@@ -980,373 +804,97 @@ export default function InboxTab() {
     </>
   );
 
-  const renderChatRow = ({
-    item,
-  }: {
-    item:
-      | { kind: "date"; id: string; label: string }
-      | { kind: "msg"; id: string; msg: OptimisticMessage };
-  }) => {
-    if (item.kind === "date") {
-      return (
-        <View style={styles.dateSeparator}>
-          <View style={styles.dateLine} />
-          <Text style={styles.dateSeparatorText}>{item.label}</Text>
-          <View style={styles.dateLine} />
-        </View>
-      );
-    }
-    const m = item.msg;
-    const isMine = m.senderId === user?.uid;
-    return (
-      <View
-        style={[styles.bubbleRow, isMine ? styles.bubbleRowRight : styles.bubbleRowLeft]}
-      >
-        <View
-          style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}
-        >
-          <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>
-            {m.text}
-          </Text>
-          <View style={styles.bubbleFooter}>
-            <Text style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}>
-              {formatTime(m.createdAt)}
-            </Text>
-            {m.failed && (
-              <Pressable onPress={() => handleRetry(m)}>
-                <Text style={styles.retryText}>Retry</Text>
-              </Pressable>
-            )}
-          </View>
-        </View>
-      </View>
-    );
-  };
-
   return (
-    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+    <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior="padding"
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
-        <View style={styles.headerGradient}>
-          <View style={styles.header}>
-            {viewMode === "inbox" ? (
-              <View style={{ width: 40 }} />
-            ) : (
-              <Pressable style={styles.backBtn} onPress={handleBack}>
-                <Ionicons name="arrow-back" size={22} color="#7C4DCC" />
-              </Pressable>
-            )}
-            <View style={styles.headerTitleWrap}>
-              {viewMode === "chat" &&
-                (liveProfile?.profileImage ? (
-                  <Image
-                    source={{ uri: liveProfile.profileImage }}
-                    style={styles.headerAvatar}
-                  />
-                ) : (
-                  <View style={[styles.headerAvatar, styles.headerAvatarFallback]}>
-                    <Ionicons name="person" size={16} color="white" />
-                  </View>
-                ))}
-              <View style={styles.headerTitleCol}>
-                <Text style={styles.headerTitle} numberOfLines={1}>
-                  {viewMode === "chat" ? headerName : "Inbox"}
-                </Text>
-                {viewMode === "chat" && chatMeta.role ? (
-                  <View style={styles.headerMetaRow}>
-                    <Text style={styles.headerSub} numberOfLines={1}>
-                      {chatMeta.role}
-                    </Text>
-                    {chatMeta.verified && (
-                      <View style={styles.headerVerifiedPill}>
-                        <Ionicons name="shield-checkmark" size={10} color="#7C4DCC" />
-                        <Text style={styles.headerVerifiedText}>Verified</Text>
-                      </View>
-                    )}
-                  </View>
-                ) : null}
-              </View>
-            </View>
-            {viewMode === "inbox" ? (
-              <View style={{ width: 40 }} />
-            ) : viewMode === "chat" ? (
-              <View style={styles.headerActions}>
-                <Pressable
-                  style={styles.backBtn}
-                  onPress={() => setInfoVisible(true)}
-                  hitSlop={8}
-                >
-                  <Ionicons name="information-circle-outline" size={22} color="#7C4DCC" />
-                </Pressable>
-                <Pressable
-                  style={styles.backBtn}
-                  onPress={() => setMenuVisible(true)}
-                  hitSlop={8}
-                >
-                  <Ionicons name="ellipsis-vertical" size={22} color="#7C4DCC" />
-                </Pressable>
-              </View>
-            ) : (
-              <View style={{ width: 40 }} />
-            )}
-          </View>
-
-          {viewMode === "inbox" && (
-            <View style={styles.headerSubRow}>
-              <Text style={styles.headerSubtitle}>
-                Your private space for support and conversations
-              </Text>
-              <View style={styles.headerStats}>
-                <Text style={styles.headerStatsText}>
-                  {conversations.length} conversation
-                  {conversations.length === 1 ? "" : "s"}
-                </Text>
-                <Text style={styles.headerStatsDot}>·</Text>
-                <Text style={styles.headerStatsText}>
-                  {unreadCount} unread
-                </Text>
-              </View>
-            </View>
-          )}
-        </View>
-
-        {viewMode === "inbox" ? renderInbox() : renderChat()}
-      </KeyboardAvoidingView>
-
-      {/* ─── Conversation info modal ─────────────────────────────── */}
-      <Modal
-        visible={infoVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setInfoVisible(false)}
-      >
-        <Pressable
-          style={styles.infoOverlay}
-          onPress={() => setInfoVisible(false)}
+        {/* Header */}
+        <LinearGradient
+          colors={["#8A63D2", "#B794F6"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
         >
-          <Pressable style={styles.infoCard} onPress={() => {}}>
-            <View style={styles.infoHandle} />
-            <Text style={styles.infoTitle}>Conversation Information</Text>
-
-            <View style={styles.infoBlock}>
-              <Text style={styles.infoLabel}>Participant</Text>
-              <View style={styles.infoParticipant}>
-                <View
-                  style={[
-                    styles.infoAvatar,
-                    activeConversation?.type === "peer"
-                      ? styles.convAvatarPeer
-                      : styles.convAvatarAdmin,
-                  ]}
-                >
-                  {liveProfile?.profileImage ? (
+          <View style={styles.header}>
+            <Pressable style={styles.backBtn} onPress={handleBack}>
+              <Ionicons name="arrow-back" size={22} color="white" />
+            </Pressable>
+            <View style={styles.headerCenter}>
+              <View style={styles.headerTitleRow}>
+                {viewMode === "chat" &&
+                  (liveProfile?.profileImage ? (
                     <Image
                       source={{ uri: liveProfile.profileImage }}
-                      style={{ width: 44, height: 44, borderRadius: 22 }}
+                      style={styles.headerAvatar}
                     />
                   ) : (
-                    <Ionicons
-                      name={
-                        activeConversation?.type === "peer"
-                          ? "person"
-                          : "shield-checkmark"
-                      }
-                      size={20}
-                      color={
-                        activeConversation?.type === "peer"
-                          ? "#8A63D2"
-                          : "#6D5BBF"
-                      }
-                    />
-                  )}
-                </View>
-                <View style={styles.infoParticipantText}>
-                  <Text style={styles.infoName}>{headerName}</Text>
-                  {chatMeta.role ? (
-                    <Text style={styles.infoRole}>{chatMeta.role}</Text>
-                  ) : null}
-                  {chatMeta.verified && (
-                    <View style={styles.verifiedPill}>
-                      <Ionicons name="shield-checkmark" size={11} color="#6D5BBF" />
-                      <Text style={styles.verifiedPillText}>
-                        Verified University Support
-                      </Text>
+                    <View
+                      style={[styles.headerAvatar, styles.headerAvatarFallback]}
+                    >
+                      <Ionicons name="person" size={14} color="white" />
                     </View>
-                  )}
-                </View>
+                  ))}
+                <Text style={styles.headerTitle} numberOfLines={1}>
+                  {viewMode === "chat"
+                    ? liveProfile?.fullName || chatPartnerName || "Chat"
+                    : "Inbox"}
+                </Text>
               </View>
-            </View>
-
-            <View style={styles.infoDivider} />
-
-            <View style={styles.infoBlock}>
-              <Text style={styles.infoLabel}>Conversation started</Text>
-              <Text style={styles.infoValue}>
-                {formatStartedDate(chatStartedAt)}
-              </Text>
-            </View>
-
-            <View style={styles.infoDivider} />
-
-            <View style={styles.infoBlock}>
-              <Text style={styles.infoLabel}>Privacy</Text>
-              <Text style={styles.infoValue}>
-                This conversation is private between participants. MindCare is
-                not an emergency service.
-              </Text>
-            </View>
-
-            <View style={styles.infoDivider} />
-
-            <View style={styles.infoBlock}>
-              <Text style={styles.infoLabel}>Actions</Text>
-              <Pressable
-                style={styles.infoActionRow}
-                onPress={() => {
-                  if (activeConversation) handleTogglePin(activeConversation);
-                }}
-              >
-                <Ionicons
-                  name={
-                    activeConversation?.pinnedBy?.includes(user?.uid || "")
-                      ? "pin"
-                      : "pin-outline"
-                  }
-                  size={18}
-                  color="#8A63D2"
-                />
-                <Text style={styles.infoActionText}>
-                  {activeConversation?.pinnedBy?.includes(user?.uid || "")
-                    ? "Unpin conversation"
-                    : "Pin conversation"}
-                </Text>
-              </Pressable>
-              <Pressable
-                style={styles.infoActionRow}
-                onPress={() => {
-                  if (activeConversation) {
-                    setInfoVisible(false);
-                    handleReport(activeConversation);
-                  }
-                }}
-              >
-                <Ionicons name="flag-outline" size={18} color="#8A63D2" />
-                <Text style={styles.infoActionText}>Report conversation</Text>
-              </Pressable>
-              {activeConversation?.type === "peer" && (
-                <Pressable
-                  style={styles.infoActionRow}
-                  onPress={() => {
-                    if (activeConversation) {
-                      setInfoVisible(false);
-                      handleBlock(activeConversation);
-                    }
-                  }}
-                >
-                  <Ionicons name="ban-outline" size={18} color="#EF4444" />
-                  <Text style={[styles.infoActionText, { color: "#EF4444" }]}>
-                    Block student
-                  </Text>
-                </Pressable>
+              {viewMode === "chat" && (
+                <View style={styles.headerMeta}>
+                  <View style={styles.headerBadge}>
+                    <Ionicons name="chatbubble" size={10} color="white" />
+                    <Text style={styles.headerBadgeText}>Chat</Text>
+                  </View>
+                  <View style={styles.onlineIndicator}>
+                    <View
+                      style={[
+                        styles.onlineDot,
+                        partnerOnline
+                          ? styles.onlineDotActive
+                          : styles.onlineDotInactive,
+                      ]}
+                    />
+                    <Text style={styles.onlineText}>
+                      {partnerOnline ? "Online" : "Offline"}
+                    </Text>
+                  </View>
+                </View>
               )}
-              <Pressable
-                style={styles.infoActionRow}
-                onPress={() => {
-                  if (activeConversation) {
-                    setInfoVisible(false);
-                    handleDeleteConversation(activeConversation);
-                  }
-                }}
-              >
-                <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                <Text style={[styles.infoActionText, { color: "#EF4444" }]}>
-                  Delete conversation
-                </Text>
-              </Pressable>
             </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+            <View style={{ width: 40 }} />
+          </View>
+        </LinearGradient>
 
-      {/* ─── Chat ellipsis menu ────────────────────────────────────── */}
+        {/* Content */}
+        {viewMode === "directory" ? renderInboxView() : renderChatView()}
+      </KeyboardAvoidingView>
+
+      {/* ─── Context Menu Modal ─────────────────────────────────────── */}
       <Modal
-        visible={menuVisible}
+        visible={contextVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setMenuVisible(false)}
+        onRequestClose={() => setContextVisible(false)}
       >
         <Pressable
-          style={styles.menuOverlay}
-          onPress={() => setMenuVisible(false)}
+          style={styles.ctxOverlay}
+          onPress={() => setContextVisible(false)}
         >
-          <View style={styles.menuCard}>
-            <Pressable
-              style={styles.menuRow}
-              onPress={() => {
-                setMenuVisible(false);
-                if (activeConversation) handleTogglePin(activeConversation);
-              }}
-            >
-              <Ionicons
-                name={
-                  activeConversation?.pinnedBy?.includes(user?.uid || "")
-                    ? "pin"
-                    : "pin-outline"
-                }
-                size={18}
-                color="#8A63D2"
-              />
-              <Text style={styles.menuLabel}>
-                {activeConversation?.pinnedBy?.includes(user?.uid || "")
-                  ? "Unpin conversation"
-                  : "Pin conversation"}
+          <View style={styles.ctxMenu}>
+            <Text style={styles.ctxTitle}>Message Options</Text>
+            <Pressable style={styles.ctxRow} onPress={handleCopy}>
+              <Ionicons name="copy-outline" size={20} color="#8A63D2" />
+              <Text style={styles.ctxLabel}>Copy</Text>
+            </Pressable>
+            <View style={styles.ctxDivider} />
+            <Pressable style={styles.ctxRow} onPress={handleDelete}>
+              <Ionicons name="trash-outline" size={20} color="#EF4444" />
+              <Text style={[styles.ctxLabel, { color: "#EF4444" }]}>
+                Delete
               </Text>
-            </Pressable>
-            <Pressable
-              style={styles.menuRow}
-              onPress={() => {
-                setMenuVisible(false);
-                if (activeConversation) handleReport(activeConversation);
-              }}
-            >
-              <Ionicons name="flag-outline" size={18} color="#8A63D2" />
-              <Text style={styles.menuLabel}>Report conversation</Text>
-            </Pressable>
-            {activeConversation?.type === "peer" && (
-              <Pressable
-                style={styles.menuRow}
-                onPress={() => {
-                  setMenuVisible(false);
-                  if (activeConversation) handleBlock(activeConversation);
-                }}
-              >
-                <Ionicons name="ban-outline" size={18} color="#EF4444" />
-                <Text style={[styles.menuLabel, { color: "#EF4444" }]}>
-                  Block student
-                </Text>
-              </Pressable>
-            )}
-            <Pressable
-              style={styles.menuRow}
-              onPress={() => {
-                setMenuVisible(false);
-                if (activeConversation) handleDeleteConversation(activeConversation);
-              }}
-            >
-              <Ionicons name="trash-outline" size={18} color="#EF4444" />
-              <Text style={[styles.menuLabel, { color: "#EF4444" }]}>
-                Delete conversation
-              </Text>
-            </Pressable>
-            <Pressable
-              style={styles.menuRow}
-              onPress={() => setMenuVisible(false)}
-            >
-              <Ionicons name="close-circle-outline" size={18} color="#64748B" />
-              <Text style={styles.menuLabel}>Close</Text>
             </Pressable>
           </View>
         </Pressable>
@@ -1356,230 +904,89 @@ export default function InboxTab() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#0F0D15" },
+  container: { flex: 1, backgroundColor: "#F4F2F8" },
 
   // Header
-  headerGradient: {
-    backgroundColor: "#1E1B2E",
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(139, 92, 246, 0.2)",
-  },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 6,
+    paddingBottom: 14,
   },
-  headerSubRow: {
+  backBtn: {
+    width: 40,
+    height: 40,
+    justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-    gap: 2,
   },
-  headerSubtitle: {
-    fontSize: 12,
-    color: "#9CA3AF",
-    textAlign: "center",
-  },
-  headerStats: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 2,
-  },
-  headerStatsText: {
-    fontSize: 11,
+  headerTitle: {
+    color: "white",
+    fontSize: 18,
     fontWeight: "700",
-    color: "#A78BFA",
+    flexShrink: 1,
   },
-  headerStatsDot: { fontSize: 11, color: "#9CA3AF" },
-  backBtn: { width: 40, height: 40, justifyContent: "center", alignItems: "center" },
-  headerTitleWrap: {
-    flex: 1,
+  headerTitleRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
+    maxWidth: "100%",
   },
-  headerTitleCol: { alignItems: "center", flexShrink: 1 },
-  headerMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 1,
+  headerAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#7A54C4",
   },
-  headerSub: {
-    fontSize: 11,
-    color: "#9CA3AF",
-    maxWidth: 180,
-  },
-  headerVerifiedPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    backgroundColor: "rgba(139, 92, 246, 0.15)",
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 8,
-  },
-  headerVerifiedText: { fontSize: 9, fontWeight: "700", color: "#A78BFA" },
-  headerActions: { flexDirection: "row", alignItems: "center" },
-  headerAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: "#7A54C4" },
   headerAvatarFallback: { alignItems: "center", justifyContent: "center" },
-  headerTitle: { color: "#FFFFFF", fontSize: 18, fontWeight: "800", flexShrink: 1 },
-
-  // Search + filters
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#1E1B2E",
-    margin: 16,
-    marginBottom: 8,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    height: 46,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: "rgba(139, 92, 246, 0.2)",
-  },
-  searchInput: { flex: 1, fontSize: 15, color: "#FFFFFF", paddingVertical: 0 },
-  filterBar: { marginBottom: 8 },
-  filterBarRow: {
-    flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: 16,
-  },
-  filterPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    paddingHorizontal: 14,
-    minHeight: 44,
-    borderRadius: 22,
-    backgroundColor: "#1E1B2E",
-    borderWidth: 1,
-    borderColor: "rgba(139, 92, 246, 0.2)",
-  },
-  filterPillActive: { backgroundColor: "#6D28D9", borderColor: "#6D28D9" },
-  filterText: { fontSize: 13, fontWeight: "500", color: "#9CA3AF" },
-  filterTextActive: { color: "#FFFFFF", fontWeight: "700" },
-  filterCount: {
-    minWidth: 20,
-    height: 20,
-    paddingHorizontal: 6,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#2A2740",
-  },
-  filterCountActive: { backgroundColor: "rgba(255, 255, 255, 0.22)" },
-  filterCountText: { fontSize: 11, fontWeight: "700", color: "#94A3B8" },
-  filterCountTextActive: { color: "#FFFFFF" },
-
-  // Conversation list
-  convList: { paddingHorizontal: 16, paddingBottom: 24 },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingTop: 8,
-    paddingBottom: 6,
-  },
-  sectionHeaderText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#A78BFA",
-    letterSpacing: 0.5,
-  },
-  convCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#1E1B2E",
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: "rgba(139, 92, 246, 0.2)",
-    gap: 12,
-  },
-  convCardUnread: {
-    backgroundColor: "#26223A",
-    borderColor: "rgba(139, 92, 246, 0.4)",
-  },
-  convAvatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    justifyContent: "center",
+  headerCenter: {
+    flex: 1,
     alignItems: "center",
   },
-  convAvatarPeer: { backgroundColor: "rgba(139, 92, 246, 0.2)" },
-  convAvatarAdmin: { backgroundColor: "rgba(139, 92, 246, 0.15)" },
-  convInfo: { flex: 1 },
-  convTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 2,
-  },
-  convNameRow: {
+  headerBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.25)",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    alignSelf: "center",
   },
-  convName: { fontSize: 15, fontWeight: "600", color: "#FFFFFF", flexShrink: 1 },
-  convNameBold: { fontWeight: "800", color: "#A78BFA" },
-  convTime: { fontSize: 11, color: "#9CA3AF", marginLeft: 8 },
-  convTimeUnread: { color: "#A78BFA", fontWeight: "700" },
-  convSubRow: {
+  headerBadgeText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "white",
+  },
+  headerMeta: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginBottom: 2,
+    marginTop: 3,
+    alignSelf: "center",
   },
-  convSubtitle: { fontSize: 12, color: "#9CA3AF", flexShrink: 1 },
-  convSubtitleUnread: { color: "#D1D5DB", fontWeight: "600" },
-  verifiedPill: {
+  onlineIndicator: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 3,
-    backgroundColor: "rgba(139, 92, 246, 0.15)",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    alignSelf: "flex-start",
+    gap: 4,
   },
-  verifiedPillText: { fontSize: 10, fontWeight: "700", color: "#A78BFA" },
-  convPreview: { fontSize: 13, color: "#9CA3AF" },
-  convPreviewBold: { fontWeight: "600", color: "#D1D5DB" },
-  unreadDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#8B5CF6",
-    marginLeft: 4,
+  onlineDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
   },
-  inboxPrivacyNote: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    backgroundColor: "rgba(139, 92, 246, 0.12)",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(139, 92, 246, 0.2)",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginTop: 8,
+  onlineDotActive: {
+    backgroundColor: "#4ADE80",
   },
-  inboxPrivacyNoteText: {
-    flex: 1,
-    fontSize: 11,
-    color: "#A78BFA",
-    lineHeight: 16,
+  onlineDotInactive: {
+    backgroundColor: "rgba(255,255,255,0.4)",
+  },
+  onlineText: {
+    fontSize: 10,
+    fontWeight: "500",
+    color: "rgba(255,255,255,0.75)",
   },
 
   // Empty state
@@ -1590,22 +997,139 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 40,
   },
-  emptyTitle: { fontSize: 17, fontWeight: "700", color: "#FFFFFF" },
-  emptyText: { fontSize: 14, color: "#9CA3AF", textAlign: "center" },
-  privacyNote: {
-    fontSize: 12,
-    color: "#9CA3AF",
+  emptyTitle: { fontSize: 17, fontWeight: "700", color: "#1E1B4B" },
+  emptyText: {
+    fontSize: 14,
+    color: "#64748B",
     textAlign: "center",
-    fontStyle: "italic",
-    marginTop: 4,
+  },
+
+  // Search bar
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
+    margin: 16,
+    marginBottom: 8,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 46,
+    gap: 8,
+    // @ts-ignore
+    boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: "#1E1B4B",
+    paddingVertical: 0,
+  },
+
+  // Filter pills
+  filterRow: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    gap: 8,
+    paddingBottom: 8,
+  },
+  filterPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "white",
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.1)",
+  },
+  filterPillActive: {
+    backgroundColor: "#F3EEFF",
+    borderColor: "#8A63D2",
+  },
+  filterPillText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#94A3B8",
+  },
+  filterPillTextActive: {
+    color: "#8A63D2",
+    fontWeight: "600",
+  },
+
+  // Conversation list
+  convList: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+  },
+  convRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 8,
+    // @ts-ignore
+    boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
+    gap: 12,
+  },
+  convAvatarWrapper: {
+    position: "relative",
+  },
+  convAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  convAvatarPeer: { backgroundColor: "#F3EEFF" },
+  convAvatarAdmin: { backgroundColor: "#EDE9FE" },
+  convInfo: { flex: 1 },
+  convTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 3,
+  },
+  convName: { fontSize: 15, fontWeight: "600", color: "#1E1B4B", flexShrink: 1 },
+  convNameBold: { fontWeight: "800" },
+  convTime: { fontSize: 11, color: "#94A3B8", marginLeft: 8 },
+  convLastMsg: { fontSize: 13, color: "#64748B" },
+  convLastMsgBold: { fontWeight: "600", color: "#1E1B4B" },
+  unreadDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#8A63D2",
+  },
+  convPresenceDot: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: "white",
+  },
+  convPresenceDotOnline: {
+    backgroundColor: "#22C55E",
+  },
+  convPresenceDotOffline: {
+    backgroundColor: "#D1D5DB",
   },
 
   // Reminder banner
   reminderBanner: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     gap: 8,
-    backgroundColor: "rgba(139, 92, 246, 0.12)",
+    backgroundColor: "#F3EEFF",
     marginHorizontal: 16,
     marginTop: 10,
     marginBottom: 4,
@@ -1613,43 +1137,65 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(139, 92, 246, 0.2)",
+    borderColor: "rgba(138, 99, 210, 0.12)",
   },
-  reminderText: { flex: 1, fontSize: 12, color: "#A78BFA", lineHeight: 17 },
+  reminderText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#6D5BBF",
+    lineHeight: 17,
+  },
 
   // Messages
-  messagesList: { flexGrow: 1, paddingVertical: 12, paddingHorizontal: 16 },
-  dateSeparator: {
-    flexDirection: "row",
+  messagesList: {
+    flexGrow: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  scrollToBottomBtn: {
+    position: "absolute",
+    right: 16,
+    bottom: 12,
+    width: 44,
+    height: 44,
+    borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
-    marginVertical: 14,
-  },
-  dateLine: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "rgba(139, 92, 246, 0.2)",
-    flex: 1,
-    maxWidth: 60,
-  },
-  dateSeparatorText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#A78BFA",
-    letterSpacing: 0.5,
+    // @ts-ignore
+    boxShadow: "0px 4px 12px rgba(124, 77, 204, 0.4)",
+    elevation: 4,
   },
   bubbleRow: { marginBottom: 8, flexDirection: "row" },
   bubbleRowRight: { justifyContent: "flex-end" },
   bubbleRowLeft: { justifyContent: "flex-start" },
-  bubble: { maxWidth: "78%", borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
-  bubbleMine: { backgroundColor: "#8B5CF6", borderBottomRightRadius: 4 },
-  bubbleTheirs: {
-    backgroundColor: "#1E1B2E",
-    borderBottomLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: "rgba(139, 92, 246, 0.2)",
+  bubble: {
+    maxWidth: "78%",
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
-  bubbleText: { fontSize: 15, color: "#FFFFFF", lineHeight: 20 },
+  bubbleMine: {
+    backgroundColor: "#8A63D2",
+    borderBottomRightRadius: 4,
+  },
+  bubbleTheirs: {
+    backgroundColor: "white",
+    borderBottomLeftRadius: 4,
+    // @ts-ignore
+    boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(156, 126, 235, 0.06)",
+  },
+  bubbleDeleted: {
+    backgroundColor: "rgba(148, 163, 184, 0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.2)",
+  },
+  bubbleText: {
+    fontSize: 15,
+    color: "#1E1B4B",
+    lineHeight: 20,
+  },
   bubbleTextMine: { color: "white" },
   bubbleFooter: {
     flexDirection: "row",
@@ -1658,9 +1204,35 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 4,
   },
-  bubbleTime: { fontSize: 10, color: "#9CA3AF" },
-  bubbleTimeMine: { color: "rgba(255,255,255,0.6)" },
+  bubbleTime: { fontSize: 10, color: "#94A3B8" },
+  bubbleTimeMine: { color: "rgba(255,255,255,0.5)" },
+  deletedRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  deletedText: { fontSize: 13, color: "#94A3B8", fontStyle: "italic" },
+  deletedTextMine: { color: "rgba(255,255,255,0.5)" },
+  retryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
   retryText: { fontSize: 11, color: "#EF4444", fontWeight: "600" },
+
+  // Typing indicator
+  typingIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 6,
+    backgroundColor: "#F8F5FF",
+  },
+  typingText: {
+    fontSize: 12,
+    color: "#8A63D2",
+    fontStyle: "italic",
+  },
 
   // Input
   inputBar: {
@@ -1669,107 +1241,71 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: "rgba(139, 92, 246, 0.2)",
-    backgroundColor: "#1E1B2E",
+    borderTopColor: "rgba(156, 126, 235, 0.08)",
+    backgroundColor: "white",
     gap: 8,
   },
   textInput: {
     flex: 1,
-    backgroundColor: "#26223A",
+    backgroundColor: "#FAF8FF",
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(139, 92, 246, 0.3)",
+    borderColor: "#E9D5FF",
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
-    color: "#FFFFFF",
+    color: "#1E1B4B",
     maxHeight: 100,
   },
-  sendBtn: { width: 40, height: 40, justifyContent: "center", alignItems: "center" },
-  sendBtnDisabled: { opacity: 0.5 },
-
-  // Conversation info modal
-  infoOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-  infoCard: {
-    backgroundColor: "#1E1B2E",
-    borderRadius: 20,
-    padding: 20,
-  },
-  infoHandle: {
-    alignSelf: "center",
+  emojiBtn: {
     width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#3B3550",
-    marginBottom: 12,
-  },
-  infoTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    textAlign: "center",
-    marginBottom: 14,
-  },
-  infoBlock: { marginBottom: 4 },
-  infoLabel: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#A78BFA",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 6,
-  },
-  infoParticipant: { flexDirection: "row", alignItems: "center", gap: 12 },
-  infoAvatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    height: 40,
     justifyContent: "center",
     alignItems: "center",
   },
-  infoParticipantText: { flex: 1 },
-  infoName: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
-  infoRole: { fontSize: 13, color: "#9CA3AF", marginTop: 2 },
-  infoValue: { fontSize: 14, color: "#D1D5DB", lineHeight: 20 },
-  infoDivider: {
-    height: 1,
-    backgroundColor: "rgba(139, 92, 246, 0.15)",
-    marginVertical: 14,
+  sendBtn: {
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  infoActionRow: {
+  sendBtnDisabled: { opacity: 0.5 },
+
+  // Context menu
+  ctxOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  ctxMenu: {
+    backgroundColor: "white",
+    borderRadius: 18,
+    padding: 6,
+    width: 200,
+    // @ts-ignore
+    boxShadow: "0px 8px 24px rgba(0,0,0,0.15)",
+  },
+  ctxTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#64748B",
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 6,
+  },
+  ctxRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    paddingVertical: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
   },
-  infoActionText: { fontSize: 15, fontWeight: "600", color: "#FFFFFF" },
-
-  // Chat ellipsis menu
-  menuOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
+  ctxLabel: { fontSize: 15, fontWeight: "600", color: "#1E1B4B" },
+  ctxDivider: {
+    height: 1,
+    backgroundColor: "#F1F5F9",
+    marginHorizontal: 14,
   },
-  menuCard: {
-    backgroundColor: "#1E1B2E",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 30,
-  },
-  menuRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(139, 92, 246, 0.15)",
-  },
-  menuLabel: { fontSize: 15, fontWeight: "600", color: "#FFFFFF" },
 });

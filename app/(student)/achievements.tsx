@@ -1,7 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -17,9 +16,9 @@ import {
 import { shadows } from "@/utils/shadows";
 
 import {
+  ACHIEVEMENT_CATEGORIES,
   AchievementCategory,
   AchievementWithStatus,
-  ACHIEVEMENT_CATEGORIES,
   useAchievements,
 } from "@/hooks/useAchievements";
 
@@ -204,7 +203,7 @@ export default function AchievementsScreen() {
                 Your garden is in full bloom
               </Text>
               <Text style={styles.allCompleteSubtitle}>
-                You've unlocked every achievement. Keep caring for yourself —
+                You have unlocked every achievement. Keep caring for yourself —
                 your journey is what matters most.
               </Text>
             </View>
@@ -248,10 +247,8 @@ export default function AchievementsScreen() {
               {activeMeta.emoji} {activeMeta.label.toUpperCase()}
             </Text>
             <Text style={styles.sectionCount}>
-              {
-                visibleAchievements.filter((a) => a.unlocked).length
-              }{" "}
-              of {visibleAchievements.length} unlocked
+              {visibleAchievements.filter((a) => a.unlocked).length} of{" "}
+              {visibleAchievements.length} unlocked
             </Text>
           </View>
 
@@ -360,10 +357,7 @@ function NextAchievementCard({
   achievement: AchievementWithStatus;
 }) {
   const remaining = Math.max(0, achievement.target - achievement.current);
-  const percent = progressPercent(
-    achievement.current,
-    achievement.target,
-  );
+  const percent = progressPercent(achievement.current, achievement.target);
 
   return (
     <View style={styles.nextCard}>
@@ -399,7 +393,7 @@ function AchievementCard({
   achievement: AchievementWithStatus;
   onPress: () => void;
 }) {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const [scaleAnim] = useState(() => new Animated.Value(1));
 
   const handlePressIn = () => {
     Animated.spring(scaleAnim, {
@@ -415,15 +409,10 @@ function AchievementCard({
     }).start();
   };
 
-  const percent = progressPercent(
-    achievement.current,
-    achievement.target,
-  );
+  const percent = progressPercent(achievement.current, achievement.target);
 
   return (
-    <Animated.View
-      style={[styles.card, { transform: [{ scale: scaleAnim }] }]}
-    >
+    <Animated.View style={[styles.card, { transform: [{ scale: scaleAnim }] }]}>
       <Pressable
         onPress={onPress}
         onPressIn={handlePressIn}
@@ -459,9 +448,7 @@ function AchievementCard({
               <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
               <Text style={styles.cardCompletedText}>Completed</Text>
               <View style={styles.cardRewardPill}>
-                <Text style={styles.cardRewardText}>
-                  {achievement.reward}
-                </Text>
+                <Text style={styles.cardRewardText}>{achievement.reward}</Text>
               </View>
             </View>
           ) : (
