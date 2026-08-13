@@ -11,6 +11,8 @@ export interface DeptComparisonMetric {
   lsnCount: number;
   assessmentCount: number;
   participationRate: number;
+  trackedStudents?: number;
+  assessedStudents?: number;
 }
 
 export interface ScatterPoint {
@@ -158,6 +160,7 @@ function renderMobileRadar(data: DeptComparisonMetric[], colors: string[]) {
         { label: "LSN Count", get: (d: DeptComparisonMetric) => `${d.lsnCount} (${normalized(d.lsnCount, maxLsn).toFixed(0)}%)` },
         { label: "Assessments", get: (d: DeptComparisonMetric) => `${d.assessmentCount} (${normalized(d.assessmentCount, maxAssessment).toFixed(0)}%)` },
         { label: "Participation", get: (d: DeptComparisonMetric) => `${(d.participationRate * 100).toFixed(0)}%` },
+        { label: "Tracked / Assessed", get: (d: DeptComparisonMetric) => `${d.trackedStudents ?? "—"} / ${d.assessedStudents ?? "—"}` },
       ].map((m) => (
         <View key={m.label} style={styles.mobileRadarRow}>
           <Text style={styles.mobileRadarCell}>{m.label}</Text>

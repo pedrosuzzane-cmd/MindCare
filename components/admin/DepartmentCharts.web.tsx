@@ -33,6 +33,8 @@ export interface DeptComparisonMetric {
   lsnCount: number;
   assessmentCount: number;
   participationRate: number;
+  trackedStudents?: number;
+  assessedStudents?: number;
 }
 
 export interface ScatterPoint {
@@ -82,6 +84,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       {isBar && typeof first.participationRate === "number" && (
         <Text style={styles.tooltipMuted}>
           Participation: {Math.round(first.participationRate * 100)}%
+        </Text>
+      )}
+      {isBar && typeof first.trackedStudents === "number" && (
+        <Text style={styles.tooltipMuted}>
+          Tracked / assessed students: {first.trackedStudents} /{" "}
+          {first.assessedStudents ?? "—"}
         </Text>
       )}
       <Text style={styles.tooltipNote}>
@@ -134,6 +142,8 @@ export function DepartmentComparisonChart({ data }: ComparisonChartProps) {
         "LSN": d.lsnCount,
         "Assessments": d.assessmentCount,
         participationRate: d.participationRate,
+        trackedStudents: d.trackedStudents,
+        assessedStudents: d.assessedStudents,
       })),
     [data],
   );

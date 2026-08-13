@@ -18,6 +18,7 @@ import {
   mergeDepartmentBuckets,
 } from "@/utils/departmentMeta";
 import { useAuth } from "@/hooks/AuthContext";
+import { MIN_ANALYTICS_GROUP_SIZE } from "@/utils/analyticsPrivacy";
 import { listenForAdminDashboardData } from "@/services/adminFirestoreService";
 import {
   cleanupExpiredAnnouncements,
@@ -104,6 +105,17 @@ const COLLEGES = [
   "Star Colleges",
 ];
 
+function formatLastUpdated(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.round(diffMs / 60000);
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin} min ago`;
+  const diffHr = Math.round(diffMin / 60);
+  if (diffHr < 24) return `${diffHr} hr ago`;
+  return date.toLocaleDateString();
+}
+
 type RiskLevel = "low" | "normal" | "high";
 
 interface AnalyticsSummary {
@@ -166,6 +178,7 @@ interface PerDepartmentKpi {
   deptName: string;
   deptAbbr: string;
   avgScore: number;
+  studentCount: number;
   journalEntries: number;
   lsnStudents: number;
   topMood: string;
@@ -401,6 +414,7 @@ function HeaderIconButton({
 interface DonutSlice {
   label: string;
   value: number;
+  count: number;
   color: string;
 }
 
@@ -430,6 +444,7 @@ export default function AdminPanelScreen() {
   const [studentSummaries, setStudentSummaries] = useState<StudentSummary[]>(
     [],
   );
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<
     "students" | "analytics" | "announcements"
@@ -496,6 +511,7 @@ export default function AdminPanelScreen() {
       (data) => {
         setStudentSummaries(data.studentSummaries);
         setAnalyticsData(data.analyticsData);
+        setLastUpdated(new Date());
         setError(null);
         setLoading(false);
       },
@@ -834,6 +850,12 @@ export default function AdminPanelScreen() {
           .length;
   }, [yearLevelFilter, studentSummaries]);
 
+  // ─── Assessed students (at least one assessment) across the tracked set ────
+  const assessedStudentCount = useMemo(
+    () => studentSummaries.filter((s) => s.assessmentsCount > 0).length,
+    [studentSummaries],
+  );
+
   // ─── Computed Chart Data ───────────────────────────────────────────────────
   const donutData = useMemo((): DonutSlice[] => {
     if (!analyticsData.department) return [];
@@ -846,16 +868,19 @@ export default function AdminPanelScreen() {
       {
         label: "Lower Concern",
         value: Math.round((totalLow / total) * 100),
+        count: totalLow,
         color: "#22C55E",
       },
       {
         label: "Moderate Concern",
         value: Math.round((totalNormal / total) * 100),
+        count: totalNormal,
         color: "#F59E0B",
       },
       {
         label: "Elevated Concern",
         value: Math.round((totalHigh / total) * 100),
+        count: totalHigh,
         color: "#EF4444",
       },
     ];
@@ -957,6 +982,7 @@ export default function AdminPanelScreen() {
         deptName: d.label,
         deptAbbr: getDepartmentCode(d.label),
         avgScore: d.total > 0 ? +(d.scoreSum / d.total).toFixed(1) : 0,
+        studentCount: deptStudents.length,
         journalEntries,
         lsnStudents,
         topMood,
@@ -1039,6 +1065,8 @@ export default function AdminPanelScreen() {
         lsnCount,
         assessmentCount: d.total,
         participationRate,
+        trackedStudents: deptStudents.length,
+        assessedStudents: assessedCount,
       };
     });
   }, [analyticsData, studentSummaries]);
@@ -2069,6 +2097,19 @@ export default function AdminPanelScreen() {
         <Text style={styles.deptKpiCardFull} numberOfLines={1}>
           {kpi.deptName}
         </Text>
+        <View style={styles.deptKpiSampleRow}>
+          <Text style={styles.deptKpiSampleText}>
+            n = {kpi.studentCount}
+            {kpi.studentCount < MIN_ANALYTICS_GROUP_SIZE
+              ? " · small sample"
+              : ""}
+          </Text>
+        </View>
+        {kpi.studentCount < MIN_ANALYTICS_GROUP_SIZE && (
+          <Text style={styles.deptKpiCaution}>
+            Small sample — interpret with caution.
+          </Text>
+        )}
         <View style={styles.deptKpiMetricsGrid}>
           <View style={styles.deptKpiMetricSpark}>
             <View style={styles.sparklineRow}>
@@ -2314,7 +2355,9 @@ export default function AdminPanelScreen() {
                 <Text style={styles.donutLegendText} numberOfLines={1}>
                   {slice.label}
                 </Text>
-                <Text style={styles.donutLegendValue}>{slice.value}%</Text>
+                <Text style={styles.donutLegendValue}>
+                  {slice.count} · {slice.value}%
+                </Text>
               </Pressable>
             ))}
           </View>
@@ -2392,6 +2435,13 @@ export default function AdminPanelScreen() {
               </Text>
               <Text style={styles.radialLegendValue}>{notCompletedPct}%</Text>
             </View>
+          </View>
+          <View style={styles.radialCountsRow}>
+            <Text style={styles.radialCountsText}>
+              {assessedStudentCount} assessed · {studentSummaries.length} tracked ·{" "}
+              {Math.max(studentSummaries.length - assessedStudentCount, 0)}{" "}
+              not yet assessed
+            </Text>
           </View>
         </View>
         <Text style={styles.widgetInsightText}>
@@ -3558,6 +3608,68 @@ export default function AdminPanelScreen() {
                       },
                     ]}
                   />
+
+                  {studentSummaries.length > 0 && (
+                    <View style={styles.dataCoverageCard}>
+                      <View style={styles.dataCoverageHeader}>
+                        <Ionicons
+                          name="shield-checkmark-outline"
+                          size={16}
+                          color="#8A63D2"
+                        />
+                        <Text style={styles.dataCoverageTitle}>
+                          Data Coverage
+                        </Text>
+                      </View>
+                      <View style={styles.dataCoverageRow}>
+                        <View style={styles.dataCoverageStat}>
+                          <Text style={styles.dataCoverageValue}>
+                            {studentSummaries.length}
+                          </Text>
+                          <Text style={styles.dataCoverageLabel}>
+                            Tracked students
+                          </Text>
+                        </View>
+                        <View style={styles.dataCoverageStat}>
+                          <Text style={styles.dataCoverageValue}>
+                            {assessedStudentCount}
+                          </Text>
+                          <Text style={styles.dataCoverageLabel}>Assessed</Text>
+                        </View>
+                        <View style={styles.dataCoverageStat}>
+                          <Text style={styles.dataCoverageValue}>
+                            {surveyCompletionPct}%
+                          </Text>
+                          <Text style={styles.dataCoverageLabel}>
+                            Assessment coverage
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.dataCoverageMeta}>
+                        Last updated:{" "}
+                        {lastUpdated
+                          ? formatLastUpdated(lastUpdated)
+                          : "—"}
+                      </Text>
+                      {surveyCompletionPct < 50 ? (
+                        <Text style={styles.dataCoverageWarn}>
+                          Interpretation is limited because only{" "}
+                          {surveyCompletionPct}% of tracked students have
+                          completed the assessment.
+                        </Text>
+                      ) : surveyCompletionPct < 100 ? (
+                        <Text style={styles.dataCoverageNote}>
+                          The remaining{" "}
+                          {Math.max(
+                            studentSummaries.length - assessedStudentCount,
+                            0,
+                          )}{" "}
+                          students are the primary target for assessment
+                          outreach.
+                        </Text>
+                      ) : null}
+                    </View>
+                  )}
 
                   {/* ─── SECTION 2: Risk Trend KPIs ──────────────────────── */}
                   <Text style={styles.sectionHeader}>
@@ -5149,6 +5261,24 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginBottom: 4,
   },
+  deptKpiSampleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  deptKpiSampleText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#94A3B8",
+  },
+  deptKpiCaution: {
+    fontSize: 10,
+    color: "#B45309",
+    backgroundColor: "#FEF3C7",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    overflow: "hidden",
+  },
   deptKpiMetricsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -5656,6 +5786,85 @@ const styles = StyleSheet.create({
     color: "#2D1B69",
     minWidth: 36,
     textAlign: "right",
+  },
+  radialCountsRow: {
+    marginTop: 10,
+    alignItems: "center",
+  },
+  radialCountsText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#8A63D2",
+  },
+  dataCoverageCard: {
+    backgroundColor: "#FAF5FF",
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+    borderRadius: 14,
+    padding: 14,
+    gap: 10,
+  },
+  dataCoverageHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  dataCoverageTitle: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#581C87",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  dataCoverageRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  dataCoverageStat: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#EDE9FE",
+    paddingVertical: 10,
+    alignItems: "center",
+    gap: 2,
+  },
+  dataCoverageValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#2D1B69",
+  },
+  dataCoverageLabel: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#8A63D2",
+    textTransform: "uppercase",
+  },
+  dataCoverageMeta: {
+    fontSize: 10,
+    color: "#94A3B8",
+    fontWeight: "600",
+  },
+  dataCoverageWarn: {
+    fontSize: 11,
+    lineHeight: 16,
+    color: "#B45309",
+    backgroundColor: "#FEF3C7",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    overflow: "hidden",
+  },
+  dataCoverageNote: {
+    fontSize: 11,
+    lineHeight: 16,
+    color: "#6B21A8",
+    backgroundColor: "#F3E8FF",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    overflow: "hidden",
   },
   compChartContainer: {
     flexDirection: "row",
