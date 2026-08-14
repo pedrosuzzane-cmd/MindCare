@@ -28,6 +28,7 @@ import {
   NativeSyntheticEvent,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -1154,74 +1155,80 @@ export default function StudentMessagesScreen() {
                   Start typing to search for a student or guidance counselor
                 </Text>
               ) : (
-                recipientResults.map((r) => {
-                  const isStarting = startingConversationId === r.uid;
-                  const avatarUrl =
-                    r.profileImage && !failedAvatarUids[r.uid]
-                      ? r.profileImage
-                      : null;
-                  return (
-                    <Pressable
-                      key={r.uid}
-                      style={[
-                        styles.newChatResultRow,
-                        startingConversationId !== null &&
-                          startingConversationId !== r.uid &&
-                          styles.newChatResultRowDisabled,
-                      ]}
-                      onPress={() => startConversation(r)}
-                      disabled={startingConversationId !== null}
-                    >
-                      {avatarUrl ? (
-                        <Image
-                          source={{ uri: avatarUrl }}
-                          style={styles.newChatResultAvatarImage}
-                          onError={() =>
-                            setFailedAvatarUids((prev) => ({
-                              ...prev,
-                              [r.uid]: true,
-                            }))
-                          }
-                        />
-                      ) : (
-                        <View
-                          style={[
-                            styles.newChatResultAvatar,
-                            r.role === "guidance"
-                              ? styles.newChatResultAvatarGuidance
-                              : styles.newChatResultAvatarPeer,
-                          ]}
-                        >
-                          <Text style={styles.newChatResultAvatarInitials}>
-                            {getInitials(r.fullName)}
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={styles.newChatResultsContent}
+                >
+                  {recipientResults.map((r) => {
+                    const isStarting = startingConversationId === r.uid;
+                    const avatarUrl =
+                      r.profileImage && !failedAvatarUids[r.uid]
+                        ? r.profileImage
+                        : null;
+                    return (
+                      <Pressable
+                        key={r.uid}
+                        style={[
+                          styles.newChatResultRow,
+                          startingConversationId !== null &&
+                            startingConversationId !== r.uid &&
+                            styles.newChatResultRowDisabled,
+                        ]}
+                        onPress={() => startConversation(r)}
+                        disabled={startingConversationId !== null}
+                      >
+                        {avatarUrl ? (
+                          <Image
+                            source={{ uri: avatarUrl }}
+                            style={styles.newChatResultAvatarImage}
+                            onError={() =>
+                              setFailedAvatarUids((prev) => ({
+                                ...prev,
+                                [r.uid]: true,
+                              }))
+                            }
+                          />
+                        ) : (
+                          <View
+                            style={[
+                              styles.newChatResultAvatar,
+                              r.role === "guidance"
+                                ? styles.newChatResultAvatarGuidance
+                                : styles.newChatResultAvatarPeer,
+                            ]}
+                          >
+                            <Text style={styles.newChatResultAvatarInitials}>
+                              {getInitials(r.fullName)}
+                            </Text>
+                          </View>
+                        )}
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={styles.newChatResultName}
+                            numberOfLines={1}
+                          >
+                            {r.fullName}
+                          </Text>
+                          <Text
+                            style={styles.newChatResultMeta}
+                            numberOfLines={1}
+                          >
+                            {r.role === "guidance"
+                              ? r.department || "Guidance Counselor"
+                              : r.department || "Student"}
                           </Text>
                         </View>
-                      )}
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={styles.newChatResultName}
-                          numberOfLines={1}
-                        >
-                          {r.fullName}
-                        </Text>
-                        <Text
-                          style={styles.newChatResultMeta}
-                          numberOfLines={1}
-                        >
-                          {r.role === "guidance"
-                            ? r.department || "Guidance Counselor"
-                            : r.department || "Student"}
-                        </Text>
-                      </View>
-                      {isStarting && (
-                        <ActivityIndicator
-                          size="small"
-                          color={COLORS.lightPurple}
-                        />
-                      )}
-                    </Pressable>
-                  );
-                })
+                        {isStarting && (
+                          <ActivityIndicator
+                            size="small"
+                            color={COLORS.lightPurple}
+                          />
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
               )}
             </View>
           </Pressable>
@@ -1706,6 +1713,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.softBorder,
     padding: 20,
     maxHeight: "80%",
+    overflow: "hidden",
   },
   newChatHeader: {
     flexDirection: "row",
@@ -1742,6 +1750,11 @@ const styles = StyleSheet.create({
   },
   newChatResults: {
     marginTop: 14,
+    flexShrink: 1,
+    minHeight: 0,
+  },
+  newChatResultsContent: {
+    paddingBottom: 4,
   },
   newChatEmpty: {
     fontSize: 13,
