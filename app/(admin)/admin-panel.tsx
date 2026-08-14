@@ -2584,13 +2584,6 @@ export default function AdminPanelScreen() {
               onPress={() => router.push("/(admin)/student-management")}
             />
             <HeaderIconButton
-              label="Alerts / High Concern Students"
-              icon="warning-outline"
-              variant="alert"
-              color="#DC2626"
-              onPress={() => router.push("/(admin)/risk-monitor")}
-            />
-            <HeaderIconButton
               label="Messages / Inbox"
               icon="chatbubble-ellipses-outline"
               variant="messages"

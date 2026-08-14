@@ -1332,6 +1332,13 @@ export default function StudentManagementScreen() {
         style={[styles.header, { paddingTop: insets.top + 10 }]}
       >
         <View style={styles.headerTop}>
+          <Pressable
+            style={styles.backBtn}
+            onPress={() => router.back()}
+            hitSlop={8}
+          >
+            <Ionicons name="arrow-back" size={22} color="white" />
+          </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>Student Management</Text>
             <Text style={styles.headerSubtitle}>
@@ -3661,6 +3668,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
   },
   headerTitle: {
     color: "#FFFFFF",

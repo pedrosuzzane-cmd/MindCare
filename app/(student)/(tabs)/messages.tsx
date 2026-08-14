@@ -630,6 +630,7 @@ export default function StudentMessagesScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.filterScroll}
         contentContainerStyle={styles.filterRow}
       >
         {FILTER_OPTIONS.map((option) => {
@@ -1029,7 +1030,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "white",
     margin: 16,
-    marginBottom: 8,
+    marginBottom: 12,
     borderRadius: 14,
     paddingHorizontal: 14,
     height: 46,
@@ -1052,7 +1053,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     gap: 8,
-    paddingBottom: 8,
+    paddingBottom: 16,
+  },
+  filterScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
   },
   filterPill: {
     flexDirection: "row",
