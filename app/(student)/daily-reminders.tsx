@@ -778,7 +778,7 @@ export default function DailyRemindersScreen() {
         <View style={s.summaryCard}>
           <View style={s.summaryHeader}>
             <Ionicons name="today-outline" size={20} color="#8A63D2" />
-            <Text style={s.summaryTitle}>Today's Routine</Text>
+            <Text style={s.summaryTitle}>Routine for Today</Text>
             <View style={s.summaryCountPill}>
               <Text style={s.summaryCountText}>
                 {[

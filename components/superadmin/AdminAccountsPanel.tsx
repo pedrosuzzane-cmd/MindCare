@@ -135,6 +135,19 @@ export function AdminAccountsPanel() {
     isSuperAdmin: false,
   });
 
+  const [creating, setCreating] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    email: "",
+    password: "",
+    confirmPassword: "",
+    displayName: "",
+    position: "",
+    contactNo: "",
+    college: "",
+    schoolId: "",
+    isSuperAdmin: false,
+  });
+
   const loadAdmins = useCallback(async () => {
     try {
       const token = await auth.currentUser?.getIdToken();
@@ -186,6 +199,95 @@ export function AdminAccountsPanel() {
   const closeEdit = () => {
     setEditing(null);
     setSaving(false);
+  };
+
+  const openCreate = () => {
+    setCreateForm({
+      email: "",
+      password: "",
+      confirmPassword: "",
+      displayName: "",
+      position: "",
+      contactNo: "",
+      college: "",
+      schoolId: "",
+      isSuperAdmin: false,
+    });
+    setCreating(true);
+    setError(null);
+  };
+
+  const closeCreate = () => {
+    setCreating(false);
+    setSaving(false);
+  };
+
+  const handleCreate = async () => {
+    const email = createForm.email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      Alert.alert("Invalid Email", "Please enter a valid email address.");
+      return;
+    }
+    if (!createForm.displayName.trim()) {
+      Alert.alert("Missing Name", "Please enter the administrator's full name.");
+      return;
+    }
+    if (createForm.password.length < 12) {
+      Alert.alert(
+        "Weak Password",
+        "Password must be at least 12 characters long.",
+      );
+      return;
+    }
+    if (createForm.password !== createForm.confirmPassword) {
+      Alert.alert("Password Mismatch", "The passwords do not match.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) {
+        setError("You must be signed in as a Super Admin.");
+        setSaving(false);
+        return;
+      }
+      const response = await fetch(`${API_URL}/api/superadmin/create-admin`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email,
+          password: createForm.password,
+          displayName: createForm.displayName.trim(),
+          position: createForm.position.trim() || null,
+          contactNo: createForm.contactNo.trim() || null,
+          college: createForm.college.trim() || null,
+          schoolId: createForm.schoolId.trim() || null,
+          isSuperAdmin: createForm.isSuperAdmin,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        Alert.alert(
+          "Could Not Create Admin",
+          data.error || "Failed to create the administrator.",
+        );
+        setSaving(false);
+        return;
+      }
+      Alert.alert(
+        "Administrator Created",
+        `${createForm.displayName.trim()} can now sign in with these credentials.`,
+      );
+      closeCreate();
+      await loadAdmins();
+    } catch {
+      Alert.alert("Network Error", "Please try again.");
+      setSaving(false);
+    }
   };
 
   const handleSave = async () => {
@@ -311,14 +413,24 @@ export function AdminAccountsPanel() {
               Manage admin accounts and permissions
             </Text>
           </View>
-          <Pressable
-            style={styles.iconButton}
-            onPress={handleRefresh}
-            accessibilityRole="button"
-            accessibilityLabel="Refresh administrators"
-          >
-            <Ionicons name="refresh" size={20} color="#FFFFFF" />
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              style={styles.iconButton}
+              onPress={openCreate}
+              accessibilityRole="button"
+              accessibilityLabel="Create administrator"
+            >
+              <Ionicons name="person-add" size={20} color="#FFFFFF" />
+            </Pressable>
+            <Pressable
+              style={styles.iconButton}
+              onPress={handleRefresh}
+              accessibilityRole="button"
+              accessibilityLabel="Refresh administrators"
+            >
+              <Ionicons name="refresh" size={20} color="#FFFFFF" />
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.statsRow}>
@@ -402,7 +514,7 @@ export function AdminAccountsPanel() {
             </View>
             <Text style={styles.emptyTitle}>No results</Text>
             <Text style={styles.emptyText}>
-              Nothing matches "{query}". Try a different search.
+              Nothing matches &quot;{query}&quot;. Try a different search.
             </Text>
           </View>
         ) : (
@@ -606,6 +718,151 @@ export function AdminAccountsPanel() {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={creating}
+        transparent
+        animationType="fade"
+        onRequestClose={closeCreate}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modal}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderIcon}>
+                <Ionicons name="person-add" size={20} color="#7C3AED" />
+              </View>
+              <View style={styles.modalHeaderText}>
+                <Text style={styles.modalTitle}>Create Administrator</Text>
+                <Text style={styles.modalSubtitle}>
+                  New admins sign in with the credentials you set below.
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView
+              contentContainerStyle={styles.modalBody}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <Text style={styles.label}>Email address</Text>
+              <TextInput
+                style={styles.input}
+                value={createForm.email}
+                onChangeText={(v) => setCreateForm({ ...createForm, email: v })}
+                placeholder="name@example.com"
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoComplete="email"
+              />
+              <Text style={styles.label}>Full name</Text>
+              <TextInput
+                style={styles.input}
+                value={createForm.displayName}
+                onChangeText={(v) => setCreateForm({ ...createForm, displayName: v })}
+                placeholder="Full name"
+                placeholderTextColor="#9CA3AF"
+              />
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                style={styles.input}
+                value={createForm.password}
+                onChangeText={(v) => setCreateForm({ ...createForm, password: v })}
+                placeholder="At least 12 characters"
+                placeholderTextColor="#9CA3AF"
+                secureTextEntry
+                autoCapitalize="none"
+              />
+              <Text style={styles.label}>Confirm password</Text>
+              <TextInput
+                style={styles.input}
+                value={createForm.confirmPassword}
+                onChangeText={(v) =>
+                  setCreateForm({ ...createForm, confirmPassword: v })
+                }
+                placeholder="Re-enter password"
+                placeholderTextColor="#9CA3AF"
+                secureTextEntry
+                autoCapitalize="none"
+              />
+              <Text style={styles.label}>Position</Text>
+              <TextInput
+                style={styles.input}
+                value={createForm.position}
+                onChangeText={(v) => setCreateForm({ ...createForm, position: v })}
+                placeholder="Position"
+                placeholderTextColor="#9CA3AF"
+              />
+              <Text style={styles.label}>Contact number</Text>
+              <TextInput
+                style={styles.input}
+                value={createForm.contactNo}
+                onChangeText={(v) => setCreateForm({ ...createForm, contactNo: v })}
+                placeholder="Contact number"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="phone-pad"
+              />
+              <Text style={styles.label}>College</Text>
+              <TextInput
+                style={styles.input}
+                value={createForm.college}
+                onChangeText={(v) => setCreateForm({ ...createForm, college: v })}
+                placeholder="College"
+                placeholderTextColor="#9CA3AF"
+              />
+              <Text style={styles.label}>School ID</Text>
+              <TextInput
+                style={styles.input}
+                value={createForm.schoolId}
+                onChangeText={(v) => setCreateForm({ ...createForm, schoolId: v })}
+                placeholder="School ID"
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="characters"
+              />
+
+              <View style={styles.switchRow}>
+                <View style={styles.switchText}>
+                  <Text style={styles.switchTitle}>Super Admin</Text>
+                  <Text style={styles.switchHint}>
+                    Can approve resets, grant/revoke admins, and manage security
+                  </Text>
+                </View>
+                <Switch
+                  value={createForm.isSuperAdmin}
+                  onValueChange={(v) =>
+                    setCreateForm({ ...createForm, isSuperAdmin: v })
+                  }
+                  trackColor={{ false: "#D1D5DB", true: "#A78BFA" }}
+                  thumbColor={createForm.isSuperAdmin ? "#7C3AED" : "#F4F4F5"}
+                />
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <Pressable
+                style={styles.modalCancel}
+                onPress={closeCreate}
+                disabled={saving}
+                accessibilityRole="button"
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalSave, saving && styles.buttonDisabled]}
+                onPress={handleCreate}
+                disabled={saving}
+                accessibilityRole="button"
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text style={styles.modalSaveText}>Create Admin</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -646,6 +903,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.22)",
     justifyContent: "center",
     alignItems: "center",
+  },
+  headerActions: {
+    flexDirection: "row",
+    gap: 8,
   },
   statsRow: {
     flexDirection: "row",

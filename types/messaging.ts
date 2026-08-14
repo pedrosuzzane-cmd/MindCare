@@ -26,10 +26,10 @@ export interface OptimisticMessage extends Message {
 
 export interface Conversation {
   id: string;
-  studentId: string;
-  adminId: string;
-  studentName: string;
-  adminName: string;
+  studentId?: string;
+  adminId?: string;
+  studentName?: string;
+  adminName?: string;
   lastMessage: string;
   lastMessageAt: number;
   unreadBy: string[]; // UIDs who haven't read the latest message

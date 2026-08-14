@@ -97,6 +97,16 @@ export async function sendMessage(
   const messageId = `${senderUid}_${Date.now()}`;
 
   await runTransaction(db, async (transaction) => {
+    const conversationSnap = await transaction.get(conversationRef);
+    const data = conversationSnap.exists() ? conversationSnap.data() : {};
+
+    const participants = Array.isArray(data.participants)
+      ? data.participants
+      : [data.studentId, data.adminId].filter(Boolean);
+    const receiverUid = participants.find(
+      (uid: string) => uid !== senderUid,
+    );
+
     const messageRef = doc(messagesRef, messageId);
     transaction.set(messageRef, {
       senderId: senderUid,
@@ -110,7 +120,7 @@ export async function sendMessage(
     transaction.update(conversationRef, {
       lastMessage: text.trim(),
       lastMessageAt: Date.now(),
-      unreadBy: [],
+      unreadBy: receiverUid ? [receiverUid] : [],
     });
   });
 

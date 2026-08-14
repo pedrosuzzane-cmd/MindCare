@@ -60,6 +60,7 @@ type ViewMode = "inbox" | "chat" | "search";
 
 export default function PeerMessagesScreen() {
   const { user } = useAuth();
+  const currentUserUid = user?.uid;
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("inbox");
   const [activeConversation, setActiveConversation] =
@@ -98,19 +99,11 @@ export default function PeerMessagesScreen() {
   // Inbox-level search
   const [inboxSearchQuery, setInboxSearchQuery] = useState("");
 
-  // Presence
-  const [presenceMap, setPresenceMap] = useState<Record<string, boolean>>({});
-
-  // Merge Firestore messages with optimistic ones
-  const allMessages: OptimisticMessage[] = [
-    ...messages,
-    ...optimistic.filter((o) => !messages.some((m) => m.id === o.id)),
-  ];
-
   // Filtered conversations for inbox search
   const filteredConversations = inboxSearchQuery.trim()
     ? conversations.filter((c) => {
-        const name = getPeerName(c, user!.uid).toLowerCase();
+        if (!currentUserUid) return false;
+        const name = getPeerName(c, currentUserUid).toLowerCase();
         return name.includes(inboxSearchQuery.toLowerCase());
       })
     : conversations;
@@ -122,7 +115,7 @@ export default function PeerMessagesScreen() {
       setConversations(convs);
       setLoading(false);
     });
-    return () => unsub();
+    return unsub;
   }, [user?.uid]);
 
   // Set self as online on mount, offline on unmount
@@ -132,7 +125,7 @@ export default function PeerMessagesScreen() {
     return () => {
       setUserOffline(user.uid);
     };
-  }, [user?.uid]);
+  }, [user]);
 
   // Listen for presence of conversation partners
   useEffect(() => {
@@ -147,7 +140,7 @@ export default function PeerMessagesScreen() {
     });
 
     return () => unsubs.forEach((unsub) => unsub());
-  }, [conversations, user?.uid]);
+  }, [conversations, user]);
 
   // Listen for messages when in chat view
   useEffect(() => {
@@ -163,40 +156,36 @@ export default function PeerMessagesScreen() {
     });
 
     return () => unsub();
-  }, [activeConversation?.id, user?.uid]);
+  }, [activeConversation?.id, user, scrollToBottom]);
 
   // Real-time moderation check while typing
-  useEffect(() => {
-    if (!inputText.trim()) {
-      setModerationError(null);
-      return;
-    }
-    const result = quickModerationCheck(inputText);
-    if (result.status === "blocked") {
-      setModerationError(
-        result.reason || "This message contains restricted content.",
-      );
-    } else {
-      setModerationError(null);
-    }
+  const moderationResult = useMemo(() => {
+    const text = inputText.trim();
+    if (!text) return null;
+    return quickModerationCheck(text);
   }, [inputText]);
+
+  const currentModerationError =
+    moderationResult?.status === "blocked"
+      ? moderationResult.reason || "This message contains restricted content."
+      : null;
 
   const [headerName, setHeaderName] = useState<string>("");
 
-  const openChat = async (conversation: Conversation) => {
+  const openChat = useCallback(async (conversation: Conversation) => {
     setActiveConversation(conversation);
     setViewMode("chat");
     setModerationError(null);
 
     // Fetch fresh names from DB
-    if (conversation.participants && user?.uid) {
+    if (conversation.participants && currentUserUid) {
       try {
         const freshNames = await refreshPeerConversationNames(
           conversation.id,
           conversation.participants,
         );
         const otherUid = conversation.participants.find(
-          (uid) => uid !== user!.uid,
+          (uid) => uid !== currentUserUid,
         );
         if (otherUid && freshNames[otherUid]) {
           setHeaderName(freshNames[otherUid]);
@@ -207,10 +196,10 @@ export default function PeerMessagesScreen() {
         }
       } catch {
         // Use cached name on error
-        setHeaderName(getPeerName(conversation, user!.uid));
+        setHeaderName(getPeerName(conversation, currentUserUid));
       }
     }
-  };
+  }, [currentUserUid]);
 
   // Debounced search query
   useEffect(() => {
@@ -224,13 +213,13 @@ export default function PeerMessagesScreen() {
     }, 300); // Debounce for 300ms
 
     return () => clearTimeout(handler);
-  }, [searchQuery, viewMode, user]);
+  }, [searchQuery, viewMode, user, currentUserUid]);
 
   const openSearch = async () => {
     setViewMode("search");
   };
 
-  const startConversation = async (student: StudentSearchResult) => {
+  const startConversation = useCallback(async (student: StudentSearchResult) => {
     try {
       const myName = user?.displayName || "Student";
       const convId = await getOrCreatePeerConversation(
@@ -248,17 +237,13 @@ export default function PeerMessagesScreen() {
         // Create a temporary conversation object
         const tempConv: Conversation = {
           id: convId,
-          studentId: "",
-          adminId: "",
-          studentName: "",
-          adminName: "",
           lastMessage: "",
           lastMessageAt: Date.now(),
           unreadBy: [],
           type: "peer",
-          participants: [user!.uid, student.uid],
+          participants: [currentUserUid!, student.uid],
           participantNames: {
-            [user!.uid]: myName || "Student",
+            [currentUserUid!]: myName || "Student",
             [student.uid]: student.fullName,
           },
         };
@@ -269,16 +254,58 @@ export default function PeerMessagesScreen() {
     } catch (err) {
       console.error("Failed to start conversation:", err);
     }
-  };
+  }, [conversations, currentUserUid, openChat, user?.displayName]);
+ const sendWithStatus = useCallback(
+    async (
+      text: string,
+      moderationStatus: "safe" | "flagged" | "blocked",
+    ) => {
+      if (!activeConversation || !currentUserUid) return;
+
+      const tempId = `temp_${Date.now()}`;
+      setInputText("");
+      setModerationError(null);
+
+      const optMsg: OptimisticMessage = {
+        id: tempId,
+        senderId: currentUserUid,
+        text,
+        createdAt: Date.now(),
+        isAdmin: false,
+        senderRole: "student",
+        moderationStatus,
+        failed: false,
+      };
+      setOptimistic((prev) => [...prev, optMsg]);
+      setSending(true);
+
+      try {
+        await sendMsg(
+          activeConversation.id,
+          text,
+          currentUserUid,
+          false,
+          moderationStatus,
+        );
+      } catch (err) {
+        console.error("Failed to send:", err);
+        setOptimistic((prev) =>
+          prev.map((m) => (m.id === tempId ? { ...m, failed: true } : m)),
+        );
+      } finally {
+        setSending(false);
+      }
+    },
+    [activeConversation, currentUserUid],
+  );
 
   // ─── Send with moderation + optimistic UI ──────────────────────────────────
   const handleSend = useCallback(async () => {
-    if (!inputText.trim() || !activeConversation || !user?.uid || sending)
+    if (!inputText.trim() || !activeConversation || !currentUserUid || sending)
       return;
 
     const text = inputText.trim();
     setModerationLoading(true);
-    setModerationError(null);
 
     try {
       // Run full moderation (blocklist + AI)
@@ -309,51 +336,13 @@ export default function PeerMessagesScreen() {
     } finally {
       setModerationLoading(false);
     }
-  }, [inputText, activeConversation, user?.uid, sending]);
-
-  const sendWithStatus = async (
-    text: string,
-    moderationStatus: "safe" | "flagged" | "blocked",
-  ) => {
-    if (!activeConversation || !user?.uid) return;
-
-    const tempId = `temp_${Date.now()}`;
-    setInputText("");
-    setModerationError(null);
-
-    const optMsg: OptimisticMessage = {
-      id: tempId,
-      senderId: user.uid,
-      text,
-      createdAt: Date.now(),
-      isAdmin: false,
-      senderRole: "student",
-      moderationStatus,
-      failed: false,
-    };
-    setOptimistic((prev) => [...prev, optMsg]);
-    setSending(true);
-
-    try {
-      const realId = await sendMsg(
-        activeConversation.id,
-        text,
-        user.uid,
-        false,
-        moderationStatus,
-      );
-      setOptimistic((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, id: realId } : m)),
-      );
-    } catch (err) {
-      console.error("Failed to send:", err);
-      setOptimistic((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, failed: true } : m)),
-      );
-    } finally {
-      setSending(false);
-    }
-  };
+  }, [
+    inputText,
+    activeConversation,
+    currentUserUid,
+    sending,
+    sendWithStatus,
+  ]);
 
   const handleFlaggedConfirm = async () => {
     setFlaggedModal(false);
@@ -364,7 +353,7 @@ export default function PeerMessagesScreen() {
   // ─── Retry failed message ──────────────────────────────────────────────────
   const handleRetry = useCallback(
     async (msg: OptimisticMessage) => {
-      if (!activeConversation || !user?.uid) return;
+      if (!activeConversation || !currentUserUid) return;
 
       setOptimistic((prev) =>
         prev.map((m) => (m.id === msg.id ? { ...m, failed: false } : m)),
@@ -374,7 +363,7 @@ export default function PeerMessagesScreen() {
         const realId = await sendMsg(
           activeConversation.id,
           msg.text,
-          user.uid,
+          currentUserUid,
           false,
           msg.moderationStatus,
         );
@@ -387,8 +376,9 @@ export default function PeerMessagesScreen() {
         );
       }
     },
-    [activeConversation, user?.uid],
+    [activeConversation, currentUserUid],
   );
+
 
   // ─── Message context menu ──────────────────────────────────────────────────
   const handleCopyMsg = () => {
@@ -416,7 +406,7 @@ export default function PeerMessagesScreen() {
 
     const peerName = getPeerName(convCtxConv, user!.uid);
     Alert.alert(
-      "Delete Conversation",
+      "Delete Conversation?",
       `Are you sure you want to delete your conversation with ${peerName}? This cannot be undone.`,
       [
         { text: "Cancel", style: "cancel" },
@@ -453,8 +443,8 @@ export default function PeerMessagesScreen() {
 
   // ─── Inbox: Conversation row ───────────────────────────────────────────────
   const renderConversation = ({ item }: { item: Conversation }) => {
-    const hasUnread = item.unreadBy?.includes(user?.uid || "");
-    const peerName = getPeerName(item, user!.uid);
+    const hasUnread = item.unreadBy?.includes(currentUserUid || "");
+    const peerName = getPeerName(item, currentUserUid || "");
 
     return (
       <Pressable
@@ -471,7 +461,7 @@ export default function PeerMessagesScreen() {
             <Ionicons name="person" size={22} color="#8A63D2" />
           </View>
           {(() => {
-            const peerUid = item.participants?.find((p) => p !== user?.uid);
+            const peerUid = item.participants?.find((p) => p !== currentUserUid);
             const isOnline = peerUid ? presenceMap[peerUid] : false;
             return (
               <View
@@ -506,7 +496,7 @@ export default function PeerMessagesScreen() {
 
   // ─── Chat: Message bubble ──────────────────────────────────────────────────
   const renderMessage = ({ item }: { item: OptimisticMessage }) => {
-    const isMine = item.senderId === user?.uid;
+    const isMine = item.senderId === currentUserUid;
     const isDeleted = item.deleted;
     const isFailed = item.failed;
     const isFlagged = item.moderationStatus === "flagged";
@@ -529,7 +519,7 @@ export default function PeerMessagesScreen() {
           {!isMine && (
             <Text style={styles.senderLabel}>
               {activeConversation
-                ? getPeerName(activeConversation, user!.uid)
+                ? getPeerName(activeConversation, currentUserUid || "")
                 : "Student"}
             </Text>
           )}
@@ -612,12 +602,10 @@ export default function PeerMessagesScreen() {
   );
 
   // ─── Header title ──────────────────────────────────────────────────────────
-  // Live partner profile from the centralized users/admins collection keeps the
-  // header name/avatar current when a peer updates their profile.
   const partnerUid = useMemo(() => {
     if (viewMode !== "chat" || !activeConversation) return undefined;
-    return activeConversation.participants?.find((u) => u !== user?.uid);
-  }, [viewMode, activeConversation, user?.uid]);
+    return activeConversation.participants?.find((u) => u !== currentUserUid);
+  }, [viewMode, activeConversation, currentUserUid]);
   const liveProfile = useStudentProfile(partnerUid);
 
   const headerTitle =
@@ -625,7 +613,7 @@ export default function PeerMessagesScreen() {
       ? liveProfile?.fullName ||
         headerName ||
         (activeConversation
-          ? getPeerName(activeConversation, user!.uid)
+          ? getPeerName(activeConversation, currentUserUid || "")
           : "Chat")
       : viewMode === "search"
         ? "Find Students"
@@ -633,6 +621,13 @@ export default function PeerMessagesScreen() {
 
   const headerSubtitle =
     viewMode === "chat" ? "Peer" : viewMode === "search" ? null : "Students";
+
+  // Presence
+  const [presenceMap, setPresenceMap] = useState<Record<string, boolean>>({});
+  const allMessages: OptimisticMessage[] = useMemo(() => [
+    ...messages,
+    ...optimistic.filter((o) => !messages.some((m) => m.id === o.id)),
+  ], [messages, optimistic]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -887,7 +882,7 @@ export default function PeerMessagesScreen() {
                   (!inputText.trim() ||
                     sending ||
                     moderationLoading ||
-                    !!moderationError) &&
+                    !!currentModerationError) &&
                     styles.sendBtnDisabled,
                 ]}
                 onPress={handleSend}
@@ -895,7 +890,7 @@ export default function PeerMessagesScreen() {
                   !inputText.trim() ||
                   sending ||
                   moderationLoading ||
-                  !!moderationError
+                  !!currentModerationError
                 }
               >
                 {moderationLoading ? (
@@ -905,7 +900,7 @@ export default function PeerMessagesScreen() {
                     name="arrow-up-circle"
                     size={32}
                     color={
-                      inputText.trim() && !moderationError
+                      inputText.trim() && !currentModerationError
                         ? "#8A63D2"
                         : "#D1D5DB"
                     }

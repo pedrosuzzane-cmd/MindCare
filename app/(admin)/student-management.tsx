@@ -1,28 +1,6 @@
 import { API_URL, isSuperAdminEmail } from "@/backend/config";
 import { auth, db } from "@/constants/firebase";
 import { useAuth } from "@/hooks/AuthContext";
-import { Ionicons } from "@expo/vector-icons";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import { LinearGradient } from "expo-linear-gradient";
-import { Redirect, router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { v4 as uuidv4 } from "uuid";
-import {
-  ActivityIndicator,
-  Modal,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { doc, getDoc } from "firebase/firestore";
 import {
   applyStudentFilters,
   buildTriageQueue,
@@ -55,6 +33,28 @@ import {
   type SupportActionType,
   type SupportStatus,
 } from "@/services/studentTypes";
+import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { LinearGradient } from "expo-linear-gradient";
+import { Redirect, router, useLocalSearchParams } from "expo-router";
+import { doc, getDoc } from "firebase/firestore";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Modal,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { v4 as uuidv4 } from "uuid";
 
 type RiskLevel = "low" | "normal" | "high";
 
@@ -79,9 +79,15 @@ const CONCERN_LABELS: Record<RiskLevel, string> = {
 // Support actions grouped by purpose. Pure UI organization — the underlying
 // actions and their status mapping are unchanged.
 const ACTION_GROUPS: { title: string; actions: SupportActionType[] }[] = [
-  { title: "Immediate / Communication", actions: ["contact_recommended", "send_wellness_checkin"] },
+  {
+    title: "Immediate / Communication",
+    actions: ["contact_recommended", "send_wellness_checkin"],
+  },
   { title: "Support", actions: ["guidance_consultation", "provide_resources"] },
-  { title: "Follow-up / Monitoring", actions: ["schedule_follow_up", "monitor_only"] },
+  {
+    title: "Follow-up / Monitoring",
+    actions: ["schedule_follow_up", "monitor_only"],
+  },
   { title: "Closure", actions: ["resolved", "no_action"] },
 ];
 
@@ -145,13 +151,15 @@ function formatDate(d?: Date | null): string {
 
 function formatDateTime(d?: Date | null): string {
   if (!d) return "—";
-  return d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }) +
+  return (
+    d.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }) +
     " " +
-    d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+  );
 }
 
 function initials(name: string): string {
@@ -164,6 +172,17 @@ function addDays(base: Date, days: number): Date {
   const d = new Date(base);
   d.setHours(12, 0, 0, 0);
   d.setDate(d.getDate() + days);
+  return d;
+}
+
+function addMonths(base: Date, months: number): Date {
+  const d = new Date(base);
+  d.setHours(12, 0, 0, 0);
+  const day = d.getDate();
+  d.setMonth(d.getMonth() + months);
+  if (d.getDate() < day) {
+    d.setDate(0);
+  }
   return d;
 }
 
@@ -197,7 +216,8 @@ function buildReasonSummary(opts: {
   if (opts.contactMethod) parts.push(`Contact method: ${opts.contactMethod}`);
   if (opts.resources.length)
     parts.push(`Resources provided: ${opts.resources.join(", ")}`);
-  if (opts.monitorDays) parts.push(`Monitoring period: ${opts.monitorDays} days`);
+  if (opts.monitorDays)
+    parts.push(`Monitoring period: ${opts.monitorDays} days`);
   const note = opts.notes.trim();
   if (note) parts.push(`Notes: ${note}`);
   return parts.join(" | ") || "Support workflow";
@@ -281,7 +301,10 @@ function KpiCard({
 }
 
 function PriorityBadge({ priority }: { priority: TriagePriority }) {
-  const config: Record<TriagePriority, { label: string; color: string; bg: string }> = {
+  const config: Record<
+    TriagePriority,
+    { label: string; color: string; bg: string }
+  > = {
     high: { label: "HIGH", color: "#BE123C", bg: "#FFE4E6" },
     medium: { label: "MEDIUM", color: "#B45309", bg: "#FEF3C7" },
     monitor: { label: "MONITOR", color: "#0F766E", bg: "#CCFBF1" },
@@ -320,7 +343,10 @@ function FilterOptionChip({
       onPress={onPress}
     >
       <Text
-        style={[styles.filterOptChipText, active && styles.filterOptChipTextActive]}
+        style={[
+          styles.filterOptChipText,
+          active && styles.filterOptChipTextActive,
+        ]}
       >
         {label}
       </Text>
@@ -424,6 +450,7 @@ export default function StudentManagementScreen() {
   const [wfSaving, setWfSaving] = useState(false);
   const [wfError, setWfError] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pickerMinDate, setPickerMinDate] = useState<Date | null>(null);
   const wfRequestIds = useRef<Map<string, string>>(new Map());
 
   // Profile / audit / delete modals
@@ -551,7 +578,20 @@ export default function StudentManagementScreen() {
         assessmentFrom,
         assessmentTo,
       }),
-    [entries, search, deptFilter, yearFilter, statusFilter, riskFilter, supportFilter, assessedFilter, lsnOnly, activityFilter, assessmentFrom, assessmentTo],
+    [
+      entries,
+      search,
+      deptFilter,
+      yearFilter,
+      statusFilter,
+      riskFilter,
+      supportFilter,
+      assessedFilter,
+      lsnOnly,
+      activityFilter,
+      assessmentFrom,
+      assessmentTo,
+    ],
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -602,10 +642,18 @@ export default function StudentManagementScreen() {
       });
     }
     if (deptFilter !== "All") {
-      chips.push({ key: "dept", label: deptFilter, clear: () => setDeptFilter("All") });
+      chips.push({
+        key: "dept",
+        label: deptFilter,
+        clear: () => setDeptFilter("All"),
+      });
     }
     if (yearFilter !== "All") {
-      chips.push({ key: "year", label: yearFilter, clear: () => setYearFilter("All") });
+      chips.push({
+        key: "year",
+        label: yearFilter,
+        clear: () => setYearFilter("All"),
+      });
     }
     if (riskFilter !== "All") {
       chips.push({
@@ -638,7 +686,11 @@ export default function StudentManagementScreen() {
       });
     }
     if (lsnOnly) {
-      chips.push({ key: "lsn", label: "LSN only", clear: () => setLsnOnly(false) });
+      chips.push({
+        key: "lsn",
+        label: "LSN only",
+        clear: () => setLsnOnly(false),
+      });
     }
     if (assessmentFrom) {
       chips.push({
@@ -710,12 +762,15 @@ export default function StudentManagementScreen() {
 
   // ─── Actions ──────────────────────────────────────────────────────────────
 
-  const openEdit = (kind: "status" | "department" | "year", targets: string[]) => {
-    setEditModal({ kind, targets });
-    setEditValue("");
-    setEditReason("");
-    setEditError(null);
-  };
+  const openEdit = useCallback(
+    (kind: "status" | "department" | "year", targets: string[]) => {
+      setEditModal({ kind, targets });
+      setEditValue("");
+      setEditReason("");
+      setEditError(null);
+    },
+    [],
+  );
 
   const applyEdit = async () => {
     if (!editModal) return;
@@ -726,7 +781,10 @@ export default function StudentManagementScreen() {
     }
     setEditBusy(true);
     setEditError(null);
-    const context: ActionContext = { actor, reason: editReason.trim() || undefined };
+    const context: ActionContext = {
+      actor,
+      reason: editReason.trim() || undefined,
+    };
     try {
       for (const uid of editModal.targets) {
         if (editModal.kind === "status") {
@@ -749,10 +807,16 @@ export default function StudentManagementScreen() {
     }
   };
 
-  const openConfirm = (kind: "archive" | "restore" | "graduate" | "restrict", targets: string[]) => {
-    setConfirm({ kind, targets });
-    setConfirmError(null);
-  };
+  const openConfirm = useCallback(
+    (
+      kind: "archive" | "restore" | "graduate" | "restrict",
+      targets: string[],
+    ) => {
+      setConfirm({ kind, targets });
+      setConfirmError(null);
+    },
+    [],
+  );
 
   const runConfirm = async () => {
     if (!confirm) return;
@@ -787,40 +851,45 @@ export default function StudentManagementScreen() {
     }
   };
 
-  const openWorkflow = (targets: string[], presetAction?: SupportActionType) => {
-    setWfBulk(targets.length > 1);
-    setWfTarget(targets[0] ?? null);
-    setWfAction(presetAction ?? null);
-    setWfReason("");
-    setWfReasons([]);
-    setWfContactMethod(null);
-    setWfResources([]);
-    setWfMonitorDays(null);
-    setWfFollowUp(null);
-    setWfError(null);
-    setWfAssignee(user?.uid ?? "");
-    wfRequestIds.current = new Map();
-    const first = entryById(targets[0]);
-    if (first) {
-      const presets: string[] = [];
-      if (first.latestRiskLevel === "high") presets.push("Elevated assessment");
-      if ((first.supportStatus ?? "no_action") === "outreach_recommended") presets.push("Repeated concern");
-      if (first.assessmentsCount === 0 || first.latestAssessmentDate === undefined) presets.push("Engagement concern");
-      if (isFollowUpOverdue(first.followUpDate)) {
-        presets.push("Follow-up due");
+  const openWorkflow = useCallback(
+    (targets: string[], presetAction?: SupportActionType) => {
+      setWfBulk(targets.length > 1);
+      setWfTarget(targets[0] ?? null);
+      setWfAction(presetAction ?? null);
+      setWfReason("");
+      setWfReasons([]);
+      setWfContactMethod(null);
+      setWfResources([]);
+      setWfMonitorDays(null);
+      setWfFollowUp(null);
+      setWfError(null);
+      setWfAssignee(user?.uid ?? "");
+      wfRequestIds.current = new Map();
+      const first = entryById(targets[0]);
+      if (first) {
+        const presets: string[] = [];
+        if (first.latestRiskLevel === "high")
+          presets.push("Elevated assessment");
+        if ((first.supportStatus ?? "no_action") === "outreach_recommended")
+          presets.push("Repeated concern");
+        if (
+          first.assessmentsCount === 0 ||
+          first.latestAssessmentDate === undefined
+        )
+          presets.push("Engagement concern");
+        if (isFollowUpOverdue(first.followUpDate)) {
+          presets.push("Follow-up due");
+        }
+        setWfReasons(presets);
       }
-      setWfReasons(presets);
-    }
-    setWfOpen(true);
-  };
+      setWfOpen(true);
+    },
+    [user?.uid, entryById],
+  );
 
   const saveWorkflow = async () => {
     if (!wfAction) return;
-    const targets = wfBulk
-      ? Array.from(selected)
-      : wfTarget
-        ? [wfTarget]
-        : [];
+    const targets = wfBulk ? Array.from(selected) : wfTarget ? [wfTarget] : [];
     if (targets.length === 0) {
       setWfError("No student selected.");
       return;
@@ -851,10 +920,12 @@ export default function StudentManagementScreen() {
     }
     setWfSaving(true);
     setWfError(null);
-    const assigneeName = admins.find((a) => a.uid === wfAssignee)?.name ?? "Administrator";
+    const assigneeName =
+      admins.find((a) => a.uid === wfAssignee)?.name ?? "Administrator";
     const reason = buildReasonSummary({
       reasons: wfReasons,
-      contactMethod: wfAction === "send_wellness_checkin" ? wfContactMethod : null,
+      contactMethod:
+        wfAction === "send_wellness_checkin" ? wfContactMethod : null,
       resources: wfAction === "provide_resources" ? wfResources : [],
       monitorDays: wfAction === "monitor_only" ? wfMonitorDays : null,
       notes: wfReason,
@@ -892,27 +963,29 @@ export default function StudentManagementScreen() {
     }
   };
 
-  const openAudit = async (scope: "all" | string) => {
+  const openAudit = useCallback(async (scope: "all" | string) => {
     setAuditScope(scope);
     setAuditVisible(true);
     setAuditLoading(true);
     try {
       const logs = await fetchStudentAuditLogs(200);
       setAuditLogs(
-        scope === "all" ? logs : logs.filter((l) => l.targetStudentId === scope),
+        scope === "all"
+          ? logs
+          : logs.filter((l) => l.targetStudentId === scope),
       );
     } catch {
       setAuditLogs([]);
     } finally {
       setAuditLoading(false);
     }
-  };
+  }, []);
 
-  const openDelete = (uid: string) => {
+  const openDelete = useCallback((uid: string) => {
     setDeleteUid(uid);
     setDeleteText("");
     setDeleteError(null);
-  };
+  }, []);
 
   const runDelete = async () => {
     if (!deleteUid) return;
@@ -1037,33 +1110,125 @@ export default function StudentManagementScreen() {
     </View>
   );
 
-  const rowMenuActions = (s?: StudentManagementEntry) => {
-    if (!s) return [];
-    const st = s.status ?? "active";
-    const actions: { key: string; label: string; icon: keyof typeof Ionicons.glyphMap; danger?: boolean; onPress: () => void }[] = [
-      { key: "profile", label: "View Profile", icon: "person-circle-outline", onPress: () => router.push({ pathname: "./student-detail", params: { uid: s.uid } }) },
-      { key: "workflow", label: "Create / View Workflow", icon: "git-network-outline", onPress: () => openWorkflow([s.uid]) },
-      { key: "status", label: "Change Status", icon: "swap-horizontal-outline", onPress: () => openEdit("status", [s.uid]) },
-      { key: "dept", label: "Edit Department", icon: "business-outline", onPress: () => openEdit("department", [s.uid]) },
-      { key: "year", label: "Edit Year Level", icon: "school-outline", onPress: () => openEdit("year", [s.uid]) },
+  const activeMenuActions = useMemo(() => {
+    if (!menuUid) return [];
+    const student = entryById(menuUid);
+    if (!student) return [];
+
+    const st = student.status ?? "active";
+    const actions: {
+      key: string;
+      label: string;
+      icon: keyof typeof Ionicons.glyphMap;
+      danger?: boolean;
+    }[] = [
+      { key: "profile", label: "View Profile", icon: "person-circle-outline" },
+      {
+        key: "workflow",
+        label: "Create / View Workflow",
+        icon: "git-network-outline",
+      },
+      {
+        key: "status",
+        label: "Change Status",
+        icon: "swap-horizontal-outline",
+      },
+      { key: "dept", label: "Edit Department", icon: "business-outline" },
+      { key: "year", label: "Edit Year Level", icon: "school-outline" },
     ];
+
     if (st !== "archived") {
-      actions.push({ key: "archive", label: "Archive", icon: "archive-outline", onPress: () => openConfirm("archive", [s.uid]) });
+      actions.push({
+        key: "archive",
+        label: "Archive",
+        icon: "archive-outline",
+      });
     } else {
-      actions.push({ key: "restore", label: "Restore to Active", icon: "refresh-outline", onPress: () => openConfirm("restore", [s.uid]) });
+      actions.push({
+        key: "restore",
+        label: "Restore to Active",
+        icon: "refresh-outline",
+      });
     }
     if (st !== "restricted") {
-      actions.push({ key: "restrict", label: "Restrict Login Access", icon: "lock-closed-outline", danger: true, onPress: () => openConfirm("restrict", [s.uid]) });
+      actions.push({
+        key: "restrict",
+        label: "Restrict Login Access",
+        icon: "lock-closed-outline",
+        danger: true,
+      });
     }
     if (st !== "graduated") {
-      actions.push({ key: "graduate", label: "Mark as Graduated", icon: "ribbon-outline", onPress: () => openConfirm("graduate", [s.uid]) });
+      actions.push({
+        key: "graduate",
+        label: "Mark as Graduated",
+        icon: "ribbon-outline",
+      });
     }
-    actions.push({ key: "audit", label: "View Audit Trail", icon: "document-text-outline", onPress: () => openAudit(s.uid) });
+
+    actions.push({
+      key: "audit",
+      label: "View Audit Trail",
+      icon: "document-text-outline",
+    });
+
     if (isSuperAdmin) {
-      actions.push({ key: "delete", label: "Permanently Delete", icon: "trash-outline", danger: true, onPress: () => openDelete(s.uid) });
+      actions.push({
+        key: "delete",
+        label: "Permanently Delete",
+        icon: "trash-outline",
+        danger: true,
+      });
     }
+
     return actions;
-  };
+  }, [menuUid, isSuperAdmin, entryById]);
+
+  const handleStudentMenuAction = useCallback(
+    (actionKey: string) => {
+      if (!menuUid) return;
+      setMenuUid(null); // Close menu on action
+      switch (actionKey) {
+        case "profile":
+          router.push({
+            pathname: "./student-detail",
+            params: { uid: menuUid },
+          });
+          break;
+        case "workflow":
+          openWorkflow([menuUid]);
+          break;
+        case "status":
+          openEdit("status", [menuUid]);
+          break;
+        case "dept":
+          openEdit("department", [menuUid]);
+          break;
+        case "year":
+          openEdit("year", [menuUid]);
+          break;
+        case "archive":
+          openConfirm("archive", [menuUid]);
+          break;
+        case "restore":
+          openConfirm("restore", [menuUid]);
+          break;
+        case "restrict":
+          openConfirm("restrict", [menuUid]);
+          break;
+        case "graduate":
+          openConfirm("graduate", [menuUid]);
+          break;
+        case "audit":
+          openAudit(menuUid);
+          break;
+        case "delete":
+          openDelete(menuUid);
+          break;
+      }
+    },
+    [menuUid, openWorkflow, openEdit, openConfirm, openDelete, openAudit],
+  ); 
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -1114,10 +1279,17 @@ export default function StudentManagementScreen() {
               style={styles.headerBtn}
               onPress={() => openAudit("all")}
             >
-              <Ionicons name="document-text-outline" size={16} color="#6D28D9" />
+              <Ionicons
+                name="document-text-outline"
+                size={16}
+                color="#6D28D9"
+              />
               <Text style={styles.headerBtnText}>Audit Log</Text>
             </Pressable>
-            <Pressable style={styles.headerBtn} onPress={() => setStatusFilter("All")}>
+            <Pressable
+              style={styles.headerBtn}
+              onPress={() => setStatusFilter("All")}
+            >
               <Ionicons name="people-outline" size={16} color="#6D28D9" />
               <Text style={styles.headerBtnText}>All Students</Text>
             </Pressable>
@@ -1136,14 +1308,14 @@ export default function StudentManagementScreen() {
       <ScrollView
         ref={scrollRef}
         style={{ flex: 1 }}
-        contentContainerStyle={[styles.content, { paddingBottom: selected.size > 0 ? 110 : insets.bottom + 20 }]}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: selected.size > 0 ? 110 : insets.bottom + 20 },
+        ]}
         showsVerticalScrollIndicator={true}
         keyboardShouldPersistTaps="handled"
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={reload}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={reload} />
         }
       >
         {error ? (
@@ -1158,12 +1330,53 @@ export default function StudentManagementScreen() {
 
         {/* KPI grid */}
         <View style={styles.kpiGrid}>
-          <KpiCard label="Total Students" value={kpis.total} icon="people-outline" color="#1E1B4B" bg="#EDE9FE" onPress={() => setStatusFilter("All")} />
-          <KpiCard label="Active" value={kpis.active} icon="checkmark-circle-outline" color="#15803D" bg="#DCFCE7" onPress={() => setStatusFilter("active")} />
-          <KpiCard label="On Leave" value={kpis.onLeave} icon="time-outline" color="#B45309" bg="#FEF3C7" onPress={() => setStatusFilter("on_leave")} />
-          <KpiCard label="Graduated" value={kpis.graduated} icon="ribbon-outline" color="#6D28D9" bg="#EDE9FE" onPress={() => setStatusFilter("graduated")} />
-          <KpiCard label="Archived" value={kpis.archived} icon="archive-outline" color="#475569" bg="#E2E8F0" onPress={() => setStatusFilter("archived")} />
-          <KpiCard label="Attention Required" value={kpis.attention} icon="alert-circle-outline" color="#BE123C" bg="#FFE4E6" />
+          <KpiCard
+            label="Total Students"
+            value={kpis.total}
+            icon="people-outline"
+            color="#1E1B4B"
+            bg="#EDE9FE"
+            onPress={() => setStatusFilter("All")}
+          />
+          <KpiCard
+            label="Active"
+            value={kpis.active}
+            icon="checkmark-circle-outline"
+            color="#15803D"
+            bg="#DCFCE7"
+            onPress={() => setStatusFilter("active")}
+          />
+          <KpiCard
+            label="On Leave"
+            value={kpis.onLeave}
+            icon="time-outline"
+            color="#B45309"
+            bg="#FEF3C7"
+            onPress={() => setStatusFilter("on_leave")}
+          />
+          <KpiCard
+            label="Graduated"
+            value={kpis.graduated}
+            icon="ribbon-outline"
+            color="#6D28D9"
+            bg="#EDE9FE"
+            onPress={() => setStatusFilter("graduated")}
+          />
+          <KpiCard
+            label="Archived"
+            value={kpis.archived}
+            icon="archive-outline"
+            color="#475569"
+            bg="#E2E8F0"
+            onPress={() => setStatusFilter("archived")}
+          />
+          <KpiCard
+            label="Attention Required"
+            value={kpis.attention}
+            icon="alert-circle-outline"
+            color="#BE123C"
+            bg="#FFE4E6"
+          />
         </View>
 
         {/* Attention Required — vertical triage queue */}
@@ -1182,16 +1395,22 @@ export default function StudentManagementScreen() {
             {isWide ? (
               <View>
                 <View style={styles.triageHead}>
-                  <Text style={[styles.triageHeadCell, styles.triageColPriority]}>
+                  <Text
+                    style={[styles.triageHeadCell, styles.triageColPriority]}
+                  >
                     Priority
                   </Text>
-                  <Text style={[styles.triageHeadCell, styles.triageColStudent]}>
+                  <Text
+                    style={[styles.triageHeadCell, styles.triageColStudent]}
+                  >
                     Student
                   </Text>
                   <Text style={[styles.triageHeadCell, styles.triageColRisk]}>
                     Risk
                   </Text>
-                  <Text style={[styles.triageHeadCell, styles.triageColSupport]}>
+                  <Text
+                    style={[styles.triageHeadCell, styles.triageColSupport]}
+                  >
                     Support
                   </Text>
                   <View style={styles.triageColActions} />
@@ -1243,16 +1462,25 @@ export default function StudentManagementScreen() {
                   >
                     <View style={styles.triageCardTop}>
                       <PriorityBadge priority={item.priority} />
-                      <View style={{ flex: 1 }}>{renderStudentCell(item.student)}</View>
+                      <View style={{ flex: 1 }}>
+                        {renderStudentCell(item.student)}
+                      </View>
                     </View>
-                    <Text style={styles.triageRiskText}>{item.riskStatement}</Text>
+                    <Text style={styles.triageRiskText}>
+                      {item.riskStatement}
+                    </Text>
                     <Text style={styles.triageMetaText}>
                       {item.daysSinceAssessment === null
                         ? "No assessment yet"
                         : item.daysSinceAssessment === 0
                           ? "Assessed today"
                           : `Last assessed ${item.daysSinceAssessment}d ago`}{" "}
-                      · {SUPPORT_LABELS[item.student.supportStatus ?? "no_action"]}
+                      ·{" "}
+                      {
+                        SUPPORT_LABELS[
+                          item.student.supportStatus ?? "no_action"
+                        ]
+                      }
                     </Text>
                     {item.reasons.map((r) => (
                       <View key={r} style={styles.triageReasonRow}>
@@ -1265,24 +1493,47 @@ export default function StudentManagementScreen() {
                         style={styles.triageActionBtn}
                         onPress={() => setProfileUid(item.student.uid)}
                       >
-                        <Ionicons name="eye-outline" size={13} color="#6D28D9" />
+                        <Ionicons
+                          name="eye-outline"
+                          size={13}
+                          color="#6D28D9"
+                        />
                         <Text style={styles.triageActionText}>Review</Text>
                       </Pressable>
                       <Pressable
                         style={styles.triageActionBtn}
-                        onPress={() => openWorkflow([item.student.uid], "schedule_follow_up")}
+                        onPress={() =>
+                          openWorkflow([item.student.uid], "schedule_follow_up")
+                        }
                       >
-                        <Ionicons name="calendar-outline" size={13} color="#0F766E" />
-                        <Text style={[styles.triageActionText, { color: "#0F766E" }]}>
+                        <Ionicons
+                          name="calendar-outline"
+                          size={13}
+                          color="#0F766E"
+                        />
+                        <Text
+                          style={[
+                            styles.triageActionText,
+                            { color: "#0F766E" },
+                          ]}
+                        >
                           Schedule Follow-up
                         </Text>
                       </Pressable>
                       <Pressable
-                        style={[styles.triageActionBtn, styles.triageActionPrimary]}
+                        style={[
+                          styles.triageActionBtn,
+                          styles.triageActionPrimary,
+                        ]}
                         onPress={() => openWorkflow([item.student.uid])}
                       >
                         <Ionicons name="add" size={13} color="#FFFFFF" />
-                        <Text style={[styles.triageActionText, { color: "#FFFFFF" }]}>
+                        <Text
+                          style={[
+                            styles.triageActionText,
+                            { color: "#FFFFFF" },
+                          ]}
+                        >
                           Record Support
                         </Text>
                       </Pressable>
@@ -1333,7 +1584,10 @@ export default function StudentManagementScreen() {
               <Ionicons name="chevron-down" size={14} color="#4B5563" />
             </Pressable>
             <Pressable
-              style={[styles.filterBtn, activeFilters.length > 0 && styles.filterBtnActive]}
+              style={[
+                styles.filterBtn,
+                activeFilters.length > 0 && styles.filterBtnActive,
+              ]}
               onPress={() => setAdvancedOpen(true)}
             >
               <Ionicons
@@ -1347,7 +1601,8 @@ export default function StudentManagementScreen() {
                   activeFilters.length > 0 && styles.filterBtnTextActive,
                 ]}
               >
-                Filters{activeFilters.length > 0 ? ` (${activeFilters.length})` : ""}
+                Filters
+                {activeFilters.length > 0 ? ` (${activeFilters.length})` : ""}
               </Text>
             </Pressable>
             {activeFilters.length > 0 ? (
@@ -1369,7 +1624,9 @@ export default function StudentManagementScreen() {
                     onPress={chip.clear}
                     accessibilityLabel={`Remove filter ${chip.label}`}
                   >
-                    <Text style={styles.activeFilterChipText}>{chip.label}</Text>
+                    <Text style={styles.activeFilterChipText}>
+                      {chip.label}
+                    </Text>
                     <Ionicons name="close-circle" size={14} color="#6D28D9" />
                   </Pressable>
                 ))}
@@ -1383,7 +1640,9 @@ export default function StudentManagementScreen() {
           entries.length === 0 ? (
             <View style={styles.emptyCard}>
               <Ionicons name="people-outline" size={26} color="#CBD5E1" />
-              <Text style={styles.emptyTitle}>No students have been registered yet</Text>
+              <Text style={styles.emptyTitle}>
+                No students have been registered yet
+              </Text>
               <Text style={styles.emptyText}>
                 New student accounts will appear here once they register.
               </Text>
@@ -1391,12 +1650,17 @@ export default function StudentManagementScreen() {
           ) : (
             <View style={styles.emptyCard}>
               <Ionicons name="file-tray-outline" size={26} color="#CBD5E1" />
-              <Text style={styles.emptyTitle}>No students match these filters</Text>
+              <Text style={styles.emptyTitle}>
+                No students match these filters
+              </Text>
               <Text style={styles.emptyText}>
                 Try removing one or more filters or search for another student.
               </Text>
               {activeFilters.length > 0 ? (
-                <Pressable style={styles.emptyClearBtn} onPress={clearAllFilters}>
+                <Pressable
+                  style={styles.emptyClearBtn}
+                  onPress={clearAllFilters}
+                >
                   <Text style={styles.emptyClearText}>Clear Filters</Text>
                 </Pressable>
               ) : null}
@@ -1407,7 +1671,11 @@ export default function StudentManagementScreen() {
             <View style={styles.tableHead}>
               <Pressable style={styles.cellCheck} onPress={selectAllVisible}>
                 <Ionicons
-                  name={pageStudents.every((s) => selected.has(s.uid)) ? "checkbox" : "square-outline"}
+                  name={
+                    pageStudents.every((s) => selected.has(s.uid))
+                      ? "checkbox"
+                      : "square-outline"
+                  }
                   size={18}
                   color="#8A63D2"
                 />
@@ -1420,12 +1688,23 @@ export default function StudentManagementScreen() {
               <Text style={[styles.cellText, styles.colNum]}>Assess</Text>
               <Text style={[styles.cellText, styles.colNum]}>Journals</Text>
               <Text style={[styles.cellText, styles.colSupport]}>Support</Text>
-              <Text style={[styles.cellText, styles.colActivity]}>Last Activity</Text>
+              <Text style={[styles.cellText, styles.colActivity]}>
+                Last Activity
+              </Text>
               <View style={styles.colActions} />
             </View>
             {pageStudents.map((s) => (
-              <View key={s.uid} style={[styles.tableRow, selected.has(s.uid) && styles.tableRowSelected]}>
-                <Pressable style={styles.cellCheck} onPress={() => toggleSelect(s.uid)}>
+              <View
+                key={s.uid}
+                style={[
+                  styles.tableRow,
+                  selected.has(s.uid) && styles.tableRowSelected,
+                ]}
+              >
+                <Pressable
+                  style={styles.cellCheck}
+                  onPress={() => toggleSelect(s.uid)}
+                >
                   <Ionicons
                     name={selected.has(s.uid) ? "checkbox" : "square-outline"}
                     size={18}
@@ -1433,23 +1712,43 @@ export default function StudentManagementScreen() {
                   />
                 </Pressable>
                 <View style={styles.colStudent}>{renderStudentCell(s)}</View>
-                <Text style={[styles.cellText, styles.colDept]} numberOfLines={1}>
+                <Text
+                  style={[styles.cellText, styles.colDept]}
+                  numberOfLines={1}
+                >
                   {s.department || "—"}
                 </Text>
-                <Text style={[styles.cellText, styles.colYear]} numberOfLines={1}>
+                <Text
+                  style={[styles.cellText, styles.colYear]}
+                  numberOfLines={1}
+                >
                   {s.yearLevel || "—"}
                 </Text>
                 <View style={styles.colStatus}>{renderStatusBadge(s)}</View>
                 <View style={styles.colWell}>{renderRiskBadge(s)}</View>
-                <Text style={[styles.cellText, styles.colNum]}>{s.assessmentsCount}</Text>
-                <Text style={[styles.cellText, styles.colNum]}>{s.journalCount}</Text>
+                <Text style={[styles.cellText, styles.colNum]}>
+                  {s.assessmentsCount}
+                </Text>
+                <Text style={[styles.cellText, styles.colNum]}>
+                  {s.journalCount}
+                </Text>
                 <View style={styles.colSupport}>{renderSupportBadge(s)}</View>
-                <Text style={[styles.cellText, styles.colActivity]} numberOfLines={1}>
+                <Text
+                  style={[styles.cellText, styles.colActivity]}
+                  numberOfLines={1}
+                >
                   {renderLastActivity(s)}
                 </Text>
                 <View style={styles.colActions}>
-                  <Pressable style={styles.moreBtn} onPress={() => setMenuUid(s.uid)}>
-                    <Ionicons name="ellipsis-horizontal" size={18} color="#6B7280" />
+                  <Pressable
+                    style={styles.moreBtn}
+                    onPress={() => setMenuUid(s.uid)}
+                  >
+                    <Ionicons
+                      name="ellipsis-horizontal"
+                      size={18}
+                      color="#6B7280"
+                    />
                   </Pressable>
                 </View>
               </View>
@@ -1458,9 +1757,18 @@ export default function StudentManagementScreen() {
         ) : (
           <View style={styles.cardList}>
             {pageStudents.map((s) => (
-              <View key={s.uid} style={[styles.studentCard, selected.has(s.uid) && styles.studentCardSelected]}>
+              <View
+                key={s.uid}
+                style={[
+                  styles.studentCard,
+                  selected.has(s.uid) && styles.studentCardSelected,
+                ]}
+              >
                 <View style={styles.studentCardTop}>
-                  <Pressable style={styles.cellCheck} onPress={() => toggleSelect(s.uid)}>
+                  <Pressable
+                    style={styles.cellCheck}
+                    onPress={() => toggleSelect(s.uid)}
+                  >
                     <Ionicons
                       name={selected.has(s.uid) ? "checkbox" : "square-outline"}
                       size={20}
@@ -1468,8 +1776,15 @@ export default function StudentManagementScreen() {
                     />
                   </Pressable>
                   <View style={{ flex: 1 }}>{renderStudentCell(s)}</View>
-                  <Pressable style={styles.moreBtn} onPress={() => setMenuUid(s.uid)}>
-                    <Ionicons name="ellipsis-horizontal" size={20} color="#6B7280" />
+                  <Pressable
+                    style={styles.moreBtn}
+                    onPress={() => setMenuUid(s.uid)}
+                  >
+                    <Ionicons
+                      name="ellipsis-horizontal"
+                      size={20}
+                      color="#6B7280"
+                    />
                   </Pressable>
                 </View>
                 <View style={styles.studentCardMeta}>
@@ -1502,17 +1817,28 @@ export default function StudentManagementScreen() {
               disabled={page === 1}
               onPress={() => setPage((p) => Math.max(1, p - 1))}
             >
-              <Ionicons name="chevron-back" size={16} color={page === 1 ? "#CBD5E1" : "#4B5563"} />
+              <Ionicons
+                name="chevron-back"
+                size={16}
+                color={page === 1 ? "#CBD5E1" : "#4B5563"}
+              />
             </Pressable>
             <Text style={styles.pagerText}>
               Page {page} of {totalPages}
             </Text>
             <Pressable
-              style={[styles.pagerBtn, page === totalPages && styles.pagerBtnDisabled]}
+              style={[
+                styles.pagerBtn,
+                page === totalPages && styles.pagerBtnDisabled,
+              ]}
               disabled={page === totalPages}
               onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
             >
-              <Ionicons name="chevron-forward" size={16} color={page === totalPages ? "#CBD5E1" : "#4B5563"} />
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={page === totalPages ? "#CBD5E1" : "#4B5563"}
+              />
             </Pressable>
           </View>
         )}
@@ -1522,30 +1848,57 @@ export default function StudentManagementScreen() {
       {selected.size > 0 && (
         <View style={[styles.bulkBar, { paddingBottom: insets.bottom + 10 }]}>
           <Text style={styles.bulkCount}>{selected.size} selected</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bulkActions}>
-            <Pressable style={styles.bulkBtn} onPress={() => openWorkflow(Array.from(selected))}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.bulkActions}
+          >
+            <Pressable
+              style={styles.bulkBtn}
+              onPress={() => openWorkflow(Array.from(selected))}
+            >
               <Ionicons name="git-network-outline" size={14} color="#6D28D9" />
               <Text style={styles.bulkBtnText}>Assign Support</Text>
             </Pressable>
-            <Pressable style={styles.bulkBtn} onPress={() => openEdit("status", Array.from(selected))}>
-              <Ionicons name="swap-horizontal-outline" size={14} color="#6D28D9" />
+            <Pressable
+              style={styles.bulkBtn}
+              onPress={() => openEdit("status", Array.from(selected))}
+            >
+              <Ionicons
+                name="swap-horizontal-outline"
+                size={14}
+                color="#6D28D9"
+              />
               <Text style={styles.bulkBtnText}>Change Status</Text>
             </Pressable>
-            <Pressable style={styles.bulkBtn} onPress={() => openConfirm("archive", Array.from(selected))}>
+            <Pressable
+              style={styles.bulkBtn}
+              onPress={() => openConfirm("archive", Array.from(selected))}
+            >
               <Ionicons name="archive-outline" size={14} color="#6D28D9" />
               <Text style={styles.bulkBtnText}>Archive</Text>
             </Pressable>
-            <Pressable style={styles.bulkBtn} onPress={() => openConfirm("graduate", Array.from(selected))}>
+            <Pressable
+              style={styles.bulkBtn}
+              onPress={() => openConfirm("graduate", Array.from(selected))}
+            >
               <Ionicons name="ribbon-outline" size={14} color="#6D28D9" />
               <Text style={styles.bulkBtnText}>Graduate</Text>
             </Pressable>
-            <Pressable style={styles.bulkBtn} onPress={() => openConfirm("restrict", Array.from(selected))}>
+            <Pressable
+              style={styles.bulkBtn}
+              onPress={() => openConfirm("restrict", Array.from(selected))}
+            >
               <Ionicons name="lock-closed-outline" size={14} color="#BE123C" />
-              <Text style={[styles.bulkBtnText, { color: "#BE123C" }]}>Restrict</Text>
+              <Text style={[styles.bulkBtnText, { color: "#BE123C" }]}>
+                Restrict
+              </Text>
             </Pressable>
             <Pressable style={styles.bulkBtn} onPress={clearSelection}>
               <Ionicons name="close" size={14} color="#6B7280" />
-              <Text style={[styles.bulkBtnText, { color: "#6B7280" }]}>Clear</Text>
+              <Text style={[styles.bulkBtnText, { color: "#6B7280" }]}>
+                Clear
+              </Text>
             </Pressable>
           </ScrollView>
         </View>
@@ -1560,7 +1913,10 @@ export default function StudentManagementScreen() {
       >
         {editModal && (
           <View style={styles.backdrop}>
-            <Pressable style={StyleSheet.absoluteFill} onPress={() => !editBusy && setEditModal(null)} />
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => !editBusy && setEditModal(null)}
+            />
             <View style={styles.sheet}>
               <Text style={styles.sheetTitle}>
                 {editModal.kind === "status"
@@ -1583,14 +1939,26 @@ export default function StudentManagementScreen() {
                 ).map((opt) => (
                   <Pressable
                     key={opt}
-                    style={[styles.optionRow, editValue === opt && styles.optionRowActive]}
+                    style={[
+                      styles.optionRow,
+                      editValue === opt && styles.optionRowActive,
+                    ]}
                     onPress={() => setEditValue(opt)}
                   >
-                    <Text style={[styles.optionText, editValue === opt && styles.optionTextActive]}>
+                    <Text
+                      style={[
+                        styles.optionText,
+                        editValue === opt && styles.optionTextActive,
+                      ]}
+                    >
                       {opt}
                     </Text>
                     {editValue === opt ? (
-                      <Ionicons name="checkmark-circle" size={18} color="#6D28D9" />
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={18}
+                        color="#6D28D9"
+                      />
                     ) : null}
                   </Pressable>
                 ))}
@@ -1607,13 +1975,22 @@ export default function StudentManagementScreen() {
                 value={editReason}
                 onChangeText={setEditReason}
               />
-              {editError ? <Text style={styles.errorText}>{editError}</Text> : null}
+              {editError ? (
+                <Text style={styles.errorText}>{editError}</Text>
+              ) : null}
               <View style={styles.sheetFooter}>
-                <Pressable style={styles.cancelBtn} onPress={() => setEditModal(null)} disabled={editBusy}>
+                <Pressable
+                  style={styles.cancelBtn}
+                  onPress={() => setEditModal(null)}
+                  disabled={editBusy}
+                >
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </Pressable>
                 <Pressable
-                  style={[styles.primaryBtn, (!editValue || editBusy) && styles.btnDisabled]}
+                  style={[
+                    styles.primaryBtn,
+                    (!editValue || editBusy) && styles.btnDisabled,
+                  ]}
                   disabled={!editValue || editBusy}
                   onPress={applyEdit}
                 >
@@ -1638,11 +2015,22 @@ export default function StudentManagementScreen() {
       >
         {confirm && (
           <View style={styles.backdrop}>
-            <Pressable style={StyleSheet.absoluteFill} onPress={() => !confirmBusy && setConfirm(null)} />
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => !confirmBusy && setConfirm(null)}
+            />
             <View style={styles.sheet}>
               <View style={[styles.warnIcon, { backgroundColor: "#FEF3C7" }]}>
                 <Ionicons
-                  name={confirm.kind === "restrict" ? "lock-closed" : confirm.kind === "archive" ? "archive" : confirm.kind === "graduate" ? "ribbon" : "refresh"}
+                  name={
+                    confirm.kind === "restrict"
+                      ? "lock-closed"
+                      : confirm.kind === "archive"
+                        ? "archive"
+                        : confirm.kind === "graduate"
+                          ? "ribbon"
+                          : "refresh"
+                  }
                   size={22}
                   color="#B45309"
                 />
@@ -1669,9 +2057,15 @@ export default function StudentManagementScreen() {
                   ? `This applies to ${confirm.targets.length} students.`
                   : `This applies to ${entryById(confirm.targets[0])?.name ?? "this student"}.`}
               </Text>
-              {confirmError ? <Text style={styles.errorText}>{confirmError}</Text> : null}
+              {confirmError ? (
+                <Text style={styles.errorText}>{confirmError}</Text>
+              ) : null}
               <View style={styles.sheetFooter}>
-                <Pressable style={styles.cancelBtn} onPress={() => setConfirm(null)} disabled={confirmBusy}>
+                <Pressable
+                  style={styles.cancelBtn}
+                  onPress={() => setConfirm(null)}
+                  disabled={confirmBusy}
+                >
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </Pressable>
                 <Pressable
@@ -1713,24 +2107,38 @@ export default function StudentManagementScreen() {
           />
           <View style={styles.sheet}>
             <Text style={styles.sheetTitle}>Student Status</Text>
-            <Text style={styles.sheetSubtitle}>Filter the directory by lifecycle status.</Text>
+            <Text style={styles.sheetSubtitle}>
+              Filter the directory by lifecycle status.
+            </Text>
             <ScrollView style={{ maxHeight: 360 }}>
               {["All", ...LIFECYCLE_STATUSES].map((st) => (
                 <Pressable
                   key={st}
-                  style={[styles.optionRow, statusFilter === st && styles.optionRowActive]}
+                  style={[
+                    styles.optionRow,
+                    statusFilter === st && styles.optionRowActive,
+                  ]}
                   onPress={() => {
                     setStatusFilter(st);
                     setStatusMenuOpen(false);
                   }}
                 >
                   <Text
-                    style={[styles.optionText, statusFilter === st && styles.optionTextActive]}
+                    style={[
+                      styles.optionText,
+                      statusFilter === st && styles.optionTextActive,
+                    ]}
                   >
-                    {st === "All" ? "All Statuses" : LIFECYCLE_LABELS[st as LifecycleStatus]}
+                    {st === "All"
+                      ? "All Statuses"
+                      : LIFECYCLE_LABELS[st as LifecycleStatus]}
                   </Text>
                   {statusFilter === st ? (
-                    <Ionicons name="checkmark-circle" size={18} color="#6D28D9" />
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={18}
+                      color="#6D28D9"
+                    />
                   ) : null}
                 </Pressable>
               ))}
@@ -1759,7 +2167,10 @@ export default function StudentManagementScreen() {
                   Combine any of these filters — all conditions apply together.
                 </Text>
               </View>
-              <Pressable onPress={() => setAdvancedOpen(false)} style={styles.closeBtn}>
+              <Pressable
+                onPress={() => setAdvancedOpen(false)}
+                style={styles.closeBtn}
+              >
                 <Ionicons name="close" size={20} color="#6B7280" />
               </Pressable>
             </View>
@@ -1792,7 +2203,9 @@ export default function StudentManagementScreen() {
               </FilterGroup>
 
               <FilterGroup title="Risk Level">
-                {(["All", "low", "normal", "high"] as (RiskLevel | "All")[]).map((r) => (
+                {(
+                  ["All", "low", "normal", "high"] as (RiskLevel | "All")[]
+                ).map((r) => (
                   <FilterOptionChip
                     key={r}
                     label={r === "All" ? "All levels" : RISK_LABELS[r]}
@@ -1806,7 +2219,11 @@ export default function StudentManagementScreen() {
                 {["All", ...SUPPORT_STATUSES].map((sp) => (
                   <FilterOptionChip
                     key={"sp" + sp}
-                    label={sp === "All" ? "All statuses" : SUPPORT_LABELS[sp as SupportStatus]}
+                    label={
+                      sp === "All"
+                        ? "All statuses"
+                        : SUPPORT_LABELS[sp as SupportStatus]
+                    }
                     active={supportFilter === sp}
                     onPress={() => setSupportFilter(sp)}
                   />
@@ -1856,14 +2273,28 @@ export default function StudentManagementScreen() {
 
               <FilterGroup title="Assessment Date Range">
                 <View style={styles.rangeRow}>
-                  <Pressable style={styles.rangeBtn} onPress={() => setRangePicker("from")}>
-                    <Ionicons name="calendar-outline" size={14} color="#6D28D9" />
+                  <Pressable
+                    style={styles.rangeBtn}
+                    onPress={() => setRangePicker("from")}
+                  >
+                    <Ionicons
+                      name="calendar-outline"
+                      size={14}
+                      color="#6D28D9"
+                    />
                     <Text style={styles.rangeBtnText}>
                       {assessmentFrom ? formatDate(assessmentFrom) : "From…"}
                     </Text>
                   </Pressable>
-                  <Pressable style={styles.rangeBtn} onPress={() => setRangePicker("to")}>
-                    <Ionicons name="calendar-outline" size={14} color="#6D28D9" />
+                  <Pressable
+                    style={styles.rangeBtn}
+                    onPress={() => setRangePicker("to")}
+                  >
+                    <Ionicons
+                      name="calendar-outline"
+                      size={14}
+                      color="#6D28D9"
+                    />
                     <Text style={styles.rangeBtnText}>
                       {assessmentTo ? formatDate(assessmentTo) : "To…"}
                     </Text>
@@ -1899,7 +2330,11 @@ export default function StudentManagementScreen() {
 
       {rangePicker ? (
         <DateTimePicker
-          value={rangePicker === "from" ? assessmentFrom ?? new Date() : assessmentTo ?? new Date()}
+          value={
+            rangePicker === "from"
+              ? (assessmentFrom ?? new Date())
+              : (assessmentTo ?? new Date())
+          }
           mode="date"
           display="default"
           textColor="#1E1B4B"
@@ -1929,7 +2364,10 @@ export default function StudentManagementScreen() {
       >
         {menuUid && (
           <View style={styles.backdrop}>
-            <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenuUid(null)} />
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setMenuUid(null)}
+            />
             <View style={styles.sheet}>
               <View style={styles.menuHead}>
                 <Text style={styles.sheetTitle} numberOfLines={1}>
@@ -1940,17 +2378,23 @@ export default function StudentManagementScreen() {
                 </Text>
               </View>
               <ScrollView style={{ maxHeight: 420 }}>
-                {rowMenuActions(entryById(menuUid)).map((a) => (
+                {activeMenuActions.map((a) => (
                   <Pressable
                     key={a.key}
                     style={styles.menuItem}
-                    onPress={() => {
-                      setMenuUid(null);
-                      a.onPress();
-                    }}
+                    onPress={() => handleStudentMenuAction(a.key)}
                   >
-                    <Ionicons name={a.icon} size={18} color={a.danger ? "#B91C1C" : "#4B5563"} />
-                    <Text style={[styles.menuItemText, a.danger && { color: "#B91C1C" }]}>
+                    <Ionicons
+                      name={a.icon}
+                      size={18}
+                      color={a.danger ? "#B91C1C" : "#4B5563"}
+                    />
+                    <Text
+                      style={[
+                        styles.menuItemText,
+                        a.danger && { color: "#B91C1C" },
+                      ]}
+                    >
                       {a.label}
                     </Text>
                   </Pressable>
@@ -1969,7 +2413,10 @@ export default function StudentManagementScreen() {
         onRequestClose={() => !wfSaving && setWfOpen(false)}
       >
         <View style={styles.backdrop}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => !wfSaving && setWfOpen(false)} />
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => !wfSaving && setWfOpen(false)}
+          />
           <View style={[styles.wizardSheet, { maxHeight: "88%" }]}>
             <View style={styles.wizardHead}>
               <View style={{ flex: 1 }}>
@@ -1977,19 +2424,24 @@ export default function StudentManagementScreen() {
                 <Text style={styles.sheetSubtitle}>
                   {wfBulk
                     ? `${selected.size} students selected`
-                    : entryById(wfTarget ?? "")?.name ?? "New support action"}
+                    : (entryById(wfTarget ?? "")?.name ?? "New support action")}
                 </Text>
               </View>
-              <Pressable onPress={() => !wfSaving && setWfOpen(false)} style={styles.closeBtn}>
+              <Pressable
+                onPress={() => !wfSaving && setWfOpen(false)}
+                style={styles.closeBtn}
+              >
                 <Ionicons name="close" size={20} color="#6B7280" />
               </Pressable>
             </View>
 
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.wizardBody} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={styles.wizardBody}
+              keyboardShouldPersistTaps="handled"
+            >
               {!wfBulk && wfTarget ? (
-                <StudentContext
-                  student={entryById(wfTarget)}
-                />
+                <StudentContext student={entryById(wfTarget)} />
               ) : (
                 <View style={styles.bulkNote}>
                   <Ionicons name="people" size={15} color="#6D28D9" />
@@ -2008,7 +2460,10 @@ export default function StudentManagementScreen() {
                     return (
                       <Pressable
                         key={action}
-                        style={[styles.wfActionRow, selectedAction && styles.wfActionRowActive]}
+                        style={[
+                          styles.wfActionRow,
+                          selectedAction && styles.wfActionRowActive,
+                        ]}
                         onPress={() => setWfAction(action)}
                       >
                         <View
@@ -2017,7 +2472,9 @@ export default function StudentManagementScreen() {
                             selectedAction && styles.wfActionRadioActive,
                           ]}
                         >
-                          {selectedAction ? <View style={styles.wfActionRadioDot} /> : null}
+                          {selectedAction ? (
+                            <View style={styles.wfActionRadioDot} />
+                          ) : null}
                         </View>
                         <Text
                           style={[
@@ -2042,10 +2499,18 @@ export default function StudentManagementScreen() {
                       return (
                         <Pressable
                           key={m}
-                          style={[styles.assigneeChip, active && styles.assigneeChipActive]}
+                          style={[
+                            styles.assigneeChip,
+                            active && styles.assigneeChipActive,
+                          ]}
                           onPress={() => setWfContactMethod(active ? null : m)}
                         >
-                          <Text style={[styles.assigneeChipText, active && styles.assigneeChipTextActive]}>
+                          <Text
+                            style={[
+                              styles.assigneeChipText,
+                              active && styles.assigneeChipTextActive,
+                            ]}
+                          >
                             {m}
                           </Text>
                         </Pressable>
@@ -2055,16 +2520,19 @@ export default function StudentManagementScreen() {
                 </View>
               ) : null}
 
-              {wfAction === "guidance_consultation" || wfAction === "schedule_follow_up" ? (
+              {wfAction === "guidance_consultation" ||
+              wfAction === "schedule_follow_up" ? (
                 <View>
                   <Text style={styles.fieldLabel}>
-                    {wfAction === "schedule_follow_up" ? "Follow-up date" : "Follow-up date (optional)"}
+                    {wfAction === "schedule_follow_up"
+                      ? "Follow-up date"
+                      : "Follow-up date (optional)"}
                   </Text>
                   <View style={styles.quickDates}>
                     {[
                       { label: "Today", date: new Date() },
-                      { label: "+1 week", date: addDays(new Date(), 7) },
-                      { label: "+2 weeks", date: addDays(new Date(), 14) },
+                      { label: "7 days", date: addDays(new Date(), 7) },
+                      { label: "1 month", date: addMonths(new Date(), 1) },
                     ].map((q) => {
                       const same =
                         wfFollowUp !== null &&
@@ -2072,38 +2540,70 @@ export default function StudentManagementScreen() {
                       return (
                         <Pressable
                           key={q.label}
-                          style={[styles.quickDateBtn, same && styles.quickDateBtnActive]}
+                          style={[
+                            styles.quickDateBtn,
+                            same && styles.quickDateBtnActive,
+                          ]}
                           onPress={() => setWfFollowUp(q.date)}
                         >
-                          <Text style={[styles.quickDateText, same && styles.quickDateTextActive]}>
+                          <Text
+                            style={[
+                              styles.quickDateText,
+                              same && styles.quickDateTextActive,
+                            ]}
+                          >
                             {q.label}
                           </Text>
                         </Pressable>
                       );
                     })}
-                    <Pressable style={styles.quickDateBtn} onPress={() => setShowDatePicker(true)}>
-                      <Ionicons name="calendar-outline" size={14} color="#6D28D9" />
+                    <Pressable
+                      style={styles.quickDateBtn}
+                      onPress={() => {
+                        const minDate = new Date();
+                        minDate.setHours(0, 0, 0, 0);
+                        setPickerMinDate(minDate);
+                        setShowDatePicker(true);
+                      }}
+                    >
+                      <Ionicons
+                        name="calendar-outline"
+                        size={14}
+                        color="#6D28D9"
+                      />
                       <Text style={styles.quickDateText}>Custom…</Text>
                     </Pressable>
                   </View>
                   <Text style={styles.followUpValue}>
-                    {wfFollowUp ? formatDate(wfFollowUp) : "No follow-up date selected"}
+                    {wfFollowUp
+                      ? formatDate(wfFollowUp)
+                      : "No follow-up date selected"}
                   </Text>
 
                   <Text style={styles.fieldLabel}>Assigned counselor</Text>
                   <View style={styles.assigneeRow}>
                     {admins.length === 0 ? (
-                      <Text style={styles.pickerPlaceholder}>Loading administrators…</Text>
+                      <Text style={styles.pickerPlaceholder}>
+                        Loading administrators…
+                      </Text>
                     ) : (
                       admins.map((a) => {
                         const active = wfAssignee === a.uid;
                         return (
                           <Pressable
                             key={a.uid}
-                            style={[styles.assigneeChip, active && styles.assigneeChipActive]}
+                            style={[
+                              styles.assigneeChip,
+                              active && styles.assigneeChipActive,
+                            ]}
                             onPress={() => setWfAssignee(a.uid)}
                           >
-                            <Text style={[styles.assigneeChipText, active && styles.assigneeChipTextActive]}>
+                            <Text
+                              style={[
+                                styles.assigneeChipText,
+                                active && styles.assigneeChipTextActive,
+                              ]}
+                            >
                               {a.name}
                             </Text>
                           </Pressable>
@@ -2123,7 +2623,10 @@ export default function StudentManagementScreen() {
                       return (
                         <Pressable
                           key={r}
-                          style={[styles.assigneeChip, on && styles.assigneeChipActive]}
+                          style={[
+                            styles.assigneeChip,
+                            on && styles.assigneeChipActive,
+                          ]}
                           onPress={() =>
                             setWfResources((prev) =>
                               on ? prev.filter((x) => x !== r) : [...prev, r],
@@ -2131,8 +2634,19 @@ export default function StudentManagementScreen() {
                           }
                         >
                           <View style={styles.tagChipInner}>
-                            {on ? <Ionicons name="checkmark" size={13} color="#6D28D9" /> : null}
-                            <Text style={[styles.assigneeChipText, on && styles.assigneeChipTextActive]}>
+                            {on ? (
+                              <Ionicons
+                                name="checkmark"
+                                size={13}
+                                color="#6D28D9"
+                              />
+                            ) : null}
+                            <Text
+                              style={[
+                                styles.assigneeChipText,
+                                on && styles.assigneeChipTextActive,
+                              ]}
+                            >
                               {r}
                             </Text>
                           </View>
@@ -2152,10 +2666,18 @@ export default function StudentManagementScreen() {
                       return (
                         <Pressable
                           key={d}
-                          style={[styles.assigneeChip, active && styles.assigneeChipActive]}
+                          style={[
+                            styles.assigneeChip,
+                            active && styles.assigneeChipActive,
+                          ]}
                           onPress={() => setWfMonitorDays(active ? null : d)}
                         >
-                          <Text style={[styles.assigneeChipText, active && styles.assigneeChipTextActive]}>
+                          <Text
+                            style={[
+                              styles.assigneeChipText,
+                              active && styles.assigneeChipTextActive,
+                            ]}
+                          >
                             {d} days
                           </Text>
                         </Pressable>
@@ -2172,7 +2694,10 @@ export default function StudentManagementScreen() {
                   return (
                     <Pressable
                       key={r}
-                      style={[styles.assigneeChip, on && styles.assigneeChipActive]}
+                      style={[
+                        styles.assigneeChip,
+                        on && styles.assigneeChipActive,
+                      ]}
                       onPress={() =>
                         setWfReasons((prev) =>
                           on ? prev.filter((x) => x !== r) : [...prev, r],
@@ -2180,8 +2705,19 @@ export default function StudentManagementScreen() {
                       }
                     >
                       <View style={styles.tagChipInner}>
-                        {on ? <Ionicons name="checkmark" size={13} color="#6D28D9" /> : null}
-                        <Text style={[styles.assigneeChipText, on && styles.assigneeChipTextActive]}>
+                        {on ? (
+                          <Ionicons
+                            name="checkmark"
+                            size={13}
+                            color="#6D28D9"
+                          />
+                        ) : null}
+                        <Text
+                          style={[
+                            styles.assigneeChipText,
+                            on && styles.assigneeChipTextActive,
+                          ]}
+                        >
                           {r}
                         </Text>
                       </View>
@@ -2196,7 +2732,11 @@ export default function StudentManagementScreen() {
               </Text>
               <TextInput
                 style={[styles.reasonInput, styles.wfReason]}
-                placeholder={wfAction === "resolved" ? "What was resolved?…" : "Optional administrative notes…"}
+                placeholder={
+                  wfAction === "resolved"
+                    ? "What was resolved?…"
+                    : "Optional administrative notes…"
+                }
                 placeholderTextColor="#9CA3AF"
                 multiline
                 value={wfReason}
@@ -2208,55 +2748,96 @@ export default function StudentManagementScreen() {
                   <Text style={styles.summaryTitle}>Support summary</Text>
                   <View style={styles.summaryRow}>
                     <Ionicons name="flash-outline" size={14} color="#6D28D9" />
-                    <Text style={styles.summaryText}>{SUPPORT_ACTION_LABELS[wfAction]}</Text>
+                    <Text style={styles.summaryText}>
+                      {SUPPORT_ACTION_LABELS[wfAction]}
+                    </Text>
                   </View>
-                  {(wfAction === "guidance_consultation" || wfAction === "schedule_follow_up") && wfAssignee ? (
+                  {(wfAction === "guidance_consultation" ||
+                    wfAction === "schedule_follow_up") &&
+                  wfAssignee ? (
                     <View style={styles.summaryRow}>
-                      <Ionicons name="person-circle-outline" size={14} color="#6D28D9" />
+                      <Ionicons
+                        name="person-circle-outline"
+                        size={14}
+                        color="#6D28D9"
+                      />
                       <Text style={styles.summaryText}>
-                        Counselor: {admins.find((a) => a.uid === wfAssignee)?.name ?? "Administrator"}
+                        Counselor:{" "}
+                        {admins.find((a) => a.uid === wfAssignee)?.name ??
+                          "Administrator"}
                       </Text>
                     </View>
                   ) : null}
-                  {(wfAction === "guidance_consultation" || wfAction === "schedule_follow_up") && wfFollowUp ? (
+                  {(wfAction === "guidance_consultation" ||
+                    wfAction === "schedule_follow_up") &&
+                  wfFollowUp ? (
                     <View style={styles.summaryRow}>
-                      <Ionicons name="calendar-outline" size={14} color="#6D28D9" />
-                      <Text style={styles.summaryText}>Follow-up: {formatDate(wfFollowUp)}</Text>
+                      <Ionicons
+                        name="calendar-outline"
+                        size={14}
+                        color="#6D28D9"
+                      />
+                      <Text style={styles.summaryText}>
+                        Follow-up: {formatDate(wfFollowUp)}
+                      </Text>
                     </View>
                   ) : null}
                   {wfAction === "send_wellness_checkin" && wfContactMethod ? (
                     <View style={styles.summaryRow}>
                       <Ionicons name="call-outline" size={14} color="#6D28D9" />
-                      <Text style={styles.summaryText}>Contact method: {wfContactMethod}</Text>
+                      <Text style={styles.summaryText}>
+                        Contact method: {wfContactMethod}
+                      </Text>
                     </View>
                   ) : null}
-                  {wfAction === "provide_resources" && wfResources.length > 0 ? (
+                  {wfAction === "provide_resources" &&
+                  wfResources.length > 0 ? (
                     <View style={styles.summaryRow}>
                       <Ionicons name="book-outline" size={14} color="#6D28D9" />
-                      <Text style={styles.summaryText}>Resources: {wfResources.join(", ")}</Text>
+                      <Text style={styles.summaryText}>
+                        Resources: {wfResources.join(", ")}
+                      </Text>
                     </View>
                   ) : null}
                   {wfAction === "monitor_only" && wfMonitorDays ? (
                     <View style={styles.summaryRow}>
-                      <Ionicons name="timer-outline" size={14} color="#6D28D9" />
-                      <Text style={styles.summaryText}>Monitoring: {wfMonitorDays} days</Text>
+                      <Ionicons
+                        name="timer-outline"
+                        size={14}
+                        color="#6D28D9"
+                      />
+                      <Text style={styles.summaryText}>
+                        Monitoring: {wfMonitorDays} days
+                      </Text>
                     </View>
                   ) : null}
                   {wfReasons.length > 0 ? (
                     <View style={styles.summaryRow}>
                       <Ionicons name="flag-outline" size={14} color="#6D28D9" />
-                      <Text style={styles.summaryText}>Reasons: {wfReasons.join(", ")}</Text>
+                      <Text style={styles.summaryText}>
+                        Reasons: {wfReasons.join(", ")}
+                      </Text>
                     </View>
                   ) : null}
                   {wfReason.trim() ? (
                     <View style={styles.summaryRow}>
-                      <Ionicons name="document-text-outline" size={14} color="#6D28D9" />
-                      <Text style={styles.summaryText}>Private note recorded (not sent to student)</Text>
+                      <Ionicons
+                        name="document-text-outline"
+                        size={14}
+                        color="#6D28D9"
+                      />
+                      <Text style={styles.summaryText}>
+                        Private note recorded (not sent to student)
+                      </Text>
                     </View>
                   ) : null}
                   <View style={styles.summaryNotify}>
                     <Ionicons
-                      name={wfAction === "no_action" ? "eye-off-outline" : "mail-outline"}
+                      name={
+                        wfAction === "no_action"
+                          ? "eye-off-outline"
+                          : "mail-outline"
+                      }
                       size={14}
                       color="#6B7280"
                     />
@@ -2279,11 +2860,18 @@ export default function StudentManagementScreen() {
             </ScrollView>
 
             <View style={styles.sheetFooter}>
-              <Pressable style={styles.cancelBtn} onPress={() => setWfOpen(false)} disabled={wfSaving}>
+              <Pressable
+                style={styles.cancelBtn}
+                onPress={() => setWfOpen(false)}
+                disabled={wfSaving}
+              >
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </Pressable>
               <Pressable
-                style={[styles.primaryBtn, !wfValid && styles.primaryBtnDisabled]}
+                style={[
+                  styles.primaryBtn,
+                  !wfValid && styles.primaryBtnDisabled,
+                ]}
                 disabled={!wfCanSave}
                 onPress={saveWorkflow}
               >
@@ -2295,7 +2883,12 @@ export default function StudentManagementScreen() {
                     </Text>
                   </View>
                 ) : (
-                  <Text style={[styles.primaryBtnText, !wfValid && styles.primaryBtnTextDisabled]}>
+                  <Text
+                    style={[
+                      styles.primaryBtnText,
+                      !wfValid && styles.primaryBtnTextDisabled,
+                    ]}
+                  >
                     Save Support Action
                   </Text>
                 )}
@@ -2306,14 +2899,16 @@ export default function StudentManagementScreen() {
 
         {showDatePicker ? (
           <DateTimePicker
-            value={wfFollowUp ?? new Date()}
+            value={wfFollowUp ?? pickerMinDate ?? new Date()}
             mode="date"
             display="default"
             textColor="#1E1B4B"
+            minimumDate={pickerMinDate ?? undefined}
             onChange={(event, selectedDate) => {
               if (Platform.OS === "android") {
                 setShowDatePicker(false);
-                if (event.type === "set" && selectedDate) setWfFollowUp(selectedDate);
+                if (event.type === "set" && selectedDate)
+                  setWfFollowUp(selectedDate);
               } else {
                 if (selectedDate) setWfFollowUp(selectedDate);
               }
@@ -2351,7 +2946,10 @@ export default function StudentManagementScreen() {
         onRequestClose={() => setAuditVisible(false)}
       >
         <View style={styles.backdrop}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setAuditVisible(false)} />
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setAuditVisible(false)}
+          />
           <View style={[styles.wizardSheet, { maxHeight: "86%" }]}>
             <View style={styles.wizardHead}>
               <View style={{ flex: 1 }}>
@@ -2359,10 +2957,13 @@ export default function StudentManagementScreen() {
                 <Text style={styles.sheetSubtitle}>
                   {auditScope === "all"
                     ? "All administrative changes"
-                    : entryById(auditScope)?.name ?? "Student history"}
+                    : (entryById(auditScope)?.name ?? "Student history")}
                 </Text>
               </View>
-              <Pressable onPress={() => setAuditVisible(false)} style={styles.closeBtn}>
+              <Pressable
+                onPress={() => setAuditVisible(false)}
+                style={styles.closeBtn}
+              >
                 <Ionicons name="close" size={20} color="#6B7280" />
               </Pressable>
             </View>
@@ -2375,7 +2976,10 @@ export default function StudentManagementScreen() {
                 <Text style={styles.emptyText}>No audit entries found.</Text>
               </View>
             ) : (
-              <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.auditList}>
+              <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={styles.auditList}
+              >
                 {auditLogs.map((log) => (
                   <View key={log.id} style={styles.auditRow}>
                     <View style={styles.auditDot} />
@@ -2386,13 +2990,16 @@ export default function StudentManagementScreen() {
                       <Text style={styles.auditMeta}>
                         {log.targetStudentName ?? "—"}
                         {log.newValue ? ` → ${log.newValue}` : ""}
-                        {log.previousValue ? ` (from ${log.previousValue})` : ""}
+                        {log.previousValue
+                          ? ` (from ${log.previousValue})`
+                          : ""}
                       </Text>
                       {log.reason ? (
                         <Text style={styles.auditReason}>“{log.reason}”</Text>
                       ) : null}
                       <Text style={styles.auditBy}>
-                        {log.actorName ?? "Administrator"} · {formatDateTime(log.createdAt)}
+                        {log.actorName ?? "Administrator"} ·{" "}
+                        {formatDateTime(log.createdAt)}
                       </Text>
                     </View>
                   </View>
@@ -2412,7 +3019,10 @@ export default function StudentManagementScreen() {
       >
         {deleteUid && (
           <View style={styles.backdrop}>
-            <Pressable style={StyleSheet.absoluteFill} onPress={() => !deleteBusy && setDeleteUid(null)} />
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => !deleteBusy && setDeleteUid(null)}
+            />
             <View style={styles.sheet}>
               <View style={[styles.warnIcon, { backgroundColor: "#FEE2E2" }]}>
                 <Ionicons name="trash" size={22} color="#B91C1C" />
@@ -2420,10 +3030,12 @@ export default function StudentManagementScreen() {
               <Text style={styles.sheetTitle}>Permanently delete student?</Text>
               <Text style={styles.sheetBody}>
                 This permanently removes the account of{" "}
-                <Text style={{ fontWeight: "800" }}>{entryById(deleteUid)?.name}</Text>,
-                including wellness history, journals and profile — and cannot be
-                undone. Type <Text style={{ fontWeight: "800" }}>DELETE</Text> to
-                confirm.
+                <Text style={{ fontWeight: "800" }}>
+                  {entryById(deleteUid)?.name}
+                </Text>
+                , including wellness history, journals and profile — and cannot
+                be undone. Type{" "}
+                <Text style={{ fontWeight: "800" }}>DELETE</Text> to confirm.
               </Text>
               <TextInput
                 style={styles.reasonInput}
@@ -2433,20 +3045,32 @@ export default function StudentManagementScreen() {
                 value={deleteText}
                 onChangeText={setDeleteText}
               />
-              {deleteError ? <Text style={styles.errorText}>{deleteError}</Text> : null}
+              {deleteError ? (
+                <Text style={styles.errorText}>{deleteError}</Text>
+              ) : null}
               <View style={styles.sheetFooter}>
-                <Pressable style={styles.cancelBtn} onPress={() => setDeleteUid(null)} disabled={deleteBusy}>
+                <Pressable
+                  style={styles.cancelBtn}
+                  onPress={() => setDeleteUid(null)}
+                  disabled={deleteBusy}
+                >
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </Pressable>
                 <Pressable
-                  style={[styles.dangerBtn, (deleteText !== "DELETE" || deleteBusy) && styles.btnDisabled]}
+                  style={[
+                    styles.dangerBtn,
+                    (deleteText !== "DELETE" || deleteBusy) &&
+                      styles.btnDisabled,
+                  ]}
                   disabled={deleteText !== "DELETE" || deleteBusy}
                   onPress={runDelete}
                 >
                   {deleteBusy ? (
                     <ActivityIndicator color="#FFFFFF" size="small" />
                   ) : (
-                    <Text style={styles.primaryBtnText}>Delete Permanently</Text>
+                    <Text style={styles.primaryBtnText}>
+                      Delete Permanently
+                    </Text>
                   )}
                 </Pressable>
               </View>
@@ -2488,9 +3112,12 @@ function StudentContext({ student }: { student?: StudentManagementEntry }) {
           <Text style={styles.avatarTextLarge}>{initials(student.name)}</Text>
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.reviewName} numberOfLines={1}>{student.name}</Text>
+          <Text style={styles.reviewName} numberOfLines={1}>
+            {student.name}
+          </Text>
           <Text style={styles.reviewSub} numberOfLines={1}>
-            {student.schoolId} · {student.department || "—"} · {student.yearLevel || "—"}
+            {student.schoolId} · {student.department || "—"} ·{" "}
+            {student.yearLevel || "—"}
           </Text>
         </View>
       </View>
@@ -2505,10 +3132,17 @@ function StudentContext({ student }: { student?: StudentManagementEntry }) {
                 : `${lastAssessed}d ago`}
           </Text>
         </View>
-        <Pressable style={styles.contextChip} onPress={() => setShowConcernInfo((v) => !v)}>
+        <Pressable
+          style={styles.contextChip}
+          onPress={() => setShowConcernInfo((v) => !v)}
+        >
           <Text style={styles.contextChipLabel}>
             Concern
-            <Ionicons name="information-circle-outline" size={12} color="#6B7280" />
+            <Ionicons
+              name="information-circle-outline"
+              size={12}
+              color="#6B7280"
+            />
           </Text>
           <Text style={[styles.contextChipValue, { color: RISK_COLORS[risk] }]}>
             ● {CONCERN_LABELS[risk]}
@@ -2522,7 +3156,9 @@ function StudentContext({ student }: { student?: StudentManagementEntry }) {
         </View>
         <View style={styles.contextChip}>
           <Text style={styles.contextChipLabel}>Follow-up</Text>
-          <Text style={styles.contextChipValue}>{formatDate(student.followUpDate)}</Text>
+          <Text style={styles.contextChipValue}>
+            {formatDate(student.followUpDate)}
+          </Text>
         </View>
       </View>
       {showConcernInfo ? (
@@ -2606,7 +3242,11 @@ function StudentProfileModal({
         if (snap.exists()) {
           const d = snap.data();
           const dref = d.departmentRef;
-          if (dref && typeof dref === "string" && dref.startsWith("departments/")) {
+          if (
+            dref &&
+            typeof dref === "string" &&
+            dref.startsWith("departments/")
+          ) {
             getDoc(doc(db, "departments", dref.split("/")[1]))
               .then((dsnap) => {
                 if (!cancelled) {
@@ -2651,7 +3291,9 @@ function StudentProfileModal({
             style={styles.profileHeader}
           >
             <View style={styles.profileAvatar}>
-              <Text style={styles.profileAvatarText}>{initials(student.name)}</Text>
+              <Text style={styles.profileAvatarText}>
+                {initials(student.name)}
+              </Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.profileName}>{student.name}</Text>
@@ -2663,35 +3305,64 @@ function StudentProfileModal({
             </Pressable>
           </LinearGradient>
 
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.profileBody}>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.profileBody}
+          >
             <ProfileSection title="Student Overview" icon="person-outline">
-              <ProfileRow label="Department" value={(deptName ?? student.department) || "—"} />
+              <ProfileRow
+                label="Department"
+                value={(deptName ?? student.department) || "—"}
+              />
               <ProfileRow label="Year Level" value={student.yearLevel || "—"} />
               <ProfileRow
                 label="Special Needs"
-                value={student.isLSN ? student.specialNeedsType ?? student.lsnCategory ?? "LSN" : "No"}
+                value={
+                  student.isLSN
+                    ? (student.specialNeedsType ?? student.lsnCategory ?? "LSN")
+                    : "No"
+                }
               />
             </ProfileSection>
 
-            <ProfileSection title="Status & Academic" icon="shield-checkmark-outline">
+            <ProfileSection
+              title="Status & Academic"
+              icon="shield-checkmark-outline"
+            >
               <View style={styles.profileBadges}>
                 <Badge
                   label={LIFECYCLE_LABELS[student.status ?? "active"]}
                   color={LIFECYCLE_COLORS[student.status ?? "active"]}
                 />
-                <Badge label={SUPPORT_LABELS[support]} color={SUPPORT_COLORS[support]} />
+                <Badge
+                  label={SUPPORT_LABELS[support]}
+                  color={SUPPORT_COLORS[support]}
+                />
               </View>
               <ProfileRow
                 label="Assigned admin"
-                value={student.supportAssignedName ?? student.supportAssignedTo ?? "—"}
+                value={
+                  student.supportAssignedName ??
+                  student.supportAssignedTo ??
+                  "—"
+                }
               />
-              <ProfileRow label="Follow-up" value={formatDate(student.followUpDate)} />
-              <ProfileRow label="Last updated" value={formatDateTime(student.updatedAt)} />
+              <ProfileRow
+                label="Follow-up"
+                value={formatDate(student.followUpDate)}
+              />
+              <ProfileRow
+                label="Last updated"
+                value={formatDateTime(student.updatedAt)}
+              />
             </ProfileSection>
 
             <ProfileSection title="Wellness Indicators" icon="pulse-outline">
               <View style={styles.profileBadges}>
-                <Badge label={`Risk: ${RISK_LABELS[risk]}`} color={RISK_COLORS[risk]} />
+                <Badge
+                  label={`Risk: ${RISK_LABELS[risk]}`}
+                  color={RISK_COLORS[risk]}
+                />
               </View>
               <ProfileRow
                 label="Last assessment"
@@ -2701,9 +3372,18 @@ function StudentProfileModal({
                     : "None"
                 }
               />
-              <ProfileRow label="Assessments" value={String(student.assessmentsCount)} />
-              <ProfileRow label="Journals" value={String(student.journalCount)} />
-              <ProfileRow label="Latest mood" value={student.latestJournalMood ?? "—"} />
+              <ProfileRow
+                label="Assessments"
+                value={String(student.assessmentsCount)}
+              />
+              <ProfileRow
+                label="Journals"
+                value={String(student.journalCount)}
+              />
+              <ProfileRow
+                label="Latest mood"
+                value={student.latestJournalMood ?? "—"}
+              />
               {moodSummary.length > 0 ? (
                 <ProfileRow
                   label="Mood mix"
@@ -2716,7 +3396,10 @@ function StudentProfileModal({
               title="Support & Follow-ups"
               icon="git-network-outline"
               action={
-                <Pressable style={styles.sectionActionBtn} onPress={() => onOpenWorkflow(student.uid)}>
+                <Pressable
+                  style={styles.sectionActionBtn}
+                  onPress={() => onOpenWorkflow(student.uid)}
+                >
                   <Ionicons name="add" size={16} color="#6D28D9" />
                   <Text style={styles.sectionActionText}>New workflow</Text>
                 </Pressable>
@@ -2728,16 +3411,27 @@ function StudentProfileModal({
                 workflows.map((w) => (
                   <View key={w.id} style={styles.wfCard}>
                     <View style={styles.wfCardHead}>
-                      <Text style={styles.wfCardTitle}>{SUPPORT_ACTION_LABELS[w.actionType]}</Text>
+                      <Text style={styles.wfCardTitle}>
+                        {SUPPORT_ACTION_LABELS[w.actionType]}
+                      </Text>
                       <Badge
                         label={w.status}
-                        color={w.status === "open" ? "#2563EB" : w.status === "completed" ? "#16A34A" : "#64748B"}
+                        color={
+                          w.status === "open"
+                            ? "#2563EB"
+                            : w.status === "completed"
+                              ? "#16A34A"
+                              : "#64748B"
+                        }
                       />
                     </View>
                     <Text style={styles.wfCardMeta}>
-                      Assigned: {w.assignedToName ?? w.assignedTo ?? "—"} · Follow-up: {formatDate(w.followUpDate)}
+                      Assigned: {w.assignedToName ?? w.assignedTo ?? "—"} ·
+                      Follow-up: {formatDate(w.followUpDate)}
                     </Text>
-                    {w.reason ? <Text style={styles.wfCardNote}>{w.reason}</Text> : null}
+                    {w.reason ? (
+                      <Text style={styles.wfCardNote}>{w.reason}</Text>
+                    ) : null}
                     {w.status === "open" ? (
                       <Pressable
                         style={styles.wfCompleteBtn}
@@ -2751,17 +3445,41 @@ function StudentProfileModal({
               )}
             </ProfileSection>
 
-            <ProfileSection title="Administrative Notes" icon="document-text-outline">
-              <ProfileRow label="Created workflow" value={workflows.length ? formatDateTime(workflows[0]?.createdAt) : "—"} />
+            <ProfileSection
+              title="Administrative Notes"
+              icon="document-text-outline"
+            >
+              <ProfileRow
+                label="Created workflow"
+                value={
+                  workflows.length
+                    ? formatDateTime(workflows[0]?.createdAt)
+                    : "—"
+                }
+              />
             </ProfileSection>
 
             <View style={styles.profileActions}>
-              <Pressable style={styles.outlineBtn} onPress={() => onChangeStatus(student.uid)}>
-                <Ionicons name="swap-horizontal-outline" size={16} color="#6D28D9" />
+              <Pressable
+                style={styles.outlineBtn}
+                onPress={() => onChangeStatus(student.uid)}
+              >
+                <Ionicons
+                  name="swap-horizontal-outline"
+                  size={16}
+                  color="#6D28D9"
+                />
                 <Text style={styles.outlineBtnText}>Change Status</Text>
               </Pressable>
-              <Pressable style={styles.outlineBtn} onPress={() => onOpenAudit(student.uid)}>
-                <Ionicons name="document-text-outline" size={16} color="#6D28D9" />
+              <Pressable
+                style={styles.outlineBtn}
+                onPress={() => onOpenAudit(student.uid)}
+              >
+                <Ionicons
+                  name="document-text-outline"
+                  size={16}
+                  color="#6D28D9"
+                />
                 <Text style={styles.outlineBtnText}>View audit trail</Text>
               </Pressable>
             </View>
@@ -3745,6 +4463,10 @@ const styles = StyleSheet.create({
   },
   quickDateTextActive: {
     color: "#6D28D9",
+  },
+  quickDateBtnCustom: {
+    // This style was missing, added to fix TypeScript error.
+    // It can be customized further if needed.
   },
   followUpValue: {
     fontSize: 13,

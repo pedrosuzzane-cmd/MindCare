@@ -104,11 +104,11 @@ service cloud.firestore {
       }
 
       // For list operations, `resource` is available per-document, so the same
-      // participation checks used by get/update apply. Using get() here would
-      // break `where`-filtered queries (rules that call get()/exists() cannot
-      // be combined with where clauses).
+      // participation checks used by get/update apply.
       // Allow get on non-existent docs so clients can check existence
       // before creating a conversation (getDoc returns null, not an error).
+      // NOTE: get()/exists()-based rules DO work alongside where-filtered list
+      // queries (verified against the Firestore emulator).
       allow get: if !exists(/databases/$(database)/documents/conversations/$(conversationId))
         || isParticipant()
         || isLegacyParticipant()
@@ -125,7 +125,10 @@ service cloud.firestore {
         || (isLegacyParticipant()
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants']));
 
-      allow delete: if false;
+      // Admins may clean up any conversation. Peer-to-peer conversations can be
+      // deleted by their participants (see the messages delete rule below).
+      allow delete: if isAdmin()
+        || (resource.data.type == 'peer' && request.auth.uid in resource.data.participants);
 
       match /messages/{messageId} {
         function isMsgParticipant() {
@@ -147,7 +150,12 @@ service cloud.firestore {
             || isAdmin())
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted'])
           && request.resource.data.deleted == true;
-        allow delete: if false;
+        // Hard delete: admins anywhere; peer participants may only clear messages
+        // inside a peer conversation (e.g. deleting their own chat). Guidance
+        // conversations stay immutable to protect the audit trail.
+        allow delete: if isAdmin()
+          || (isMsgParticipant()
+              && get(/databases/$(database)/documents/conversations/$(conversationId)).data.type == 'peer');
       }
     }
 

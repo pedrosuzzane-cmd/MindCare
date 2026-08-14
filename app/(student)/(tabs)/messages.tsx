@@ -44,6 +44,7 @@ import { useAuth } from "@/hooks/AuthContext";
 import { useStudentProfile } from "@/hooks/useStudentProfile";
 import {
   deleteMessage,
+  fetchAllUsers,
   getPeerName,
   listenForConversations,
   listenForMessages,
@@ -61,6 +62,7 @@ import type {
   Conversation,
   Message,
   OptimisticMessage,
+  StudentSearchResult,
 } from "@/types/messaging";
 
 type ViewMode = "directory" | "chat";
@@ -92,6 +94,7 @@ export default function StudentMessagesScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>("directory");
 
   // ── Inbox state ──
+  const [allPeers, setAllPeers] = useState<StudentSearchResult[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [inboxLoading, setInboxLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<InboxFilter>("all");
@@ -123,14 +126,12 @@ export default function StudentMessagesScreen() {
   const [partnerOnline, setPartnerOnline] = useState(false);
   const [presenceMap, setPresenceMap] = useState<Record<string, boolean>>({});
 
-  // ── Typing state ──
   const [partnerTyping, setPartnerTyping] = useState(false);
 
   // ── Scroll state ──
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
-  // ── Track scroll position to decide when to show the scroll-to-bottom button ──
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const { contentOffset, contentSize, layoutMeasurement } =
@@ -150,52 +151,64 @@ export default function StudentMessagesScreen() {
     scrollToBottom(true);
   }, [scrollToBottom]);
 
-  // ── Merge Firestore messages with optimistic ones ──
-  const allMessages: OptimisticMessage[] = [
-    ...messages,
-    ...optimistic.filter((o) => !messages.some((m) => m.id === o.id)),
-  ];
-
-  // ── Live partner profile (name + avatar stay current when peer updates) ──
-  const partnerUid = useMemo(() => {
-    if (viewMode !== "chat" || !activeConversation) return undefined;
-    return activeConversation.participants?.find((u) => u !== user?.uid);
-  }, [viewMode, activeConversation, user?.uid]);
-  const liveProfile = useStudentProfile(partnerUid);
-
-  // Display name for the other participant of a conversation.
-  // Peer conversations use participantNames; guidance uses the admin name.
   const getPartnerLabel = useCallback(
     (conv: Conversation): string => {
       if (conv.type === "peer") {
-        return getPeerName(conv, user?.uid || "");
+        return getPeerName(conv, userId || "");
       }
       return conv.adminName || conv.studentName || "Guidance";
     },
-    [user?.uid],
+    [userId],
   );
 
   // ── Filter + search (derived from the single source of truth) ──
   const filteredConversations = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    const result = conversations.filter((c) => {
-      if (activeFilter === "unread" && !c.unreadBy?.includes(user?.uid || "")) {
+    if (!userId) return [];
+    const peerDirectory: Conversation[] = allPeers.map((peer): Conversation => {
+      const existingConv = conversations.find((c) =>
+        c.participants?.includes(peer.uid),
+      );
+      return (
+        existingConv || {
+          id: peer.uid, // Use peer UID as a stable key for non-chatted peers
+          participants: [userId, peer.uid],
+          participantNames: {
+            [userId!]: user?.displayName || "You",
+            [peer.uid]: peer.fullName,
+          },
+          type: "peer",
+          lastMessage: `Start a conversation with ${peer.fullName}`,
+          lastMessageAt: 0,
+          unreadBy: [],
+        }
+      );
+    });
+
+    const query = searchQuery.trim().toLowerCase(); // This is for the inbox search, not directory
+    const result = (
+      activeFilter === "peers" ? peerDirectory : conversations
+    ).filter((c) => {
+      if (activeFilter === "unread" && !c.unreadBy?.includes(userId || ""))
         return false;
-      }
-      if (activeFilter === "peers" && c.type !== "peer") return false;
+      if (activeFilter === "peers" && c.type !== "peer") return false; // Should be redundant now
       if (activeFilter === "guidance" && c.type === "peer") return false;
+
       if (query) {
         const name = getPartnerLabel(c).toLowerCase();
         if (!name.includes(query)) return false;
       }
       return true;
     });
-    // [INBOX DEBUG] temporary — metadata only
-    console.log("[INBOX DEBUG] activeFilter:", activeFilter);
-    console.log("[INBOX DEBUG] searchQuery:", JSON.stringify(searchQuery));
-    console.log("[INBOX DEBUG] filtered count:", result?.length);
-    return result;
-  }, [conversations, activeFilter, searchQuery, user?.uid, getPartnerLabel]);
+    return result.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+  }, [
+    allPeers,
+    conversations,
+    activeFilter,
+    searchQuery,
+    userId,
+    user?.displayName,
+    getPartnerLabel,
+  ]);
 
   const emptyStateMessage = useMemo(() => {
     if (conversations.length === 0) {
@@ -235,37 +248,30 @@ export default function StudentMessagesScreen() {
   // ── Real-time listener for all conversations (peer + guidance) ──
   useEffect(() => {
     if (!user?.uid) return;
+
+    let cancelled = false;
+    fetchAllUsers(user.uid, "users").then((peers) => {
+      if (!cancelled) {
+        setAllPeers(peers);
+      }
+    });
+
     const unsub = listenForConversations(user.uid, "student", (convs) => {
-      // [INBOX DEBUG] temporary — metadata only, no message bodies
-      console.log("[INBOX DEBUG] conversation count:", convs?.length);
-      console.log(
-        "[INBOX DEBUG] first conversation keys:",
-        convs?.[0] ? Object.keys(convs[0]) : [],
-      );
-      console.log(
-        "[INBOX DEBUG] first conversation metadata:",
-        convs?.[0]
-          ? {
-              id: convs[0].id,
-              participants: convs[0].participants,
-              type: convs[0].type,
-              unreadBy: convs[0].unreadBy,
-              lastMessageAt: convs[0].lastMessageAt,
-            }
-          : null,
-      );
       setConversations(convs);
       setInboxLoading(false);
     });
-    return () => unsub();
-  }, [user?.uid]);
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, [user]);
 
   // ── Listen for presence of conversation partners ──
   useEffect(() => {
     if (conversations.length === 0 || !user?.uid) return;
 
     const unsubs = conversations.map((conv) => {
-      const peerUid = conv.participants?.find((p) => p !== user.uid);
+      const peerUid = conv.participants?.find((p) => p !== user!.uid);
       if (!peerUid) return () => {};
       return listenForPresence(peerUid, (online) => {
         setPresenceMap((prev) => ({ ...prev, [peerUid]: online }));
@@ -273,7 +279,7 @@ export default function StudentMessagesScreen() {
     });
 
     return () => unsubs.forEach((unsub) => unsub());
-  }, [conversations, user?.uid]);
+  }, [conversations, user]);
 
   // ── Listen for messages when in chat view ──
   useEffect(() => {
@@ -294,7 +300,7 @@ export default function StudentMessagesScreen() {
     });
 
     return () => unsub();
-  }, [activeConversation?.id, isNearBottom, scrollToBottom, userId]);
+  }, [activeConversation?.id, isNearBottom, scrollToBottom, userId, user]);
 
   // ── Scroll to newest message once when a conversation opens ──
   // Reset scroll state synchronously during render (valid derived-state
@@ -308,7 +314,7 @@ export default function StudentMessagesScreen() {
   useEffect(() => {
     if (!activeConversation?.id) return;
     scrollToBottom(false);
-  }, [activeConversation?.id, scrollToBottom]);
+  }, [activeConversation?.id, scrollToBottom, user]);
 
   // ── Set self as online on mount, offline on unmount ──
   useEffect(() => {
@@ -317,7 +323,7 @@ export default function StudentMessagesScreen() {
     return () => {
       setUserOffline(user.uid);
     };
-  }, [user?.uid]);
+  }, [user]);
 
   // ── Listen for partner presence ──
   useEffect(() => {
@@ -331,7 +337,7 @@ export default function StudentMessagesScreen() {
       setPartnerOnline(online);
     });
     return () => unsub();
-  }, [activeConversation?.id, activeConversation?.participants, user?.uid]);
+  }, [activeConversation?.id, activeConversation?.participants, user]);
 
   // ── Listen for partner typing ──
   useEffect(() => {
@@ -341,7 +347,7 @@ export default function StudentMessagesScreen() {
       setPartnerTyping(typing);
     });
     return () => unsub();
-  }, [activeConversation?.id, user?.uid]);
+  }, [activeConversation?.id, user]);
 
   // ── Open a conversation from the inbox ──
   const openConversation = (conversation: Conversation) => {
@@ -355,8 +361,7 @@ export default function StudentMessagesScreen() {
 
   // ─── Send with optimistic UI ─────────────────────────────────────────────
   const handleSend = useCallback(async () => {
-    if (!inputText.trim() || !activeConversation || !userId || sending)
-      return;
+    if (!inputText.trim() || !activeConversation || !userId || sending) return;
 
     const text = inputText.trim();
     const tempId = `temp_${Date.now()}`;
@@ -374,12 +379,7 @@ export default function StudentMessagesScreen() {
     setSending(true);
 
     try {
-      const realId = await sendMsg(
-        activeConversation.id,
-        text,
-        userId,
-        false,
-      );
+      const realId = await sendMsg(activeConversation.id, text, userId, false);
       setOptimistic((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, id: realId } : m)),
       );
@@ -459,7 +459,7 @@ export default function StudentMessagesScreen() {
     const hasUnread = item.unreadBy?.includes(user?.uid || "");
     const partnerName = getPartnerLabel(item);
     const isPeer = item.type === "peer";
-    const peerUid = item.participants?.find((u) => u !== user?.uid);
+    const peerUid = item.participants?.find((u) => u !== userId);
     const isOnline = peerUid ? presenceMap[peerUid] : false;
 
     return (
@@ -502,7 +502,9 @@ export default function StudentMessagesScreen() {
             style={[styles.convLastMsg, hasUnread && styles.convLastMsgBold]}
             numberOfLines={1}
           >
-            {item.lastMessage || "No messages yet"}
+            {item.lastMessageAt === 0
+              ? "Click to start a conversation"
+              : item.lastMessage || "No messages yet"}
           </Text>
         </View>
         {hasUnread && <View style={styles.unreadDot} />}
@@ -513,7 +515,7 @@ export default function StudentMessagesScreen() {
   // ─── Chat: Message bubble ────────────────────────────────────────────────
   const renderMessage = ({ item }: { item: OptimisticMessage }) => {
     const isMine = item.senderId === user?.uid;
-    const isDeleted = item.deleted;
+    const isDeleted = !!item.deleted;
     const isFailed = item.failed;
 
     return (
@@ -586,6 +588,21 @@ export default function StudentMessagesScreen() {
       router.back();
     }
   };
+
+  // ─── Derived values for chat view ────────────────────────────────────────
+  const allMessages: OptimisticMessage[] = useMemo(
+    () => [
+      ...messages,
+      ...optimistic.filter((o) => !messages.some((m) => m.id === o.id)),
+    ],
+    [messages, optimistic],
+  );
+
+  const partnerUid = useMemo(
+    () => activeConversation?.participants?.find((u) => u !== userId),
+    [activeConversation, userId],
+  );
+  const liveProfile = useStudentProfile(partnerUid);
 
   // ─── Inbox view ──────────────────────────────────────────────────────────
   const renderInboxView = () => (
@@ -1096,7 +1113,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 3,
   },
-  convName: { fontSize: 15, fontWeight: "600", color: "#1E1B4B", flexShrink: 1 },
+  convName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#1E1B4B",
+    flexShrink: 1,
+  },
   convNameBold: { fontWeight: "800" },
   convTime: { fontSize: 11, color: "#94A3B8", marginLeft: 8 },
   convLastMsg: { fontSize: 13, color: "#64748B" },

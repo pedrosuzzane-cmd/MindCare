@@ -150,7 +150,7 @@ function StatTile({
 
 export default function PasswordResetRequestsScreen() {
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const [segment, setSegment] = useState<"requests" | "accounts">("requests");
   const [requests, setRequests] = useState<ResetRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -192,6 +192,14 @@ export default function PasswordResetRequestsScreen() {
   useEffect(() => {
     loadRequests();
   }, [loadRequests]);
+
+  useEffect(() => {
+    if (role && role !== "superAdmin") {
+      router.replace(
+        role === "admin" ? "/admin-panel" : "/(student)/(tabs)/dashboard",
+      );
+    }
+  }, [role]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -450,7 +458,7 @@ export default function PasswordResetRequestsScreen() {
             </View>
             <Text style={styles.emptyTitle}>No results</Text>
             <Text style={styles.emptyText}>
-              Nothing matches "{query}". Try a different name or email.
+              Nothing matches &quot;{query}&quot;. Try a different name or email.
             </Text>
           </View>
         ) : (

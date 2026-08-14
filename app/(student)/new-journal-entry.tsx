@@ -375,7 +375,7 @@ export default function NewJournalEntryScreen() {
             <View style={styles.offlineBanner}>
               <Ionicons name="cloud-offline-outline" size={18} color="#B45309" />
               <Text style={styles.offlineBannerText}>
-                You're offline — entry will sync when connected
+                You are offline — entry will sync when connected
               </Text>
             </View>
           )}
@@ -428,7 +428,7 @@ export default function NewJournalEntryScreen() {
                 <View style={styles.moodHeaderLeft}>
                   <Text style={styles.moodHeaderIcon}>💭</Text>
                   <Text style={[styles.moodHeaderTitle, { color: theme.text }]}>
-                    Today's mood
+                    Mood for Today
                   </Text>
                 </View>
                 <View style={styles.moodHeaderRight}>
@@ -813,7 +813,7 @@ export default function NewJournalEntryScreen() {
               <View style={styles.previewContent}>
                 <Text style={styles.previewTitle}>Reflection Preview</Text>
                 <Text style={styles.previewText}>
-                  Your reflection will appear after saving today's journal.
+                  Your reflection will appear after saving your journal.
                 </Text>
               </View>
             </View>

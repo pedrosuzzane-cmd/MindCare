@@ -186,7 +186,7 @@ export default function JournalSavedScreen() {
           <Animated.View entering={FadeIn.duration(500)}>
             {/* Today's Entry */}
             <View style={styles.card}>
-              <Text style={styles.cardLabel}>Today's Entry</Text>
+              <Text style={styles.cardLabel}>Entry for Today</Text>
               <View style={styles.entryHeader}>
                 {mood && (
                   <View

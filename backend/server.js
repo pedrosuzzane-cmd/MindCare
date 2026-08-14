@@ -79,26 +79,6 @@ try {
 app.use(bodyParser.json({ limit: "50mb" }));
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 
-// Middleware to verify Firebase ID token and check for admin claims
-const checkAdmin = async (req, res, next) => {
-  const idToken = req.headers.authorization?.split("Bearer ")[1];
-  if (!idToken) {
-    return res.status(403).json({ error: "Unauthorized: No token provided." });
-  }
-  try {
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
-    if (decodedToken.admin === true) {
-      req.user = decodedToken;
-      return next();
-    }
-    return res
-      .status(403)
-      .json({ error: "Unauthorized: Admin privileges required." });
-  } catch (error) {
-    return res.status(403).json({ error: "Unauthorized: Invalid token." });
-  }
-};
-
 // Endpoint to grant admin privileges to a user (Super Admin only)
 app.post("/api/grant-admin", checkSuperAdmin, async (req, res) => {
   const { uid } = req.body;
@@ -1969,6 +1949,84 @@ app.get("/api/superadmin/admins", checkSuperAdmin, async (req, res) => {
   }
 });
 
+// POST /api/superadmin/create-admin — create a new administrator account.
+app.post("/api/superadmin/create-admin", checkSuperAdmin, async (req, res) => {
+  const email = normalizeEmail(req.body.email || "");
+  const password = String(req.body.password || "");
+  const displayName = String(req.body.displayName || "").trim();
+
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and password are required." });
+  }
+  if (!isValidEmail(email)) {
+    return res.status(400).json({ error: "Please provide a valid email address." });
+  }
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    return res
+      .status(400)
+      .json({ error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters long.` });
+  }
+  if (COMMON_PASSWORDS.has(password.toLowerCase())) {
+    return res.status(400).json({ error: "That password is too weak. Please choose a stronger password." });
+  }
+
+  try {
+    const db = admin.firestore();
+
+    const existing = await admin.auth().getUserByEmail(email).catch(() => null);
+    if (existing) {
+      return res.status(409).json({ error: "An account with this email already exists." });
+    }
+
+    const isSuperAdmin = req.body.isSuperAdmin === true;
+
+    const userRecord = await admin.auth().createUser({
+      email,
+      password,
+      displayName: displayName || undefined,
+      emailVerified: true,
+    });
+
+    await admin.auth().setCustomUserClaims(userRecord.uid, {
+      admin: true,
+      ...(isSuperAdmin ? { superAdmin: true } : {}),
+    });
+
+    const adminDoc = {
+      uid: userRecord.uid,
+      email,
+      displayName: displayName || null,
+      role: isSuperAdmin ? "superAdmin" : "admin",
+      isSuperAdmin,
+      position: req.body.position || null,
+      contactNo: req.body.contactNo || null,
+      college: req.body.college || null,
+      schoolId: req.body.schoolId || null,
+      createdAtMs: Date.now(),
+      createdBy: req.user.uid || null,
+    };
+
+    await db.collection("admins").doc(userRecord.uid).set(adminDoc);
+
+    await logAuditEvent({
+      action: "Admin Created",
+      actor: req.user,
+      target: { uid: userRecord.uid, email },
+      req,
+      status: "Created",
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `Administrator ${email} was created.`,
+      admin: { uid: userRecord.uid, ...adminDoc },
+    });
+  } catch (err) {
+    console.error("Create admin error:", err);
+    return res.status(500).json({ error: "Unable to create the administrator." });
+  }
+});
+
 // POST /api/superadmin/update-admin — edit admin profile fields and/or Super Admin status.
 app.post("/api/superadmin/update-admin", checkSuperAdmin, async (req, res) => {
   const { uid } = req.body;
@@ -2509,7 +2567,7 @@ app.post("/api/ai-proxy", async (req, res) => {
       try {
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { suggestions: [text] };
-      } catch (parseError) {
+    } catch (_parseError) {
         return res
           .status(500)
           .json({ error: "Failed to parse Gemini response." });
@@ -2568,7 +2626,7 @@ app.post("/api/ai-proxy", async (req, res) => {
       try {
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { suggestions: [text] };
-      } catch (parseError) {
+      } catch (_parseError) {
         return res
           .status(500)
           .json({ error: "Failed to parse OpenAI response." });
@@ -2631,6 +2689,7 @@ function buildSupportMessage(action, followUpDate) {
         month: "long",
         day: "numeric",
         year: "numeric",
+        timeZone: "Asia/Manila",
       })
     : null;
   switch (action) {
@@ -2868,6 +2927,7 @@ app.post("/api/record-support-action", async (req, res) => {
             lastMessage: messageText,
             lastMessageAt: Date.now(),
             unreadBy: [studentId],
+            type: "guidance", // Ensure it's classified as a guidance conversation
             createdAt: Date.now(),
           });
         }
