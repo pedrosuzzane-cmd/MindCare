@@ -2,7 +2,6 @@ import { db } from "@/constants/firebase";
 import {
   collection,
   addDoc,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -19,6 +18,7 @@ import type {
   CreateAnnouncementPayload,
   UpdateAnnouncementPayload,
 } from "@/types/announcement";
+import type { DocumentData } from "firebase/firestore";
 
 const EXPIRY_DAYS = 7;
 const EXPIRY_MS = EXPIRY_DAYS * 24 * 60 * 60 * 1000;
@@ -48,7 +48,6 @@ function sanitizeLinks(raw: unknown): AnnouncementLink[] {
 export async function createAnnouncement(
   payload: CreateAnnouncementPayload,
 ): Promise<string> {
-  const now = Date.now();
   const docRef = await addDoc(collection(db, "announcements"), {
     title: payload.title,
     description: payload.description,
@@ -60,7 +59,7 @@ export async function createAnnouncement(
     targetDepartments: payload.targetDepartments,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-    expiresAt: now + EXPIRY_MS,
+    expiresAt: new Date(Date.now() + EXPIRY_MS),
   });
   return docRef.id;
 }
@@ -85,6 +84,31 @@ export async function updateAnnouncement(
   );
 }
 
+function mapAnnouncementDoc(
+  id: string,
+  data: DocumentData,
+): Announcement {
+  const createdAt = firestoreTimestampToDate(data.createdAt);
+  const expiresAt = data.expiresAt
+    ? firestoreTimestampToDate(data.expiresAt)
+    : new Date(createdAt.getTime() + EXPIRY_MS);
+  return {
+    id,
+    title: data.title || "",
+    description: data.description || "",
+    links: sanitizeLinks(data.links),
+    createdAt,
+    expiresAt,
+    authorName: data.authorName || "Admin",
+    adminId: data.adminId || "",
+    authorPosition: data.authorPosition || undefined,
+    authorPhotoUrl: data.authorPhotoUrl || undefined,
+    targetDepartments: Array.isArray(data.targetDepartments)
+      ? data.targetDepartments
+      : ["ALL"],
+  };
+}
+
 export function listenForAnnouncements(
   callback: (announcements: Announcement[]) => void,
   onError?: (error: Error) => void,
@@ -93,26 +117,7 @@ export function listenForAnnouncements(
   return onSnapshot(q, (snapshot) => {
     const now = Date.now();
     const items: Announcement[] = snapshot.docs
-      .map((d) => {
-        const data = d.data();
-        const createdAt = firestoreTimestampToDate(data.createdAt);
-        const expiresAt = data.expiresAt
-          ? new Date(data.expiresAt)
-          : new Date(createdAt.getTime() + EXPIRY_MS);
-        return {
-          id: d.id,
-          title: data.title || "",
-          description: data.description || "",
-          links: sanitizeLinks(data.links),
-          createdAt,
-          expiresAt,
-          authorName: data.authorName || "Admin",
-          adminId: data.adminId || "",
-          authorPosition: data.authorPosition || undefined,
-          authorPhotoUrl: data.authorPhotoUrl || undefined,
-          targetDepartments: Array.isArray(data.targetDepartments) ? data.targetDepartments : ["ALL"],
-        };
-      })
+      .map((d) => mapAnnouncementDoc(d.id, d.data()))
       .filter((a) => a.expiresAt.getTime() > now);
     callback(items);
   }, onError || ((err) => console.warn("listenForAnnouncements error:", err)));
@@ -137,7 +142,9 @@ export async function cleanupExpiredAnnouncements(): Promise<number> {
   const snap = await getDocs(collection(db, "announcements"));
   const expired = snap.docs.filter((d) => {
     const data = d.data();
-    const expiresAt = data.expiresAt;
+    const expiresAt = data.expiresAt
+      ? firestoreTimestampToDate(data.expiresAt).getTime()
+      : 0;
     return expiresAt && expiresAt < now;
   });
 
@@ -165,6 +172,26 @@ export async function markAnnouncementAsRead(
     { uid: studentUid, readAt: serverTimestamp() },
     { merge: true },
   );
+}
+
+/**
+ * Fetches the read state (per-student reads subcollection receipt) for each
+ * announcement. Returns a map of announcementId -> has the student read it.
+ */
+export async function getReadStates(
+  studentUid: string,
+  announcements: Announcement[],
+): Promise<Record<string, boolean>> {
+  const states: Record<string, boolean> = {};
+  await Promise.all(
+    announcements.map(async (a) => {
+      const readDoc = await getDoc(
+        doc(db, "announcements", a.id, "reads", studentUid),
+      );
+      states[a.id] = readDoc.exists();
+    }),
+  );
+  return states;
 }
 
 export async function getUnreadCount(
@@ -206,4 +233,22 @@ export function formatAnnouncementDateTime(date: Date): string {
     hour12: true,
   });
   return `${dateStr} at ${timeStr}`;
+}
+
+/**
+ * Formats a date for the announcement detail header:
+ * "August 7, 2026 • 10:30 AM"
+ */
+export function formatAnnouncementDetailDate(date: Date): string {
+  const dateStr = date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  const timeStr = date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+  return `${dateStr} • ${timeStr}`;
 }

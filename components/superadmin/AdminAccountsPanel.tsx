@@ -269,11 +269,16 @@ export function AdminAccountsPanel() {
           isSuperAdmin: createForm.isSuperAdmin,
         }),
       });
-      const data = await response.json();
+      const contentType = response.headers.get("content-type") || "";
+      const data = contentType.includes("application/json")
+        ? await response.json().catch(() => ({}))
+        : {};
       if (!response.ok) {
         Alert.alert(
           "Could Not Create Admin",
-          data.error || "Failed to create the administrator.",
+          typeof data?.error === "string" && data.error
+            ? data.error
+            : `Create Admin API returned HTTP ${response.status}. Verify the deployed backend route.`,
         );
         setSaving(false);
         return;

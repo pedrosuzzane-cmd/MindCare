@@ -1,5 +1,6 @@
 import { HapticTab } from "@/components/haptic-tab";
 import { useMindCareTheme } from "@/contexts/ThemeContext";
+import { useAnnouncements } from "@/contexts/AnnouncementsContext";
 import { Tabs } from "expo-router";
 import React, { useEffect, useRef } from "react";
 import { Animated, Platform, StyleSheet, Text, View } from "react-native";
@@ -62,6 +63,7 @@ function TabLabel({ label, focused }: { label: string; focused: boolean }) {
 
 export default function TabLayout() {
   const { theme } = useMindCareTheme();
+  const { unreadCount } = useAnnouncements();
 
   return (
     <Tabs
@@ -108,7 +110,16 @@ export default function TabLayout() {
           title: "Announcements",
           tabBarButton: HapticTab,
           tabBarIcon: ({ focused }) => (
-            <TabIcon emoji="📣" focused={focused} />
+            <View>
+              <TabIcon emoji="📣" focused={focused} />
+              {unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </View>
           ),
           tabBarLabel: ({ focused }) => (
             <TabLabel label="Announcements" focused={focused} />
@@ -162,6 +173,23 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   labelActive: {
+    fontWeight: "700",
+  },
+  badge: {
+    position: "absolute",
+    top: -2,
+    right: -6,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    backgroundColor: "#DC2626",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
     fontWeight: "700",
   },
 });

@@ -1,20 +1,15 @@
-import { auth, db } from "@/constants/firebase";
-import { useAuth } from "@/hooks/AuthContext";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import { useAnnouncements } from "@/contexts/AnnouncementsContext";
 import {
   formatAnnouncementDateTime,
-  getDaysRemaining,
-  listenForAnnouncements,
-  markAnnouncementAsRead,
 } from "@/services/announcementService";
 import type { Announcement } from "@/types/announcement";
-import { useMindCareTheme } from "@/contexts/ThemeContext";
 import type { MindCareTheme } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
-import { doc, getDoc } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
+import { router } from "expo-router";
+import React from "react";
 import {
   Image,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -22,156 +17,105 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Animated, { FadeIn, LinearTransition } from "react-native-reanimated";
+import Animated, { FadeIn } from "react-native-reanimated";
 
-const PREVIEW_LINES = 4;
 const TITLE_LINES = 2;
+const PREVIEW_LINES = 2;
 
-function AnnouncementCard({
+function AnnouncementItem({
   announcement,
-  expanded,
-  onToggle,
+  isRead,
+  onPress,
   theme,
 }: {
   announcement: Announcement;
-  expanded: boolean;
-  onToggle: () => void;
+  isRead: boolean;
+  onPress: () => void;
   theme: MindCareTheme;
 }) {
   const styles = createStyles(theme);
-  const [totalLines, setTotalLines] = useState<number | null>(null);
-
-  const needsToggle = totalLines !== null && totalLines > PREVIEW_LINES;
-  const descriptionLines = needsToggle && !expanded ? PREVIEW_LINES : undefined;
 
   return (
-    <Animated.View
-      layout={LinearTransition.duration(180)}
-      style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}
-    >
-      <Text
-        style={[styles.cardTitle, { color: theme.primary }]}
-        numberOfLines={TITLE_LINES}
+    <Animated.View entering={FadeIn.duration(180)}>
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.card,
+          { backgroundColor: theme.card, borderColor: theme.border },
+          pressed && styles.cardPressed,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={`Announcement from ${announcement.authorName}: ${announcement.title}`}
       >
-        {announcement.title}
-      </Text>
-      <Text
-        style={[styles.cardBody, { color: theme.text }]}
-        numberOfLines={descriptionLines}
-        onTextLayout={(e) => {
-          if (totalLines === null) {
-            setTotalLines(e.nativeEvent.lines.length);
-          }
-        }}
-      >
-        {announcement.description}
-      </Text>
-      {announcement.links.length > 0 && (
-        <View style={styles.linksContainer}>
-          {announcement.links.map((link, idx) => (
-            <Pressable key={idx} onPress={() => Linking.openURL(link.url)}>
-              <Text style={[styles.linkText, { color: theme.primary }]}>
-                {link.title}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      )}
-      {needsToggle && (
-        <Animated.View entering={FadeIn.duration(200)}>
-          <Pressable
-            onPress={onToggle}
-            hitSlop={8}
-            style={styles.readMoreBtn}
-            accessibilityRole="button"
-            accessibilityState={{ expanded }}
-            accessibilityLabel={expanded ? "Read less" : "Read more"}
-          >
-            <Text style={[styles.readMoreText, { color: theme.primary }]}>
-              {expanded ? "Read less" : "Read more"}
-            </Text>
-            <Ionicons
-              name={expanded ? "chevron-up" : "chevron-down"}
-              size={14}
-              color={theme.primary}
+        <View style={styles.row}>
+          {announcement.authorPhotoUrl ? (
+            <Image
+              source={{ uri: announcement.authorPhotoUrl }}
+              style={styles.avatar}
             />
-          </Pressable>
-        </Animated.View>
-      )}
-      <View style={styles.authorRow}>
-        {announcement.authorPhotoUrl ? (
-          <Image
-            source={{ uri: announcement.authorPhotoUrl }}
-            style={styles.authorAvatar}
-          />
-        ) : (
-          <View
-            style={[styles.authorAvatarPlaceholder, { backgroundColor: theme.primary }]}
-          >
-            <Text style={styles.authorAvatarText}>
-              {(announcement.authorName || "A").charAt(0).toUpperCase()}
+          ) : (
+            <View
+              style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: theme.primary }]}
+            >
+              <Text style={styles.avatarText}>
+                {(announcement.authorName || "A").charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <View style={styles.body}>
+            <View style={styles.metaRow}>
+              <View style={styles.metaTextWrap}>
+                <Text
+                  style={[styles.authorName, { color: theme.text }]}
+                  numberOfLines={1}
+                >
+                  {announcement.authorName}
+                  {announcement.authorPosition
+                    ? ` · ${announcement.authorPosition}`
+                    : ""}
+                </Text>
+                <Text
+                  style={[styles.date, { color: theme.secondaryText }]}
+                  numberOfLines={1}
+                >
+                  {formatAnnouncementDateTime(announcement.createdAt)}
+                </Text>
+              </View>
+              {!isRead && <View style={styles.unreadDot} />}
+            </View>
+            <Text
+              style={[
+                styles.title,
+                { color: isRead ? theme.text : theme.primary },
+              ]}
+              numberOfLines={TITLE_LINES}
+              ellipsizeMode="tail"
+            >
+              {announcement.title}
+            </Text>
+            <Text
+              style={[styles.preview, { color: theme.secondaryText }]}
+              numberOfLines={PREVIEW_LINES}
+              ellipsizeMode="tail"
+            >
+              {announcement.description}
             </Text>
           </View>
-        )}
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.cardMeta, { color: theme.secondaryText }]}>
-            {announcement.authorName}
-            {announcement.authorPosition
-              ? `, ${announcement.authorPosition}`
-              : ""}
-          </Text>
-          <Text style={[styles.cardDate, { color: theme.secondaryText }]}>
-            {formatAnnouncementDateTime(announcement.createdAt)}
-          </Text>
         </View>
-      </View>
-      <View style={[styles.expiry, { backgroundColor: theme.softPurple }]}>
-        <Text style={[styles.expiryText, { color: theme.primary }]}>
-          Expires in {getDaysRemaining(announcement.expiresAt)} days
-        </Text>
-      </View>
+      </Pressable>
     </Animated.View>
   );
 }
 
 export default function AnnouncementsTab() {
-  const { user } = useAuth();
   const { theme } = useMindCareTheme();
   const styles = createStyles(theme);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [studentDepartment, setStudentDepartment] = useState<string | null>(
-    null,
-  );
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const { announcements, readMap, markRead } = useAnnouncements();
 
-  useEffect(() => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
-    getDoc(doc(db, "users", uid)).then((snap) => {
-      if (snap.exists()) {
-        setStudentDepartment(snap.data().department || null);
-      }
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
-    const unsub = listenForAnnouncements((data) => {
-      setAnnouncements(data);
-      data.forEach((a) => markAnnouncementAsRead(a.id, user.uid));
-    });
-    return () => unsub();
-  }, [user]);
-
-  const visibleAnnouncements = announcements.filter(
-    (a) =>
-      a.targetDepartments.includes("ALL") ||
-      (studentDepartment &&
-        a.targetDepartments.includes(studentDepartment)),
-  );
-
-  const toggleAnnouncement = (id: string) =>
-    setExpandedId((prev) => (prev === id ? null : id));
+  const openAnnouncement = (id: string) => {
+    markRead(id);
+    router.push({ pathname: "/announcement-detail", params: { id } });
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -185,7 +129,7 @@ export default function AnnouncementsTab() {
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
       >
-        {visibleAnnouncements.length === 0 ? (
+        {announcements.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons
               name="megaphone-outline"
@@ -202,12 +146,12 @@ export default function AnnouncementsTab() {
             </Text>
           </View>
         ) : (
-          visibleAnnouncements.map((announcement) => (
-            <AnnouncementCard
+          announcements.map((announcement) => (
+            <AnnouncementItem
               key={announcement.id}
               announcement={announcement}
-              expanded={expandedId === announcement.id}
-              onToggle={() => toggleAnnouncement(announcement.id)}
+              isRead={!!readMap[announcement.id]}
+              onPress={() => openAnnouncement(announcement.id)}
               theme={theme}
             />
           ))
@@ -237,89 +181,80 @@ const createStyles = (theme: MindCareTheme) =>
       color: theme.text,
     },
     list: {
-      padding: 20,
-      gap: 16,
+      padding: 16,
+      gap: 12,
       paddingBottom: 110,
     },
     card: {
-      backgroundColor: theme.card,
-      borderRadius: 20,
-      padding: 18,
+      borderRadius: 18,
+      padding: 14,
       borderWidth: 1,
       borderColor: theme.border,
       // @ts-ignore — web-only shadow property
-      boxShadow: `0px 2px 12px ${theme.shadow}`,
+      boxShadow: `0px 1px 8px ${theme.shadow}`,
     },
-    cardTitle: {
+    cardPressed: {
+      opacity: 0.85,
+    },
+    row: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 12,
+    },
+    avatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+    },
+    avatarPlaceholder: {
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    avatarText: {
+      color: "#FFFFFF",
       fontSize: 16,
       fontWeight: "700",
-      color: theme.primary,
-      marginBottom: 8,
     },
-    cardBody: {
-      fontSize: 14,
-      color: theme.text,
-      lineHeight: 22,
-      marginBottom: 12,
+    body: {
+      flex: 1,
     },
-    readMoreBtn: {
+    metaRow: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "center",
-      alignSelf: "flex-start",
-      gap: 4,
-      minHeight: 44,
-      paddingHorizontal: 8,
-      marginTop: -4,
+      justifyContent: "space-between",
+      gap: 8,
+      marginBottom: 6,
+    },
+    metaTextWrap: {
+      flex: 1,
+    },
+    authorName: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: theme.text,
+    },
+    date: {
+      fontSize: 11,
+      color: theme.secondaryText,
+      marginTop: 2,
+    },
+    unreadDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: theme.primary,
+    },
+    title: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: theme.primary,
       marginBottom: 4,
     },
-    readMoreText: {
+    preview: {
       fontSize: 13,
-      fontWeight: "700",
-      color: theme.primary,
+      lineHeight: 19,
+      color: theme.secondaryText,
     },
-    linksContainer: { gap: 6, marginBottom: 12 },
-    linkText: {
-      fontSize: 13,
-      color: theme.primary,
-      fontWeight: "600",
-      textDecorationLine: "underline",
-    },
-    authorRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-      marginTop: 8,
-    },
-    authorAvatar: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-    },
-    authorAvatarPlaceholder: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: theme.primary,
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    authorAvatarText: {
-      color: "#FFFFFF",
-      fontSize: 14,
-      fontWeight: "700",
-    },
-    cardMeta: { fontSize: 12, color: theme.secondaryText, marginBottom: 2 },
-    cardDate: { fontSize: 11, color: theme.secondaryText },
-    expiry: {
-      marginTop: 6,
-      alignSelf: "flex-start",
-      backgroundColor: theme.softPurple,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 6,
-    },
-    expiryText: { fontSize: 10, fontWeight: "600", color: theme.primary },
     emptyState: {
       alignItems: "center",
       justifyContent: "center",

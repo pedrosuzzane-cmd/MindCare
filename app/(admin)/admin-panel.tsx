@@ -1911,7 +1911,7 @@ export default function AdminPanelScreen() {
     setCreateAdminError(null);
     try {
       const token = await user?.getIdToken();
-      const res = await fetch(`${API_URL}/api/create-admin`, {
+      const res = await fetch(`${API_URL}/api/superadmin/create-admin`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1931,44 +1931,17 @@ export default function AdminPanelScreen() {
         }),
       });
 
-      const result = await res.json();
+      const contentType = res.headers.get("content-type") || "";
+      const result = contentType.includes("application/json")
+        ? await res.json().catch(() => ({}))
+        : {};
 
       if (!res.ok) {
-        throw new Error(result.message || "Failed to create admin.");
-      }
-
-      const newUid = result?.newUser?.uid;
-
-      if (newUid) {
-        const { setDoc: _setDoc } = await import("firebase/firestore");
-        await _setDoc(
-          doc(db, "admins", newUid),
-          {
-            displayName: newAdminName.trim(),
-            email: newAdminEmail.trim(),
-            role: "admin",
-            ...(newAdminIdNo.replace(/-/g, "").trim()
-              ? { schoolId: newAdminIdNo.replace(/-/g, "").trim() }
-              : {}),
-            ...(newAdminPosition.trim()
-              ? { position: newAdminPosition.trim() }
-              : {}),
-            ...(newAdminContactNo.trim()
-              ? { contactNo: newAdminContactNo.trim() }
-              : {}),
-            ...(newAdminGender.trim()
-              ? { genderIdentity: newAdminGender.trim() }
-              : {}),
-            ...(newAdminNationality.trim()
-              ? { nationality: newAdminNationality.trim() }
-              : {}),
-            ...(newAdminAddress.trim()
-              ? { address: newAdminAddress.trim() }
-              : {}),
-            ...(newAdminCollege ? { college: newAdminCollege } : {}),
-          },
-          { merge: true },
-        );
+        const message =
+          typeof result?.error === "string" && result.error
+            ? result.error
+            : `Create Admin API returned HTTP ${res.status}. Verify the deployed backend route.`;
+        throw new Error(message);
       }
 
       Alert.alert(
