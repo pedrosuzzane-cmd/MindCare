@@ -28,14 +28,16 @@ import {
   NativeSyntheticEvent,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 import EmojiPicker from "@/components/chat/EmojiPicker";
 
@@ -1047,6 +1049,7 @@ const styles = StyleSheet.create({
   // Filter pills
   filterRow: {
     flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
     gap: 8,
     paddingBottom: 8,
@@ -1054,13 +1057,15 @@ const styles = StyleSheet.create({
   filterPill: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 6,
     paddingHorizontal: 14,
-    paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: "white",
     borderWidth: 1,
     borderColor: "rgba(156, 126, 235, 0.1)",
+    height: 38,
+    minHeight: 38,
   },
   filterPillActive: {
     backgroundColor: "#F3EEFF",

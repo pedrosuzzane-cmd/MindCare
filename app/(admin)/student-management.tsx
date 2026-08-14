@@ -34,6 +34,10 @@ import {
   type SupportStatus,
 } from "@/services/studentTypes";
 import { FollowUpDatePickerModal } from "@/components/admin/FollowUpDatePickerModal";
+import {
+  FollowUpTimePickerModal,
+  type TimeValue,
+} from "@/components/admin/FollowUpTimePickerModal";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -163,6 +167,41 @@ function formatDateTime(d?: Date | null): string {
   );
 }
 
+function pad2(n: number): string {
+  return n.toString().padStart(2, "0");
+}
+
+function formatTime(t: TimeValue): string {
+  return `${pad2(t.hour)}:${pad2(t.minute)} ${t.period}`;
+}
+
+/** "Aug 21, 2026 · 10:30 AM" — falls back to date-only when no time is set. */
+function formatFollowUp(date: Date, time: TimeValue | null): string {
+  const d = date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  return time ? `${d} · ${formatTime(time)}` : d;
+}
+
+/**
+ * Combines the selected calendar date and time into one local Date. Built from
+ * local y/m/d components (never a "YYYY-MM-DD" string, which JS may parse as
+ * UTC) so the exact date is preserved, then the local time is applied.
+ */
+function combineDateAndTime(date: Date, time: TimeValue): Date {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const h24 =
+    time.period === "PM" && time.hour !== 12
+      ? time.hour + 12
+      : time.period === "AM" && time.hour === 12
+        ? 0
+        : time.hour;
+  d.setHours(h24, time.minute, 0, 0);
+  return d;
+}
+
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
   const out = parts.map((p) => p[0]?.toUpperCase() || "").join("");
@@ -228,6 +267,7 @@ function buildReasonSummary(opts: {
 function canSaveWorkflow(a: {
   action: SupportActionType | null;
   followUp: Date | null;
+  followUpTime: TimeValue | null;
   assignee: string;
   contactMethod: string | null;
   resources: string[];
@@ -238,9 +278,9 @@ function canSaveWorkflow(a: {
     case "send_wellness_checkin":
       return !!a.contactMethod;
     case "guidance_consultation":
-      return !!a.assignee;
+      return !!a.assignee && (a.followUp ? !!a.followUpTime : true);
     case "schedule_follow_up":
-      return !!a.followUp && !!a.assignee;
+      return !!a.followUp && !!a.followUpTime && !!a.assignee;
     case "provide_resources":
       return a.resources.length > 0;
     case "monitor_only":
@@ -448,6 +488,8 @@ export default function StudentManagementScreen() {
   const [wfMonitorDays, setWfMonitorDays] = useState<number | null>(null);
   const [wfAssignee, setWfAssignee] = useState("");
   const [wfFollowUp, setWfFollowUp] = useState<Date | null>(null);
+  const [wfFollowUpTime, setWfFollowUpTime] = useState<TimeValue | null>(null);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [wfSaving, setWfSaving] = useState(false);
   const [wfError, setWfError] = useState<string | null>(null);
   const [showCustomDate, setShowCustomDate] = useState(false);
@@ -862,6 +904,8 @@ export default function StudentManagementScreen() {
       setWfResources([]);
       setWfMonitorDays(null);
       setWfFollowUp(null);
+      setWfFollowUpTime(null);
+      setShowTimePicker(false);
       setWfError(null);
       setWfAssignee(user?.uid ?? "");
       wfRequestIds.current = new Map();
@@ -906,6 +950,15 @@ export default function StudentManagementScreen() {
       setWfError("Please select a follow-up date.");
       return;
     }
+    if (
+      (wfAction === "schedule_follow_up" ||
+        wfAction === "guidance_consultation") &&
+      wfFollowUp &&
+      !wfFollowUpTime
+    ) {
+      setWfError("Please select a follow-up time.");
+      return;
+    }
     if (wfAction === "schedule_follow_up" && !wfAssignee) {
       setWfError("Please assign a counselor for the follow-up.");
       return;
@@ -939,6 +992,10 @@ export default function StudentManagementScreen() {
           requestId = uuidv4();
           wfRequestIds.current.set(uid, requestId);
         }
+        const followUpAt =
+          wfFollowUp && wfFollowUpTime
+            ? combineDateAndTime(wfFollowUp, wfFollowUpTime)
+            : wfFollowUp;
         await recordSupportAction({
           studentId: uid,
           action: wfAction,
@@ -947,7 +1004,7 @@ export default function StudentManagementScreen() {
           followUpDate:
             wfAction === "schedule_follow_up" ||
             wfAction === "guidance_consultation"
-              ? wfFollowUp
+              ? followUpAt
               : null,
           reason,
           requestId,
@@ -1252,12 +1309,19 @@ export default function StudentManagementScreen() {
   const wfValid = canSaveWorkflow({
     action: wfAction,
     followUp: wfFollowUp,
+    followUpTime: wfFollowUpTime,
     assignee: wfAssignee,
     contactMethod: wfContactMethod,
     resources: wfResources,
     monitorDays: wfMonitorDays,
   });
   const wfCanSave = wfValid && !wfSaving;
+
+  /** Selects a quick follow-up date and immediately opens the time picker. */
+  const pickQuickDate = (date: Date) => {
+    setWfFollowUp(date);
+    setShowTimePicker(true);
+  };
 
   return (
     <View style={styles.root}>
@@ -2544,7 +2608,7 @@ export default function StudentManagementScreen() {
                             styles.quickDateBtn,
                             same && styles.quickDateBtnActive,
                           ]}
-                          onPress={() => setWfFollowUp(q.date)}
+                          onPress={() => pickQuickDate(q.date)}
                         >
                           <Text
                             style={[
@@ -2574,6 +2638,36 @@ export default function StudentManagementScreen() {
                       ? formatDate(wfFollowUp)
                       : "No follow-up date selected"}
                   </Text>
+
+                  {wfFollowUp ? (
+                    <View>
+                      <Text style={styles.fieldLabel}>Follow-up time</Text>
+                      <Pressable
+                        style={[
+                          styles.timePill,
+                          wfFollowUpTime && styles.timePillActive,
+                        ]}
+                        onPress={() => setShowTimePicker(true)}
+                      >
+                        <Ionicons
+                          name="time-outline"
+                          size={15}
+                          color={wfFollowUpTime ? "#6D28D9" : "#9CA3AF"}
+                        />
+                        <Text
+                          style={[
+                            styles.timePillText,
+                            wfFollowUpTime && styles.timePillTextActive,
+                            !wfFollowUpTime && styles.timePillTextPlaceholder,
+                          ]}
+                        >
+                          {wfFollowUpTime
+                            ? formatTime(wfFollowUpTime)
+                            : "Select time"}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
 
                   <Text style={styles.fieldLabel}>Assigned counselor</Text>
                   <View style={styles.assigneeRow}>
@@ -2773,7 +2867,7 @@ export default function StudentManagementScreen() {
                         color="#6D28D9"
                       />
                       <Text style={styles.summaryText}>
-                        Follow-up: {formatDate(wfFollowUp)}
+                        Follow-up: {formatFollowUp(wfFollowUp, wfFollowUpTime)}
                       </Text>
                     </View>
                   ) : null}
@@ -2902,6 +2996,18 @@ export default function StudentManagementScreen() {
         onConfirm={(date) => {
           setWfFollowUp(date);
           setShowCustomDate(false);
+          setShowTimePicker(true);
+        }}
+      />
+
+      <FollowUpTimePickerModal
+        key={showTimePicker ? "time-picker-open" : "time-picker-idle"}
+        visible={showTimePicker}
+        initialTime={wfFollowUpTime}
+        onCancel={() => setShowTimePicker(false)}
+        onConfirm={(time) => {
+          setWfFollowUpTime(time);
+          setShowTimePicker(false);
         }}
       />
 
@@ -4461,6 +4567,33 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#6D28D9",
     marginTop: 8,
+  },
+  timePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "#F9FAFB",
+  },
+  timePillActive: {
+    borderColor: "#6D28D9",
+    backgroundColor: "#F5F0FF",
+  },
+  timePillText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#4B5563",
+  },
+  timePillTextActive: {
+    color: "#6D28D9",
+  },
+  timePillTextPlaceholder: {
+    color: "#9CA3AF",
   },
   assigneeRow: {
     flexDirection: "row",

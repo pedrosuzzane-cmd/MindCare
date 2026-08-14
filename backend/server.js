@@ -2685,10 +2685,12 @@ const SUPPORT_STATUS_LABELS = {
 // date are ever shown — administrative notes and risk details are never sent.
 function buildSupportMessage(action, followUpDate) {
   const date = followUpDate
-    ? followUpDate.toLocaleDateString("en-US", {
+    ? followUpDate.toLocaleString("en-US", {
         month: "long",
         day: "numeric",
         year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
         timeZone: "Asia/Manila",
       })
     : null;

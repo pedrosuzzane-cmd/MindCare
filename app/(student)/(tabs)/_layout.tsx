@@ -4,6 +4,7 @@ import { useAnnouncements } from "@/contexts/AnnouncementsContext";
 import { Tabs } from "expo-router";
 import React, { useEffect, useRef } from "react";
 import { Animated, Platform, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 function TabIcon({
   emoji,
@@ -64,6 +65,9 @@ function TabLabel({ label, focused }: { label: string; focused: boolean }) {
 export default function TabLayout() {
   const { theme } = useMindCareTheme();
   const { unreadCount } = useAnnouncements();
+  const insets = useSafeAreaInsets();
+  const tabBarHeight =
+    Platform.OS === "ios" ? 88 : 68 + Math.max(insets.bottom, 0);
 
   return (
     <Tabs
@@ -75,9 +79,9 @@ export default function TabLayout() {
           backgroundColor: theme.tabBar,
           borderTopWidth: 1,
           borderTopColor: theme.tabBarBorder,
-          height: Platform.OS === "ios" ? 88 : 68,
+          height: tabBarHeight,
           paddingTop: 7,
-          paddingBottom: Platform.OS === "ios" ? 24 : 7,
+          paddingBottom: Platform.OS === "ios" ? 24 : Math.max(insets.bottom, 7),
           elevation: 8,
           shadowColor: "#6D28D9",
           shadowOffset: { width: 0, height: -2 },
