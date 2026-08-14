@@ -157,7 +157,7 @@ export default function StudentMessagesScreen() {
     return () => {
       cancelled = true;
     };
-  }, [viewMode, user?.uid]);
+  }, [viewMode, user]);
 
   // ── Listen for presence of all directory users ──
   useEffect(() => {
@@ -188,7 +188,7 @@ export default function StudentMessagesScreen() {
     });
 
     return () => unsub();
-  }, [activeConversation?.id, user?.uid]);
+  }, [activeConversation?.id, user, scrollToBottom]);
 
   // ── Set self as online on mount, offline on unmount ──
   useEffect(() => {

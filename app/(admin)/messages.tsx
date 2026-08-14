@@ -34,7 +34,6 @@ import EmojiPicker from "@/components/chat/EmojiPicker";
 
 import { useAuth } from "@/hooks/AuthContext";
 import {
-  deleteConversation,
   deleteMessage,
   fetchAllUsers,
   getOrCreateConversation,
@@ -151,7 +150,7 @@ export default function AdminMessagesScreen() {
     return () => {
       cancelled = true;
     };
-  }, [viewMode, user?.uid]);
+  }, [viewMode, user]);
 
   // ── Listen for presence of all directory users ──
   useEffect(() => {
@@ -182,7 +181,7 @@ export default function AdminMessagesScreen() {
     });
 
     return () => unsub();
-  }, [activeConversation?.id, user?.uid]);
+  }, [activeConversation?.id, user, scrollToBottom]);
 
   // ── Set self as online on mount, offline on unmount ──
   useEffect(() => {

@@ -28,7 +28,6 @@ import {
   NativeSyntheticEvent,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -40,6 +39,7 @@ import {
 } from "react-native-safe-area-context";
 
 import EmojiPicker from "@/components/chat/EmojiPicker";
+import Toast from "@/components/Toast";
 
 import { useMindCareTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/hooks/AuthContext";
@@ -47,11 +47,14 @@ import { useStudentProfile } from "@/hooks/useStudentProfile";
 import {
   deleteMessage,
   fetchAllUsers,
+  getOrCreateConversation,
+  getOrCreatePeerConversation,
   getPeerName,
   listenForConversations,
   listenForMessages,
   listenForTyping,
   markAsRead,
+  searchUsers,
   sendMessage as sendMsg,
   startTyping,
 } from "@/services/messagingService";
@@ -70,6 +73,11 @@ import type {
 type ViewMode = "directory" | "chat";
 type InboxFilter = "all" | "unread" | "peers" | "guidance";
 
+/** Recipient search result tagged with the conversation type it maps to. */
+type RecipientResult = StudentSearchResult & {
+  role: "peer" | "guidance";
+};
+
 const REMINDER_BANNER =
   "Friendly Reminder: Please keep conversations respectful, supportive, and kind.";
 
@@ -78,13 +86,36 @@ const FILTER_OPTIONS: {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
 }[] = [
-  { key: "all", label: "All", icon: "chatbubbles-outline" },
+  { key: "all", label: "All Conversations", icon: "chatbubbles-outline" },
   { key: "unread", label: "Unread", icon: "mail-unread-outline" },
   { key: "peers", label: "Peers", icon: "people-outline" },
   { key: "guidance", label: "Guidance", icon: "shield-checkmark-outline" },
 ];
 
 const BOTTOM_THRESHOLD = 80;
+
+/** Builds initials from a full name, e.g. "John Doe" → "JD", "Maria" → "M". */
+const getInitials = (name: string) => {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+};
+
+// ── MindCare dark theme (Inbox screen only) ──
+const COLORS = {
+  background: "#0F0D15",
+  card: "#1E1B2E",
+  secondary: "#161224",
+  purple: "#6D28D9",
+  lightPurple: "#A78BFA",
+  primaryText: "#FFFFFF",
+  secondaryText: "#9CA3AF",
+  border: "rgba(139, 92, 246, 0.3)",
+  softBorder: "rgba(139, 92, 246, 0.12)",
+};
 
 export default function StudentMessagesScreen() {
   const { user } = useAuth();
@@ -101,6 +132,26 @@ export default function StudentMessagesScreen() {
   const [inboxLoading, setInboxLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<InboxFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
+
+  // ── New conversation modal state ──
+  const [newChatVisible, setNewChatVisible] = useState(false);
+  const [recipientQuery, setRecipientQuery] = useState("");
+  const [recipientResults, setRecipientResults] = useState<RecipientResult[]>(
+    [],
+  );
+  const [recipientLoading, setRecipientLoading] = useState(false);
+  const [startingConversationId, setStartingConversationId] = useState<
+    string | null
+  >(null);
+  const [failedAvatarUids, setFailedAvatarUids] = useState<
+    Record<string, boolean>
+  >({});
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    message: string;
+    type: "error" | "info";
+  }>({ visible: false, message: "", type: "info" });
 
   // ── Chat state ──
   const [activeConversation, setActiveConversation] =
@@ -352,14 +403,104 @@ export default function StudentMessagesScreen() {
   }, [activeConversation?.id, user]);
 
   // ── Open a conversation from the inbox ──
-  const openConversation = (conversation: Conversation) => {
-    setActiveConversation(conversation);
-    setChatPartnerName(getPartnerLabel(conversation));
-    setMessages([]);
-    setOptimistic([]);
-    setChatLoading(true);
-    setViewMode("chat");
-  };
+  const openConversation = useCallback(
+    (conversation: Conversation) => {
+      setActiveConversation(conversation);
+      setChatPartnerName(getPartnerLabel(conversation));
+      setMessages([]);
+      setOptimistic([]);
+      setChatLoading(true);
+      setViewMode("chat");
+    },
+    [getPartnerLabel],
+  );
+
+  // ── Recipient search (real users + guidance counsellors) ──
+  const searchRecipients = useCallback(
+    async (queryText: string) => {
+      if (!userId) return;
+      const trimmed = queryText.trim();
+      if (!trimmed) {
+        setRecipientResults([]);
+        return;
+      }
+      setRecipientLoading(true);
+      try {
+        const [peers, guidance] = await Promise.all([
+          searchUsers(userId, "student", trimmed, "users"),
+          searchUsers(userId, "student", trimmed, "admins"),
+        ]);
+        const combined: RecipientResult[] = [
+          ...peers.map((p) => ({ ...p, role: "peer" as const })),
+          ...guidance.map((g) => ({ ...g, role: "guidance" as const })),
+        ];
+        setRecipientResults(combined);
+      } catch (err) {
+        console.error("Recipient search failed:", err);
+        setRecipientResults([]);
+      } finally {
+        setRecipientLoading(false);
+      }
+    },
+    [userId],
+  );
+
+  // ── Start a conversation with a selected recipient ──
+  const startConversation = useCallback(
+    async (recipient: RecipientResult) => {
+      if (!user?.uid || startingConversationId) return;
+      // Fall back to a safe label if the auth profile lacks a display name so
+      // contact selection is never silently blocked.
+      const myName = user.displayName || "Student";
+      setStartingConversationId(recipient.uid);
+      try {
+        let conversationId: string;
+        if (recipient.role === "peer") {
+          conversationId = await getOrCreatePeerConversation(
+            user.uid,
+            recipient.uid,
+            myName,
+            recipient.fullName,
+          );
+        } else {
+          conversationId = await getOrCreateConversation(
+            user.uid,
+            recipient.uid,
+            myName,
+            recipient.fullName,
+          );
+        }
+
+        const conversation: Conversation = {
+          id: conversationId,
+          participants: [user.uid, recipient.uid],
+          participantNames: {
+            [user.uid]: myName,
+            [recipient.uid]: recipient.fullName,
+          },
+          type: recipient.role === "peer" ? "peer" : "admin",
+          lastMessage: "",
+          lastMessageAt: Date.now(),
+          unreadBy: [],
+        };
+
+        setNewChatVisible(false);
+        setRecipientQuery("");
+        setRecipientResults([]);
+        openConversation(conversation);
+      } catch (err) {
+        console.error("Failed to start conversation:", err);
+        setToast({
+          visible: true,
+          message: "Could not start conversation. Please try again.",
+          type: "error",
+        });
+      } finally {
+        setStartingConversationId(null);
+      }
+    },
+    [user, startingConversationId, openConversation],
+  );
 
   // ─── Send with optimistic UI ─────────────────────────────────────────────
   const handleSend = useCallback(async () => {
@@ -607,57 +748,95 @@ export default function StudentMessagesScreen() {
   const liveProfile = useStudentProfile(partnerUid);
 
   // ─── Inbox view ──────────────────────────────────────────────────────────
-  const renderInboxView = () => (
+  const renderInboxView = () => {
+    const activeLabel =
+      FILTER_OPTIONS.find((o) => o.key === activeFilter)?.label ||
+      "All Conversations";
+
+    return (
     <>
+      {/* Filter dropdown */}
+      <View style={styles.filterWrap}>
+        <Pressable
+          style={styles.filterTrigger}
+          onPress={() => setFilterDropdownOpen((v) => !v)}
+          accessibilityRole="button"
+          accessibilityLabel="Filter conversations"
+        >
+          <Ionicons name="options-outline" size={16} color={COLORS.lightPurple} />
+          <Text style={styles.filterTriggerText}>{activeLabel}</Text>
+          <Ionicons
+            name={filterDropdownOpen ? "chevron-up" : "chevron-down"}
+            size={16}
+            color={COLORS.secondaryText}
+          />
+        </Pressable>
+
+        {filterDropdownOpen && (
+          <>
+            <Pressable
+              style={styles.filterBackdrop}
+              onPress={() => setFilterDropdownOpen(false)}
+            />
+            <View style={styles.dropdownMenu}>
+              {FILTER_OPTIONS.map((option) => {
+                const isActive = activeFilter === option.key;
+                return (
+                  <Pressable
+                    key={option.key}
+                    style={[
+                      styles.dropdownItem,
+                      isActive && styles.dropdownItemActive,
+                    ]}
+                    onPress={() => {
+                      setActiveFilter(option.key);
+                      setFilterDropdownOpen(false);
+                    }}
+                  >
+                    <Ionicons
+                      name={option.icon}
+                      size={16}
+                      color={isActive ? COLORS.lightPurple : COLORS.secondaryText}
+                    />
+                    <Text
+                      style={[
+                        styles.dropdownItemText,
+                        isActive && styles.dropdownItemTextActive,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                    {isActive && (
+                      <Ionicons
+                        name="checkmark"
+                        size={16}
+                        color={COLORS.lightPurple}
+                      />
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        )}
+      </View>
+
       {/* Search */}
       <View style={styles.searchBar}>
-        <Ionicons name="search" size={18} color="#94A3B8" />
+        <Ionicons name="search" size={18} color={COLORS.secondaryText} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search conversations..."
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={COLORS.secondaryText}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
         {searchQuery.length > 0 && (
           <Pressable onPress={() => setSearchQuery("")}>
-            <Ionicons name="close-circle" size={18} color="#94A3B8" />
+            <Ionicons name="close-circle" size={18} color={COLORS.secondaryText} />
           </Pressable>
         )}
       </View>
-
-      {/* Filter pills */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterScroll}
-        contentContainerStyle={styles.filterRow}
-      >
-        {FILTER_OPTIONS.map((option) => {
-          const isActive = activeFilter === option.key;
-          return (
-            <Pressable
-              key={option.key}
-              style={[styles.filterPill, isActive && styles.filterPillActive]}
-              onPress={() => setActiveFilter(option.key)}
-            >
-              <Ionicons
-                name={option.icon}
-                size={14}
-                color={isActive ? "#8A63D2" : "#94A3B8"}
-              />
-              <Text
-                style={[
-                  styles.filterPillText,
-                  isActive && styles.filterPillTextActive,
-                ]}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
 
       {/* Conversation list */}
       {inboxLoading ? (
@@ -695,7 +874,8 @@ export default function StudentMessagesScreen() {
         />
       )}
     </>
-  );
+    );
+  };
 
   // ─── Chat view ───────────────────────────────────────────────────────────
   const renderChatView = () => (
@@ -892,6 +1072,170 @@ export default function StudentMessagesScreen() {
         {viewMode === "directory" ? renderInboxView() : renderChatView()}
       </KeyboardAvoidingView>
 
+      {/* Floating new message button */}
+      {viewMode === "directory" && (
+        <Pressable
+          style={styles.fab}
+          onPress={() => setNewChatVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel="New conversation"
+        >
+          <Ionicons name="add" size={28} color="#FFFFFF" />
+        </Pressable>
+      )}
+
+      {/* ─── New Conversation Modal ─────────────────────────────────── */}
+      <Modal
+        visible={newChatVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setNewChatVisible(false)}
+      >
+        <Pressable
+          style={styles.newChatOverlay}
+          onPress={() => setNewChatVisible(false)}
+        >
+          <Pressable style={styles.newChatCard} onPress={() => {}}>
+            <View style={styles.newChatHeader}>
+              <Text style={styles.newChatTitle}>New Conversation</Text>
+              <Pressable
+                onPress={() => setNewChatVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <Ionicons name="close" size={22} color={COLORS.secondaryText} />
+              </Pressable>
+            </View>
+
+            <Text style={styles.newChatSubtitle}>
+              Search for a student or guidance counselor
+            </Text>
+
+            <View style={styles.newChatSearch}>
+              <Ionicons name="search" size={18} color={COLORS.secondaryText} />
+              <TextInput
+                style={styles.newChatSearchInput}
+                placeholder="Search name..."
+                placeholderTextColor={COLORS.secondaryText}
+                value={recipientQuery}
+                onChangeText={(text) => {
+                  setRecipientQuery(text);
+                  searchRecipients(text);
+                }}
+                autoFocus
+              />
+              {recipientQuery.length > 0 && (
+                <Pressable
+                  onPress={() => {
+                    setRecipientQuery("");
+                    setRecipientResults([]);
+                  }}
+                >
+                  <Ionicons
+                    name="close-circle"
+                    size={18}
+                    color={COLORS.secondaryText}
+                  />
+                </Pressable>
+              )}
+            </View>
+
+            <View style={styles.newChatResults}>
+              {recipientLoading ? (
+                <ActivityIndicator
+                  size="small"
+                  color={COLORS.lightPurple}
+                  style={{ marginTop: 16 }}
+                />
+              ) : recipientQuery.trim() && recipientResults.length === 0 ? (
+                <Text style={styles.newChatEmpty}>No matches found</Text>
+              ) : recipientResults.length === 0 ? (
+                <Text style={styles.newChatEmpty}>
+                  Start typing to search for a student or guidance counselor
+                </Text>
+              ) : (
+                recipientResults.map((r) => {
+                  const isStarting = startingConversationId === r.uid;
+                  const avatarUrl =
+                    r.profileImage && !failedAvatarUids[r.uid]
+                      ? r.profileImage
+                      : null;
+                  return (
+                    <Pressable
+                      key={r.uid}
+                      style={[
+                        styles.newChatResultRow,
+                        startingConversationId !== null &&
+                          startingConversationId !== r.uid &&
+                          styles.newChatResultRowDisabled,
+                      ]}
+                      onPress={() => startConversation(r)}
+                      disabled={startingConversationId !== null}
+                    >
+                      {avatarUrl ? (
+                        <Image
+                          source={{ uri: avatarUrl }}
+                          style={styles.newChatResultAvatarImage}
+                          onError={() =>
+                            setFailedAvatarUids((prev) => ({
+                              ...prev,
+                              [r.uid]: true,
+                            }))
+                          }
+                        />
+                      ) : (
+                        <View
+                          style={[
+                            styles.newChatResultAvatar,
+                            r.role === "guidance"
+                              ? styles.newChatResultAvatarGuidance
+                              : styles.newChatResultAvatarPeer,
+                          ]}
+                        >
+                          <Text style={styles.newChatResultAvatarInitials}>
+                            {getInitials(r.fullName)}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={styles.newChatResultName}
+                          numberOfLines={1}
+                        >
+                          {r.fullName}
+                        </Text>
+                        <Text
+                          style={styles.newChatResultMeta}
+                          numberOfLines={1}
+                        >
+                          {r.role === "guidance"
+                            ? r.department || "Guidance Counselor"
+                            : r.department || "Student"}
+                        </Text>
+                      </View>
+                      {isStarting && (
+                        <ActivityIndicator
+                          size="small"
+                          color={COLORS.lightPurple}
+                        />
+                      )}
+                    </Pressable>
+                  );
+                })
+              )}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ─── Toast ──────────────────────────────────────────────────── */}
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onDismiss={() => setToast((prev) => ({ ...prev, visible: false }))}
+      />
+
       {/* ─── Context Menu Modal ─────────────────────────────────────── */}
       <Modal
         visible={contextVisible}
@@ -924,7 +1268,7 @@ export default function StudentMessagesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F2F8" },
+  container: { flex: 1, backgroundColor: COLORS.background },
 
   // Header
   header: {
@@ -1017,73 +1361,101 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 40,
   },
-  emptyTitle: { fontSize: 17, fontWeight: "700", color: "#1E1B4B" },
+  emptyTitle: { fontSize: 17, fontWeight: "700", color: COLORS.primaryText },
   emptyText: {
     fontSize: 14,
-    color: "#64748B",
+    color: COLORS.secondaryText,
     textAlign: "center",
+  },
+
+  // Filter dropdown
+  filterWrap: {
+    position: "relative",
+    zIndex: 1000,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  filterTrigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: COLORS.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.softBorder,
+    paddingHorizontal: 14,
+    height: 44,
+  },
+  filterTriggerText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "600",
+    color: COLORS.primaryText,
+  },
+  filterBackdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1001,
+  },
+  dropdownMenu: {
+    position: "absolute",
+    top: 50,
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingVertical: 6,
+    zIndex: 1002,
+    elevation: 10,
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+  },
+  dropdownItemActive: {
+    backgroundColor: "rgba(139, 92, 246, 0.15)",
+  },
+  dropdownItemText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "500",
+    color: COLORS.secondaryText,
+  },
+  dropdownItemTextActive: {
+    color: COLORS.lightPurple,
+    fontWeight: "600",
   },
 
   // Search bar
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "white",
-    margin: 16,
+    backgroundColor: COLORS.card,
+    marginHorizontal: 16,
+    marginTop: 8,
     marginBottom: 12,
     borderRadius: 14,
     paddingHorizontal: 14,
     height: 46,
     gap: 8,
-    // @ts-ignore
-    boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.06)",
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
+    borderColor: COLORS.softBorder,
   },
   searchInput: {
     flex: 1,
     fontSize: 15,
-    color: "#1E1B4B",
+    color: COLORS.primaryText,
     paddingVertical: 0,
-  },
-
-  // Filter pills
-  filterRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    gap: 8,
-    paddingBottom: 16,
-  },
-  filterScroll: {
-    flexGrow: 0,
-    flexShrink: 0,
-  },
-  filterPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    backgroundColor: "white",
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.1)",
-    height: 38,
-    minHeight: 38,
-  },
-  filterPillActive: {
-    backgroundColor: "#F3EEFF",
-    borderColor: "#8A63D2",
-  },
-  filterPillText: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#94A3B8",
-  },
-  filterPillTextActive: {
-    color: "#8A63D2",
-    fontWeight: "600",
   },
 
   // Conversation list
@@ -1094,14 +1466,12 @@ const styles = StyleSheet.create({
   convRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "white",
+    backgroundColor: COLORS.card,
     borderRadius: 16,
     padding: 14,
     marginBottom: 8,
-    // @ts-ignore
-    boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.06)",
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
+    borderColor: COLORS.softBorder,
     gap: 12,
   },
   convAvatarWrapper: {
@@ -1114,8 +1484,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  convAvatarPeer: { backgroundColor: "#F3EEFF" },
-  convAvatarAdmin: { backgroundColor: "#EDE9FE" },
+  convAvatarPeer: { backgroundColor: "rgba(139, 92, 246, 0.18)" },
+  convAvatarAdmin: { backgroundColor: "rgba(109, 91, 191, 0.22)" },
   convInfo: { flex: 1 },
   convTop: {
     flexDirection: "row",
@@ -1126,18 +1496,18 @@ const styles = StyleSheet.create({
   convName: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#1E1B4B",
+    color: COLORS.primaryText,
     flexShrink: 1,
   },
   convNameBold: { fontWeight: "800" },
-  convTime: { fontSize: 11, color: "#94A3B8", marginLeft: 8 },
-  convLastMsg: { fontSize: 13, color: "#64748B" },
-  convLastMsgBold: { fontWeight: "600", color: "#1E1B4B" },
+  convTime: { fontSize: 11, color: COLORS.secondaryText, marginLeft: 8 },
+  convLastMsg: { fontSize: 13, color: COLORS.secondaryText },
+  convLastMsgBold: { fontWeight: "600", color: COLORS.primaryText },
   unreadDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: "#8A63D2",
+    backgroundColor: COLORS.lightPurple,
   },
   convPresenceDot: {
     position: "absolute",
@@ -1147,13 +1517,13 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: "white",
+    borderColor: COLORS.card,
   },
   convPresenceDotOnline: {
     backgroundColor: "#22C55E",
   },
   convPresenceDotOffline: {
-    backgroundColor: "#D1D5DB",
+    backgroundColor: "#4B5563",
   },
 
   // Reminder banner
@@ -1161,7 +1531,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#F3EEFF",
+    backgroundColor: "rgba(139, 92, 246, 0.12)",
     marginHorizontal: 16,
     marginTop: 10,
     marginBottom: 4,
@@ -1169,12 +1539,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "rgba(138, 99, 210, 0.12)",
+    borderColor: COLORS.softBorder,
   },
   reminderText: {
     flex: 1,
     fontSize: 12,
-    color: "#6D5BBF",
+    color: COLORS.lightPurple,
     lineHeight: 17,
   },
 
@@ -1211,12 +1581,10 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
   },
   bubbleTheirs: {
-    backgroundColor: "white",
+    backgroundColor: COLORS.card,
     borderBottomLeftRadius: 4,
-    // @ts-ignore
-    boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.08)",
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
+    borderColor: COLORS.softBorder,
   },
   bubbleDeleted: {
     backgroundColor: "rgba(148, 163, 184, 0.15)",
@@ -1225,7 +1593,7 @@ const styles = StyleSheet.create({
   },
   bubbleText: {
     fontSize: 15,
-    color: "#1E1B4B",
+    color: COLORS.primaryText,
     lineHeight: 20,
   },
   bubbleTextMine: { color: "white" },
@@ -1258,11 +1626,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 6,
-    backgroundColor: "#F8F5FF",
+    backgroundColor: COLORS.secondary,
   },
   typingText: {
     fontSize: 12,
-    color: "#8A63D2",
+    color: COLORS.lightPurple,
     fontStyle: "italic",
   },
 
@@ -1273,20 +1641,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: "rgba(156, 126, 235, 0.08)",
-    backgroundColor: "white",
+    borderTopColor: COLORS.softBorder,
+    backgroundColor: COLORS.card,
     gap: 8,
   },
   textInput: {
     flex: 1,
-    backgroundColor: "#FAF8FF",
+    backgroundColor: COLORS.secondary,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
+    borderColor: COLORS.softBorder,
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
-    color: "#1E1B4B",
+    color: COLORS.primaryText,
     maxHeight: 100,
   },
   emojiBtn: {
@@ -1303,6 +1671,129 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: { opacity: 0.5 },
 
+  // Floating action button
+  fab: {
+    position: "absolute",
+    right: 20,
+    bottom: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.purple,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 8,
+    shadowColor: "#6D28D9",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+  },
+
+  // New conversation modal
+  newChatOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  newChatCard: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: COLORS.card,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.softBorder,
+    padding: 20,
+    maxHeight: "80%",
+  },
+  newChatHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  newChatTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.primaryText,
+  },
+  newChatSubtitle: {
+    fontSize: 13,
+    color: COLORS.secondaryText,
+    marginBottom: 14,
+  },
+  newChatSearch: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: COLORS.secondary,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.softBorder,
+    paddingHorizontal: 12,
+    height: 44,
+  },
+  newChatSearchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: COLORS.primaryText,
+    paddingVertical: 0,
+  },
+  newChatResults: {
+    marginTop: 14,
+  },
+  newChatEmpty: {
+    fontSize: 13,
+    color: COLORS.secondaryText,
+    textAlign: "center",
+    paddingVertical: 16,
+  },
+  newChatResultRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  newChatResultRowDisabled: {
+    opacity: 0.6,
+  },
+  newChatResultAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  newChatResultAvatarImage: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+  },
+  newChatResultAvatarInitials: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.lightPurple,
+  },
+  newChatResultAvatarPeer: {
+    backgroundColor: "rgba(139, 92, 246, 0.18)",
+  },
+  newChatResultAvatarGuidance: {
+    backgroundColor: "rgba(109, 91, 191, 0.22)",
+  },
+  newChatResultName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: COLORS.primaryText,
+  },
+  newChatResultMeta: {
+    fontSize: 12,
+    color: COLORS.secondaryText,
+    marginTop: 2,
+  },
+
   // Context menu
   ctxOverlay: {
     flex: 1,
@@ -1311,17 +1802,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   ctxMenu: {
-    backgroundColor: "white",
+    backgroundColor: COLORS.card,
     borderRadius: 18,
     padding: 6,
     width: 200,
-    // @ts-ignore
-    boxShadow: "0px 8px 24px rgba(0,0,0,0.15)",
+    borderWidth: 1,
+    borderColor: COLORS.softBorder,
   },
   ctxTitle: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#64748B",
+    color: COLORS.secondaryText,
     paddingHorizontal: 14,
     paddingTop: 10,
     paddingBottom: 6,
@@ -1334,10 +1825,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 12,
   },
-  ctxLabel: { fontSize: 15, fontWeight: "600", color: "#1E1B4B" },
+  ctxLabel: { fontSize: 15, fontWeight: "600", color: COLORS.primaryText },
   ctxDivider: {
     height: 1,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: COLORS.softBorder,
     marginHorizontal: 14,
   },
 });

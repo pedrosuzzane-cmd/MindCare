@@ -477,6 +477,7 @@ export async function searchUsers(
             fullName: data.fullName || data.displayName || "Student",
             department: data.department || undefined,
             yearLevel: data.yearLevel || undefined,
+            profileImage: data.profileImage || undefined,
           });
         }
       }
@@ -494,6 +495,7 @@ export async function searchUsers(
             uid: d.id,
             fullName: data.fullName || data.displayName || "Admin",
             department: data.position || data.department || "Administrator",
+            profileImage: data.profileImage || undefined,
           });
         }
       }
