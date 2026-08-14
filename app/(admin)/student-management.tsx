@@ -33,6 +33,7 @@ import {
   type SupportActionType,
   type SupportStatus,
 } from "@/services/studentTypes";
+import { FollowUpDatePickerModal } from "@/components/admin/FollowUpDatePickerModal";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -184,19 +185,6 @@ function addMonths(base: Date, months: number): Date {
     d.setDate(0);
   }
   return d;
-}
-
-/** Local YYYY-MM-DD string for <input type="date"> (no UTC shift). */
-function formatDateInput(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function parseDateInput(value: string): Date {
-  const [y, m, d] = value.split("-").map(Number);
-  return new Date(y, m - 1, d);
 }
 
 /** Whole days between `date` and now (0 if the date is in the future). */
@@ -462,8 +450,7 @@ export default function StudentManagementScreen() {
   const [wfFollowUp, setWfFollowUp] = useState<Date | null>(null);
   const [wfSaving, setWfSaving] = useState(false);
   const [wfError, setWfError] = useState<string | null>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [pickerMinDate, setPickerMinDate] = useState<Date | null>(null);
+  const [showCustomDate, setShowCustomDate] = useState(false);
   const wfRequestIds = useRef<Map<string, string>>(new Map());
 
   // Profile / audit / delete modals
@@ -2572,12 +2559,7 @@ export default function StudentManagementScreen() {
                     })}
                     <Pressable
                       style={styles.quickDateBtn}
-                      onPress={() => {
-                        const minDate = new Date();
-                        minDate.setHours(0, 0, 0, 0);
-                        setPickerMinDate(minDate);
-                        setShowDatePicker(true);
-                      }}
+                      onPress={() => setShowCustomDate(true)}
                     >
                       <Ionicons
                         name="calendar-outline"
@@ -2909,57 +2891,19 @@ export default function StudentManagementScreen() {
             </View>
           </View>
         </View>
-
-        {showDatePicker ? (
-          Platform.OS === "web" ? (
-            <input
-              type="date"
-              value={
-                wfFollowUp
-                  ? formatDateInput(wfFollowUp)
-                  : pickerMinDate
-                    ? formatDateInput(pickerMinDate)
-                    : ""
-              }
-              min={
-                pickerMinDate ? formatDateInput(pickerMinDate) : undefined
-              }
-              onChange={(e) => {
-                const raw = e.target.value;
-                if (raw) setWfFollowUp(parseDateInput(raw));
-                setShowDatePicker(false);
-              }}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                fontSize: 15,
-                color: "#1E1B4B",
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: "#E9D5FF",
-                backgroundColor: "#FAF8FF",
-              }}
-            />
-          ) : (
-            <DateTimePicker
-              value={wfFollowUp ?? pickerMinDate ?? new Date()}
-              mode="date"
-              display="default"
-              textColor="#1E1B4B"
-              minimumDate={pickerMinDate ?? undefined}
-              onChange={(event, selectedDate) => {
-                if (Platform.OS === "android") {
-                  setShowDatePicker(false);
-                  if (event.type === "set" && selectedDate)
-                    setWfFollowUp(selectedDate);
-                } else {
-                  if (selectedDate) setWfFollowUp(selectedDate);
-                }
-              }}
-            />
-          )
-        ) : null}
       </Modal>
+
+      <FollowUpDatePickerModal
+        key={showCustomDate ? "date-picker-open" : "date-picker-idle"}
+        visible={showCustomDate}
+        initialDate={wfFollowUp}
+        minDate={new Date()}
+        onCancel={() => setShowCustomDate(false)}
+        onConfirm={(date) => {
+          setWfFollowUp(date);
+          setShowCustomDate(false);
+        }}
+      />
 
       {/* Profile modal */}
       <StudentProfileModal
