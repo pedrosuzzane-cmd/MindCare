@@ -361,7 +361,7 @@ export default function NewJournalEntryScreen() {
         style={styles.flex}
       >
         <LinearGradient
-          colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
+          colors={theme.headerGradient}
           style={styles.headerGradient}
         >
           <View style={styles.header}>
@@ -383,7 +383,15 @@ export default function NewJournalEntryScreen() {
           showsVerticalScrollIndicator={false}
         >
           {isConnected === false && (
-            <View style={styles.offlineBanner}>
+            <View
+              style={[
+                styles.offlineBanner,
+                {
+                  backgroundColor: theme.secondaryCard,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
               <Ionicons
                 name="cloud-offline-outline"
                 size={18}
@@ -396,9 +404,17 @@ export default function NewJournalEntryScreen() {
           )}
 
           {draftRestored && (
-            <View style={styles.draftBanner}>
-              <Ionicons name="save-outline" size={18} color="#6D28D9" />
-              <Text style={styles.draftBannerText}>
+            <View
+              style={[
+                styles.draftBanner,
+                {
+                  backgroundColor: theme.secondaryCard,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <Ionicons name="save-outline" size={18} color={theme.primary} />
+              <Text style={[styles.draftBannerText, { color: theme.primary }]}>
                 Draft restored — your writing is saved automatically every 30s
               </Text>
               <Pressable
@@ -408,7 +424,7 @@ export default function NewJournalEntryScreen() {
                 }}
                 hitSlop={8}
               >
-                <Ionicons name="close" size={18} color="#6D28D9" />
+                <Ionicons name="close" size={18} color={theme.primary} />
               </Pressable>
             </View>
           )}
@@ -756,12 +772,28 @@ export default function NewJournalEntryScreen() {
           {/* Entry Title */}
           <Animated.View entering={FadeInDown.delay(160).duration(350)}>
             <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Entry Title</Text>
-              <View style={styles.inputContainer}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                Entry Title
+              </Text>
+              <View
+                style={[
+                  styles.inputContainer,
+                  {
+                    backgroundColor: theme.card,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
                 <TextInput
-                  style={styles.titleInput}
+                  style={[
+                    styles.titleInput,
+                    {
+                      backgroundColor: theme.card,
+                      color: theme.text,
+                    },
+                  ]}
                   placeholder="Give your entry a title..."
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.secondaryText}
                   value={entryTitle}
                   onChangeText={setEntryTitle}
                   maxLength={TITLE_LIMIT}
@@ -774,7 +806,9 @@ export default function NewJournalEntryScreen() {
           <Animated.View entering={FadeInDown.delay(240).duration(350)}>
             <View style={styles.sectionContainer}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Tell us about your day</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                  Tell us about your day
+                </Text>
                 {thoughts.length > 0 && (
                   <Pressable
                     style={styles.clearButton}
@@ -783,17 +817,38 @@ export default function NewJournalEntryScreen() {
                     <Ionicons
                       name="close-circle-outline"
                       size={16}
-                      color="#999"
+                      color={theme.secondaryText}
                     />
-                    <Text style={styles.clearButtonText}>Clear</Text>
+                    <Text
+                      style={[
+                        styles.clearButtonText,
+                        { color: theme.secondaryText },
+                      ]}
+                    >
+                      Clear
+                    </Text>
                   </Pressable>
                 )}
               </View>
-              <View style={styles.inputContainer}>
+              <View
+                style={[
+                  styles.inputContainer,
+                  {
+                    backgroundColor: theme.card,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
                 <TextInput
-                  style={styles.thoughtsInput}
+                  style={[
+                    styles.thoughtsInput,
+                    {
+                      backgroundColor: theme.card,
+                      color: theme.text,
+                    },
+                  ]}
                   placeholder="Today I felt..."
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.secondaryText}
                   value={thoughts}
                   onChangeText={setThoughts}
                   maxLength={THOUGHT_LIMIT}
@@ -804,23 +859,33 @@ export default function NewJournalEntryScreen() {
                   <Text
                     style={[
                       styles.charCounter,
+                      { color: theme.secondaryText },
                       thoughts.length >= THOUGHT_LIMIT - 200 &&
                         styles.charCounterWarning,
                     ]}
                   >
                     Characters: {thoughts.length}/{THOUGHT_LIMIT}
                   </Text>
-                  <Text style={styles.charCounter}>
+                  <Text
+                    style={[styles.charCounter, { color: theme.secondaryText }]}
+                  >
                     {wordCount} {wordCount === 1 ? "word" : "words"}
                   </Text>
                 </View>
                 <View style={styles.goalSection}>
-                  <View style={styles.goalBar}>
+                  <View
+                    style={[
+                      styles.goalBar,
+                      { backgroundColor: theme.borderSoft },
+                    ]}
+                  >
                     <View
                       style={[styles.goalFill, { width: `${goalPct * 100}%` }]}
                     />
                   </View>
-                  <Text style={styles.goalText}>
+                  <Text
+                    style={[styles.goalText, { color: theme.secondaryText }]}
+                  >
                     {wordCount >= GOAL_WORDS
                       ? `Goal reached — nice writing! 🎉`
                       : `${wordCount} / ${GOAL_WORDS} words written`}
@@ -832,11 +897,23 @@ export default function NewJournalEntryScreen() {
 
           {/* Reflection Preview */}
           <Animated.View entering={FadeInDown.delay(320).duration(450)}>
-            <View style={styles.previewCard}>
+            <View
+              style={[
+                styles.previewCard,
+                {
+                  backgroundColor: theme.secondaryCard,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
               <Text style={styles.previewEmoji}>🌸</Text>
               <View style={styles.previewContent}>
-                <Text style={styles.previewTitle}>Reflection Preview</Text>
-                <Text style={styles.previewText}>
+                <Text style={[styles.previewTitle, { color: theme.primary }]}>
+                  Reflection Preview
+                </Text>
+                <Text
+                  style={[styles.previewText, { color: theme.secondaryText }]}
+                >
                   Your reflection will appear after saving your journal.
                 </Text>
               </View>
@@ -845,7 +922,15 @@ export default function NewJournalEntryScreen() {
         </ScrollView>
 
         {/* Sticky Save Footer */}
-        <View style={styles.footer}>
+        <View
+          style={[
+            styles.footer,
+            {
+              backgroundColor: theme.background,
+              borderTopColor: theme.border,
+            },
+          ]}
+        >
           <Pressable
             onPress={handleSaveEntry}
             disabled={saving || !canSave}
@@ -894,7 +979,6 @@ export default function NewJournalEntryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F4F2F8",
   },
   flex: {
     flex: 1,
@@ -946,9 +1030,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "#FEF3C7",
     borderWidth: 1,
-    borderColor: "#FDE68A",
     borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -964,9 +1046,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "#F3E8FF",
     borderWidth: 1,
-    borderColor: "#E9D5FF",
     borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -976,7 +1056,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontWeight: "600",
-    color: "#6D28D9",
   },
   sectionContainer: {
     marginBottom: 24,
@@ -984,7 +1063,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#2D2640",
     marginBottom: 4,
   },
   sectionHint: {
@@ -1233,24 +1311,20 @@ const styles = StyleSheet.create({
   },
   // Inputs
   inputContainer: {
-    backgroundColor: "white",
     borderRadius: 20,
     ...(shadows.sm("#000") as any),
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
   },
   titleInput: {
     paddingHorizontal: 20,
     paddingVertical: 16,
     fontSize: 16,
-    color: "#333",
     borderRadius: 16,
   },
   thoughtsInput: {
     paddingHorizontal: 20,
     paddingVertical: 16,
     fontSize: 16,
-    color: "#333",
     borderRadius: 16,
     minHeight: 180,
     lineHeight: 24,
@@ -1263,7 +1337,6 @@ const styles = StyleSheet.create({
   },
   charCounter: {
     fontSize: 12,
-    color: "#999",
     fontWeight: "500",
   },
   charCounterWarning: {
@@ -1277,7 +1350,6 @@ const styles = StyleSheet.create({
   goalBar: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#F0ECF6",
     overflow: "hidden",
     marginBottom: 6,
   },
@@ -1288,7 +1360,6 @@ const styles = StyleSheet.create({
   },
   goalText: {
     fontSize: 12,
-    color: "#8B7FA8",
     fontWeight: "500",
   },
   clearButton: {
@@ -1299,7 +1370,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   clearButtonText: {
-    color: "#999",
     fontSize: 13,
     fontWeight: "600",
   },
@@ -1308,10 +1378,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    backgroundColor: "#F3E8FF",
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
     padding: 18,
     marginBottom: 8,
   },
@@ -1324,12 +1392,10 @@ const styles = StyleSheet.create({
   previewTitle: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#6D28D9",
     marginBottom: 2,
   },
   previewText: {
     fontSize: 13,
-    color: "#7C5AC8",
     lineHeight: 18,
   },
   // Sticky footer
@@ -1337,9 +1403,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 12,
-    backgroundColor: "#F4F2F8",
     borderTopWidth: 1,
-    borderTopColor: "rgba(156, 126, 235, 0.12)",
   },
   saveButton: {
     borderRadius: 25,
