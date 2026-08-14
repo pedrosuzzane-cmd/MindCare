@@ -1236,7 +1236,7 @@ async function checkSuperAdmin(req, res, next) {
     return res.status(403).json({
       error: "Only Super Admins can perform this action.",
     });
-  } catch (error) {
+  } catch (_error) {
     return res.status(403).json({ error: "Unauthorized: Invalid token." });
   }
 };
