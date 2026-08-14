@@ -1,10 +1,15 @@
-import { shadows } from "@/utils/shadows";
-import { useJournal } from "@/hooks/useJournal";
 import { useNetwork } from "@/contexts/NetworkContext";
 import { useMindCareTheme } from "@/contexts/ThemeContext";
-import { CATEGORIES, MOODS, getCategory, getMood } from "@/utils/journalOptions";
-import { generateLocalReflection, detectRisk } from "@/utils/journalReflection";
+import { useJournal } from "@/hooks/useJournal";
 import { journalDraftStorage } from "@/storage/journalDraftStorage";
+import {
+  CATEGORIES,
+  MOODS,
+  getCategory,
+  getMood,
+} from "@/utils/journalOptions";
+import { detectRisk, generateLocalReflection } from "@/utils/journalReflection";
+import { shadows } from "@/utils/shadows";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -41,16 +46,46 @@ const DRAFT_INTERVAL_MS = 30_000;
 
 export default function NewJournalEntryScreen() {
   const params = useLocalSearchParams<{ date?: string; entryId?: string }>();
-  const { addJournalEntry, updateJournalEntry, getJournalEntry, entries, manualSync } =
+  const { addJournalEntry, updateJournalEntry, entries, manualSync } =
     useJournal();
   const { isConnected } = useNetwork();
   const { theme } = useMindCareTheme();
-  const [entryDate, setEntryDate] = useState<Date>(new Date());
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [customCategory, setCustomCategory] = useState<string>("");
-  const [entryTitle, setEntryTitle] = useState<string>("");
-  const [selectedMood, setSelectedMood] = useState<string>("");
-  const [thoughts, setThoughts] = useState<string>("");
+
+  const editEntryId = params.entryId;
+  const isEditing = !!editEntryId;
+
+  const editEntry = useMemo(() => {
+    if (!editEntryId) return undefined;
+    return entries.find((entry) => entry.id === editEntryId);
+  }, [editEntryId, entries]);
+
+  const [entryDate] = useState<Date>(() => {
+    if (editEntry) {
+      return new Date(editEntry.entryDate);
+    }
+    if (!editEntryId && params.date) {
+      const parsed = new Date(params.date);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    }
+    return new Date();
+  });
+  const [selectedCategory, setSelectedCategory] = useState<string>(
+    () => editEntry?.category ?? "",
+  );
+  const [customCategory, setCustomCategory] = useState<string>(
+    () => editEntry?.customCategory ?? "",
+  );
+  const [entryTitle, setEntryTitle] = useState<string>(
+    () => editEntry?.title ?? "",
+  );
+  const [selectedMood, setSelectedMood] = useState<string>(
+    () => editEntry?.mood ?? "",
+  );
+  const [thoughts, setThoughts] = useState<string>(
+    () => editEntry?.thoughts ?? "",
+  );
   const [saving, setSaving] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
   const [isMoodExpanded, setIsMoodExpanded] = useState(false);
@@ -59,9 +94,6 @@ export default function NewJournalEntryScreen() {
   const categoryChevronRotation = useSharedValue(0);
   const [customCategoryError, setCustomCategoryError] = useState(false);
 
-  const editEntryId = params.entryId;
-  const isEditing = !!editEntryId;
-
   const draftRef = useRef({
     title: "",
     thoughts: "",
@@ -69,13 +101,6 @@ export default function NewJournalEntryScreen() {
     category: "",
     customCategory: "",
   });
-  draftRef.current = {
-    title: entryTitle,
-    thoughts,
-    mood: selectedMood,
-    category: selectedCategory,
-    customCategory,
-  };
 
   const isFutureDate = (date: Date): boolean => {
     const today = new Date();
@@ -86,31 +111,14 @@ export default function NewJournalEntryScreen() {
   };
 
   useEffect(() => {
-    if (editEntryId) {
-      const entry = getJournalEntry(editEntryId);
-      if (entry) {
-        setEntryTitle(entry.title || "");
-        setThoughts(entry.thoughts || "");
-        setSelectedMood(entry.mood || "");
-        setSelectedCategory(entry.category || "");
-        setCustomCategory(entry.customCategory || "");
-        setEntryDate(new Date(entry.entryDate));
-      }
-    } else if (params.date) {
-      const parsed = new Date(params.date);
-      if (!Number.isNaN(parsed.getTime())) {
-        if (isFutureDate(parsed)) {
-          Alert.alert(
-            "Future Date",
-            "You cannot create journal entries for future dates.",
-          );
-          router.back();
-          return;
-        }
-        setEntryDate(parsed);
-      }
-    }
-  }, [params.date, editEntryId]);
+    draftRef.current = {
+      title: entryTitle,
+      thoughts,
+      mood: selectedMood,
+      category: selectedCategory,
+      customCategory,
+    };
+  }, [entryTitle, thoughts, selectedMood, selectedCategory, customCategory]);
 
   // Restore an auto-saved draft for new entries
   useEffect(() => {
@@ -263,7 +271,9 @@ export default function NewJournalEntryScreen() {
         reflectionStatus: localReflection ? ("local" as const) : undefined,
         reflectionSource: localReflection ? ("local" as const) : undefined,
         generatedAt: localReflection ? now : undefined,
-        wellnessTips: localReflection ? localReflection.wellnessTips : undefined,
+        wellnessTips: localReflection
+          ? localReflection.wellnessTips
+          : undefined,
         riskLevel: risk.riskLevel,
         riskScore: risk.riskScore,
         riskDetected: risk.riskDetected,
@@ -296,10 +306,7 @@ export default function NewJournalEntryScreen() {
   };
 
   const canSave = Boolean(
-    selectedCategory &&
-      selectedMood &&
-      entryTitle.trim() &&
-      thoughts.trim(),
+    selectedCategory && selectedMood && entryTitle.trim() && thoughts.trim(),
   );
 
   const selectedMoodOption = getMood(selectedMood);
@@ -344,7 +351,11 @@ export default function NewJournalEntryScreen() {
   }));
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <SafeAreaView
+      key={editEntryId ?? "new-entry"}
+      style={styles.container}
+      edges={["top", "bottom"]}
+    >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.flex}
@@ -373,7 +384,11 @@ export default function NewJournalEntryScreen() {
         >
           {isConnected === false && (
             <View style={styles.offlineBanner}>
-              <Ionicons name="cloud-offline-outline" size={18} color="#B45309" />
+              <Ionicons
+                name="cloud-offline-outline"
+                size={18}
+                color="#B45309"
+              />
               <Text style={styles.offlineBannerText}>
                 You are offline — entry will sync when connected
               </Text>
@@ -438,7 +453,10 @@ export default function NewJournalEntryScreen() {
                         {selectedMoodOption.emoji}
                       </Text>
                       <Text
-                        style={[styles.moodHeaderValue, { color: theme.primary }]}
+                        style={[
+                          styles.moodHeaderValue,
+                          { color: theme.primary },
+                        ]}
                       >
                         {selectedMoodOption.label}
                       </Text>
@@ -762,7 +780,11 @@ export default function NewJournalEntryScreen() {
                     style={styles.clearButton}
                     onPress={() => setThoughts("")}
                   >
-                    <Ionicons name="close-circle-outline" size={16} color="#999" />
+                    <Ionicons
+                      name="close-circle-outline"
+                      size={16}
+                      color="#999"
+                    />
                     <Text style={styles.clearButtonText}>Clear</Text>
                   </Pressable>
                 )}
@@ -794,7 +816,9 @@ export default function NewJournalEntryScreen() {
                 </View>
                 <View style={styles.goalSection}>
                   <View style={styles.goalBar}>
-                    <View style={[styles.goalFill, { width: `${goalPct * 100}%` }]} />
+                    <View
+                      style={[styles.goalFill, { width: `${goalPct * 100}%` }]}
+                    />
                   </View>
                   <Text style={styles.goalText}>
                     {wordCount >= GOAL_WORDS

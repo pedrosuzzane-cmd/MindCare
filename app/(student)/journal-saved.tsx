@@ -1,9 +1,3 @@
-import { useJournal } from "@/hooks/useJournal";
-import { getCategory, getMood } from "@/utils/journalOptions";
-import {
-  getActiveReflection,
-  getReflectionStatusLabel,
-} from "@/utils/journalReflection";
 import {
   HIGH_RISK_SAVED_NOTE,
   HIGH_RISK_SUPPORT_MESSAGE,
@@ -11,6 +5,14 @@ import {
   MODERATE_SUPPORT_MESSAGE,
   MODERATE_SUPPORT_TITLE,
 } from "@/constants/crisisSupport";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import { useJournal } from "@/hooks/useJournal";
+import { getCategory, getMood } from "@/utils/journalOptions";
+import {
+  getActiveReflection,
+  getReflectionStatusLabel,
+} from "@/utils/journalReflection";
+import { shadows } from "@/utils/shadows";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -23,22 +25,16 @@ import {
   Text,
   View,
 } from "react-native";
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  ZoomIn,
-} from "react-native-reanimated";
+import Animated, { FadeIn, FadeInDown, ZoomIn } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { shadows } from "@/utils/shadows";
 
 export default function JournalSavedScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const { entries, loading } = useJournal();
+  const { theme } = useMindCareTheme();
   const [showReflection, setShowReflection] = useState(false);
 
-  const entry = params.id
-    ? entries.find((e) => e.id === params.id)
-    : undefined;
+  const entry = params.id ? entries.find((e) => e.id === params.id) : undefined;
 
   const reflection = useMemo(
     () => (entry ? getActiveReflection(entry) : null),
@@ -50,11 +46,32 @@ export default function JournalSavedScreen() {
   const isHighRisk = entry?.riskLevel === "high";
   const isModerate = entry?.riskLevel === "moderate";
 
+  const successMessage = useMemo(() => {
+    const moodId = mood?.id;
+    if (
+      moodId === "sad" ||
+      moodId === "stressed" ||
+      moodId === "anxious" ||
+      moodId === "overwhelmed" ||
+      moodId === "lonely"
+    ) {
+      return "Thank you for taking a moment to put your feelings into words.";
+    }
+    if (moodId === "happy" || moodId === "calm" || moodId === "hopeful") {
+      return "Great job taking time to reflect today.";
+    }
+    return "Taking time to reflect can be meaningful.";
+  }, [mood]);
+
+  const reassuranceText = "Your journal entry has been saved.";
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+      >
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#8A63D2" />
+          <ActivityIndicator size="large" color={theme.primary} />
         </View>
       </SafeAreaView>
     );
@@ -62,11 +79,17 @@ export default function JournalSavedScreen() {
 
   if (!entry) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+      >
         <View style={styles.center}>
-          <Text style={styles.notFoundText}>Journal entry not found.</Text>
+          <Text style={[styles.notFoundText, { color: theme.secondaryText }]}>
+            Journal entry not found.
+          </Text>
           <Pressable onPress={() => router.replace("/daily-journal")}>
-            <Text style={styles.backLink}>Back to Journal</Text>
+            <Text style={[styles.backLink, { color: theme.primary }]}>
+              Back to Journal
+            </Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -77,13 +100,19 @@ export default function JournalSavedScreen() {
   // student toward crisis support. The journal itself is always saved.
   if (isHighRisk) {
     return (
-      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={["top", "bottom"]}
+      >
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[
+            styles.content,
+            { backgroundColor: theme.background },
+          ]}
           showsVerticalScrollIndicator={false}
         >
-          <CrisisSupportView />
+          <CrisisSupportView theme={theme} />
         </ScrollView>
       </SafeAreaView>
     );
@@ -91,67 +120,130 @@ export default function JournalSavedScreen() {
 
   if (!reflection) {
     return (
-      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={["top", "bottom"]}
+      >
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[
+            styles.content,
+            { backgroundColor: theme.background },
+          ]}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.title}>Journal Saved!</Text>
-          <Text style={styles.subtitle}>
-            Great job taking time to reflect today.
-          </Text>
-          <Pressable
-            style={styles.primaryButton}
-            onPress={() => router.replace("/daily-journal")}
+          <Animated.View
+            entering={ZoomIn.duration(450)}
+            style={[
+              styles.emojiWrap,
+              { backgroundColor: theme.softPurple, borderColor: theme.border },
+            ]}
           >
-            <LinearGradient
-              colors={["#9C7EEB", "#8A63D2"]}
-              style={styles.primaryGradient}
+            <Text style={styles.emoji}>✅</Text>
+          </Animated.View>
+
+          <Animated.View entering={FadeInDown.delay(120).duration(420)}>
+            <Text style={[styles.title, { color: theme.text }]}>
+              Journal Saved!
+            </Text>
+          </Animated.View>
+
+          <Animated.View entering={FadeInDown.delay(200).duration(420)}>
+            <Text style={[styles.subtitle, { color: theme.secondaryText }]}>
+              {successMessage}
+            </Text>
+            <Text style={[styles.reassuranceText, { color: theme.primary }]}>
+              {reassuranceText}
+            </Text>
+          </Animated.View>
+
+          <Animated.View entering={FadeInDown.delay(280).duration(420)}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Back to journal"
+              style={styles.primaryButton}
+              onPress={() => router.replace("/daily-journal")}
             >
-              <Ionicons name="book-outline" size={20} color="white" />
-              <Text style={styles.primaryButtonText}>Back to Journal</Text>
-            </LinearGradient>
-          </Pressable>
+              <LinearGradient
+                colors={[theme.primary, theme.primaryDeep]}
+                style={styles.primaryGradient}
+              >
+                <Ionicons
+                  name="book-outline"
+                  size={20}
+                  color={theme.onPrimary}
+                />
+                <Text style={styles.primaryButtonText}>Back to Journal</Text>
+              </LinearGradient>
+            </Pressable>
+          </Animated.View>
         </ScrollView>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.background }]}
+      edges={["top", "bottom"]}
+    >
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { backgroundColor: theme.background },
+        ]}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View entering={ZoomIn.duration(500)} style={styles.emojiWrap}>
+        <Animated.View
+          entering={ZoomIn.duration(450)}
+          style={[
+            styles.emojiWrap,
+            { backgroundColor: theme.softPurple, borderColor: theme.border },
+          ]}
+        >
           <Text style={styles.emoji}>🎉</Text>
         </Animated.View>
 
-        <Text style={styles.title}>Journal Saved!</Text>
-        <Text style={styles.subtitle}>
-          Great job taking time to reflect today.{"\n"}Your reflection is now
-          ready.
-        </Text>
+        <Animated.View entering={FadeInDown.delay(120).duration(420)}>
+          <Text style={[styles.title, { color: theme.text }]}>
+            Journal Saved!
+          </Text>
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(200).duration(420)}>
+          <Text style={[styles.subtitle, { color: theme.secondaryText }]}>
+            {successMessage}
+          </Text>
+          <Text style={[styles.reassuranceText, { color: theme.primary }]}>
+            {reassuranceText}
+          </Text>
+        </Animated.View>
 
         {isModerate && (
           <Animated.View entering={FadeIn.duration(400)}>
-            <View style={styles.moderateCard}>
+            <View
+              style={[
+                styles.moderateCard,
+                { backgroundColor: theme.card, borderColor: theme.border },
+              ]}
+            >
               <View style={styles.moderateHeader}>
                 <Text style={styles.moderateEmoji}>💜</Text>
-                <Text style={styles.moderateTitle}>
+                <Text style={[styles.moderateTitle, { color: theme.text }]}>
                   {MODERATE_SUPPORT_TITLE}
                 </Text>
               </View>
-              <Text style={styles.moderateMessage}>
+              <Text
+                style={[styles.moderateMessage, { color: theme.secondaryText }]}
+              >
                 {MODERATE_SUPPORT_MESSAGE}
               </Text>
               <Pressable
                 onPress={() => router.push("/support-hotlines")}
                 hitSlop={6}
               >
-                <Text style={styles.moderateLink}>
+                <Text style={[styles.moderateLink, { color: theme.primary }]}>
                   View support contacts →
                 </Text>
               </Pressable>
@@ -160,33 +252,51 @@ export default function JournalSavedScreen() {
         )}
 
         {!showReflection ? (
-          <Animated.View entering={FadeInDown.delay(150).duration(450)}>
+          <Animated.View entering={FadeInDown.delay(280).duration(420)}>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="View reflection"
               style={styles.primaryButton}
               onPress={() => setShowReflection(true)}
             >
               <LinearGradient
-                colors={["#9C7EEB", "#8A63D2"]}
+                colors={[theme.primary, theme.primaryDeep]}
                 style={styles.primaryGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                <Ionicons name="sparkles" size={20} color="white" />
+                <Ionicons name="sparkles" size={20} color={theme.onPrimary} />
                 <Text style={styles.primaryButtonText}>View Reflection</Text>
               </LinearGradient>
             </Pressable>
             <Pressable
-              style={styles.secondaryButton}
+              accessibilityRole="button"
+              accessibilityLabel="Back to journal"
+              style={[
+                styles.secondaryButton,
+                { backgroundColor: theme.card, borderColor: theme.border },
+              ]}
               onPress={() => router.replace("/daily-journal")}
             >
-              <Text style={styles.secondaryButtonText}>Back to Journal</Text>
+              <Text
+                style={[styles.secondaryButtonText, { color: theme.primary }]}
+              >
+                Back to Journal
+              </Text>
             </Pressable>
           </Animated.View>
         ) : (
           <Animated.View entering={FadeIn.duration(500)}>
             {/* Today's Entry */}
-            <View style={styles.card}>
-              <Text style={styles.cardLabel}>Entry for Today</Text>
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: theme.card, borderColor: theme.border },
+              ]}
+            >
+              <Text style={[styles.cardLabel, { color: theme.secondaryText }]}>
+                Entry for Today
+              </Text>
               <View style={styles.entryHeader}>
                 {mood && (
                   <View
@@ -199,20 +309,29 @@ export default function JournalSavedScreen() {
                   </View>
                 )}
                 <View style={styles.entryMeta}>
-                  <Text style={styles.entryTitle}>{entry.title}</Text>
+                  <Text style={[styles.entryTitle, { color: theme.text }]}>
+                    {entry.title}
+                  </Text>
                   <View style={styles.entryTags}>
                     {mood && (
-                      <Text style={styles.entryTag}>
+                      <Text style={[styles.entryTag, { color: theme.primary }]}>
                         {mood.emoji} {mood.label}
                       </Text>
                     )}
                     {category && (
-                      <Text style={[styles.entryTag, { color: category.color }]}>
+                      <Text
+                        style={[styles.entryTag, { color: category.color }]}
+                      >
                         {category.emoji} {category.name}
                       </Text>
                     )}
                     {entry.customCategory && (
-                      <Text style={[styles.entryTag, { color: category?.color ?? "#8A63D2" }]}>
+                      <Text
+                        style={[
+                          styles.entryTag,
+                          { color: category?.color ?? theme.primary },
+                        ]}
+                      >
                         {entry.customCategory}
                       </Text>
                     )}
@@ -220,28 +339,55 @@ export default function JournalSavedScreen() {
                 </View>
               </View>
               {entry.thoughts ? (
-                <Text style={styles.entryThoughts} numberOfLines={4}>
+                <Text
+                  style={[styles.entryThoughts, { color: theme.secondaryText }]}
+                  numberOfLines={4}
+                >
                   {entry.thoughts}
                 </Text>
               ) : null}
             </View>
 
             {/* Reflection Insight */}
-            <View style={[styles.card, styles.reflectionCard]}>
+            <View
+              style={[
+                styles.card,
+                styles.reflectionCard,
+                { backgroundColor: theme.card, borderColor: theme.border },
+              ]}
+            >
               <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardLabel}>🧠 Your Reflection</Text>
-                <View style={styles.localBadge}>
-                  <Text style={styles.localBadgeText}>
+                <Text
+                  style={[styles.cardLabel, { color: theme.secondaryText }]}
+                >
+                  🧠 Your Reflection
+                </Text>
+                <View
+                  style={[
+                    styles.localBadge,
+                    { backgroundColor: theme.softPurple },
+                  ]}
+                >
+                  <Text
+                    style={[styles.localBadgeText, { color: theme.primary }]}
+                  >
                     {getReflectionStatusLabel(entry.reflectionSource) ||
                       "Generated locally"}
                   </Text>
                 </View>
               </View>
-              {(reflection.topicLabel || reflection.emotion) ? (
+              {reflection.topicLabel || reflection.emotion ? (
                 <View style={styles.metaRow}>
                   {reflection.topicLabel ? (
-                    <View style={styles.metaBadge}>
-                      <Text style={styles.metaBadgeText}>
+                    <View
+                      style={[
+                        styles.metaBadge,
+                        { backgroundColor: theme.softPurple },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.metaBadgeText, { color: theme.text }]}
+                      >
                         📍 {reflection.topicLabel}
                         {typeof reflection.topicConfidence === "number"
                           ? ` · ${reflection.topicConfidence}%`
@@ -250,8 +396,15 @@ export default function JournalSavedScreen() {
                     </View>
                   ) : null}
                   {reflection.emotion ? (
-                    <View style={styles.metaBadge}>
-                      <Text style={styles.metaBadgeText}>
+                    <View
+                      style={[
+                        styles.metaBadge,
+                        { backgroundColor: theme.softPurple },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.metaBadgeText, { color: theme.text }]}
+                      >
                         💭 {reflection.emotion}
                         {reflection.emotionIntensity
                           ? ` · ${reflection.emotionIntensity}`
@@ -260,8 +413,15 @@ export default function JournalSavedScreen() {
                     </View>
                   ) : null}
                   {reflection.sentiment ? (
-                    <View style={styles.metaBadge}>
-                      <Text style={styles.metaBadgeText}>
+                    <View
+                      style={[
+                        styles.metaBadge,
+                        { backgroundColor: theme.softPurple },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.metaBadgeText, { color: theme.text }]}
+                      >
                         {reflection.sentiment === "positive"
                           ? "☀️"
                           : reflection.sentiment === "negative"
@@ -273,8 +433,15 @@ export default function JournalSavedScreen() {
                     </View>
                   ) : null}
                   {reflection.stressLevel ? (
-                    <View style={styles.metaBadge}>
-                      <Text style={styles.metaBadgeText}>
+                    <View
+                      style={[
+                        styles.metaBadge,
+                        { backgroundColor: theme.softPurple },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.metaBadgeText, { color: theme.text }]}
+                      >
                         ⚠️ Stress:{" "}
                         {reflection.stressLevel[0].toUpperCase() +
                           reflection.stressLevel.slice(1)}
@@ -287,8 +454,15 @@ export default function JournalSavedScreen() {
                 <View style={styles.sectionBlock}>
                   <Text style={styles.sectionEmoji}>😊</Text>
                   <View style={styles.sectionBody}>
-                    <Text style={styles.sectionTitle}>Mood Summary</Text>
-                    <Text style={styles.reflectionText}>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                      Mood Summary
+                    </Text>
+                    <Text
+                      style={[
+                        styles.reflectionText,
+                        { color: theme.secondaryText },
+                      ]}
+                    >
                       {reflection.summary}
                     </Text>
                   </View>
@@ -298,8 +472,15 @@ export default function JournalSavedScreen() {
                 <View style={styles.sectionBlock}>
                   <Text style={styles.sectionEmoji}>💡</Text>
                   <View style={styles.sectionBody}>
-                    <Text style={styles.sectionTitle}>Positive Observation</Text>
-                    <Text style={styles.reflectionText}>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                      Positive Observation
+                    </Text>
+                    <Text
+                      style={[
+                        styles.reflectionText,
+                        { color: theme.secondaryText },
+                      ]}
+                    >
                       {reflection.positive}
                     </Text>
                   </View>
@@ -309,8 +490,15 @@ export default function JournalSavedScreen() {
                 <View style={styles.sectionBlock}>
                   <Text style={styles.sectionEmoji}>🌿</Text>
                   <View style={styles.sectionBody}>
-                    <Text style={styles.sectionTitle}>Gentle Suggestion</Text>
-                    <Text style={styles.reflectionText}>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                      Gentle Suggestion
+                    </Text>
+                    <Text
+                      style={[
+                        styles.reflectionText,
+                        { color: theme.secondaryText },
+                      ]}
+                    >
                       {reflection.suggestion}
                     </Text>
                   </View>
@@ -320,8 +508,15 @@ export default function JournalSavedScreen() {
                 <View style={styles.sectionBlock}>
                   <Text style={styles.sectionEmoji}>⭐</Text>
                   <View style={styles.sectionBody}>
-                    <Text style={styles.sectionTitle}>Encouragement</Text>
-                    <Text style={styles.reflectionText}>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                      Encouragement
+                    </Text>
+                    <Text
+                      style={[
+                        styles.reflectionText,
+                        { color: theme.secondaryText },
+                      ]}
+                    >
                       {reflection.encouragement}
                     </Text>
                   </View>
@@ -330,13 +525,28 @@ export default function JournalSavedScreen() {
             </View>
 
             {/* Wellness Tips */}
-            <View style={styles.card}>
-              <Text style={styles.cardLabel}>💜 Suggested Wellness Activity</Text>
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: theme.card, borderColor: theme.border },
+              ]}
+            >
+              <Text style={[styles.cardLabel, { color: theme.secondaryText }]}>
+                💜 Suggested Wellness Activity
+              </Text>
               {entry.wellnessTips?.length ? (
                 entry.wellnessTips.map((tip, idx) => (
                   <View key={idx} style={styles.tipRow}>
-                    <Ionicons name="checkmark-circle" size={18} color="#8A63D2" />
-                    <Text style={styles.tipText}>{tip}</Text>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={18}
+                      color={theme.primary}
+                    />
+                    <Text
+                      style={[styles.tipText, { color: theme.secondaryText }]}
+                    >
+                      {tip}
+                    </Text>
                   </View>
                 ))
               ) : (
@@ -344,9 +554,11 @@ export default function JournalSavedScreen() {
                   <Ionicons
                     name="checkmark-circle"
                     size={18}
-                    color="#8A63D2"
+                    color={theme.primary}
                   />
-                  <Text style={styles.tipText}>
+                  <Text
+                    style={[styles.tipText, { color: theme.secondaryText }]}
+                  >
                     Take a short walk to reset your mind.
                   </Text>
                 </View>
@@ -354,16 +566,22 @@ export default function JournalSavedScreen() {
             </View>
 
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Back to journal"
               style={styles.primaryButton}
               onPress={() => router.replace("/daily-journal")}
             >
               <LinearGradient
-                colors={["#9C7EEB", "#8A63D2"]}
+                colors={[theme.primary, theme.primaryDeep]}
                 style={styles.primaryGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                <Ionicons name="book-outline" size={20} color="white" />
+                <Ionicons
+                  name="book-outline"
+                  size={20}
+                  color={theme.onPrimary}
+                />
                 <Text style={styles.primaryButtonText}>Back to Journal</Text>
               </LinearGradient>
             </Pressable>
@@ -374,17 +592,34 @@ export default function JournalSavedScreen() {
   );
 }
 
-function CrisisSupportView() {
+function CrisisSupportView({
+  theme,
+}: {
+  theme: ReturnType<typeof useMindCareTheme>["theme"];
+}) {
   return (
     <>
-      <Animated.View entering={ZoomIn.duration(500)} style={styles.supportHeartWrap}>
+      <Animated.View
+        entering={ZoomIn.duration(450)}
+        style={[
+          styles.supportHeartWrap,
+          { backgroundColor: theme.softPurple, borderColor: theme.border },
+        ]}
+      >
         <Text style={styles.supportHeart}>💜</Text>
       </Animated.View>
 
-      <Text style={styles.supportTitle}>{HIGH_RISK_TITLE}</Text>
-      <Text style={styles.supportMessage}>{HIGH_RISK_SUPPORT_MESSAGE}</Text>
+      <Text style={[styles.supportTitle, { color: theme.text }]}>
+        {HIGH_RISK_TITLE}
+      </Text>
+      <Text style={[styles.supportMessage, { color: theme.secondaryText }]}>
+        {HIGH_RISK_SUPPORT_MESSAGE}
+      </Text>
 
-      <Animated.View entering={FadeInDown.delay(150).duration(450)} style={styles.supportActions}>
+      <Animated.View
+        entering={FadeInDown.delay(150).duration(450)}
+        style={styles.supportActions}
+      >
         <Pressable
           style={styles.emergencyButton}
           onPress={() => router.push("/support-hotlines")}
@@ -401,24 +636,34 @@ function CrisisSupportView() {
         </Pressable>
 
         <Pressable
-          style={styles.secondaryButton}
+          style={[
+            styles.secondaryButton,
+            { backgroundColor: theme.card, borderColor: theme.border },
+          ]}
           onPress={() => router.push("/support-hotlines")}
         >
-          <Ionicons name="business-outline" size={18} color="#8A63D2" />
-          <Text style={styles.secondaryButtonText}>
+          <Ionicons name="business-outline" size={18} color={theme.primary} />
+          <Text style={[styles.secondaryButtonText, { color: theme.primary }]}>
             Campus Guidance Information
           </Text>
         </Pressable>
 
         <Pressable
-          style={styles.continueButton}
+          style={[
+            styles.continueButton,
+            { backgroundColor: theme.secondaryCard, borderColor: theme.border },
+          ]}
           onPress={() => router.replace("/daily-journal")}
         >
-          <Text style={styles.continueButtonText}>Continue to Journal</Text>
+          <Text style={[styles.continueButtonText, { color: theme.primary }]}>
+            Continue to Journal
+          </Text>
         </Pressable>
       </Animated.View>
 
-      <Text style={styles.supportNote}>{HIGH_RISK_SAVED_NOTE}</Text>
+      <Text style={[styles.supportNote, { color: theme.secondaryText }]}>
+        {HIGH_RISK_SAVED_NOTE}
+      </Text>
     </>
   );
 }
@@ -426,7 +671,6 @@ function CrisisSupportView() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F4F2F8",
   },
   center: {
     flex: 1,
@@ -458,6 +702,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 20,
     marginBottom: 20,
+    borderWidth: 1,
   },
   emoji: {
     fontSize: 48,
@@ -465,15 +710,20 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: "800",
-    color: "#2D2640",
     marginBottom: 8,
+    textAlign: "center",
   },
   subtitle: {
     fontSize: 15,
-    color: "#8B7FA8",
     textAlign: "center",
     lineHeight: 22,
+    marginBottom: 8,
+  },
+  reassuranceText: {
+    fontSize: 13,
+    textAlign: "center",
     marginBottom: 28,
+    fontWeight: "600",
   },
   primaryButton: {
     borderRadius: 25,
@@ -499,11 +749,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 25,
     borderWidth: 1.5,
-    borderColor: "#E2D6F5",
     backgroundColor: "white",
   },
   secondaryButtonText: {
-    color: "#8A63D2",
     fontSize: 16,
     fontWeight: "600",
   },
