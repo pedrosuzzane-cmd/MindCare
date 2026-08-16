@@ -1,3 +1,4 @@
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -10,6 +11,7 @@ export default function PasswordStrength({
   password,
   confirm,
 }: PasswordStrengthProps) {
+  const { theme } = useMindCareTheme();
   const checks = [
     { label: "12 characters", met: password.length >= 12 },
     { label: "Uppercase letter (A-Z)", met: /[A-Z]/.test(password) },
@@ -26,8 +28,13 @@ export default function PasswordStrength({
   ];
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Requirements</Text>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: theme.card, borderColor: theme.border },
+      ]}
+    >
+      <Text style={[styles.title, { color: theme.text }]}>Requirements</Text>
       {checks.map((check) => (
         <View key={check.label} style={styles.row}>
           <Ionicons
@@ -35,7 +42,13 @@ export default function PasswordStrength({
             size={16}
             color={check.met ? "#22C55E" : "#CBD5E1"}
           />
-          <Text style={[styles.label, check.met && styles.labelMet]}>
+          <Text
+            style={[
+              styles.label,
+              { color: theme.secondaryText },
+              check.met && [styles.labelMet, { color: theme.text }],
+            ]}
+          >
             {check.label}
           </Text>
         </View>
@@ -46,9 +59,7 @@ export default function PasswordStrength({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#F1F0F6",
     borderRadius: 14,
     padding: 16,
     marginBottom: 24,
@@ -56,7 +67,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#374151",
     marginBottom: 12,
   },
   row: {
@@ -67,9 +77,8 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    color: "#9CA3AF",
   },
   labelMet: {
-    color: "#4B5563",
+    fontWeight: "600",
   },
 });

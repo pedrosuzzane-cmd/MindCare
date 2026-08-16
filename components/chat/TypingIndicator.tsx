@@ -4,8 +4,12 @@
 
 import React, { useEffect, useRef } from "react";
 import { Animated, Image, Platform, StyleSheet, View } from "react-native";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 export default function TypingIndicator() {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
   const dot3 = useRef(new Animated.Value(0)).current;
@@ -75,44 +79,45 @@ export default function TypingIndicator() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    marginBottom: 16,
-    paddingHorizontal: 16,
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#F3E5F5",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 8,
-    marginTop: 4,
-    overflow: "hidden",
-  },
-  avatarImage: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-  },
-  bubble: {
-    backgroundColor: "#F5F5F5",
-    borderRadius: 18,
-    borderBottomLeftRadius: 4,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  dotsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#8A63D2",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flexDirection: "row",
+      marginBottom: 16,
+      paddingHorizontal: 16,
+    },
+    avatar: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: theme.softPurple,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 8,
+      marginTop: 4,
+      overflow: "hidden",
+    },
+    avatarImage: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+    },
+    bubble: {
+      backgroundColor: theme.inputBg,
+      borderRadius: 18,
+      borderBottomLeftRadius: 4,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    dotsContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+    },
+    dot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: theme.primary,
+    },
+  });

@@ -10,19 +10,21 @@ import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 const OTP_TOTAL_SECONDS = 5 * 60;
 const MAX_ATTEMPTS = 5;
 
 export default function AdminVerifyOtpScreen() {
-  const insets = useSafeAreaInsets();
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const requestId = adminResetFlow.getRequestId();
   const savedExpiresAt = adminResetFlow.getOtpExpiresAt();
   const [code, setCode] = useState("");
@@ -85,9 +87,9 @@ export default function AdminVerifyOtpScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
+    <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#E8E0F5", "#F4F2F8", "#E8E0F5"]}
+        colors={theme.softGradient}
         style={styles.gradient}
       >
         <ScrollView
@@ -124,7 +126,7 @@ export default function AdminVerifyOtpScreen() {
               <Ionicons
                 name="shield-checkmark-outline"
                 size={16}
-                color="#6B7280"
+                color={theme.secondaryText}
               />
               <Text style={styles.attemptsText}>
                 Attempts Remaining: {attemptsRemaining}
@@ -145,13 +147,13 @@ export default function AdminVerifyOtpScreen() {
               accessibilityLabel="Verify code"
             >
               <LinearGradient
-                colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
+                colors={theme.headerGradient}
                 style={styles.buttonGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
                 {loading ? (
-                  <ActivityIndicator color="white" />
+                  <ActivityIndicator color={theme.onPrimary} />
                 ) : (
                   <Text style={styles.buttonText}>Verify Code</Text>
                 )}
@@ -173,74 +175,75 @@ export default function AdminVerifyOtpScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F4F2F8",
-  },
-  gradient: {
-    flex: 1,
-    paddingHorizontal: 24,
-  },
-  scroll: {
-    flexGrow: 1,
-    paddingBottom: 40,
-  },
-  body: {
-    flex: 1,
-    marginTop: 32,
-  },
-  statusRow: {
-    marginTop: 24,
-  },
-  attemptsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    marginTop: 6,
-  },
-  attemptsText: {
-    fontSize: 14,
-    color: "#6B7280",
-    fontWeight: "500",
-  },
-  errorText: {
-    color: "#EF4444",
-    textAlign: "center",
-    fontSize: 14,
-    fontWeight: "500",
-    marginTop: 14,
-  },
-  button: {
-    borderRadius: 25,
-    overflow: "hidden",
-    marginTop: 24,
-    // @ts-ignore - web only
-    boxShadow: "0px 10px 24px rgba(124, 58, 237, 0.25)",
-    elevation: 6,
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  buttonGradient: {
-    height: 56,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  loginLinkWrap: {
-    marginTop: 28,
-  },
-  loginLink: {
-    color: "#6B7280",
-    fontSize: 14,
-    fontWeight: "600",
-    textAlign: "center",
-    paddingVertical: 8,
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    gradient: {
+      flex: 1,
+      paddingHorizontal: 24,
+    },
+    scroll: {
+      flexGrow: 1,
+      paddingBottom: 40,
+    },
+    body: {
+      flex: 1,
+      marginTop: 32,
+    },
+    statusRow: {
+      marginTop: 24,
+    },
+    attemptsRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      marginTop: 6,
+    },
+    attemptsText: {
+      fontSize: 14,
+      color: theme.secondaryText,
+      fontWeight: "500",
+    },
+    errorText: {
+      color: theme.status.error,
+      textAlign: "center",
+      fontSize: 14,
+      fontWeight: "500",
+      marginTop: 14,
+    },
+    button: {
+      borderRadius: 25,
+      overflow: "hidden",
+      marginTop: 24,
+      // @ts-ignore - web only
+      boxShadow: `0px 10px 24px ${theme.shadow}`,
+      elevation: 6,
+    },
+    buttonDisabled: {
+      opacity: 0.7,
+    },
+    buttonGradient: {
+      height: 56,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    buttonText: {
+      color: theme.onPrimary,
+      fontSize: 16,
+      fontWeight: "700",
+    },
+    loginLinkWrap: {
+      marginTop: 28,
+    },
+    loginLink: {
+      color: theme.secondaryText,
+      fontSize: 14,
+      fontWeight: "600",
+      textAlign: "center",
+      paddingVertical: 8,
+    },
+  });

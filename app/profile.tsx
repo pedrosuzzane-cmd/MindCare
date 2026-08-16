@@ -1,9 +1,12 @@
 import { auth, db } from "@/constants/firebase";
-import { useAuth } from "@/hooks/AuthContext";
-import { useMindCareTheme } from "@/contexts/ThemeContext";
 import { MindCareTheme } from "@/constants/theme";
-import { changeProfileImage, uploadProfileImageFromFile } from "@/services/userService";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import { useAuth } from "@/hooks/AuthContext";
 import { uploadDocumentToCloudinary } from "@/services/cloudinaryUpload";
+import {
+    changeProfileImage,
+    uploadProfileImageFromFile,
+} from "@/services/userService";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -50,12 +53,16 @@ function InfoRow({
     <View style={[s.kvBlock, last && s.kvBlockLast]}>
       {children ? (
         <>
-          <Text style={[s.kvLabel, { color: theme.secondaryText }]}>{label}</Text>
+          <Text style={[s.kvLabel, { color: theme.secondaryText }]}>
+            {label}
+          </Text>
           {children}
         </>
       ) : (
         <View style={s.kvRow}>
-          <Text style={[s.kvLabel, { color: theme.secondaryText }]}>{label}</Text>
+          <Text style={[s.kvLabel, { color: theme.secondaryText }]}>
+            {label}
+          </Text>
           <Text style={[s.kvValue, { color: theme.text }]} numberOfLines={2}>
             {value || "-"}
           </Text>
@@ -66,7 +73,13 @@ function InfoRow({
 }
 
 /** Compact verification pill. Status is conveyed by text + icon, not color alone. */
-function VerifyBadge({ verified, theme }: { verified: boolean; theme: MindCareTheme }) {
+function VerifyBadge({
+  verified,
+  theme,
+}: {
+  verified: boolean;
+  theme: MindCareTheme;
+}) {
   const color = verified
     ? "#22C55E"
     : theme.mode === "dark"
@@ -84,7 +97,11 @@ function VerifyBadge({ verified, theme }: { verified: boolean; theme: MindCareTh
       : "rgba(217,119,6,0.30)";
   return (
     <View style={[s.verifyBadge, { backgroundColor: bg, borderColor }]}>
-      <Ionicons name={verified ? "checkmark" : "warning"} size={11} color={color} />
+      <Ionicons
+        name={verified ? "checkmark" : "warning"}
+        size={11}
+        color={color}
+      />
       <Text style={[s.verifyBadgeText, { color }]}>
         {verified ? "Verified" : "Not verified"}
       </Text>
@@ -123,7 +140,8 @@ export default function ProfileScreen() {
   const [academicProgram, setAcademicProgram] = useState("");
   const [yearLevel, setYearLevel] = useState("");
 
-  const [lsnDocPickResult, setLsnDocPickResult] = useState<DocumentPicker.DocumentPickerResult | null>(null);
+  const [lsnDocPickResult, setLsnDocPickResult] =
+    useState<DocumentPicker.DocumentPickerResult | null>(null);
   const [lsnDocUploading, setLsnDocUploading] = useState(false);
   const [lsnDocUploadProgress, setLsnDocUploadProgress] = useState(0);
 
@@ -222,7 +240,13 @@ export default function ProfileScreen() {
   const uploadLsnDoc = async (
     asset: DocumentPicker.DocumentPickerAsset,
   ): Promise<{ secureUrl: string; publicId: string }> => {
-    return uploadDocumentToCloudinary(asset.uri, asset.name, asset.mimeType || "application/pdf", undefined, setLsnDocUploadProgress);
+    return uploadDocumentToCloudinary(
+      asset.uri,
+      asset.name,
+      asset.mimeType || "application/pdf",
+      undefined,
+      setLsnDocUploadProgress,
+    );
   };
 
   const handlePickLsnDocument = async () => {
@@ -352,7 +376,11 @@ export default function ProfileScreen() {
   };
 
   const roleLabel =
-    role === "superAdmin" ? "Super Administrator" : isAdmin ? "Administrator" : "Student";
+    role === "superAdmin"
+      ? "Super Administrator"
+      : isAdmin
+        ? "Administrator"
+        : "Student";
   const deptLabel = isAdmin
     ? profile?.college || profile?.position || "MindCare Staff"
     : profile?.academicProgram || "MindCare Student";
@@ -374,7 +402,9 @@ export default function ProfileScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[s.container, { backgroundColor: theme.background }]}>
+      <SafeAreaView
+        style={[s.container, { backgroundColor: theme.background }]}
+      >
         <ActivityIndicator style={{ marginTop: 60 }} color="#8A63D2" />
       </SafeAreaView>
     );
@@ -385,7 +415,9 @@ export default function ProfileScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={{ flex: 1 }}
     >
-      <SafeAreaView style={[s.container, { backgroundColor: theme.background }]}>
+      <SafeAreaView
+        style={[s.container, { backgroundColor: theme.background }]}
+      >
         {/* ─── Purple Header Banner ──────────────────────────────────── */}
         <LinearGradient
           colors={["#7B2CBF", "#9C27B0", "#AB47BC"]}
@@ -403,72 +435,88 @@ export default function ProfileScreen() {
               <View style={{ width: 40 }} />
             </View>
 
-          {/* Avatar */}
-          <Pressable style={s.avatarContainer} onPress={handleAvatarPress}>
-            {Platform.OS === "web" && (
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                style={{ display: "none" }}
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (!file || !uid) return;
-                  setUploadingImage(true);
-                  try {
-                    const collectionName = isAdmin ? "admins" : "users";
-                    const newUrl = await uploadProfileImageFromFile(file, uid, collectionName);
-                    if (newUrl) {
-                      setProfile((p) => ({ ...(p || {}), profileImage: newUrl }));
+            {/* Avatar */}
+            <Pressable style={s.avatarContainer} onPress={handleAvatarPress}>
+              {Platform.OS === "web" && (
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file || !uid) return;
+                    setUploadingImage(true);
+                    try {
+                      const collectionName = isAdmin ? "admins" : "users";
+                      const newUrl = await uploadProfileImageFromFile(
+                        file,
+                        uid,
+                        collectionName,
+                      );
+                      if (newUrl) {
+                        setProfile((p) => ({
+                          ...(p || {}),
+                          profileImage: newUrl,
+                        }));
+                      }
+                    } finally {
+                      setUploadingImage(false);
                     }
-                  } finally {
-                    setUploadingImage(false);
-                  }
-                  e.target.value = "";
-                }}
-              />
-            )}
-            <View style={s.avatarRing}>
-              {profile?.profileImage ? (
-                <Image
-                  source={{ uri: profile.profileImage }}
-                  style={s.avatarImage}
+                    e.target.value = "";
+                  }}
                 />
-              ) : (
-                <View style={s.avatar}>
-                  <Text style={s.avatarText}>
-                    {getInitials(profile?.fullName || "")}
-                  </Text>
-                </View>
               )}
-            </View>
-            <View style={s.cameraOverlay}>
-              {uploadingImage ? (
-                <ActivityIndicator size="small" color="#7B2CBF" />
-              ) : (
-                <Ionicons name="camera" size={14} color="#7B2CBF" />
-              )}
-            </View>
-          </Pressable>
+              <View style={s.avatarRing}>
+                {profile?.profileImage ? (
+                  <Image
+                    source={{ uri: profile.profileImage }}
+                    style={s.avatarImage}
+                  />
+                ) : (
+                  <View style={s.avatar}>
+                    <Text style={s.avatarText}>
+                      {getInitials(profile?.fullName || "")}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <View style={s.cameraOverlay}>
+                {uploadingImage ? (
+                  <ActivityIndicator size="small" color="#7B2CBF" />
+                ) : (
+                  <Ionicons name="camera" size={14} color="#7B2CBF" />
+                )}
+              </View>
+            </Pressable>
 
-          {/* Name + Role */}
-          <Text style={s.userName}>{profile?.fullName || "No Name"}</Text>
-          <Text style={s.userRole}>
-            {roleLabel} / {deptLabel}
-          </Text>
-          {memberSince && (
-            <Text style={s.memberSince}>Member since {memberSince}</Text>
-          )}
+            {/* Name + Role */}
+            <Text style={s.userName}>{profile?.fullName || "No Name"}</Text>
+            <Text style={s.userRole}>
+              {roleLabel} / {deptLabel}
+            </Text>
+            {memberSince && (
+              <Text style={s.memberSince}>Member since {memberSince}</Text>
+            )}
 
             {/* Quick action buttons */}
             <View style={s.quickActions}>
-              <Pressable style={s.quickActionBtn} onPress={() => Linking.openURL("mailto:support@mindcare.app")}>
+              <Pressable
+                style={s.quickActionBtn}
+                onPress={() => Linking.openURL("mailto:support@mindcare.app")}
+              >
                 <Ionicons name="mail" size={20} color="#7B2CBF" />
               </Pressable>
-              <Pressable style={s.quickActionBtn} onPress={() => Linking.openURL("tel:911")}>
+              <Pressable
+                style={s.quickActionBtn}
+                onPress={() => Linking.openURL("tel:911")}
+              >
                 <Ionicons name="call" size={20} color="#7B2CBF" />
               </Pressable>
-              <Pressable style={s.quickActionBtn} onPress={() => router.push("/(student)/(tabs)/messages")}>
+              <Pressable
+                style={s.quickActionBtn}
+                onPress={() => router.push("/(student)/(tabs)/messages")}
+              >
                 <Ionicons name="chatbubble" size={20} color="#7B2CBF" />
               </Pressable>
             </View>
@@ -487,12 +535,28 @@ export default function ProfileScreen() {
               {/* ── LEFT column: Personal + Contact ─────────────────── */}
               <View style={[s.gridCol, isWide && s.gridColWide]}>
                 {/* Personal Information */}
-                <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <View
+                  style={[
+                    s.sectionCard,
+                    { backgroundColor: theme.card, borderColor: theme.border },
+                  ]}
+                >
                   <View style={s.sectionHeader}>
-                    <View style={[s.sectionIcon, { backgroundColor: theme.softPurple }]}>
-                      <Ionicons name="person-outline" size={18} color={theme.primary} />
+                    <View
+                      style={[
+                        s.sectionIcon,
+                        { backgroundColor: theme.softPurple },
+                      ]}
+                    >
+                      <Ionicons
+                        name="person-outline"
+                        size={18}
+                        color={theme.primary}
+                      />
                     </View>
-                    <Text style={[s.sectionTitle, { color: theme.text }]}>Personal Information</Text>
+                    <Text style={[s.sectionTitle, { color: theme.text }]}>
+                      Personal Information
+                    </Text>
                   </View>
 
                   <InfoRow
@@ -502,7 +566,14 @@ export default function ProfileScreen() {
                   >
                     {editing && isAdmin ? (
                       <TextInput
-                        style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
+                        style={[
+                          s.input,
+                          {
+                            backgroundColor: theme.inputBg,
+                            color: theme.text,
+                            borderColor: theme.border,
+                          },
+                        ]}
                         value={fullName}
                         onChangeText={setFullName}
                       />
@@ -515,7 +586,14 @@ export default function ProfileScreen() {
                   >
                     {editing && isAdmin ? (
                       <TextInput
-                        style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
+                        style={[
+                          s.input,
+                          {
+                            backgroundColor: theme.inputBg,
+                            color: theme.text,
+                            borderColor: theme.border,
+                          },
+                        ]}
                         value={genderIdentity}
                         onChangeText={setGenderIdentity}
                       />
@@ -528,7 +606,14 @@ export default function ProfileScreen() {
                   >
                     {editing && isAdmin ? (
                       <TextInput
-                        style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
+                        style={[
+                          s.input,
+                          {
+                            backgroundColor: theme.inputBg,
+                            color: theme.text,
+                            borderColor: theme.border,
+                          },
+                        ]}
                         value={nationality}
                         onChangeText={setNationality}
                       />
@@ -537,7 +622,15 @@ export default function ProfileScreen() {
                   <InfoRow label="Address" value={address} last>
                     {editing ? (
                       <TextInput
-                        style={[s.input, { minHeight: 80, backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
+                        style={[
+                          s.input,
+                          {
+                            minHeight: 80,
+                            backgroundColor: theme.inputBg,
+                            color: theme.text,
+                            borderColor: theme.border,
+                          },
+                        ]}
                         value={address}
                         onChangeText={setAddress}
                         multiline
@@ -549,18 +642,39 @@ export default function ProfileScreen() {
                 </View>
 
                 {/* Contact Information */}
-                <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <View
+                  style={[
+                    s.sectionCard,
+                    { backgroundColor: theme.card, borderColor: theme.border },
+                  ]}
+                >
                   <View style={s.sectionHeader}>
-                    <View style={[s.sectionIcon, { backgroundColor: theme.softPurple }]}>
-                      <Ionicons name="mail-outline" size={18} color={theme.primary} />
+                    <View
+                      style={[
+                        s.sectionIcon,
+                        { backgroundColor: theme.softPurple },
+                      ]}
+                    >
+                      <Ionicons
+                        name="mail-outline"
+                        size={18}
+                        color={theme.primary}
+                      />
                     </View>
-                    <Text style={[s.sectionTitle, { color: theme.text }]}>Contact Information</Text>
+                    <Text style={[s.sectionTitle, { color: theme.text }]}>
+                      Contact Information
+                    </Text>
                   </View>
 
                   <View style={s.kvBlock}>
                     <View style={s.kvRow}>
-                      <Text style={[s.kvLabel, { color: theme.secondaryText }]}>Email</Text>
-                      <Text style={[s.kvValue, { color: theme.text }]} numberOfLines={1}>
+                      <Text style={[s.kvLabel, { color: theme.secondaryText }]}>
+                        Email
+                      </Text>
+                      <Text
+                        style={[s.kvValue, { color: theme.text }]}
+                        numberOfLines={1}
+                      >
                         {profile?.email || "-"}
                       </Text>
                     </View>
@@ -568,10 +682,23 @@ export default function ProfileScreen() {
                       <VerifyBadge verified={emailVerified} theme={theme} />
                       {!emailVerified ? (
                         verificationSending ? (
-                          <ActivityIndicator size="small" color={theme.primary} />
+                          <ActivityIndicator
+                            size="small"
+                            color={theme.primary}
+                          />
                         ) : (
-                          <Pressable style={s.verifyAction} onPress={handleVerifyEmail}>
-                            <Text style={[s.verifyActionText, { color: theme.primary }]}>Verify email</Text>
+                          <Pressable
+                            style={s.verifyAction}
+                            onPress={handleVerifyEmail}
+                          >
+                            <Text
+                              style={[
+                                s.verifyActionText,
+                                { color: theme.primary },
+                              ]}
+                            >
+                              Verify email
+                            </Text>
                           </Pressable>
                         )
                       ) : null}
@@ -581,9 +708,18 @@ export default function ProfileScreen() {
                   <InfoRow label="Phone Number" value={profile?.contactNo} last>
                     {editing ? (
                       <TextInput
-                        style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
+                        style={[
+                          s.input,
+                          {
+                            backgroundColor: theme.inputBg,
+                            color: theme.text,
+                            borderColor: theme.border,
+                          },
+                        ]}
                         value={contactNo}
-                        onChangeText={(t) => setContactNo(t.replace(/[^0-9+\-() ]/g, ""))}
+                        onChangeText={(t) =>
+                          setContactNo(t.replace(/[^0-9+\-() ]/g, ""))
+                        }
                         keyboardType="phone-pad"
                         placeholder="Enter contact number"
                         placeholderTextColor="#94A3B8"
@@ -596,22 +732,50 @@ export default function ProfileScreen() {
               {/* ── RIGHT column: Admin/Academic + Account ─────────── */}
               <View style={[s.gridCol, isWide && s.gridColWide]}>
                 {isAdmin ? (
-                  <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <View
+                    style={[
+                      s.sectionCard,
+                      {
+                        backgroundColor: theme.card,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
                     <View style={s.sectionHeader}>
-                      <View style={[s.sectionIcon, { backgroundColor: theme.softPurple }]}>
-                        <Ionicons name="briefcase-outline" size={18} color={theme.primary} />
+                      <View
+                        style={[
+                          s.sectionIcon,
+                          { backgroundColor: theme.softPurple },
+                        ]}
+                      >
+                        <Ionicons
+                          name="briefcase-outline"
+                          size={18}
+                          color={theme.primary}
+                        />
                       </View>
-                      <Text style={[s.sectionTitle, { color: theme.text }]}>Administrator Details</Text>
+                      <Text style={[s.sectionTitle, { color: theme.text }]}>
+                        Administrator Details
+                      </Text>
                     </View>
 
                     <InfoRow
                       label="ID No."
-                      value={formatSchoolId(profile?.schoolId || "") || undefined}
+                      value={
+                        formatSchoolId(profile?.schoolId || "") || undefined
+                      }
                       last={false}
                     >
                       {editing ? (
                         <TextInput
-                          style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
+                          style={[
+                            s.input,
+                            {
+                              backgroundColor: theme.inputBg,
+                              color: theme.text,
+                              borderColor: theme.border,
+                            },
+                          ]}
                           value={schoolId}
                           onChangeText={(t) => setSchoolId(formatSchoolId(t))}
                           placeholder="XX-XXXX-XXX"
@@ -627,7 +791,14 @@ export default function ProfileScreen() {
                     >
                       {editing ? (
                         <TextInput
-                          style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
+                          style={[
+                            s.input,
+                            {
+                              backgroundColor: theme.inputBg,
+                              color: theme.text,
+                              borderColor: theme.border,
+                            },
+                          ]}
                           value={college}
                           onChangeText={setCollege}
                           placeholder="e.g. University of the Cordilleras (UC)"
@@ -638,7 +809,14 @@ export default function ProfileScreen() {
                     <InfoRow label="Position" value={profile?.position} last>
                       {editing ? (
                         <TextInput
-                          style={[s.input, { backgroundColor: theme.inputBg, color: theme.text, borderColor: theme.border }]}
+                          style={[
+                            s.input,
+                            {
+                              backgroundColor: theme.inputBg,
+                              color: theme.text,
+                              borderColor: theme.border,
+                            },
+                          ]}
                           value={position}
                           onChangeText={setPosition}
                         />
@@ -646,32 +824,87 @@ export default function ProfileScreen() {
                     </InfoRow>
                   </View>
                 ) : (
-                  <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <View
+                    style={[
+                      s.sectionCard,
+                      {
+                        backgroundColor: theme.card,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
                     <View style={s.sectionHeader}>
-                      <View style={[s.sectionIcon, { backgroundColor: theme.softPurple }]}>
-                        <Ionicons name="book-outline" size={18} color={theme.primary} />
+                      <View
+                        style={[
+                          s.sectionIcon,
+                          { backgroundColor: theme.softPurple },
+                        ]}
+                      >
+                        <Ionicons
+                          name="book-outline"
+                          size={18}
+                          color={theme.primary}
+                        />
                       </View>
-                      <Text style={[s.sectionTitle, { color: theme.text }]}>Academic Information</Text>
+                      <Text style={[s.sectionTitle, { color: theme.text }]}>
+                        Academic Information
+                      </Text>
                     </View>
 
-                    <InfoRow label="Student ID" value={profile?.schoolId} last={false} />
-                    <InfoRow label="Program" value={profile?.academicProgram} last={false} />
-                    <InfoRow label="Year Level" value={profile?.yearLevel} last />
+                    <InfoRow
+                      label="Student ID"
+                      value={profile?.schoolId}
+                      last={false}
+                    />
+                    <InfoRow
+                      label="Program"
+                      value={profile?.academicProgram}
+                      last={false}
+                    />
+                    <InfoRow
+                      label="Year Level"
+                      value={profile?.yearLevel}
+                      last
+                    />
                   </View>
                 )}
 
                 {/* Account Information */}
-                <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <View
+                  style={[
+                    s.sectionCard,
+                    { backgroundColor: theme.card, borderColor: theme.border },
+                  ]}
+                >
                   <View style={s.sectionHeader}>
-                    <View style={[s.sectionIcon, { backgroundColor: theme.softPurple }]}>
-                      <Ionicons name="shield-checkmark-outline" size={18} color={theme.primary} />
+                    <View
+                      style={[
+                        s.sectionIcon,
+                        { backgroundColor: theme.softPurple },
+                      ]}
+                    >
+                      <Ionicons
+                        name="shield-checkmark-outline"
+                        size={18}
+                        color={theme.primary}
+                      />
                     </View>
-                    <Text style={[s.sectionTitle, { color: theme.text }]}>Account Information</Text>
+                    <Text style={[s.sectionTitle, { color: theme.text }]}>
+                      Account Information
+                    </Text>
                   </View>
 
                   <InfoRow label="Role" value={roleLabel} last={false} />
-                  <InfoRow label="Member since" value={memberSince ?? undefined} last={false} />
-                  <InfoRow label="Last updated" value={lastUpdated ?? undefined} last={false} />
+                  <InfoRow
+                    label="Member since"
+                    value={memberSince ?? undefined}
+                    last={false}
+                  />
+                  <InfoRow
+                    label="Last updated"
+                    value={lastUpdated ?? undefined}
+                    last={false}
+                  />
                   <Pressable
                     onPress={() => router.push("/security-log")}
                     accessibilityRole="button"
@@ -679,10 +912,20 @@ export default function ProfileScreen() {
                   >
                     <View style={s.kvBlockLast}>
                       <View style={s.kvRow}>
-                        <Text style={[s.kvLabel, { color: theme.secondaryText }]}>Security Activity</Text>
+                        <Text
+                          style={[s.kvLabel, { color: theme.secondaryText }]}
+                        >
+                          Security Activity
+                        </Text>
                         <View style={s.linkValue}>
-                          <Text style={[s.kvValue, { color: theme.primary }]}>Review sign-ins</Text>
-                          <Ionicons name="chevron-forward" size={16} color="#CBD5E1" />
+                          <Text style={[s.kvValue, { color: theme.primary }]}>
+                            Review sign-ins
+                          </Text>
+                          <Ionicons
+                            name="chevron-forward"
+                            size={16}
+                            color="#CBD5E1"
+                          />
                         </View>
                       </View>
                     </View>
@@ -693,18 +936,33 @@ export default function ProfileScreen() {
 
             {/* ── LSN Document Section (students only) ── */}
             {!isAdmin && (
-              <View style={[s.sectionCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <View
+                style={[
+                  s.sectionCard,
+                  { backgroundColor: theme.card, borderColor: theme.border },
+                ]}
+              >
                 <View style={s.sectionHeader}>
                   <View style={[s.sectionIcon, { backgroundColor: "#FCE7F3" }]}>
-                    <Ionicons name="document-text-outline" size={18} color="#DB2777" />
+                    <Ionicons
+                      name="document-text-outline"
+                      size={18}
+                      color="#DB2777"
+                    />
                   </View>
-                  <Text style={[s.sectionTitle, { color: theme.text }]}>LSN Document</Text>
+                  <Text style={[s.sectionTitle, { color: theme.text }]}>
+                    LSN Document
+                  </Text>
                 </View>
 
                 {profile?.lsnDocument ? (
                   <>
                     <View style={s.fieldRow}>
-                      <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={18}
+                        color="#16A34A"
+                      />
                       <Text style={s.fieldValue} numberOfLines={1}>
                         {profile.lsnDocument.fileName || "Document uploaded"}
                       </Text>
@@ -721,34 +979,58 @@ export default function ProfileScreen() {
                   <>
                     {lsnDocPickResult && !lsnDocPickResult.canceled ? (
                       <View style={s.fieldRow}>
-                        <Ionicons name="document-outline" size={18} color="#7B2CBF" />
+                        <Ionicons
+                          name="document-outline"
+                          size={18}
+                          color="#7B2CBF"
+                        />
                         <Text style={s.fieldValue} numberOfLines={1}>
                           {(lsnDocPickResult.assets[0] as any).name}
                         </Text>
                       </View>
                     ) : (
                       <Text style={s.lsnHintText}>
-                        Your LSN document was not uploaded during registration. Please upload it here.
+                        Your LSN document was not uploaded during registration.
+                        Please upload it here.
                       </Text>
                     )}
 
                     {lsnDocUploading ? (
                       <View style={s.lsnProgressRow}>
                         <View style={s.lsnProgressBar}>
-                          <View style={[s.lsnProgressFill, { width: `${lsnDocUploadProgress}%` }]} />
+                          <View
+                            style={[
+                              s.lsnProgressFill,
+                              { width: `${lsnDocUploadProgress}%` },
+                            ]}
+                          />
                         </View>
-                        <Text style={s.lsnProgressText}>{lsnDocUploadProgress}%</Text>
+                        <Text style={s.lsnProgressText}>
+                          {lsnDocUploadProgress}%
+                        </Text>
                       </View>
                     ) : (
                       <View style={s.lsnActions}>
-                        <Pressable style={s.lsnPickBtn} onPress={handlePickLsnDocument}>
-                          <Ionicons name="cloud-upload-outline" size={18} color="#7B2CBF" />
+                        <Pressable
+                          style={s.lsnPickBtn}
+                          onPress={handlePickLsnDocument}
+                        >
+                          <Ionicons
+                            name="cloud-upload-outline"
+                            size={18}
+                            color="#7B2CBF"
+                          />
                           <Text style={s.lsnPickText}>
-                            {lsnDocPickResult ? "Choose Different File" : "Pick Document"}
+                            {lsnDocPickResult
+                              ? "Choose Different File"
+                              : "Pick Document"}
                           </Text>
                         </Pressable>
                         {lsnDocPickResult && !lsnDocPickResult.canceled && (
-                          <Pressable style={s.lsnUploadBtn} onPress={handleUploadLsnDocument}>
+                          <Pressable
+                            style={s.lsnUploadBtn}
+                            onPress={handleUploadLsnDocument}
+                          >
                             <Text style={s.lsnUploadText}>Upload</Text>
                           </Pressable>
                         )}
@@ -757,7 +1039,8 @@ export default function ProfileScreen() {
                   </>
                 ) : (
                   <Text style={s.lsnHintText}>
-                    No LSN document on file. If you have special needs, contact your guidance office.
+                    No LSN document on file. If you have special needs, contact
+                    your guidance office.
                   </Text>
                 )}
               </View>
@@ -839,7 +1122,6 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
-
     </KeyboardAvoidingView>
   );
 }
@@ -1122,7 +1404,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: Platform.OS === "ios" ? 32 : 24,
-    backgroundColor: "white",
+    backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
     borderTopColor: "rgba(156, 126, 235, 0.08)",
     gap: 12,
@@ -1347,5 +1629,4 @@ const s = StyleSheet.create({
     fontWeight: "700",
     color: "#FFFFFF",
   },
-
 });

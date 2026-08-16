@@ -15,6 +15,7 @@ import {
 import { shadows } from "@/utils/shadows";
 import { auth, db } from "@/constants/firebase";
 import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 
@@ -29,6 +30,7 @@ interface JournalEntry {
 
 export default function MoodCalendarScreen() {
   const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -79,7 +81,7 @@ export default function MoodCalendarScreen() {
   };
 
   const getMoodColor = (moodId: string | null) => {
-    if (!moodId) return "#F0F0F0";
+    if (!moodId) return theme.inputBg;
     return moods.find((m) => m.id === moodId)?.color;
   };
 
@@ -185,7 +187,7 @@ export default function MoodCalendarScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8A63D2" />
+          <ActivityIndicator size="large" color={theme.primary} />
         </View>
       </SafeAreaView>
     );
@@ -202,7 +204,7 @@ export default function MoodCalendarScreen() {
           <View style={{ width: 40 }} />
           <Text style={styles.headerTitle}>Mood Calendar</Text>
           <Pressable onPress={handleAddEntry}>
-            <Ionicons name="add-circle-outline" size={28} color="#8A63D2" />
+            <Ionicons name="add-circle-outline" size={28} color={theme.primary} />
           </Pressable>
         </View>
 
@@ -214,20 +216,20 @@ export default function MoodCalendarScreen() {
           {/* Month Navigation */}
           <View style={styles.monthNavigator}>
             <Pressable onPress={prevMonth}>
-              <Ionicons name="chevron-back" size={24} color="#8A63D2" />
+              <Ionicons name="chevron-back" size={24} color={theme.primary} />
             </Pressable>
-            <Text style={[styles.monthText, { color: theme.text }]}>{monthName}</Text>
+            <Text style={styles.monthText}>{monthName}</Text>
             <Pressable onPress={nextMonth}>
-              <Ionicons name="chevron-forward" size={24} color="#8A63D2" />
+              <Ionicons name="chevron-forward" size={24} color={theme.primary} />
             </Pressable>
           </View>
 
           {/* Calendar Grid */}
-          <View style={[styles.calendarContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={styles.calendarContainer}>
             {/* Day headers */}
             <View style={styles.dayHeaderRow}>
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                <Text key={day} style={[styles.dayHeader, { color: theme.secondaryText }]}>
+                <Text key={day} style={styles.dayHeader}>
                   {day}
                 </Text>
               ))}
@@ -247,7 +249,6 @@ export default function MoodCalendarScreen() {
                     key={idx}
                     style={[
                       styles.dayCell,
-                      { backgroundColor: theme.inputBg },
                       dayObj.isCurrentMonth && mood && moodColor
                         ? { backgroundColor: moodColor }
                         : undefined,
@@ -263,7 +264,7 @@ export default function MoodCalendarScreen() {
                   >
                     {dayObj.isCurrentMonth && (
                       <>
-                        <Text style={[styles.dayNumber, { color: theme.text }]}>{dayObj.day}</Text>
+                        <Text style={styles.dayNumber}>{dayObj.day}</Text>
                         {moodEmoji && (
                           <Text style={styles.moodEmoji}>{moodEmoji}</Text>
                         )}
@@ -277,8 +278,8 @@ export default function MoodCalendarScreen() {
 
           {/* Mood Legend */}
           <View style={styles.legendContainer}>
-            <Text style={[styles.legendTitle, { color: theme.text }]}>Mood Legend</Text>
-            <View style={[styles.legendGrid, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Text style={styles.legendTitle}>Mood Legend</Text>
+            <View style={styles.legendGrid}>
               {moods.map((mood) => (
                 <View key={mood.id} style={styles.legendItem}>
                   <View
@@ -299,7 +300,7 @@ export default function MoodCalendarScreen() {
             onPress={handleGetSuggestions}
           >
             <LinearGradient
-              colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
+              colors={[theme.accent.purple, theme.primary, theme.primaryDeep]}
               style={styles.suggestionsBtnGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -314,7 +315,7 @@ export default function MoodCalendarScreen() {
           {/* Selected Date Entry Preview */}
           {selectedDate && (
             <View style={styles.entryPreviewContainer}>
-              <Text style={[styles.previewTitle, { color: theme.text }]}>Entry for {selectedDate}</Text>
+              <Text style={styles.previewTitle}>Entry for {selectedDate}</Text>
               {journalEntries
                 .filter(
                   (e) => e.date.toISOString().split("T")[0] === selectedDate,
@@ -322,21 +323,18 @@ export default function MoodCalendarScreen() {
                 .map((entry) => (
                   <Pressable
                     key={entry.id}
-                    style={[
-                      styles.previewCard,
-                      { backgroundColor: theme.card, borderColor: theme.border },
-                    ]}
+                    style={styles.previewCard}
                     onPress={() => handleViewEntry(entry.id)}
                   >
                     <View style={styles.previewHeader}>
-                      <Text style={[styles.previewEntryTitle, { color: theme.text }]}>
+                      <Text style={styles.previewEntryTitle}>
                         {entry.title}
                       </Text>
                       <Text style={styles.previewMood}>
                         {getMoodEmoji(entry.mood)}
                       </Text>
                     </View>
-                    <Text style={[styles.previewThoughts, { color: theme.secondaryText }]} numberOfLines={2}>
+                    <Text style={styles.previewThoughts} numberOfLines={2}>
                       {entry.thoughts}
                     </Text>
                     <Text style={styles.tapToViewText}>
@@ -352,7 +350,8 @@ export default function MoodCalendarScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -380,7 +379,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#8A63D2",
+    color: theme.primary,
   },
   scrollContainer: {
     flex: 1,
@@ -399,16 +398,16 @@ const styles = StyleSheet.create({
   monthText: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
+    color: theme.text,
   },
   calendarContainer: {
-    backgroundColor: "white",
+    backgroundColor: theme.card,
     borderRadius: 20,
     padding: 12,
     marginBottom: 24,
     ...(shadows.custom(2, 8, 0.08, 3, "#8A63D2") as any),
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
+    borderColor: theme.borderSoft,
   },
   dayHeaderRow: {
     flexDirection: "row",
@@ -418,7 +417,7 @@ const styles = StyleSheet.create({
   dayHeader: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#666",
+    color: theme.secondaryText,
     width: "14.28%",
     textAlign: "center",
   },
@@ -433,15 +432,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 8,
     marginBottom: 8,
-    backgroundColor: "#F0F0F0",
+    backgroundColor: theme.inputBg,
   },
   otherMonthDay: {
-    backgroundColor: "#FAFAFA",
+    backgroundColor: theme.secondaryCard,
   },
   dayNumber: {
     fontSize: 12,
     fontWeight: "500",
-    color: "#333",
+    color: theme.text,
   },
   moodEmoji: {
     fontSize: 16,
@@ -453,19 +452,19 @@ const styles = StyleSheet.create({
   legendTitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#333",
+    color: theme.text,
     marginBottom: 12,
   },
   legendGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-around",
-    backgroundColor: "white",
+    backgroundColor: theme.card,
     borderRadius: 20,
     padding: 12,
     ...(shadows.custom(1, 4, 0.05, 1, "#8A63D2") as any),
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
+    borderColor: theme.borderSoft,
   },
   legendItem: {
     alignItems: "center",
@@ -494,7 +493,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   suggestionsButtonText: {
-    color: "white",
+    color: theme.onPrimary,
     fontSize: 16,
     fontWeight: "600",
     marginLeft: 8,
@@ -505,17 +504,17 @@ const styles = StyleSheet.create({
   previewTitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#333",
+    color: theme.text,
     marginBottom: 12,
   },
   previewCard: {
-    backgroundColor: "white",
+    backgroundColor: theme.card,
     borderRadius: 16,
     padding: 12,
     marginBottom: 12,
     ...(shadows.custom(1, 4, 0.06, 2, "#8A63D2") as any),
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
+    borderColor: theme.borderSoft,
   },
   previewHeader: {
     flexDirection: "row",
@@ -526,7 +525,7 @@ const styles = StyleSheet.create({
   previewEntryTitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#333",
+    color: theme.text,
     flex: 1,
   },
   previewMood: {
@@ -535,13 +534,13 @@ const styles = StyleSheet.create({
   },
   previewThoughts: {
     fontSize: 12,
-    color: "#666",
+    color: theme.secondaryText,
     lineHeight: 18,
     marginBottom: 8,
   },
   tapToViewText: {
     fontSize: 11,
-    color: "#8A63D2",
+    color: theme.primary,
     fontWeight: "500",
   },
 });

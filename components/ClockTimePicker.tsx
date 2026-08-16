@@ -3,6 +3,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import React, { useEffect, useMemo, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 
 interface Props {
   val: { hour: number; minute: number; period: "AM" | "PM" };
@@ -44,6 +45,8 @@ export default function ClockTimePicker({
   visible,
   onDismiss,
 }: Props & { visible: boolean; onDismiss: () => void }) {
+  const { theme } = useMindCareTheme();
+
   const dateValue = useMemo(
     () => timeToDate(val.hour, val.minute, val.period),
     [val.hour, val.minute, val.period],
@@ -83,8 +86,8 @@ export default function ClockTimePicker({
       mode="time"
       display="default"
       onChange={handleChange}
-      textColor="#1E1B4B"
-      {...(Platform.OS === "ios" ? { accentColor: "#8A63D2" } : {})}
+      textColor={theme.text}
+      {...(Platform.OS === "ios" ? { accentColor: theme.primary } : {})}
     />
   );
 }

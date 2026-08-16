@@ -13,6 +13,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { fetchStudentJournals } from "@/services/adminFirestoreService";
 import type { JournalEntryDoc } from "@/services/adminFirestoreService";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 function formatDate(createdAt: JournalEntryDoc["createdAt"]): string {
   if (!createdAt) return "";
@@ -147,6 +149,9 @@ export default function StudentJournalsScreen() {
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const listRef = useRef<FlatList<JournalEntryDoc>>(null);
 
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
+
   // Always start at the top so navigation never lands mid-list.
   useEffect(() => {
     const t = setTimeout(() => {
@@ -215,7 +220,7 @@ export default function StudentJournalsScreen() {
         {displayInsight ? (
           <View style={styles.insightCard}>
             <View style={styles.insightHeader}>
-              <Ionicons name="bulb" size={16} color="#8A63D2" />
+              <Ionicons name="bulb" size={16} color={theme.primary} />
               <Text style={styles.insightLabel}>AI Wellness Insight</Text>
             </View>
             <Text style={styles.insightText}>{displayInsight}</Text>
@@ -229,10 +234,10 @@ export default function StudentJournalsScreen() {
             disabled={isGenerating}
           >
             {isGenerating ? (
-              <ActivityIndicator size="small" color="white" />
+              <ActivityIndicator size="small" color={theme.onPrimary} />
             ) : (
               <>
-                <Ionicons name="sparkles" size={16} color="white" />
+                <Ionicons name="sparkles" size={16} color={theme.onPrimary} />
                 <Text style={styles.generateBtnText}>
                   {localInsights[item.id] ? "Regenerate Insight" : "Generate AI Wellness Insight"}
                 </Text>
@@ -247,7 +252,7 @@ export default function StudentJournalsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#8A63D2", "#B794F6"]}
+        colors={theme.headerGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
@@ -267,12 +272,12 @@ export default function StudentJournalsScreen() {
 
       {loading ? (
         <View style={styles.centerState}>
-          <ActivityIndicator size="large" color="#8A63D2" />
+          <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.stateText}>Loading journal entries...</Text>
         </View>
       ) : error ? (
         <View style={styles.centerState}>
-          <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
+          <Ionicons name="alert-circle-outline" size={48} color={theme.status.error} />
           <Text style={styles.stateTitle}>Failed to Load</Text>
           <Text style={styles.stateText}>{error}</Text>
           <Pressable
@@ -291,7 +296,7 @@ export default function StudentJournalsScreen() {
         </View>
       ) : entries.length === 0 ? (
         <View style={styles.centerState}>
-          <Ionicons name="book-outline" size={48} color="#D1D5DB" />
+          <Ionicons name="book-outline" size={48} color={theme.border} />
           <Text style={styles.stateTitle}>No Journal Entries</Text>
           <Text style={styles.stateText}>
             {studentName || "This student"} has not written any journal entries yet.
@@ -311,8 +316,9 @@ export default function StudentJournalsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F2F8" },
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -326,24 +332,24 @@ const styles = StyleSheet.create({
   headerTitle: { color: "white", fontSize: 18, fontWeight: "700", textAlign: "center" },
   headerSubtitle: { color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: "500", marginTop: 2 },
   centerState: { flex: 1, justifyContent: "center", alignItems: "center", gap: 8, paddingHorizontal: 40 },
-  stateTitle: { fontSize: 17, fontWeight: "700", color: "#1E1B4B", marginTop: 4 },
-  stateText: { fontSize: 14, color: "#64748B", textAlign: "center" },
+  stateTitle: { fontSize: 17, fontWeight: "700", color: theme.text, marginTop: 4 },
+  stateText: { fontSize: 14, color: theme.secondaryText, textAlign: "center" },
   retryButton: {
     marginTop: 12,
-    backgroundColor: "#8A63D2",
+    backgroundColor: theme.primary,
     paddingHorizontal: 24,
     paddingVertical: 10,
     borderRadius: 20,
   },
-  retryButtonText: { color: "white", fontWeight: "600", fontSize: 14 },
+  retryButtonText: { color: theme.onPrimary, fontWeight: "600", fontSize: 14 },
   list: { padding: 16, paddingBottom: 40 },
   entryCard: {
-    backgroundColor: "white",
+    backgroundColor: theme.card,
     borderRadius: 18,
     padding: 18,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
+    borderColor: theme.borderSoft,
   },
   entryHeader: {
     flexDirection: "row",
@@ -351,27 +357,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
   },
-  entryDate: { fontSize: 13, fontWeight: "600", color: "#8A63D2" },
+  entryDate: { fontSize: 13, fontWeight: "600", color: theme.primary },
   moodBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "#F3EEFF",
+    backgroundColor: theme.softPurple,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
   },
   moodEmoji: { fontSize: 14 },
-  moodText: { fontSize: 12, fontWeight: "600", color: "#6D5BBF" },
-  entryTitle: { fontSize: 16, fontWeight: "700", color: "#1E1B4B", marginBottom: 6 },
-  entryText: { fontSize: 14, color: "#334155", lineHeight: 22 },
+  moodText: { fontSize: 12, fontWeight: "600", color: theme.primary },
+  entryTitle: { fontSize: 16, fontWeight: "700", color: theme.text, marginBottom: 6 },
+  entryText: { fontSize: 14, color: theme.text, lineHeight: 22 },
   insightCard: {
-    backgroundColor: "#F8F5FF",
+    backgroundColor: theme.secondaryCard,
     borderRadius: 14,
     padding: 14,
     marginTop: 12,
     borderWidth: 1,
-    borderColor: "rgba(138, 99, 210, 0.1)",
+    borderColor: theme.borderSoft,
   },
   insightHeader: {
     flexDirection: "row",
@@ -379,18 +385,18 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 6,
   },
-  insightLabel: { fontSize: 12, fontWeight: "700", color: "#8A63D2", textTransform: "uppercase" },
-  insightText: { fontSize: 13, color: "#4B5563", lineHeight: 20, fontStyle: "italic" },
+  insightLabel: { fontSize: 12, fontWeight: "700", color: theme.primary, textTransform: "uppercase" },
+  insightText: { fontSize: 13, color: theme.secondaryText, lineHeight: 20, fontStyle: "italic" },
   generateBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    backgroundColor: "#8A63D2",
+    backgroundColor: theme.primary,
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 16,
     marginTop: 12,
   },
-  generateBtnText: { color: "white", fontSize: 13, fontWeight: "600" },
+  generateBtnText: { color: theme.onPrimary, fontSize: 13, fontWeight: "600" },
 });

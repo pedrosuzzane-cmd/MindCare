@@ -1,3 +1,4 @@
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
@@ -18,22 +19,28 @@ export default function EmailInput({
   onSubmit,
 }: EmailInputProps) {
   const [focused, setFocused] = useState(false);
+  const { theme } = useMindCareTheme();
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Email Address</Text>
+      <Text style={[styles.label, { color: theme.secondaryText }]}>
+        Email Address
+      </Text>
       <View
         style={[
           styles.inputWrap,
-          focused && styles.inputWrapFocused,
+          {
+            backgroundColor: theme.inputBg,
+            borderColor: focused ? theme.primary : theme.border,
+          },
           error ? styles.inputWrapError : null,
         ]}
       >
-        <Ionicons name="mail-outline" size={20} color="#94A3B8" />
+        <Ionicons name="mail-outline" size={20} color={theme.secondaryText} />
         <TextInput
-          style={styles.input}
+          style={[styles.input, { color: theme.text }]}
           placeholder="student@uc-bcf.edu.ph"
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={theme.secondaryText}
           value={value}
           onChangeText={onChangeText}
           onFocus={() => setFocused(true)}
@@ -69,22 +76,16 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#4B5563",
     marginBottom: 8,
   },
   inputWrap: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "#FFFFFF",
     borderWidth: 1.5,
-    borderColor: "#E5E7EB",
     borderRadius: 14,
     paddingHorizontal: 15,
     height: 56,
-  },
-  inputWrapFocused: {
-    borderColor: "#7C3AED",
   },
   inputWrapError: {
     borderColor: "#EF4444",
@@ -92,7 +93,6 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: "#1F2937",
   },
   errorText: {
     color: "#EF4444",

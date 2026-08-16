@@ -6,6 +6,8 @@ import {
 } from "@/hooks/reminderDefaults";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useReminderSettings } from "@/hooks/useReminderSettings";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 import ClockTimePicker from "@/components/ClockTimePicker";
 import { requestNotificationPermissions } from "@/services/notificationService";
 import { Ionicons } from "@expo/vector-icons";
@@ -279,14 +281,16 @@ function TimeField({
   value: { hour: number; minute: number; period: "AM" | "PM" };
   onChange: (v: { hour: number; minute: number; period: "AM" | "PM" }) => void;
 }) {
+  const { theme } = useMindCareTheme();
+  const s = createStyles(theme);
   const [open, setOpen] = useState(false);
 
   return (
     <>
       <Pressable style={s.timeField} onPress={() => setOpen(true)}>
-        <Ionicons name="alarm-outline" size={18} color="#8A63D2" />
+        <Ionicons name="alarm-outline" size={18} color={theme.primary} />
         <Text style={s.timeFieldText}>{fmt(value)}</Text>
-        <Ionicons name="chevron-forward" size={16} color="#C4B5D0" />
+        <Ionicons name="chevron-forward" size={16} color={theme.secondaryText} />
       </Pressable>
       <ClockTimePicker
         visible={open}
@@ -308,6 +312,8 @@ function PillRow({
   selected: number;
   onSelect: (v: number) => void;
 }) {
+  const { theme } = useMindCareTheme();
+  const s = createStyles(theme);
   return (
     <ScrollView
       horizontal
@@ -344,6 +350,8 @@ function RepeatPicker({
   onChange: (r: RepeatSchedule) => void;
   onDaysChange: (d: number[]) => void;
 }) {
+  const { theme } = useMindCareTheme();
+  const s = createStyles(theme);
   const opts: { label: string; value: RepeatSchedule }[] = [
     { label: "Every Day", value: "every-day" },
     { label: "Weekdays", value: "weekdays" },
@@ -405,6 +413,8 @@ function HydrationCard({
   onToggle: () => void;
   onUpdate: (u: Partial<HydrationState>) => void;
 }) {
+  const { theme } = useMindCareTheme();
+  const s = createStyles(theme);
   // Debounce text inputs to avoid excessive Firestore writes
   const debouncedName = useDebounce(r.hydrationName, 1000);
   const debouncedNote = useDebounce(r.note, 1000);
@@ -445,9 +455,9 @@ function HydrationCard({
           ) : null}
         </View>
         <Switch
-          trackColor={{ false: "#E0E0E0", true: "#8A63D2" }}
+          trackColor={{ false: theme.border, true: theme.primary }}
           thumbColor="#FFFFFF"
-          ios_backgroundColor="#E0E0E0"
+          ios_backgroundColor={theme.border}
           onValueChange={onToggle}
           value={r.enabled}
         />
@@ -459,7 +469,7 @@ function HydrationCard({
             <TextInput
               style={s.input}
               placeholder="e.g., Drink Water"
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.secondaryText}
               value={r.hydrationName}
               // Update local state immediately for responsive UI
               onChangeText={(v) => onUpdate({ hydrationName: v })}
@@ -506,7 +516,7 @@ function HydrationCard({
             <TextInput
               style={s.noteInput}
               placeholder="Add a note..."
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.secondaryText}
               value={r.note}
               onChangeText={(v) => onUpdate({ note: v })}
               multiline
@@ -531,6 +541,8 @@ function StandardCard({
   onToggle: () => void;
   onUpdate: (u: Partial<StandardState>) => void;
 }) {
+  const { theme } = useMindCareTheme();
+  const s = createStyles(theme);
   // Debounce text inputs
   const debouncedNote = useDebounce(r.note, 1000);
   const debouncedTaskTitle = useDebounce(r.taskTitle, 1000);
@@ -588,9 +600,9 @@ function StandardCard({
           ) : null}
         </View>
         <Switch
-          trackColor={{ false: "#E0E0E0", true: "#8A63D2" }}
+          trackColor={{ false: theme.border, true: theme.primary }}
           thumbColor="#FFFFFF"
-          ios_backgroundColor="#E0E0E0"
+          ios_backgroundColor={theme.border}
           onValueChange={onToggle}
           value={r.enabled}
         />
@@ -618,7 +630,7 @@ function StandardCard({
             <TextInput
               style={s.noteInput}
               placeholder="Add a note..."
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.secondaryText}
               value={r.note}
               onChangeText={(v) => onUpdate({ note: v })}
               multiline
@@ -631,7 +643,7 @@ function StandardCard({
                 <TextInput
                   style={s.input}
                   placeholder="e.g., Programming Project"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.secondaryText}
                   value={r.taskTitle}
                   onChangeText={(v) => onUpdate({ taskTitle: v })}
                 />
@@ -641,7 +653,7 @@ function StandardCard({
                 <TextInput
                   style={s.input}
                   placeholder="e.g., Dec 15, 5:00 PM"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.secondaryText}
                   value={r.taskDueDate}
                   onChangeText={(v) => onUpdate({ taskDueDate: v })}
                 />
@@ -651,7 +663,7 @@ function StandardCard({
                 <TextInput
                   style={s.noteInput}
                   placeholder="e.g., Finish Chapters 4-6"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={theme.secondaryText}
                   value={r.taskNotes}
                   onChangeText={(v) => onUpdate({ taskNotes: v })}
                   multiline
@@ -667,6 +679,8 @@ function StandardCard({
 
 // ── Main Screen ──
 export default function DailyRemindersScreen() {
+  const { theme } = useMindCareTheme();
+  const s = createStyles(theme);
   const { reminders, loading, updateReminder: update } = useReminderSettings();
   const [customOpen, setCustomOpen] = useState(false);
 
@@ -758,7 +772,7 @@ export default function DailyRemindersScreen() {
 
   return (
     <SafeAreaView style={s.container}>
-      <LinearGradient colors={["#8A63D2", "#7C5AC8"]} style={s.headerBg}>
+      <LinearGradient colors={theme.headerGradient} style={s.headerBg}>
         <View style={s.header}>
           <View style={{ width: 40 }} />
           <View>
@@ -777,7 +791,7 @@ export default function DailyRemindersScreen() {
         {/* ── Summary ── */}
         <View style={s.summaryCard}>
           <View style={s.summaryHeader}>
-            <Ionicons name="today-outline" size={20} color="#8A63D2" />
+            <Ionicons name="today-outline" size={20} color={theme.primary} />
             <Text style={s.summaryTitle}>Routine for Today</Text>
             <View style={s.summaryCountPill}>
               <Text style={s.summaryCountText}>
@@ -844,7 +858,7 @@ export default function DailyRemindersScreen() {
                   </Text>
                 </View>
                 {active && (
-                  <Ionicons name="checkmark-circle" size={16} color="#8A63D2" />
+                  <Ionicons name="checkmark-circle" size={16} color={theme.primary} />
                 )}
               </Pressable>
             );
@@ -852,7 +866,7 @@ export default function DailyRemindersScreen() {
         </ScrollView>
 
         <Pressable style={s.customBtn} onPress={() => setCustomOpen(true)}>
-          <Ionicons name="add-circle-outline" size={20} color="#8A63D2" />
+          <Ionicons name="add-circle-outline" size={20} color={theme.primary} />
           <Text style={s.customBtnText}>Create Custom Reminder</Text>
         </Pressable>
 
@@ -890,7 +904,7 @@ export default function DailyRemindersScreen() {
           <Ionicons
             name="information-circle-outline"
             size={20}
-            color="#8A63D2"
+            color={theme.primary}
           />
           <Text style={s.infoText}>
             Notifications at scheduled times. Enable permissions to receive
@@ -919,7 +933,7 @@ export default function DailyRemindersScreen() {
               style={s.modalClose}
               onPress={() => setCustomOpen(false)}
             >
-              <Ionicons name="close" size={22} color="#888" />
+              <Ionicons name="close" size={22} color={theme.secondaryText} />
             </Pressable>
           </View>
           <ScrollView
@@ -948,13 +962,13 @@ export default function DailyRemindersScreen() {
                     <Ionicons
                       name="checkmark-circle"
                       size={22}
-                      color="#4CAF50"
+                      color={theme.status.success}
                     />
                   ) : (
                     <Ionicons
                       name="add-circle"
                       size={22}
-                      color="#8A63D2"
+                      color={theme.primary}
                     />
                   )}
                 </Pressable>
@@ -967,10 +981,11 @@ export default function DailyRemindersScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F2F8" },
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  loadText: { fontSize: 16, color: "#888" },
+  loadText: { fontSize: 16, color: theme.secondaryText },
   headerBg: { paddingBottom: 20 },
   header: {
     flexDirection: "row",
@@ -1001,14 +1016,14 @@ const s = StyleSheet.create({
   },
   // Card
   card: {
-    backgroundColor: "white",
+    backgroundColor: theme.card,
     borderRadius: 20,
     padding: 20,
     // @ts-ignore — web-only shadow property
-    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
+    boxShadow: "0px 4px 16px " + theme.shadow,
     elevation: 3,
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
+    borderColor: theme.borderSoft,
   },
   cardH: { flexDirection: "row", alignItems: "center" },
   icon: {
@@ -1020,11 +1035,11 @@ const s = StyleSheet.create({
     marginRight: 14,
   },
   cardT: { flex: 1 },
-  cardTitle: { fontSize: 16, fontWeight: "700", color: "#333" },
-  cardDesc: { fontSize: 13, color: "#888", marginTop: 2 },
+  cardTitle: { fontSize: 16, fontWeight: "700", color: theme.text },
+  cardDesc: { fontSize: 13, color: theme.secondaryText, marginTop: 2 },
   badge: {
     fontSize: 11,
-    color: "#8A63D2",
+    color: theme.primary,
     fontWeight: "600",
     marginTop: 4,
     backgroundColor: "rgba(76, 175, 80, 0.1)",
@@ -1034,11 +1049,11 @@ const s = StyleSheet.create({
     alignSelf: "flex-start",
     overflow: "hidden",
   },
-  saving: { fontSize: 12, color: "#888", width: 50, textAlign: "center" },
+  saving: { fontSize: 12, color: theme.secondaryText, width: 50, textAlign: "center" },
   settings: {
     marginTop: 16,
     borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
+    borderTopColor: theme.border,
     paddingTop: 16,
     gap: 16,
   },
@@ -1046,20 +1061,20 @@ const s = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#555",
+    color: theme.secondaryText,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
-  hint: { fontSize: 12, color: "#888", fontStyle: "italic" },
+  hint: { fontSize: 12, color: theme.secondaryText, fontStyle: "italic" },
   // Scroll Wheel Picker
   scrollWheelRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F9FAFB",
+    backgroundColor: theme.inputBg,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: theme.border,
     paddingVertical: 8,
     paddingHorizontal: 12,
     gap: 2,
@@ -1072,7 +1087,7 @@ const s = StyleSheet.create({
   scrollWheelLabelText: {
     fontSize: 10,
     fontWeight: "600",
-    color: "#999",
+    color: theme.secondaryText,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
@@ -1085,7 +1100,7 @@ const s = StyleSheet.create({
   scrollWheelColonText: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#333",
+    color: theme.text,
   },
   // Time (legacy - kept for reference, not used)
   row: { gap: 8 },
@@ -1100,82 +1115,82 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: theme.inputBg,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: theme.border,
   },
-  pillSelected: { backgroundColor: "#8A63D2", borderColor: "#8A63D2" },
-  pillText: { color: "#333", fontWeight: "600", fontSize: 13 },
-  pillTextSelected: { color: "white" },
+  pillSelected: { backgroundColor: theme.primary, borderColor: theme.primary },
+  pillText: { color: theme.text, fontWeight: "600", fontSize: 13 },
+  pillTextSelected: { color: theme.onPrimary },
   periodRow: { flexDirection: "row", gap: 6 },
   periodPill: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: theme.inputBg,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: theme.border,
   },
-  periodPillSelected: { backgroundColor: "#9C27B0", borderColor: "#9C27B0" },
-  periodPillText: { color: "#333", fontWeight: "700", fontSize: 13 },
-  periodPillTextSelected: { color: "white" },
+  periodPillSelected: { backgroundColor: theme.primary, borderColor: theme.primary },
+  periodPillText: { color: theme.text, fontWeight: "700", fontSize: 13 },
+  periodPillTextSelected: { color: theme.onPrimary },
   // Repeat
   repeatRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   repeatPill: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 12,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: theme.inputBg,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: theme.border,
   },
-  repeatPillSelected: { backgroundColor: "#8A63D2", borderColor: "#8A63D2" },
-  repeatPillText: { color: "#555", fontWeight: "600", fontSize: 12 },
-  repeatPillTextSelected: { color: "white" },
+  repeatPillSelected: { backgroundColor: theme.primary, borderColor: theme.primary },
+  repeatPillText: { color: theme.secondaryText, fontWeight: "600", fontSize: 12 },
+  repeatPillTextSelected: { color: theme.onPrimary },
   dayPill: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: theme.inputBg,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: theme.border,
     minWidth: 40,
     alignItems: "center",
   },
-  dayPillSelected: { backgroundColor: "#8A63D2", borderColor: "#8A63D2" },
-  dayPillText: { color: "#555", fontWeight: "600", fontSize: 11 },
-  dayPillTextSelected: { color: "white" },
+  dayPillSelected: { backgroundColor: theme.primary, borderColor: theme.primary },
+  dayPillText: { color: theme.secondaryText, fontWeight: "600", fontSize: 11 },
+  dayPillTextSelected: { color: theme.onPrimary },
   // Inputs
   input: {
-    backgroundColor: "#F9FAFB",
+    backgroundColor: theme.inputBg,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: theme.border,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    color: "#333",
+    color: theme.text,
   },
   noteInput: {
-    backgroundColor: "#F9FAFB",
+    backgroundColor: theme.inputBg,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: theme.border,
     borderRadius: 12,
     minHeight: 60,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    color: "#333",
+    color: theme.text,
     textAlignVertical: "top",
   },
   // Native Time Picker display button
   timeDisplayButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F9FAFB",
+    backgroundColor: theme.inputBg,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: theme.border,
     paddingVertical: 12,
     paddingHorizontal: 16,
     gap: 8,
@@ -1183,7 +1198,7 @@ const s = StyleSheet.create({
   timeDisplayText: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#333",
+    color: theme.text,
     flex: 1,
   },
   // Info
@@ -1195,16 +1210,16 @@ const s = StyleSheet.create({
     gap: 10,
     alignItems: "flex-start",
   },
-  infoText: { fontSize: 13, color: "#2E7D32", lineHeight: 20, flex: 1 },
+  infoText: { fontSize: 13, color: theme.status.success, lineHeight: 20, flex: 1 },
 
   /* ── Time Field + Modal ── */
   timeField: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F9FAFB",
+    backgroundColor: theme.inputBg,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: theme.border,
     paddingVertical: 12,
     paddingHorizontal: 16,
     gap: 8,
@@ -1213,45 +1228,45 @@ const s = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: "700",
-    color: "#333",
+    color: theme.text,
     fontVariant: ["tabular-nums"],
   },
 
   /* ── Summary ── */
   summaryCard: {
-    backgroundColor: "white",
+    backgroundColor: theme.card,
     borderRadius: 20,
     padding: 20,
     // @ts-ignore — web-only shadow property
-    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
+    boxShadow: "0px 4px 16px " + theme.shadow,
     elevation: 3,
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
+    borderColor: theme.borderSoft,
     gap: 14,
   },
   summaryHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
   summaryTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#333",
+    color: theme.text,
     flex: 1,
   },
   summaryCountPill: {
-    backgroundColor: "rgba(138, 99, 210, 0.12)",
+    backgroundColor: theme.softPurple,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
   },
-  summaryCountText: { fontSize: 12, fontWeight: "700", color: "#8A63D2" },
+  summaryCountText: { fontSize: 12, fontWeight: "700", color: theme.primary },
   nextRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: theme.inputBg,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#F0EAF8",
+    borderColor: theme.borderSoft,
   },
   nextIcon: {
     width: 38,
@@ -1263,21 +1278,21 @@ const s = StyleSheet.create({
   nextLabel: {
     fontSize: 11,
     fontWeight: "600",
-    color: "#999",
+    color: theme.secondaryText,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
-  nextName: { fontSize: 15, fontWeight: "700", color: "#333", marginTop: 2 },
+  nextName: { fontSize: 15, fontWeight: "700", color: theme.text, marginTop: 2 },
   nextTimeWrap: { alignItems: "flex-end" },
-  nextTime: { fontSize: 15, fontWeight: "800", color: "#8A63D2" },
-  nextDay: { fontSize: 12, color: "#999", marginTop: 2 },
-  summaryEmpty: { fontSize: 13, color: "#888", lineHeight: 20 },
+  nextTime: { fontSize: 15, fontWeight: "800", color: theme.primary },
+  nextDay: { fontSize: 12, color: theme.secondaryText, marginTop: 2 },
+  summaryEmpty: { fontSize: 13, color: theme.secondaryText, lineHeight: 20 },
 
   /* ── Sections + Templates ── */
   sectionTitle: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#333",
+    color: theme.text,
     marginTop: 6,
   },
   tplRow: { gap: 10, paddingVertical: 4, paddingRight: 8 },
@@ -1285,20 +1300,20 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "white",
+    backgroundColor: theme.card,
     borderRadius: 16,
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.1)",
+    borderColor: theme.borderSoft,
     maxWidth: 240,
     // @ts-ignore — web-only shadow property
-    boxShadow: "0px 2px 10px rgba(138, 99, 210, 0.06)",
+    boxShadow: "0px 2px 10px " + theme.shadow,
     elevation: 2,
   },
   tplChipActive: {
-    backgroundColor: "rgba(138, 99, 210, 0.08)",
-    borderColor: "#8A63D2",
+    backgroundColor: theme.softPurple,
+    borderColor: theme.primary,
   },
   tplChipIcon: {
     width: 36,
@@ -1307,32 +1322,32 @@ const s = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  tplChipName: { fontSize: 13, fontWeight: "700", color: "#333" },
-  tplChipNameActive: { color: "#8A63D2" },
-  tplChipDesc: { fontSize: 11, color: "#888", marginTop: 1 },
-  tplChipDescActive: { color: "#9C7EEB" },
+  tplChipName: { fontSize: 13, fontWeight: "700", color: theme.text },
+  tplChipNameActive: { color: theme.primary },
+  tplChipDesc: { fontSize: 11, color: theme.secondaryText, marginTop: 1 },
+  tplChipDescActive: { color: theme.accent.purple },
   customBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: "rgba(138, 99, 210, 0.1)",
+    backgroundColor: theme.softPurple,
     borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: "#8A63D2",
+    borderColor: theme.primary,
     borderRadius: 16,
     paddingVertical: 14,
   },
   customBtnText: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#8A63D2",
+    color: theme.primary,
   },
 
   /* ── Custom Reminder Modal ── */
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
   modalSheet: {
-    backgroundColor: "white",
+    backgroundColor: theme.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 20,
@@ -1346,15 +1361,15 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
+    borderBottomColor: theme.border,
   },
-  modalTitle: { fontSize: 18, fontWeight: "700", color: "#333" },
-  modalSubtitle: { fontSize: 13, color: "#888", marginTop: 2 },
+  modalTitle: { fontSize: 18, fontWeight: "700", color: theme.text },
+  modalSubtitle: { fontSize: 13, color: theme.secondaryText, marginTop: 2 },
   modalClose: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "#F4F2F8",
+    backgroundColor: theme.inputBg,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -1363,12 +1378,12 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: theme.inputBg,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#F0EAF8",
+    borderColor: theme.borderSoft,
   },
-  modalItemName: { fontSize: 14, fontWeight: "700", color: "#333" },
-  modalItemDesc: { fontSize: 12, color: "#888", marginTop: 2 },
+  modalItemName: { fontSize: 14, fontWeight: "700", color: theme.text },
+  modalItemDesc: { fontSize: 12, color: theme.secondaryText, marginTop: 2 },
 });

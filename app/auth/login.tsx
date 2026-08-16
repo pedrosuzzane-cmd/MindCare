@@ -19,53 +19,23 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 const REMEMBER_EMAIL_KEY = "@MindCare:remembered_email";
 
-const DARK = {
-  background: "#0F0D15",
-  card: "#1E1B2E",
-  input: "#1E1B2E",
-  tile: "#FFFFFF",
-  border: "rgba(167, 139, 250, 0.22)",
-  checkboxBorder: "#6B5B8A",
-  primary: "#6D28D9",
-  primarySoft: "#A78BFA",
-  text: "#FFFFFF",
-  muted: "#9CA3AF",
-  placeholder: "#6E6A84",
-  error: "#F87171",
-  onPrimary: "#FFFFFF",
-};
-
-const LIGHT = {
-  background: "#F8F6FC",
-  card: "#FFFFFF",
-  input: "#F8F6FC",
-  tile: "#F3EEFE",
-  border: "rgba(139, 92, 246, 0.22)",
-  checkboxBorder: "#A78BFA",
-  primary: "#6D28D9",
-  primarySoft: "#8B5CF6",
-  text: "#1E1B2E",
-  muted: "#6B7280",
-  placeholder: "#9CA3AF",
-  error: "#DC2626",
-  onPrimary: "#FFFFFF",
-};
-
 type Breakpoint = "mobile" | "tablet" | "desktop";
 
-const makeStyles = (breakpoint: Breakpoint, C: typeof DARK) => {
+const createStyles = (breakpoint: Breakpoint, theme: MindCareTheme) => {
   const desktop = breakpoint === "desktop";
   const tablet = breakpoint === "tablet";
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: C.background },
+    container: { flex: 1, backgroundColor: theme.background },
     loadingContainer: {
       flex: 1,
       justifyContent: "center",
       alignItems: "center",
-      backgroundColor: C.background,
+      backgroundColor: theme.background,
     },
     scrollContent: {
       flexGrow: 1,
@@ -79,17 +49,17 @@ const makeStyles = (breakpoint: Breakpoint, C: typeof DARK) => {
       paddingTop: desktop ? 48 : tablet ? 64 : 72,
       paddingBottom: desktop ? 48 : 48,
       ...(desktop && {
-        backgroundColor: C.card,
+        backgroundColor: theme.card,
         borderRadius: 28,
         borderWidth: 1,
-        borderColor: "rgba(139, 92, 246, 0.18)",
-        shadowColor: "#6D28D9",
+        borderColor: theme.border,
+        shadowColor: theme.primary,
         shadowOffset: { width: 0, height: 14 },
         shadowOpacity: 0.12,
         shadowRadius: 40,
         elevation: 8,
         // @ts-ignore
-        boxShadow: "0px 16px 48px rgba(109, 40, 217, 0.12)",
+        boxShadow: `0px 16px 48px ${theme.shadow}`,
       }),
     },
     brandRow: {
@@ -104,7 +74,7 @@ const makeStyles = (breakpoint: Breakpoint, C: typeof DARK) => {
       borderRadius: desktop ? 16 : tablet ? 14 : 12,
       justifyContent: "center",
       alignItems: "center",
-      backgroundColor: C.tile,
+      backgroundColor: theme.softPurple,
       overflow: "hidden",
     },
     brandLogoImage: {
@@ -112,19 +82,19 @@ const makeStyles = (breakpoint: Breakpoint, C: typeof DARK) => {
       height: desktop ? 40 : tablet ? 34 : 30,
     },
     brandName: {
-      color: C.text,
+      color: theme.text,
       fontSize: desktop ? 24 : tablet ? 22 : 20,
       fontWeight: "800",
     },
     welcomeTitle: {
-      color: C.text,
+      color: theme.text,
       fontSize: desktop ? 26 : tablet ? 28 : 26,
       fontWeight: "800",
       textAlign: "center",
       marginTop: desktop ? 24 : tablet ? 28 : 26,
     },
     welcomeSubtitle: {
-      color: C.muted,
+      color: theme.secondaryText,
       fontSize: desktop ? 15 : 14,
       lineHeight: 21,
       textAlign: "center",
@@ -139,15 +109,15 @@ const makeStyles = (breakpoint: Breakpoint, C: typeof DARK) => {
       paddingHorizontal: 18,
       borderRadius: desktop ? 16 : tablet ? 29 : 28,
       marginBottom: desktop ? 18 : tablet ? 18 : 16,
-      backgroundColor: C.input,
+      backgroundColor: theme.inputBg,
       borderWidth: 1,
-      borderColor: C.border,
+      borderColor: theme.border,
     },
-    inputError: { borderColor: C.error },
-    input: { flex: 1, color: C.text, fontSize: desktop ? 16 : 15, fontWeight: "600" },
+    inputError: { borderColor: theme.status.error },
+    input: { flex: 1, color: theme.text, fontSize: desktop ? 16 : 15, fontWeight: "600" },
     eyeIcon: { padding: 4 },
     fieldError: {
-      color: C.error,
+      color: theme.status.error,
       fontSize: 12,
       fontWeight: "600",
       marginTop: -10,
@@ -170,14 +140,14 @@ const makeStyles = (breakpoint: Breakpoint, C: typeof DARK) => {
       height: 22,
       borderRadius: 7,
       borderWidth: 2,
-      borderColor: C.checkboxBorder,
+      borderColor: theme.primary,
       justifyContent: "center",
       alignItems: "center",
     },
-    checkboxChecked: { backgroundColor: C.primary, borderColor: C.primary },
-    rememberText: { color: C.muted, fontSize: 13, fontWeight: "600" },
+    checkboxChecked: { backgroundColor: theme.primary, borderColor: theme.primary },
+    rememberText: { color: theme.secondaryText, fontSize: 13, fontWeight: "600" },
     formError: {
-      color: C.error,
+      color: theme.status.error,
       fontSize: 12,
       fontWeight: "600",
       textAlign: "center",
@@ -187,24 +157,24 @@ const makeStyles = (breakpoint: Breakpoint, C: typeof DARK) => {
     loginButton: {
       height: desktop ? 56 : tablet ? 58 : 56,
       borderRadius: desktop ? 18 : tablet ? 29 : 28,
-      backgroundColor: C.primary,
+      backgroundColor: theme.primary,
       alignItems: "center",
       justifyContent: "center",
       marginTop: desktop ? 20 : tablet ? 18 : 14,
-      shadowColor: C.primary,
+      shadowColor: theme.primary,
       shadowOffset: { width: 0, height: 6 },
       shadowOpacity: 0.4,
       shadowRadius: 12,
       elevation: 6,
       // @ts-ignore
       boxShadow: desktop
-        ? "0px 10px 24px rgba(109, 40, 217, 0.28)"
-        : "0px 8px 20px rgba(109, 40, 217, 0.35)",
+        ? `0px 10px 24px ${theme.shadow}`
+        : `0px 8px 20px ${theme.shadow}`,
     },
     loginButtonPressed: { opacity: 0.88 },
     loginButtonDisabled: { opacity: 0.65 },
     loginButtonText: {
-      color: C.onPrimary,
+      color: theme.onPrimary,
       fontSize: desktop ? 16 : 15,
       fontWeight: "800",
       letterSpacing: 1,
@@ -214,7 +184,7 @@ const makeStyles = (breakpoint: Breakpoint, C: typeof DARK) => {
       paddingVertical: desktop ? 16 : 14,
       marginTop: desktop ? 10 : 6,
     },
-    forgotText: { color: C.primarySoft, fontSize: desktop ? 15 : 14, fontWeight: "600" },
+    forgotText: { color: theme.primary, fontSize: desktop ? 15 : 14, fontWeight: "600" },
     footerContainer: {
       flexDirection: "row",
       justifyContent: "center",
@@ -222,17 +192,20 @@ const makeStyles = (breakpoint: Breakpoint, C: typeof DARK) => {
       marginTop: tablet || desktop ? 14 : 2,
       flexWrap: "wrap",
     },
-    footerText: { color: C.muted, fontSize: desktop ? 15 : 14, fontWeight: "500" },
-    signupText: { color: C.primarySoft, fontSize: desktop ? 15 : 14, fontWeight: "800" },
+    footerText: { color: theme.secondaryText, fontSize: desktop ? 15 : 14, fontWeight: "500" },
+    signupText: { color: theme.primary, fontSize: desktop ? 15 : 14, fontWeight: "800" },
   });
 };
 
 export default function LoginScreen() {
+  const { theme } = useMindCareTheme();
   const { width } = useWindowDimensions();
   const breakpoint: Breakpoint =
     width >= 1280 ? "desktop" : width >= 768 ? "tablet" : "mobile";
-  const COLORS = breakpoint === "desktop" ? LIGHT : DARK;
-  const styles = useMemo(() => makeStyles(breakpoint, COLORS), [breakpoint, COLORS]);
+  const styles = useMemo(
+    () => createStyles(breakpoint, theme),
+    [breakpoint, theme],
+  );
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -263,7 +236,7 @@ export default function LoginScreen() {
   if (authLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primarySoft} />
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
@@ -364,11 +337,11 @@ export default function LoginScreen() {
           <View
             style={[styles.inputContainer, emailError ? styles.inputError : null]}
           >
-            <Ionicons name="person-outline" size={20} color={COLORS.primarySoft} />
+            <Ionicons name="person-outline" size={20} color={theme.primary} />
             <TextInput
               style={styles.input}
               placeholder="Username or Email"
-              placeholderTextColor={COLORS.placeholder}
+              placeholderTextColor={theme.secondaryText}
               value={email}
               onChangeText={(text) => {
                 setEmail(text);
@@ -386,11 +359,11 @@ export default function LoginScreen() {
           <View
             style={[styles.inputContainer, passwordError ? styles.inputError : null]}
           >
-            <Ionicons name="lock-closed-outline" size={20} color={COLORS.primarySoft} />
+            <Ionicons name="lock-closed-outline" size={20} color={theme.primary} />
             <TextInput
               style={styles.input}
               placeholder="Password"
-              placeholderTextColor={COLORS.placeholder}
+              placeholderTextColor={theme.secondaryText}
               value={password}
               onChangeText={(text) => {
                 setPassword(text);
@@ -410,7 +383,7 @@ export default function LoginScreen() {
               <Ionicons
                 name={showPassword ? "eye-outline" : "eye-off-outline"}
                 size={20}
-                color={COLORS.primarySoft}
+                color={theme.primary}
               />
             </Pressable>
           </View>
@@ -427,7 +400,7 @@ export default function LoginScreen() {
             >
               <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
                 {rememberMe && (
-                  <Ionicons name="checkmark" size={14} color={COLORS.onPrimary} />
+                  <Ionicons name="checkmark" size={14} color={theme.onPrimary} />
                 )}
               </View>
               <Text style={styles.rememberText}>Remember my email</Text>
@@ -450,7 +423,7 @@ export default function LoginScreen() {
             accessibilityState={{ disabled: submitting }}
           >
             {submitting ? (
-              <ActivityIndicator color={COLORS.onPrimary} />
+              <ActivityIndicator color={theme.onPrimary} />
             ) : (
               <Text style={styles.loginButtonText}>LOGIN</Text>
             )}

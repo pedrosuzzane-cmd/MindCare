@@ -12,7 +12,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,7 +19,9 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 const COMMON_PASSWORDS = [
   "password",
@@ -50,7 +51,8 @@ const COMMON_PASSWORDS = [
 ];
 
 export default function ResetPasswordScreen() {
-  const insets = useSafeAreaInsets();
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const token = resetFlow.getToken();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -132,7 +134,7 @@ export default function ResetPasswordScreen() {
         <TextInput
           style={styles.input}
           placeholder={label}
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={theme.secondaryText}
           value={value}
           onChangeText={onChangeText}
           secureTextEntry={!visible}
@@ -153,7 +155,7 @@ export default function ResetPasswordScreen() {
           <Ionicons
             name={visible ? "eye-outline" : "eye-off-outline"}
             size={20}
-            color="#94A3B8"
+            color={theme.secondaryText}
           />
         </Pressable>
       </View>
@@ -165,9 +167,9 @@ export default function ResetPasswordScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={{ flex: 1 }}
     >
-      <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
+      <SafeAreaView style={styles.container}>
         <LinearGradient
-          colors={["#E8E0F5", "#F4F2F8", "#E8E0F5"]}
+          colors={theme.softGradient}
           style={styles.gradient}
         >
           <TouchableWithoutFeedback
@@ -222,13 +224,13 @@ export default function ResetPasswordScreen() {
                   accessibilityLabel="Reset password"
                 >
                   <LinearGradient
-                    colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
+                    colors={theme.headerGradient}
                     style={styles.buttonGradient}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                   >
                     {loading ? (
-                      <ActivityIndicator color="white" />
+                      <ActivityIndicator color={theme.onPrimary} />
                     ) : (
                       <Text style={styles.buttonText}>Reset Password</Text>
                     )}
@@ -243,74 +245,75 @@ export default function ResetPasswordScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F4F2F8",
-  },
-  gradient: {
-    flex: 1,
-    paddingHorizontal: 24,
-  },
-  scroll: {
-    flexGrow: 1,
-    paddingBottom: 40,
-  },
-  body: {
-    flex: 1,
-    marginTop: 24,
-  },
-  field: {
-    marginBottom: 18,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#4B5563",
-    marginBottom: 8,
-  },
-  inputWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1.5,
-    borderColor: "#E5E7EB",
-    borderRadius: 14,
-    paddingHorizontal: 15,
-    height: 56,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: "#1F2937",
-  },
-  errorText: {
-    color: "#EF4444",
-    textAlign: "center",
-    fontSize: 14,
-    fontWeight: "500",
-    marginBottom: 12,
-  },
-  button: {
-    borderRadius: 25,
-    overflow: "hidden",
-    marginTop: 8,
-    // @ts-ignore - web only
-    boxShadow: "0px 10px 24px rgba(124, 58, 237, 0.25)",
-    elevation: 6,
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  buttonGradient: {
-    height: 56,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    gradient: {
+      flex: 1,
+      paddingHorizontal: 24,
+    },
+    scroll: {
+      flexGrow: 1,
+      paddingBottom: 40,
+    },
+    body: {
+      flex: 1,
+      marginTop: 24,
+    },
+    field: {
+      marginBottom: 18,
+    },
+    label: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: theme.secondaryText,
+      marginBottom: 8,
+    },
+    inputWrap: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      backgroundColor: theme.card,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      borderRadius: 14,
+      paddingHorizontal: 15,
+      height: 56,
+    },
+    input: {
+      flex: 1,
+      fontSize: 16,
+      color: theme.text,
+    },
+    errorText: {
+      color: theme.status.error,
+      textAlign: "center",
+      fontSize: 14,
+      fontWeight: "500",
+      marginBottom: 12,
+    },
+    button: {
+      borderRadius: 25,
+      overflow: "hidden",
+      marginTop: 8,
+      // @ts-ignore - web only
+      boxShadow: `0px 10px 24px ${theme.shadow}`,
+      elevation: 6,
+    },
+    buttonDisabled: {
+      opacity: 0.7,
+    },
+    buttonGradient: {
+      height: 56,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    buttonText: {
+      color: theme.onPrimary,
+      fontSize: 16,
+      fontWeight: "700",
+    },
+  });

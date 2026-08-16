@@ -5,13 +5,15 @@ import React from "react";
 import {
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { shadows } from "@/utils/shadows";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 type RiskLevel = "low" | "normal" | "high";
 
@@ -19,7 +21,9 @@ type RiskLevel = "low" | "normal" | "high";
  * Configuration for each risk tier — colours, titles, messages, and
  * tailored recommendations shown to the user after assessment.
  */
-const RISK_CONFIG: Record<
+const getRiskConfig = (
+  theme: MindCareTheme,
+): Record<
   RiskLevel,
   {
     gradient: [string, string];
@@ -28,9 +32,9 @@ const RISK_CONFIG: Record<
     description: string;
     recommendations: string[];
   }
-> = {
+> => ({
   low: {
-    gradient: ["#4CAF50", "#66BB6A"],
+    gradient: [theme.status.success, theme.status.success],
     icon: "checkmark-circle",
     title: "You\u2019re doing great!",
     description:
@@ -42,7 +46,7 @@ const RISK_CONFIG: Record<
     ],
   },
   normal: {
-    gradient: ["#2196F3", "#42A5F5"],
+    gradient: [theme.status.info, theme.status.info],
     icon: "thumbs-up",
     title: "You\u2019re doing great \u2014 keep it up!",
     description:
@@ -55,7 +59,7 @@ const RISK_CONFIG: Record<
     ],
   },
   high: {
-    gradient: ["#F44336", "#E53935"],
+    gradient: [theme.status.error, theme.status.error],
     icon: "heart",
     title: "Help is available \u2014 you\u2019re not alone",
     description:
@@ -67,9 +71,11 @@ const RISK_CONFIG: Record<
       "Use the Support Hotlines page in this app for immediate resources",
     ],
   },
-};
+});
 
 export default function AssessmentCompleteScreen() {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const params = useLocalSearchParams<{
     riskLevel?: string;
     totalScore?: string;
@@ -85,7 +91,7 @@ export default function AssessmentCompleteScreen() {
   const parsedScore = Number(params.totalScore);
   const totalScore =
     !isNaN(parsedScore) && params.totalScore ? parsedScore : null;
-  const config = RISK_CONFIG[riskLevel];
+  const config = getRiskConfig(theme)[riskLevel];
 
   const handleBackToHome = () => {
     router.replace("/dashboard");
@@ -113,7 +119,6 @@ export default function AssessmentCompleteScreen() {
             <Ionicons name={config.icon} size={40} color="white" />
           </LinearGradient>
         </View>
-
         {/* Title */}
         <Text style={styles.title}>Assessment Complete!</Text>
 
@@ -141,7 +146,7 @@ export default function AssessmentCompleteScreen() {
         )}
 
         {/* Clarify direction: higher scores indicate greater concern */}
-        <Text style={{ textAlign: "center", color: "#666", marginTop: 6 }}>
+        <Text style={{ textAlign: "center", color: theme.secondaryText, marginTop: 6 }}>
           Higher score indicates greater level of concern
         </Text>
 
@@ -194,7 +199,7 @@ export default function AssessmentCompleteScreen() {
             onPress={handleBackToHome}
           >
             <LinearGradient
-              colors={["#9C7EEB", "#8A63D2"]}
+              colors={theme.headerGradient}
               style={styles.backButton}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -208,145 +213,146 @@ export default function AssessmentCompleteScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F4F2F8",
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 40,
-    justifyContent: "center",
-  },
-  iconContainer: {
-    alignItems: "center",
-    marginBottom: 32,
-  },
-  iconGradient: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    ...(shadows.custom(8, 16, 0.3, 12) as any),
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#333",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  riskTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  scoreBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-    marginBottom: 16,
-  },
-  scoreText: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#333",
-  },
-  riskPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  riskPillText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  description: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 32,
-    paddingHorizontal: 10,
-  },
-  recommendationsCard: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 40,
-    ...(shadows.md("#000") as any),
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
-  },
-  recommendationsTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1E1B4B",
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  recommendationsList: {
-    gap: 16,
-  },
-  recommendationItem: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  bulletPoint: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginTop: 8,
-  },
-  recommendationText: {
-    fontSize: 16,
-    color: "#555",
-    flex: 1,
-    lineHeight: 22,
-  },
-  buttonContainer: {
-    marginTop: 20,
-  },
-  backButtonContainer: {
-    borderRadius: 25,
-  },
-  backButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 18,
-    borderRadius: 25,
-  },
-  backButtonText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "white",
-  },
-  hotlineButton: {
-    borderRadius: 25,
-    marginBottom: 16,
-  },
-  hotlineGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-    borderRadius: 25,
-    gap: 8,
-  },
-  hotlineText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "white",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    scrollContainer: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingHorizontal: 20,
+      paddingTop: 60,
+      paddingBottom: 40,
+      justifyContent: "center",
+    },
+    iconContainer: {
+      alignItems: "center",
+      marginBottom: 32,
+    },
+    iconGradient: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      justifyContent: "center",
+      alignItems: "center",
+      ...(shadows.custom(8, 16, 0.3, 12) as any),
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: "700",
+      color: theme.text,
+      textAlign: "center",
+      marginBottom: 8,
+    },
+    riskTitle: {
+      fontSize: 20,
+      fontWeight: "600",
+      textAlign: "center",
+      marginBottom: 16,
+    },
+    scoreBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 12,
+      marginBottom: 16,
+    },
+    scoreText: {
+      fontSize: 28,
+      fontWeight: "800",
+      color: theme.text,
+    },
+    riskPill: {
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    riskPillText: {
+      color: theme.onPrimary,
+      fontSize: 12,
+      fontWeight: "700",
+    },
+    description: {
+      fontSize: 16,
+      color: theme.secondaryText,
+      textAlign: "center",
+      lineHeight: 24,
+      marginBottom: 32,
+      paddingHorizontal: 10,
+    },
+    recommendationsCard: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 24,
+      marginBottom: 40,
+      ...(shadows.md("#000") as any),
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+    },
+    recommendationsTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: theme.text,
+      marginBottom: 20,
+      textAlign: "center",
+    },
+    recommendationsList: {
+      gap: 16,
+    },
+    recommendationItem: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 12,
+    },
+    bulletPoint: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      marginTop: 8,
+    },
+    recommendationText: {
+      fontSize: 16,
+      color: theme.secondaryText,
+      flex: 1,
+      lineHeight: 22,
+    },
+    buttonContainer: {
+      marginTop: 20,
+    },
+    backButtonContainer: {
+      borderRadius: 25,
+    },
+    backButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 18,
+      borderRadius: 25,
+    },
+    backButtonText: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: theme.onPrimary,
+    },
+    hotlineButton: {
+      borderRadius: 25,
+      marginBottom: 16,
+    },
+    hotlineGradient: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 14,
+      borderRadius: 25,
+      gap: 8,
+    },
+    hotlineText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: theme.onPrimary,
+    },
+  });

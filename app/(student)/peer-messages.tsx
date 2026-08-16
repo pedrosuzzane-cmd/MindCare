@@ -24,6 +24,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 import EmojiPicker from "@/components/chat/EmojiPicker";
 import {
@@ -60,6 +62,8 @@ type ViewMode = "inbox" | "chat" | "search";
 
 export default function PeerMessagesScreen() {
   const { user } = useAuth();
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const currentUserUid = user?.uid;
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("inbox");
@@ -458,7 +462,7 @@ export default function PeerMessagesScreen() {
       >
         <View style={styles.convAvatarWrapper}>
           <View style={styles.convAvatar}>
-            <Ionicons name="person" size={22} color="#8A63D2" />
+            <Ionicons name="person" size={22} color={theme.primary} />
           </View>
           {(() => {
             const peerUid = item.participants?.find((p) => p !== currentUserUid);
@@ -535,7 +539,7 @@ export default function PeerMessagesScreen() {
                 <Ionicons
                   name="ban-outline"
                   size={14}
-                  color={isMine ? "rgba(255,255,255,0.5)" : "#94A3B8"}
+                  color={isMine ? "rgba(255,255,255,0.5)" : theme.secondaryText}
                 />
                 <Text
                   style={[styles.deletedText, isMine && styles.deletedTextMine]}
@@ -561,7 +565,7 @@ export default function PeerMessagesScreen() {
                 <Ionicons
                   name="warning"
                   size={12}
-                  color={isMine ? "rgba(255,255,255,0.7)" : "#F59E0B"}
+                  color={isMine ? "rgba(255,255,255,0.7)" : theme.status.warning}
                 />
               )}
               {isFailed && (
@@ -569,7 +573,7 @@ export default function PeerMessagesScreen() {
                   style={styles.retryBtn}
                   onPress={() => handleRetry(item)}
                 >
-                  <Ionicons name="refresh" size={12} color="#EF4444" />
+                  <Ionicons name="refresh" size={12} color={theme.status.error} />
                   <Text style={styles.retryText}>Retry</Text>
                 </Pressable>
               )}
@@ -587,7 +591,7 @@ export default function PeerMessagesScreen() {
         {item.profileImage ? (
           <Image source={{ uri: item.profileImage }} style={{ width: 44, height: 44, borderRadius: 22 }} />
         ) : (
-          <Ionicons name="person" size={22} color="#8A63D2" />
+          <Ionicons name="person" size={22} color={theme.primary} />
         )}
       </View>
       <View style={styles.convInfo}>
@@ -597,7 +601,7 @@ export default function PeerMessagesScreen() {
             "Student"}
         </Text>
       </View>
-      <Ionicons name="chatbubble-outline" size={18} color="#8A63D2" />
+      <Ionicons name="chatbubble-outline" size={18} color={theme.primary} />
     </Pressable>
   );
 
@@ -638,7 +642,7 @@ export default function PeerMessagesScreen() {
       >
         {/* Header */}
         <LinearGradient
-          colors={["#8A63D2", "#B794F6"]}
+          colors={theme.headerGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
@@ -662,7 +666,7 @@ export default function PeerMessagesScreen() {
                 }
               }}
             >
-              <Ionicons name="arrow-back" size={22} color="white" />
+              <Ionicons name="arrow-back" size={22} color={theme.onPrimary} />
             </Pressable>
             <View style={styles.headerCenter}>
               <View style={styles.headerTitleRow}>
@@ -679,7 +683,7 @@ export default function PeerMessagesScreen() {
                         styles.headerAvatarFallback,
                       ]}
                     >
-                      <Ionicons name="person" size={14} color="white" />
+                      <Ionicons name="person" size={14} color={theme.onPrimary} />
                     </View>
                   ))}
                 <Text style={styles.headerTitle} numberOfLines={1}>
@@ -691,7 +695,7 @@ export default function PeerMessagesScreen() {
                   <Ionicons
                     name={viewMode === "chat" ? "people" : "people-outline"}
                     size={10}
-                    color="white"
+                    color={theme.onPrimary}
                   />
                   <Text style={styles.headerBadgeText}>{headerSubtitle}</Text>
                 </View>
@@ -699,7 +703,7 @@ export default function PeerMessagesScreen() {
             </View>
             {viewMode === "inbox" && (
               <Pressable style={styles.backBtn} onPress={openSearch}>
-                <Ionicons name="person-add" size={20} color="white" />
+                <Ionicons name="person-add" size={20} color={theme.onPrimary} />
               </Pressable>
             )}
             {viewMode !== "inbox" && <View style={{ width: 40 }} />}
@@ -710,41 +714,41 @@ export default function PeerMessagesScreen() {
         {viewMode === "inbox" ? (
           loading ? (
             <View style={styles.emptyState}>
-              <Ionicons name="chatbubbles-outline" size={48} color="#D1D5DB" />
+              <Ionicons name="chatbubbles-outline" size={48} color={theme.border} />
               <Text style={styles.emptyText}>Loading conversations...</Text>
             </View>
           ) : conversations.length === 0 ? (
             <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={48} color="#D1D5DB" />
+              <Ionicons name="people-outline" size={48} color={theme.border} />
               <Text style={styles.emptyTitle}>No conversations yet</Text>
               <Text style={styles.emptyText}>
                 Tap the + button to find students and start chatting.
               </Text>
               <Pressable style={styles.findBtn} onPress={openSearch}>
-                <Ionicons name="person-add" size={18} color="white" />
+                <Ionicons name="person-add" size={18} color={theme.onPrimary} />
                 <Text style={styles.findBtnText}>Find Students</Text>
               </Pressable>
             </View>
           ) : (
             <>
               <View style={styles.searchBar}>
-                <Ionicons name="search" size={18} color="#94A3B8" />
+                <Ionicons name="search" size={18} color={theme.secondaryText} />
                 <TextInput
                   style={styles.searchInput}
                   placeholder="Search conversations..."
-                  placeholderTextColor="#94A3B8"
+                  placeholderTextColor={theme.secondaryText}
                   value={inboxSearchQuery}
                   onChangeText={setInboxSearchQuery}
                 />
                 {inboxSearchQuery.length > 0 && (
                   <Pressable onPress={() => setInboxSearchQuery("")}>
-                    <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                    <Ionicons name="close-circle" size={18} color={theme.secondaryText} />
                   </Pressable>
                 )}
               </View>
               {filteredConversations.length === 0 ? (
                 <View style={styles.emptyState}>
-                  <Ionicons name="search-outline" size={48} color="#D1D5DB" />
+                  <Ionicons name="search-outline" size={48} color={theme.border} />
                   <Text style={styles.emptyTitle}>No matches</Text>
                   <Text style={styles.emptyText}>
                     No conversations match "{inboxSearchQuery}".
@@ -760,35 +764,35 @@ export default function PeerMessagesScreen() {
                 />
               )}
               <Pressable style={styles.fab} onPress={openSearch}>
-                <Ionicons name="add" size={28} color="white" />
+                <Ionicons name="add" size={28} color={theme.onPrimary} />
               </Pressable>
             </>
           )
         ) : viewMode === "search" ? (
           <>
             <View style={styles.searchBar}>
-              <Ionicons name="search" size={18} color="#94A3B8" />
+              <Ionicons name="search" size={18} color={theme.secondaryText} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search by name or department..."
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={theme.secondaryText}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 autoFocus
               />
               {searchQuery.length > 0 && (
                 <Pressable onPress={() => setSearchQuery("")}>
-                  <Ionicons name="close-circle" size={18} color="#94A3B8" />
+                  <Ionicons name="close-circle" size={18} color={theme.secondaryText} />
                 </Pressable>
               )}
             </View>
             {searchLoading ? (
               <View style={styles.emptyState}>
-                <ActivityIndicator size="large" color="#8A63D2" />
+                <ActivityIndicator size="large" color={theme.primary} />
                 <Text style={styles.emptyText}>Loading students...</Text>
               </View>            ) : students.length === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons name="search-outline" size={48} color="#D1D5DB" />
+                <Ionicons name="search-outline" size={48} color={theme.border} />
                 <Text style={styles.emptyTitle}>
                   {searchQuery ? "No students found" : "Find a Student"}
                 </Text>
@@ -812,7 +816,7 @@ export default function PeerMessagesScreen() {
           <>
             {allMessages.length === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons name="chatbubble-outline" size={48} color="#D1D5DB" />
+                <Ionicons name="chatbubble-outline" size={48} color={theme.border} />
                 <Text style={styles.emptyTitle}>Start the conversation</Text>
                 <Text style={styles.emptyText}>
                   Send a message to{" "}
@@ -837,7 +841,7 @@ export default function PeerMessagesScreen() {
             {/* Moderation error banner */}
             {moderationError && (
               <View style={styles.moderationBanner}>
-                <Ionicons name="warning" size={16} color="#EF4444" />
+                <Ionicons name="warning" size={16} color={theme.status.error} />
                 <Text style={styles.moderationText}>{moderationError}</Text>
               </View>
             )}
@@ -860,13 +864,13 @@ export default function PeerMessagesScreen() {
                 <Ionicons
                   name={showEmoji ? "keyboard" : ("happy-outline" as any)}
                   size={24}
-                  color={showEmoji ? "#8A63D2" : "#94A3B8"}
+                  color={showEmoji ? theme.primary : theme.secondaryText}
                 />
               </Pressable>
               <TextInput
                 style={styles.textInput}
                 placeholder="Type a message..."
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={theme.secondaryText}
                 value={inputText}
                 onChangeText={setInputText}
                 multiline
@@ -894,15 +898,15 @@ export default function PeerMessagesScreen() {
                 }
               >
                 {moderationLoading ? (
-                  <ActivityIndicator size={24} color="#8A63D2" />
+                  <ActivityIndicator size={24} color={theme.primary} />
                 ) : (
                   <Ionicons
                     name="arrow-up-circle"
                     size={32}
                     color={
                       inputText.trim() && !currentModerationError
-                        ? "#8A63D2"
-                        : "#D1D5DB"
+                        ? theme.primary
+                        : theme.border
                     }
                   />
                 )}
@@ -926,13 +930,13 @@ export default function PeerMessagesScreen() {
           <View style={styles.ctxMenu}>
             <Text style={styles.ctxTitle}>Message Options</Text>
             <Pressable style={styles.ctxRow} onPress={handleCopyMsg}>
-              <Ionicons name="copy-outline" size={20} color="#8A63D2" />
+              <Ionicons name="copy-outline" size={20} color={theme.primary} />
               <Text style={styles.ctxLabel}>Copy</Text>
             </Pressable>
             <View style={styles.ctxDivider} />
             <Pressable style={styles.ctxRow} onPress={handleDeleteMsg}>
-              <Ionicons name="trash-outline" size={20} color="#EF4444" />
-              <Text style={[styles.ctxLabel, { color: "#EF4444" }]}>
+              <Ionicons name="trash-outline" size={20} color={theme.status.error} />
+              <Text style={[styles.ctxLabel, { color: theme.status.error }]}>
                 Delete
               </Text>
             </Pressable>
@@ -954,8 +958,8 @@ export default function PeerMessagesScreen() {
           <View style={styles.ctxMenu}>
             <Text style={styles.ctxTitle}>Conversation Options</Text>
             <Pressable style={styles.ctxRow} onPress={handleDeleteConv}>
-              <Ionicons name="trash-outline" size={20} color="#EF4444" />
-              <Text style={[styles.ctxLabel, { color: "#EF4444" }]}>
+              <Ionicons name="trash-outline" size={20} color={theme.status.error} />
+              <Text style={[styles.ctxLabel, { color: theme.status.error }]}>
                 Delete Conversation
               </Text>
             </Pressable>
@@ -976,7 +980,7 @@ export default function PeerMessagesScreen() {
         >
           <View style={styles.flaggedModal}>
             <View style={styles.flaggedIcon}>
-              <Ionicons name="warning" size={32} color="#F59E0B" />
+              <Ionicons name="warning" size={32} color={theme.status.warning} />
             </View>
             <Text style={styles.flaggedTitle}>Message Flagged</Text>
             <Text style={styles.flaggedDesc}>
@@ -1010,408 +1014,409 @@ export default function PeerMessagesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F2F8" },
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background },
 
-  // Header
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 14,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "700",
-    flexShrink: 1,
-  },
-  headerTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    maxWidth: "100%",
-  },
-  headerAvatar: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: "#7A54C4",
-  },
-  headerAvatarFallback: { alignItems: "center", justifyContent: "center" },
-  headerCenter: {
-    flex: 1,
-    alignItems: "center",
-  },
-  headerBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(255,255,255,0.25)",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    marginTop: 3,
-    alignSelf: "center",
-  },
-  headerBadgeText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "white",
-  },
+    // Header
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      paddingBottom: 14,
+    },
+    backBtn: {
+      width: 40,
+      height: 40,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    headerTitle: {
+      color: theme.onPrimary,
+      fontSize: 18,
+      fontWeight: "700",
+      flexShrink: 1,
+    },
+    headerTitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      maxWidth: "100%",
+    },
+    headerAvatar: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: theme.primaryDeep,
+    },
+    headerAvatarFallback: { alignItems: "center", justifyContent: "center" },
+    headerCenter: {
+      flex: 1,
+      alignItems: "center",
+    },
+    headerBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      backgroundColor: "rgba(255,255,255,0.25)",
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 10,
+      marginTop: 3,
+      alignSelf: "center",
+    },
+    headerBadgeText: {
+      fontSize: 10,
+      fontWeight: "600",
+      color: theme.onPrimary,
+    },
 
-  // Empty state
-  emptyState: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 40,
-  },
-  emptyTitle: { fontSize: 17, fontWeight: "700", color: "#1E1B4B" },
-  emptyText: {
-    fontSize: 14,
-    color: "#64748B",
-    textAlign: "center",
-  },
-  findBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#8A63D2",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
-    marginTop: 8,
-  },
-  findBtnText: { color: "white", fontSize: 15, fontWeight: "600" },
+    // Empty state
+    emptyState: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: 40,
+    },
+    emptyTitle: { fontSize: 17, fontWeight: "700", color: theme.text },
+    emptyText: {
+      fontSize: 14,
+      color: theme.secondaryText,
+      textAlign: "center",
+    },
+    findBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      backgroundColor: theme.primary,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: 25,
+      marginTop: 8,
+    },
+    findBtnText: { color: theme.onPrimary, fontSize: 15, fontWeight: "600" },
 
-  // FAB
-  fab: {
-    position: "absolute",
-    bottom: 24,
-    right: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#8A63D2",
-    justifyContent: "center",
-    alignItems: "center",
-    // @ts-ignore
-    boxShadow: "0px 4px 12px rgba(138, 99, 210, 0.4)",
-  },
+    // FAB
+    fab: {
+      position: "absolute",
+      bottom: 24,
+      right: 24,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: theme.primary,
+      justifyContent: "center",
+      alignItems: "center",
+      // @ts-ignore
+      boxShadow: "0px 4px 12px rgba(138, 99, 210, 0.4)",
+    },
 
-  // Conversation list
-  convList: { paddingVertical: 8, paddingHorizontal: 16 },
-  convRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 8,
-    // @ts-ignore
-    boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
-    gap: 12,
-  },
-  convAvatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: "#F3EEFF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  convInfo: { flex: 1 },
-  convTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 3,
-  },
-  convName: { fontSize: 15, fontWeight: "600", color: "#1E1B4B" },
-  convNameBold: { fontWeight: "800" },
-  convTime: { fontSize: 11, color: "#94A3B8" },
-  convLastMsg: { fontSize: 13, color: "#64748B" },
-  convLastMsgBold: { fontWeight: "600", color: "#1E1B4B" },
-  unreadDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#8A63D2",
-  },
-  convAvatarWrapper: {
-    position: "relative",
-  },
-  convPresenceDot: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: "white",
-  },
-  convPresenceDotOnline: {
-    backgroundColor: "#22C55E",
-  },
-  convPresenceDotOffline: {
-    backgroundColor: "#D1D5DB",
-  },
+    // Conversation list
+    convList: { paddingVertical: 8, paddingHorizontal: 16 },
+    convRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.card,
+      borderRadius: 16,
+      padding: 14,
+      marginBottom: 8,
+      // @ts-ignore
+      boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.06)",
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+      gap: 12,
+    },
+    convAvatar: {
+      width: 46,
+      height: 46,
+      borderRadius: 23,
+      backgroundColor: theme.softPurple,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    convInfo: { flex: 1 },
+    convTop: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 3,
+    },
+    convName: { fontSize: 15, fontWeight: "600", color: theme.text },
+    convNameBold: { fontWeight: "800" },
+    convTime: { fontSize: 11, color: theme.secondaryText },
+    convLastMsg: { fontSize: 13, color: theme.secondaryText },
+    convLastMsgBold: { fontWeight: "600", color: theme.text },
+    unreadDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: theme.primary,
+    },
+    convAvatarWrapper: {
+      position: "relative",
+    },
+    convPresenceDot: {
+      position: "absolute",
+      bottom: 0,
+      right: 0,
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: theme.card,
+    },
+    convPresenceDotOnline: {
+      backgroundColor: theme.status.success,
+    },
+    convPresenceDotOffline: {
+      backgroundColor: theme.border,
+    },
 
-  // Search
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "white",
-    margin: 16,
-    marginBottom: 8,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    height: 46,
-    gap: 8,
-    // @ts-ignore
-    boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: "#1E1B4B",
-    paddingVertical: 0,
-  },
+    // Search
+    searchBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.card,
+      margin: 16,
+      marginBottom: 8,
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      height: 46,
+      gap: 8,
+      // @ts-ignore
+      boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.06)",
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 15,
+      color: theme.text,
+      paddingVertical: 0,
+    },
 
-  // Messages
-  messagesList: {
-    flexGrow: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  bubbleRow: { marginBottom: 8, flexDirection: "row" },
-  bubbleRowRight: { justifyContent: "flex-end" },
-  bubbleRowLeft: { justifyContent: "flex-start" },
-  bubbleWrapper: {
-    maxWidth: "78%",
-    gap: 2,
-  },
-  senderLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#8A63D2",
-    marginLeft: 12,
-    marginBottom: 2,
-  },
-  bubble: {
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  bubbleMine: {
-    backgroundColor: "#8A63D2",
-    borderBottomRightRadius: 4,
-  },
-  bubbleTheirs: {
-    backgroundColor: "white",
-    borderBottomLeftRadius: 4,
-    // @ts-ignore
-    boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
-  },
-  bubbleDeleted: {
-    backgroundColor: "rgba(148, 163, 184, 0.15)",
-    borderWidth: 1,
-    borderColor: "rgba(148, 163, 184, 0.2)",
-  },
-  bubbleText: {
-    fontSize: 15,
-    color: "#1E1B4B",
-    lineHeight: 20,
-  },
-  bubbleTextMine: { color: "white" },
-  bubbleFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    gap: 6,
-    marginTop: 4,
-  },
-  bubbleTime: { fontSize: 10, color: "#94A3B8" },
-  bubbleTimeMine: { color: "rgba(255,255,255,0.6)" },
-  deletedRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  deletedText: { fontSize: 13, color: "#94A3B8", fontStyle: "italic" },
-  deletedTextMine: { color: "rgba(255,255,255,0.5)" },
-  retryBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    backgroundColor: "rgba(239, 68, 68, 0.1)",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  retryText: { fontSize: 11, color: "#EF4444", fontWeight: "600" },
+    // Messages
+    messagesList: {
+      flexGrow: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+    },
+    bubbleRow: { marginBottom: 8, flexDirection: "row" },
+    bubbleRowRight: { justifyContent: "flex-end" },
+    bubbleRowLeft: { justifyContent: "flex-start" },
+    bubbleWrapper: {
+      maxWidth: "78%",
+      gap: 2,
+    },
+    senderLabel: {
+      fontSize: 11,
+      fontWeight: "600",
+      color: theme.primary,
+      marginLeft: 12,
+      marginBottom: 2,
+    },
+    bubble: {
+      borderRadius: 18,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    bubbleMine: {
+      backgroundColor: theme.primary,
+      borderBottomRightRadius: 4,
+    },
+    bubbleTheirs: {
+      backgroundColor: theme.card,
+      borderBottomLeftRadius: 4,
+      // @ts-ignore
+      boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.08)",
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+    },
+    bubbleDeleted: {
+      backgroundColor: `${theme.secondaryText}26`,
+      borderWidth: 1,
+      borderColor: `${theme.secondaryText}33`,
+    },
+    bubbleText: {
+      fontSize: 15,
+      color: theme.text,
+      lineHeight: 20,
+    },
+    bubbleTextMine: { color: theme.onPrimary },
+    bubbleFooter: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "flex-end",
+      gap: 6,
+      marginTop: 4,
+    },
+    bubbleTime: { fontSize: 10, color: theme.secondaryText },
+    bubbleTimeMine: { color: "rgba(255,255,255,0.6)" },
+    deletedRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+    deletedText: { fontSize: 13, color: theme.secondaryText, fontStyle: "italic" },
+    deletedTextMine: { color: "rgba(255,255,255,0.5)" },
+    retryBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 3,
+      backgroundColor: `${theme.status.error}1A`,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 8,
+    },
+    retryText: { fontSize: 11, color: theme.status.error, fontWeight: "600" },
 
-  // Moderation banner
-  moderationBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#FEF2F2",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(239, 68, 68, 0.1)",
-  },
-  moderationText: { fontSize: 13, color: "#EF4444", flex: 1 },
+    // Moderation banner
+    moderationBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      backgroundColor: `${theme.status.error}14`,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderTopWidth: 1,
+      borderTopColor: `${theme.status.error}1A`,
+    },
+    moderationText: { fontSize: 13, color: theme.status.error, flex: 1 },
 
-  // Input
-  inputBar: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(156, 126, 235, 0.08)",
-    backgroundColor: "white",
-    gap: 8,
-  },
-  textInput: {
-    flex: 1,
-    backgroundColor: "#FAF8FF",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: "#1E1B4B",
-    maxHeight: 100,
-  },
-  emojiBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  sendBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  sendBtnDisabled: { opacity: 0.5 },
+    // Input
+    inputBar: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderTopWidth: 1,
+      borderTopColor: theme.borderSoft,
+      backgroundColor: theme.card,
+      gap: 8,
+    },
+    textInput: {
+      flex: 1,
+      backgroundColor: theme.inputBg,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: theme.border,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      fontSize: 15,
+      color: theme.text,
+      maxHeight: 100,
+    },
+    emojiBtn: {
+      width: 40,
+      height: 40,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    sendBtn: {
+      width: 40,
+      height: 40,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    sendBtnDisabled: { opacity: 0.5 },
 
-  // Context menu
-  ctxOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  ctxMenu: {
-    backgroundColor: "white",
-    borderRadius: 18,
-    padding: 6,
-    width: 200,
-    // @ts-ignore
-    boxShadow: "0px 8px 24px rgba(0,0,0,0.15)",
-  },
-  ctxTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#64748B",
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 6,
-  },
-  ctxRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-  },
-  ctxLabel: { fontSize: 15, fontWeight: "600", color: "#1E1B4B" },
-  ctxDivider: {
-    height: 1,
-    backgroundColor: "#F1F5F9",
-    marginHorizontal: 14,
-  },
+    // Context menu
+    ctxOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.3)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    ctxMenu: {
+      backgroundColor: theme.card,
+      borderRadius: 18,
+      padding: 6,
+      width: 200,
+      // @ts-ignore
+      boxShadow: "0px 8px 24px rgba(0,0,0,0.15)",
+    },
+    ctxTitle: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: theme.secondaryText,
+      paddingHorizontal: 14,
+      paddingTop: 10,
+      paddingBottom: 6,
+    },
+    ctxRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderRadius: 12,
+    },
+    ctxLabel: { fontSize: 15, fontWeight: "600", color: theme.text },
+    ctxDivider: {
+      height: 1,
+      backgroundColor: theme.border,
+      marginHorizontal: 14,
+    },
 
-  // Flagged modal
-  flaggedModal: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 24,
-    width: "85%",
-    maxWidth: 360,
-    alignItems: "center",
-    // @ts-ignore
-    boxShadow: "0px 8px 24px rgba(0,0,0,0.15)",
-  },
-  flaggedIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#FEF3C7",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  flaggedTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1E1B4B",
-    marginBottom: 6,
-  },
-  flaggedDesc: {
-    fontSize: 14,
-    color: "#64748B",
-    textAlign: "center",
-    marginBottom: 12,
-  },
-  flaggedPreview: {
-    fontSize: 13,
-    color: "#94A3B8",
-    fontStyle: "italic",
-    textAlign: "center",
-    marginBottom: 20,
-    paddingHorizontal: 8,
-  },
-  flaggedActions: {
-    flexDirection: "row",
-    gap: 10,
-    width: "100%",
-  },
-  flaggedCancel: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: "#F1F5F9",
-    alignItems: "center",
-  },
-  flaggedCancelText: { fontSize: 15, fontWeight: "600", color: "#64748B" },
-  flaggedConfirm: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: "#F59E0B",
-    alignItems: "center",
-  },
-  flaggedConfirmText: { fontSize: 15, fontWeight: "600", color: "white" },
-});
+    // Flagged modal
+    flaggedModal: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 24,
+      width: "85%",
+      maxWidth: 360,
+      alignItems: "center",
+      // @ts-ignore
+      boxShadow: "0px 8px 24px rgba(0,0,0,0.15)",
+    },
+    flaggedIcon: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: `${theme.status.warning}1A`,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    flaggedTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: theme.text,
+      marginBottom: 6,
+    },
+    flaggedDesc: {
+      fontSize: 14,
+      color: theme.secondaryText,
+      textAlign: "center",
+      marginBottom: 12,
+    },
+    flaggedPreview: {
+      fontSize: 13,
+      color: theme.secondaryText,
+      fontStyle: "italic",
+      textAlign: "center",
+      marginBottom: 20,
+      paddingHorizontal: 8,
+    },
+    flaggedActions: {
+      flexDirection: "row",
+      gap: 10,
+      width: "100%",
+    },
+    flaggedCancel: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 14,
+      backgroundColor: theme.inputBg,
+      alignItems: "center",
+    },
+    flaggedCancelText: { fontSize: 15, fontWeight: "600", color: theme.secondaryText },
+    flaggedConfirm: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 14,
+      backgroundColor: theme.status.warning,
+      alignItems: "center",
+    },
+    flaggedConfirmText: { fontSize: 15, fontWeight: "600", color: theme.onPrimary },
+  });

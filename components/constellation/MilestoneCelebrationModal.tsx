@@ -13,6 +13,8 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 interface MilestoneCelebrationModalProps {
   milestone: JournalMilestone | null;
@@ -29,6 +31,8 @@ export function MilestoneCelebrationModal({
   milestone,
   onClose,
 }: MilestoneCelebrationModalProps) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.92);
 
@@ -92,77 +96,78 @@ export function MilestoneCelebrationModal({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(10, 6, 20, 0.72)",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 28,
-  },
-  card: {
-    width: "100%",
-    maxWidth: 340,
-    backgroundColor: "#1E1B2E",
-    borderRadius: 24,
-    paddingVertical: 32,
-    paddingHorizontal: 24,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(167, 139, 250, 0.35)",
-  },
-  emoji: {
-    fontSize: 56,
-    marginBottom: 10,
-  },
-  eyebrow: {
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 1.6,
-    textTransform: "uppercase",
-    color: "#A78BFA",
-    marginBottom: 8,
-  },
-  unlockedLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "rgba(255, 255, 255, 0.7)",
-    marginBottom: 4,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    textAlign: "center",
-    marginBottom: 10,
-  },
-  message: {
-    fontSize: 14,
-    lineHeight: 21,
-    color: "rgba(255, 255, 255, 0.82)",
-    textAlign: "center",
-    marginBottom: 22,
-  },
-  primaryButton: {
-    alignSelf: "stretch",
-    backgroundColor: "#6D28D9",
-    borderRadius: 25,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  dismissButton: {
-    marginTop: 14,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-  },
-  dismissText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "rgba(255, 255, 255, 0.6)",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      backgroundColor: "rgba(10, 6, 20, 0.72)",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 28,
+    },
+    card: {
+      width: "100%",
+      maxWidth: 340,
+      backgroundColor: theme.card,
+      borderRadius: 24,
+      paddingVertical: 32,
+      paddingHorizontal: 24,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    emoji: {
+      fontSize: 56,
+      marginBottom: 10,
+    },
+    eyebrow: {
+      fontSize: 12,
+      fontWeight: "800",
+      letterSpacing: 1.6,
+      textTransform: "uppercase",
+      color: theme.primary,
+      marginBottom: 8,
+    },
+    unlockedLabel: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: theme.secondaryText,
+      marginBottom: 4,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: "800",
+      color: theme.text,
+      textAlign: "center",
+      marginBottom: 10,
+    },
+    message: {
+      fontSize: 14,
+      lineHeight: 21,
+      color: theme.secondaryText,
+      textAlign: "center",
+      marginBottom: 22,
+    },
+    primaryButton: {
+      alignSelf: "stretch",
+      backgroundColor: theme.primary,
+      borderRadius: 25,
+      paddingVertical: 14,
+      alignItems: "center",
+    },
+    primaryButtonText: {
+      color: theme.onPrimary,
+      fontSize: 16,
+      fontWeight: "700",
+    },
+    dismissButton: {
+      marginTop: 14,
+      paddingVertical: 4,
+      paddingHorizontal: 10,
+    },
+    dismissText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: theme.secondaryText,
+    },
+  });

@@ -8,13 +8,14 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 interface SecurityEvent {
   id: string;
@@ -80,7 +81,8 @@ function formatDevice(event: SecurityEvent): string {
 }
 
 export default function SecurityLogScreen() {
-  const insets = useSafeAreaInsets();
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const { user } = useAuth();
   const [events, setEvents] = useState<SecurityEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,15 +114,15 @@ export default function SecurityLogScreen() {
   }, [user]);
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
+    <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#E8E0F5", "#F4F2F8", "#E8E0F5"]}
+        colors={theme.softGradient}
         style={styles.gradient}
       >
         {/* Header */}
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#666" />
+            <Ionicons name="arrow-back" size={24} color={theme.secondaryText} />
           </Pressable>
           <Text style={styles.headerTitle}>Security Activity</Text>
           <View style={{ width: 44 }} />
@@ -128,10 +130,10 @@ export default function SecurityLogScreen() {
 
         <View style={styles.badgeContainer}>
           <LinearGradient
-            colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
+            colors={theme.headerGradient}
             style={styles.badgeGradient}
           >
-            <Ionicons name="shield-checkmark" size={32} color="white" />
+            <Ionicons name="shield-checkmark" size={32} color={theme.onPrimary} />
           </LinearGradient>
           <Text style={styles.badgeTitle}>Account Activity</Text>
           <Text style={styles.badgeSubtitle}>
@@ -144,10 +146,10 @@ export default function SecurityLogScreen() {
           showsVerticalScrollIndicator={false}
         >
           {loading ? (
-            <ActivityIndicator style={{ marginTop: 40 }} color="#8A63D2" />
+            <ActivityIndicator style={{ marginTop: 40 }} color={theme.primary} />
           ) : events.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Ionicons name="shield-checkmark-outline" size={48} color="#CCC" />
+              <Ionicons name="shield-checkmark-outline" size={48} color={theme.border} />
               <Text style={styles.emptyTitle}>No security events yet</Text>
               <Text style={styles.emptyText}>
                 Sign-ins, password changes, and reset requests will appear here.
@@ -196,123 +198,124 @@ export default function SecurityLogScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  gradient: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    backgroundColor: "white",
-    borderRadius: 22,
-    justifyContent: "center",
-    alignItems: "center",
-    // @ts-ignore - web only
-    boxShadow: "0px 2px 4px rgba(0,0,0,0.1)",
-    elevation: 3,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#8A63D2",
-  },
-  badgeContainer: {
-    alignItems: "center",
-    paddingVertical: 20,
-  },
-  badgeGradient: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  badgeTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#8A63D2",
-  },
-  badgeSubtitle: {
-    fontSize: 14,
-    color: "#666",
-    marginTop: 4,
-  },
-  listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  eventCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    // @ts-ignore - web only
-    boxShadow: "0px 1px 2px rgba(0,0,0,0.08)",
-    elevation: 2,
-  },
-  eventIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  eventBody: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  eventLabel: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#1E1B4B",
-  },
-  eventDevice: {
-    fontSize: 13,
-    color: "#64748B",
-    marginTop: 2,
-  },
-  eventIp: {
-    fontSize: 12,
-    color: "#94A3B8",
-    marginTop: 2,
-  },
-  eventDate: {
-    fontSize: 12,
-    color: "#94A3B8",
-    marginLeft: 12,
-    textAlign: "right",
-    maxWidth: 110,
-  },
-  emptyContainer: {
-    alignItems: "center",
-    marginTop: 60,
-    paddingHorizontal: 24,
-  },
-  emptyTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#666",
-    marginTop: 12,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: "#94A3B8",
-    textAlign: "center",
-    marginTop: 6,
-    lineHeight: 20,
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    gradient: {
+      flex: 1,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      paddingBottom: 8,
+    },
+    backButton: {
+      width: 44,
+      height: 44,
+      backgroundColor: theme.card,
+      borderRadius: 22,
+      justifyContent: "center",
+      alignItems: "center",
+      // @ts-ignore - web only
+      boxShadow: "0px 2px 4px rgba(0,0,0,0.1)",
+      elevation: 3,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: theme.primary,
+    },
+    badgeContainer: {
+      alignItems: "center",
+      paddingVertical: 20,
+    },
+    badgeGradient: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    badgeTitle: {
+      fontSize: 22,
+      fontWeight: "700",
+      color: theme.primary,
+    },
+    badgeSubtitle: {
+      fontSize: 14,
+      color: theme.secondaryText,
+      marginTop: 4,
+    },
+    listContent: {
+      paddingHorizontal: 20,
+      paddingBottom: 40,
+    },
+    eventCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.card,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 12,
+      // @ts-ignore - web only
+      boxShadow: "0px 1px 2px rgba(0,0,0,0.08)",
+      elevation: 2,
+    },
+    eventIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    eventBody: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    eventLabel: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: theme.text,
+    },
+    eventDevice: {
+      fontSize: 13,
+      color: theme.secondaryText,
+      marginTop: 2,
+    },
+    eventIp: {
+      fontSize: 12,
+      color: theme.secondaryText,
+      marginTop: 2,
+    },
+    eventDate: {
+      fontSize: 12,
+      color: theme.secondaryText,
+      marginLeft: 12,
+      textAlign: "right",
+      maxWidth: 110,
+    },
+    emptyContainer: {
+      alignItems: "center",
+      marginTop: 60,
+      paddingHorizontal: 24,
+    },
+    emptyTitle: {
+      fontSize: 17,
+      fontWeight: "700",
+      color: theme.secondaryText,
+      marginTop: 12,
+    },
+    emptyText: {
+      fontSize: 14,
+      color: theme.secondaryText,
+      textAlign: "center",
+      marginTop: 6,
+      lineHeight: 20,
+    },
+  });

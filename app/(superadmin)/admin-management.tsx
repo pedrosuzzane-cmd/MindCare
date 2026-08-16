@@ -18,6 +18,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 import { AdminAccountsPanel } from "@/components/superadmin/AdminAccountsPanel";
 
 interface ResetRequest {
@@ -37,43 +39,45 @@ interface ResetRequest {
 
 type StatusKey = ResetRequest["status"];
 
-const STATUS_META: Record<
+const STATUS_META = (
+  theme: MindCareTheme,
+): Record<
   StatusKey,
   { label: string; color: string; bg: string; dot: string; avatarBg: string; avatarFg: string }
-> = {
+> => ({
   pending: {
     label: "Pending",
-    color: "#B45309",
-    bg: "#FEF3C7",
-    dot: "#F59E0B",
-    avatarBg: "#FEF3C7",
-    avatarFg: "#B45309",
+    color: theme.status.warning,
+    bg: `${theme.status.warning}1A`,
+    dot: theme.accent.amber,
+    avatarBg: `${theme.status.warning}1A`,
+    avatarFg: theme.status.warning,
   },
   approved: {
     label: "Approved",
-    color: "#047857",
-    bg: "#D1FAE5",
-    dot: "#10B981",
-    avatarBg: "#D1FAE5",
-    avatarFg: "#047857",
+    color: theme.status.success,
+    bg: `${theme.status.success}1A`,
+    dot: theme.accent.green,
+    avatarBg: `${theme.status.success}1A`,
+    avatarFg: theme.status.success,
   },
   rejected: {
     label: "Rejected",
-    color: "#B91C1C",
-    bg: "#FEE2E2",
-    dot: "#EF4444",
-    avatarBg: "#FEE2E2",
-    avatarFg: "#B91C1C",
+    color: theme.status.error,
+    bg: `${theme.status.error}1A`,
+    dot: theme.status.error,
+    avatarBg: `${theme.status.error}1A`,
+    avatarFg: theme.status.error,
   },
   completed: {
     label: "Completed",
-    color: "#1D4ED8",
-    bg: "#DBEAFE",
-    dot: "#3B82F6",
-    avatarBg: "#DBEAFE",
-    avatarFg: "#1D4ED8",
+    color: theme.status.info,
+    bg: `${theme.status.info}1A`,
+    dot: theme.status.info,
+    avatarBg: `${theme.status.info}1A`,
+    avatarFg: theme.status.info,
   },
-};
+});
 
 function timeAgo(ms?: number): string {
   if (!ms) return "—";
@@ -106,7 +110,9 @@ function initials(name: string): string {
 }
 
 function StatusBadge({ status }: { status: StatusKey }) {
-  const meta = STATUS_META[status] || STATUS_META.pending;
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
+  const meta = STATUS_META(theme)[status] || STATUS_META(theme).pending;
   return (
     <View style={[styles.statusBadge, { backgroundColor: meta.bg }]}>
       <View style={[styles.statusDot, { backgroundColor: meta.dot }]} />
@@ -130,6 +136,8 @@ function StatTile({
   icon: keyof typeof Ionicons.glyphMap;
   highlighted?: boolean;
 }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   return (
     <View
       style={[
@@ -151,6 +159,8 @@ function StatTile({
 export default function PasswordResetRequestsScreen() {
   const insets = useSafeAreaInsets();
   const { user, role } = useAuth();
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [segment, setSegment] = useState<"requests" | "accounts">("requests");
   const [requests, setRequests] = useState<ResetRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -274,7 +284,7 @@ export default function PasswordResetRequestsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
-      <LinearGradient colors={["#7C3AED", "#9B6BF2"]} style={styles.headerBand}>
+      <LinearGradient colors={theme.headerGradient} style={styles.headerBand}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <Pressable
@@ -284,7 +294,7 @@ export default function PasswordResetRequestsScreen() {
               accessibilityLabel="Back to admin panel"
               hitSlop={8}
             >
-              <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+              <Ionicons name="arrow-back" size={22} color={theme.onPrimary} />
             </Pressable>
             <View style={styles.titleWrap}>
               <View style={styles.titleRow}>
@@ -304,7 +314,7 @@ export default function PasswordResetRequestsScreen() {
               accessibilityRole="button"
               accessibilityLabel="Refresh"
             >
-              <Ionicons name="refresh" size={20} color="#FFFFFF" />
+              <Ionicons name="refresh" size={20} color={theme.onPrimary} />
             </Pressable>
           </View>
         </View>
@@ -321,7 +331,7 @@ export default function PasswordResetRequestsScreen() {
               <Ionicons
                 name={seg === "requests" ? "key-outline" : "people-outline"}
                 size={14}
-                color={segment === seg ? "#6D28D9" : "rgba(255,255,255,0.9)"}
+                color={segment === seg ? theme.primaryDeep : "rgba(255,255,255,0.9)"}
               />
               <Text
                 style={[
@@ -406,18 +416,18 @@ export default function PasswordResetRequestsScreen() {
         >
         {requests.length > 0 && (
           <View style={styles.searchBox}>
-            <Ionicons name="search-outline" size={18} color="#9CA3AF" />
+            <Ionicons name="search-outline" size={18} color={theme.secondaryText} />
             <TextInput
               style={styles.searchInput}
               value={query}
               onChangeText={setQuery}
               placeholder="Search by name or email"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={theme.secondaryText}
               autoCapitalize="none"
             />
             {query.length > 0 && (
               <Pressable onPress={() => setQuery("")} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                <Ionicons name="close-circle" size={18} color={theme.secondaryText} />
               </Pressable>
             )}
           </View>
@@ -425,11 +435,11 @@ export default function PasswordResetRequestsScreen() {
 
         {loading ? (
           <View style={styles.center}>
-            <ActivityIndicator size="large" color="#7C3AED" />
+            <ActivityIndicator size="large" color={theme.primary} />
           </View>
         ) : !user ? (
           <View style={styles.signInCard}>
-            <Ionicons name="lock-closed-outline" size={20} color="#7C3AED" />
+            <Ionicons name="lock-closed-outline" size={20} color={theme.primary} />
             <Text style={styles.signInText}>
               Please sign in to view password reset requests.
             </Text>
@@ -443,7 +453,7 @@ export default function PasswordResetRequestsScreen() {
         ) : requests.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
-              <Ionicons name="checkmark-done-circle-outline" size={40} color="#7C3AED" />
+              <Ionicons name="checkmark-done-circle-outline" size={40} color={theme.primary} />
             </View>
             <Text style={styles.emptyTitle}>No reset requests yet</Text>
             <Text style={styles.emptyText}>
@@ -454,7 +464,7 @@ export default function PasswordResetRequestsScreen() {
         ) : visible.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
-              <Ionicons name="search-outline" size={40} color="#7C3AED" />
+              <Ionicons name="search-outline" size={40} color={theme.primary} />
             </View>
             <Text style={styles.emptyTitle}>No results</Text>
             <Text style={styles.emptyText}>
@@ -515,7 +525,9 @@ function RequestCard({
   onApprove: () => void;
   onReject: () => void;
 }) {
-  const meta = STATUS_META[request.status];
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
+  const meta = STATUS_META(theme)[request.status];
   const isPending = request.status === "pending";
 
   return (
@@ -530,7 +542,7 @@ function RequestCard({
           <Text style={styles.cardName}>{request.adminName || "Administrator"}</Text>
           <Text style={styles.cardEmail}>{request.email}</Text>
           <View style={styles.cardMetaRow}>
-            <Ionicons name="time-outline" size={12} color="#9CA3AF" />
+            <Ionicons name="time-outline" size={12} color={theme.secondaryText} />
             <Text style={styles.cardMeta}>
               Requested {timeAgo(request.requestedAtMs)}
             </Text>
@@ -559,10 +571,10 @@ function RequestCard({
             accessibilityLabel={`Approve ${request.email}`}
           >
             {acting ? (
-              <ActivityIndicator size="small" color="white" />
+              <ActivityIndicator size="small" color={theme.onPrimary} />
             ) : (
               <>
-                <Ionicons name="checkmark" size={16} color="white" />
+                <Ionicons name="checkmark" size={16} color={theme.onPrimary} />
                 <Text style={styles.approveButtonText}>Approve</Text>
               </>
             )}
@@ -574,7 +586,7 @@ function RequestCard({
             accessibilityRole="button"
             accessibilityLabel={`Reject ${request.email}`}
           >
-            <Ionicons name="close" size={16} color="#B91C1C" />
+            <Ionicons name="close" size={16} color={theme.status.error} />
             <Text style={styles.rejectButtonText}>Reject</Text>
           </Pressable>
         </View>
@@ -583,11 +595,12 @@ function RequestCard({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#7C3AED",
-  },
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.primary,
+    },
   headerBand: {
     paddingHorizontal: 20,
     paddingTop: 8,
@@ -623,7 +636,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: theme.onPrimary,
   },
   headerSubtitle: {
     fontSize: 12,
@@ -653,7 +666,7 @@ const styles = StyleSheet.create({
     borderRadius: 11,
   },
   segmentPillActive: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
   },
   segmentText: {
     fontSize: 13,
@@ -661,7 +674,7 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.9)",
   },
   segmentTextActive: {
-    color: "#6D28D9",
+    color: theme.primaryDeep,
   },
   iconButton: {
     width: 40,
@@ -697,7 +710,7 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: theme.onPrimary,
   },
   statLabel: {
     fontSize: 10,
@@ -755,7 +768,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: "#F8F7FB",
+    backgroundColor: theme.background,
   },
   scroll: {
     paddingHorizontal: 20,
@@ -766,13 +779,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 14,
     paddingHorizontal: 14,
     height: 46,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#F1F0F6",
+    borderColor: theme.borderSoft,
     // @ts-ignore - web only
     boxShadow: "0px 2px 8px rgba(91,33,182,0.08)",
     elevation: 2,
@@ -780,7 +793,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 14,
-    color: "#1F2937",
+    color: theme.text,
   },
   center: {
     paddingVertical: 80,
@@ -801,13 +814,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   signInButton: {
-    backgroundColor: "#7C3AED",
+    backgroundColor: theme.primary,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
   signInButtonText: {
-    color: "white",
+    color: theme.onPrimary,
     fontSize: 13,
     fontWeight: "700",
   },
@@ -820,18 +833,18 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: "#EDE9FE",
+    backgroundColor: theme.softPurple,
     justifyContent: "center",
     alignItems: "center",
   },
   emptyTitle: {
     fontSize: 17,
     fontWeight: "800",
-    color: "#374151",
+    color: theme.text,
   },
   emptyText: {
     fontSize: 13,
-    color: "#6B7280",
+    color: theme.secondaryText,
     textAlign: "center",
     lineHeight: 19,
     maxWidth: 280,
@@ -839,7 +852,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: "800",
-    color: "#5B21B6",
+    color: theme.primaryDeep,
     textTransform: "uppercase",
     letterSpacing: 0.6,
     marginTop: 8,
@@ -847,16 +860,16 @@ const styles = StyleSheet.create({
   },
   sectionEmpty: {
     fontSize: 13,
-    color: "#9CA3AF",
+    color: theme.secondaryText,
     marginBottom: 16,
   },
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 18,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#F1F0F6",
+    borderColor: theme.borderSoft,
     // @ts-ignore - web only
     boxShadow: "0px 4px 14px rgba(91,33,182,0.08)",
     elevation: 3,
@@ -883,11 +896,11 @@ const styles = StyleSheet.create({
   cardName: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#1F2937",
+    color: theme.text,
   },
   cardEmail: {
     fontSize: 13,
-    color: "#6B7280",
+    color: theme.secondaryText,
     marginTop: 2,
   },
   cardMetaRow: {
@@ -898,11 +911,11 @@ const styles = StyleSheet.create({
   },
   cardMeta: {
     fontSize: 12,
-    color: "#9CA3AF",
+    color: theme.secondaryText,
   },
   cardId: {
     fontSize: 10,
-    color: "#D1D5DB",
+    color: theme.border,
     marginTop: 4,
     fontVariant: ["tabular-nums"],
   },
@@ -950,12 +963,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    backgroundColor: "#22C55E",
+    backgroundColor: theme.status.success,
     borderRadius: 12,
     height: 44,
   },
   approveButtonText: {
-    color: "white",
+    color: theme.onPrimary,
     fontSize: 14,
     fontWeight: "700",
   },

@@ -11,18 +11,22 @@ import React, { useEffect } from "react";
 import {
     ActivityIndicator,
     Pressable,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 export const options = {
   headerShown: false,
 };
 
 export default function JournalDetailScreen() {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const params = useLocalSearchParams<{ id?: string }>();
   const id = params.id;
   const { getJournalEntry, loading } = useJournal();
@@ -48,9 +52,9 @@ export default function JournalDetailScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.center}>
-          <Text style={{ color: "#666" }}>Entry not found.</Text>
+          <Text style={{ color: theme.secondaryText }}>Entry not found.</Text>
           <Pressable onPress={() => router.replace("/daily-journal")}>
-            <Text style={{ color: "#8A63D2", marginTop: 12 }}>
+            <Text style={{ color: theme.primary, marginTop: 12 }}>
               Back to Journal
             </Text>
           </Pressable>
@@ -61,7 +65,7 @@ export default function JournalDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient colors={["#8A63D2", "#7C5AC8"]} style={styles.header}>
+      <LinearGradient colors={theme.headerGradient} style={styles.header}>
         <View style={styles.headerRow}>
           <View style={{ width: 40 }} />
           <Text style={styles.headerTitle}>Journal Entry</Text>
@@ -73,7 +77,7 @@ export default function JournalDetailScreen() {
         style={styles.content}
         contentContainerStyle={{ padding: 20 }}
       >
-        <View style={[styles.card, { backgroundColor: "white" }]}>
+        <View style={styles.card}>
           <Text style={styles.title}>{entry.title}</Text>
           <Text style={styles.date}>
             {new Date(entry.entryDate).toLocaleString()}
@@ -197,7 +201,7 @@ export default function JournalDetailScreen() {
                     <Ionicons
                       name="checkmark-circle"
                       size={16}
-                      color="#8A63D2"
+                      color={theme.primary}
                     />
                     <Text style={styles.tipText}>{tip}</Text>
                   </View>
@@ -217,12 +221,12 @@ export default function JournalDetailScreen() {
           }
         >
           <LinearGradient
-            colors={["#9C7EEB", "#8A63D2"]}
+            colors={theme.headerGradient}
             style={styles.editBtnGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
           >
-            <Ionicons name="create-outline" size={20} color="white" />
+            <Ionicons name="create-outline" size={20} color={theme.onPrimary} />
             <Text style={styles.editButtonText}>Edit Entry</Text>
           </LinearGradient>
         </Pressable>
@@ -231,151 +235,153 @@ export default function JournalDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F2F8" },
-  header: { paddingVertical: 18, paddingHorizontal: 16 },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: { color: "white", fontSize: 18, fontWeight: "700" },
-  content: { flex: 1 },
-  card: {
-    borderRadius: 20,
-    padding: 20,
-    elevation: 3,
-    // @ts-ignore — web-only shadow property
-    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
-  },
-  title: { fontSize: 20, fontWeight: "700", color: "#1E1B4B" },
-  date: { fontSize: 12, color: "#8B7FA8", marginTop: 6 },
-  tagsRow: { flexDirection: "row", gap: 8, marginTop: 8 },
-  tag: {
-    backgroundColor: "#F3EAFF",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  tagText: { color: "#8A63D2", fontSize: 12, fontWeight: "600" },
-  body: { marginTop: 12, fontSize: 16, color: "#4B4453", lineHeight: 22 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  editButton: { borderRadius: 14, overflow: "hidden", marginTop: 20 },
-  editBtnGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-    gap: 8,
-  },
-  editButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
-  categoryRow: { marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  categoryText: {
-    alignSelf: "flex-start",
-    backgroundColor: "#FFF3E0",
-    color: "#E65100",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    fontWeight: "600",
-  },
-  reflectionCard: {
-    marginTop: 16,
-    backgroundColor: "#F9F4FF",
-    borderColor: "#E9D5FF",
-  },
-  reflectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  reflectionLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#8B7FA8",
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-  },
-  statusBadge: {
-    backgroundColor: "#EDE6F7",
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#8A63D2",
-  },
-  metaRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 14,
-  },
-  metaBadge: {
-    backgroundColor: "#EDE6F7",
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  metaBadgeText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#8A63D2",
-  },
-  sectionBlock: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    marginBottom: 12,
-  },
-  sectionEmoji: { fontSize: 18, marginTop: 1 },
-  sectionBody: { flex: 1 },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#8A63D2",
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-    marginBottom: 3,
-  },
-  sectionText: {
-    fontSize: 14,
-    color: "#4B4453",
-    lineHeight: 21,
-  },
-  tipsWrap: {
-    borderTopWidth: 1,
-    borderTopColor: "rgba(138, 99, 210, 0.12)",
-    paddingTop: 12,
-    marginTop: 4,
-  },
-  tipsLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#8A63D2",
-    marginBottom: 8,
-  },
-  tipRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    marginBottom: 6,
-  },
-  tipText: {
-    flex: 1,
-    fontSize: 13,
-    color: "#4B4453",
-    lineHeight: 19,
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background },
+    header: { paddingVertical: 18, paddingHorizontal: 16 },
+    headerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    headerTitle: { color: theme.onPrimary, fontSize: 18, fontWeight: "700" },
+    content: { flex: 1 },
+    card: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 20,
+      elevation: 3,
+      // @ts-ignore — web-only shadow property
+      boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+    },
+    title: { fontSize: 20, fontWeight: "700", color: theme.text },
+    date: { fontSize: 12, color: theme.secondaryText, marginTop: 6 },
+    tagsRow: { flexDirection: "row", gap: 8, marginTop: 8 },
+    tag: {
+      backgroundColor: theme.softPurple,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    tagText: { color: theme.primary, fontSize: 12, fontWeight: "600" },
+    body: { marginTop: 12, fontSize: 16, color: theme.text, lineHeight: 22 },
+    center: { flex: 1, justifyContent: "center", alignItems: "center" },
+    editButton: { borderRadius: 14, overflow: "hidden", marginTop: 20 },
+    editBtnGradient: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 14,
+      gap: 8,
+    },
+    editButtonText: { color: theme.onPrimary, fontSize: 16, fontWeight: "600" },
+    categoryRow: { marginTop: 8, flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    categoryText: {
+      alignSelf: "flex-start",
+      backgroundColor: `${theme.status.warning}14`,
+      color: theme.status.warning,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 10,
+      fontWeight: "600",
+    },
+    reflectionCard: {
+      marginTop: 16,
+      backgroundColor: theme.verySoftPurple,
+      borderColor: theme.borderSoft,
+    },
+    reflectionHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    reflectionLabel: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: theme.secondaryText,
+      textTransform: "uppercase",
+      letterSpacing: 0.4,
+    },
+    statusBadge: {
+      backgroundColor: theme.softPurple,
+      borderRadius: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+    },
+    statusBadgeText: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: theme.primary,
+    },
+    metaRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginBottom: 14,
+    },
+    metaBadge: {
+      backgroundColor: theme.softPurple,
+      borderRadius: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    metaBadgeText: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: theme.primary,
+    },
+    sectionBlock: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 10,
+      marginBottom: 12,
+    },
+    sectionEmoji: { fontSize: 18, marginTop: 1 },
+    sectionBody: { flex: 1 },
+    sectionTitle: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: theme.primary,
+      textTransform: "uppercase",
+      letterSpacing: 0.3,
+      marginBottom: 3,
+    },
+    sectionText: {
+      fontSize: 14,
+      color: theme.text,
+      lineHeight: 21,
+    },
+    tipsWrap: {
+      borderTopWidth: 1,
+      borderTopColor: theme.borderSoft,
+      paddingTop: 12,
+      marginTop: 4,
+    },
+    tipsLabel: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: theme.primary,
+      marginBottom: 8,
+    },
+    tipRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 8,
+      marginBottom: 6,
+    },
+    tipText: {
+      flex: 1,
+      fontSize: 13,
+      color: theme.text,
+      lineHeight: 19,
+    },
+  });

@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import type { MindCareTheme } from "@/constants/theme";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 
 interface MetricInfoLine {
   label?: string;
@@ -20,6 +22,8 @@ export function MetricInfoAccordion({
   title = "How is this calculated?",
   lines,
 }: MetricInfoAccordionProps) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [open, setOpen] = useState(false);
 
   return (
@@ -37,14 +41,14 @@ export function MetricInfoAccordion({
           <Ionicons
             name="information-circle-outline"
             size={16}
-            color="#8A63D2"
+            color={theme.primary}
           />
           <Text style={styles.headerTitle}>{title}</Text>
         </View>
         <Ionicons
           name={open ? "chevron-up" : "chevron-down"}
           size={16}
-          color="#8A63D2"
+          color={theme.primary}
         />
       </Pressable>
       {open && (
@@ -63,55 +67,56 @@ export function MetricInfoAccordion({
   );
 }
 
-const styles = StyleSheet.create({
-  wrapper: {
-    marginTop: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#E6DCF7",
-    backgroundColor: "#FBF9FF",
-    overflow: "hidden",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 11,
-    paddingHorizontal: 14,
-  },
-  headerOpen: {
-    backgroundColor: "#F5F0FE",
-  },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#5B2E91",
-    flexShrink: 1,
-  },
-  body: {
-    paddingHorizontal: 14,
-    paddingBottom: 14,
-    gap: 8,
-  },
-  lineRow: {
-    gap: 2,
-  },
-  lineLabel: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#8A63D2",
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-  },
-  lineText: {
-    fontSize: 13,
-    lineHeight: 19,
-    color: "#334155",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    wrapper: {
+      marginTop: 12,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+      backgroundColor: theme.secondaryCard,
+      overflow: "hidden",
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingVertical: 11,
+      paddingHorizontal: 14,
+    },
+    headerOpen: {
+      backgroundColor: theme.softPurple,
+    },
+    headerLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      flex: 1,
+    },
+    headerTitle: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: theme.text,
+      flexShrink: 1,
+    },
+    body: {
+      paddingHorizontal: 14,
+      paddingBottom: 14,
+      gap: 8,
+    },
+    lineRow: {
+      gap: 2,
+    },
+    lineLabel: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: theme.primary,
+      textTransform: "uppercase",
+      letterSpacing: 0.4,
+    },
+    lineText: {
+      fontSize: 13,
+      lineHeight: 19,
+      color: theme.text,
+    },
+  });

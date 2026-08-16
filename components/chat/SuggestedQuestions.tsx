@@ -5,6 +5,8 @@
 
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 const SUGGESTED_QUESTIONS = [
   "I'm feeling stressed about exams",
@@ -24,6 +26,9 @@ export default function SuggestedQuestions({
   onSelect,
   visible,
 }: SuggestedQuestionsProps) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
+
   if (!visible) return null;
 
   return (
@@ -44,36 +49,37 @@ export default function SuggestedQuestions({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    alignItems: "center",
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#666",
-    marginBottom: 16,
-    textAlign: "center",
-  },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 8,
-  },
-  chip: {
-    backgroundColor: "#F0F8FF",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: "#E3F2FD",
-  },
-  chipText: {
-    fontSize: 13,
-    color: "#8A63D2",
-    fontWeight: "500",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      paddingHorizontal: 16,
+      paddingVertical: 20,
+      alignItems: "center",
+    },
+    title: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: theme.secondaryText,
+      marginBottom: 16,
+      textAlign: "center",
+    },
+    grid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "center",
+      gap: 8,
+    },
+    chip: {
+      backgroundColor: theme.inputBg,
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+    },
+    chipText: {
+      fontSize: 13,
+      color: theme.primary,
+      fontWeight: "500",
+    },
+  });

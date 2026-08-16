@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import Svg, { Line, Rect, Text as SvgText } from "react-native-svg";
+import type { MindCareTheme } from "@/constants/theme";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 
 export interface BoxWhiskerDataPoint {
   label: string;
@@ -21,10 +23,10 @@ interface BoxWhiskerChartProps {
   yAxisLabel?: string;
 }
 
-const getBoxColor = (median: number): string => {
-  if (median <= 20) return "#22C55E";
-  if (median <= 50) return "#F59E0B";
-  return "#EF4444";
+const getBoxColor = (theme: MindCareTheme, median: number): string => {
+  if (median <= 20) return theme.status.success;
+  if (median <= 50) return theme.status.warning;
+  return theme.status.error;
 };
 
 export function generateMockBoxData(): BoxWhiskerDataPoint[] {
@@ -103,6 +105,8 @@ export function generateMockBoxData(): BoxWhiskerDataPoint[] {
 }
 
 export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiskerChartProps) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const { width: screenWidth } = useWindowDimensions();
   const isWide = screenWidth >= 900;
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
@@ -164,7 +168,7 @@ export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiske
                 y1={yScale(tick)}
                 x2={chartWidth - padding.right}
                 y2={yScale(tick)}
-                stroke="#F1F5F9"
+                stroke={theme.border}
                 strokeWidth={1}
               />
             ))}
@@ -177,7 +181,7 @@ export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiske
                 textAnchor="end"
                 fontSize={10}
                 fontWeight="600"
-                fill="#94A3B8"
+                fill={theme.secondaryText}
               >
                 {tick}
               </SvgText>
@@ -190,7 +194,7 @@ export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiske
                 textAnchor="middle"
                 fontSize={10}
                 fontWeight="600"
-                fill="#94A3B8"
+                fill={theme.secondaryText}
                 rotation={-90}
                 origin={`12, ${chartHeight / 2}`}
               >
@@ -209,7 +213,7 @@ export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiske
                     y1={yScale(d.min)}
                     x2={cx}
                     y2={yScale(d.max)}
-                    stroke={isSelected ? "#2D1B69" : "#94A3B8"}
+                    stroke={isSelected ? theme.text : theme.secondaryText}
                     strokeWidth={isSelected ? 2 : 1.5}
                   />
 
@@ -218,7 +222,7 @@ export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiske
                     y1={yScale(d.min)}
                     x2={cx + 6}
                     y2={yScale(d.min)}
-                    stroke={isSelected ? "#2D1B69" : "#64748B"}
+                    stroke={isSelected ? theme.text : theme.secondaryText}
                     strokeWidth={2}
                   />
 
@@ -227,7 +231,7 @@ export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiske
                     y1={yScale(d.max)}
                     x2={cx + 6}
                     y2={yScale(d.max)}
-                    stroke={isSelected ? "#2D1B69" : "#64748B"}
+                    stroke={isSelected ? theme.text : theme.secondaryText}
                     strokeWidth={2}
                   />
 
@@ -237,9 +241,9 @@ export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiske
                     width={boxWidth}
                     height={yScale(d.q1) - yScale(d.q3)}
                     rx={3}
-                    fill={d.boxColor || getBoxColor(d.median)}
+                    fill={d.boxColor || getBoxColor(theme, d.median)}
                     fillOpacity={isSelected ? 0.85 : 0.6}
-                    stroke={d.boxColor || getBoxColor(d.median)}
+                    stroke={d.boxColor || getBoxColor(theme, d.median)}
                     strokeWidth={isSelected ? 2 : 1}
                   />
 
@@ -248,7 +252,7 @@ export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiske
                     y1={yScale(d.median)}
                     x2={cx + boxWidth / 2}
                     y2={yScale(d.median)}
-                    stroke={isSelected ? "#1E1B4B" : "#2D1B69"}
+                    stroke={theme.text}
                     strokeWidth={isSelected ? 3 : 2}
                   />
 
@@ -270,7 +274,7 @@ export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiske
                         y1={yScale(outlier)}
                         x2={cx + 4}
                         y2={yScale(outlier)}
-                        stroke="#EF4444"
+                        stroke={theme.status.error}
                         strokeWidth={2}
                       />
                       <Line
@@ -278,7 +282,7 @@ export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiske
                         y1={yScale(outlier) - 4}
                         x2={cx}
                         y2={yScale(outlier) + 4}
-                        stroke="#EF4444"
+                        stroke={theme.status.error}
                         strokeWidth={2}
                       />
                       <SvgText
@@ -287,7 +291,7 @@ export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiske
                         textAnchor="start"
                         fontSize={8}
                         fontWeight="700"
-                        fill="#EF4444"
+                        fill={theme.status.error}
                       >
                         {outlier}
                       </SvgText>
@@ -307,7 +311,7 @@ export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiske
                   textAnchor="middle"
                   fontSize={10}
                   fontWeight="700"
-                  fill={selectedIdx === idx ? "#2D1B69" : "#64748B"}
+                  fill={selectedIdx === idx ? theme.text : theme.secondaryText}
                 >
                   {d.label}
                 </SvgText>
@@ -360,7 +364,7 @@ export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiske
                   styles.varianceFill,
                   {
                     width: `${Math.min((selectedBox.q3 - selectedBox.q1) / range * 100, 100)}%`,
-                    backgroundColor: selectedBox.boxColor || getBoxColor(selectedBox.median),
+                    backgroundColor: selectedBox.boxColor || getBoxColor(theme, selectedBox.median),
                   },
                 ]}
               />
@@ -372,100 +376,101 @@ export function BoxWhiskerChart({ data, title, subtitle, yAxisLabel }: BoxWhiske
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
-    shadowColor: "#6D28D9",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 22,
-    elevation: 4,
-  },
-  containerWide: { padding: 28 },
-  header: {
-    marginBottom: 16,
-  },
-  headerContent: { flex: 1 },
-  title: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#2D1B69",
-  },
-  subtitle: {
-    fontSize: 12,
-    color: "#94A3B8",
-    marginTop: 4,
-    lineHeight: 18,
-  },
-  tooltip: {
-    marginTop: 16,
-    backgroundColor: "#F8F6FC",
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#EDE9FE",
-  },
-  tooltipTitle: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#2D1B69",
-    marginBottom: 10,
-  },
-  tooltipGrid: {
-    flexDirection: "row",
-    gap: 24,
-    marginBottom: 8,
-  },
-  tooltipCol: {
-    gap: 4,
-  },
-  tooltipStat: {
-    fontSize: 13,
-    color: "#475569",
-    lineHeight: 20,
-  },
-  tooltipBold: {
-    fontWeight: "700",
-    color: "#1E1B4B",
-  },
-  tooltipOutlier: {
-    fontSize: 12,
-    color: "#EF4444",
-    fontWeight: "600",
-    marginTop: 6,
-  },
-  varianceBar: {
-    marginTop: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  varianceLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#64748B",
-    minWidth: 80,
-  },
-  varianceTrack: {
-    flex: 1,
-    height: 6,
-    backgroundColor: "#F3EAFF",
-    borderRadius: 3,
-    overflow: "hidden",
-  },
-  varianceFill: {
-    height: "100%",
-    borderRadius: 3,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: "#94A3B8",
-    textAlign: "center",
-    paddingVertical: 24,
-    fontWeight: "500",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: theme.border,
+      shadowColor: theme.primaryDeep,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.1,
+      shadowRadius: 22,
+      elevation: 4,
+    },
+    containerWide: { padding: 28 },
+    header: {
+      marginBottom: 16,
+    },
+    headerContent: { flex: 1 },
+    title: {
+      fontSize: 18,
+      fontWeight: "800",
+      color: theme.text,
+    },
+    subtitle: {
+      fontSize: 12,
+      color: theme.secondaryText,
+      marginTop: 4,
+      lineHeight: 18,
+    },
+    tooltip: {
+      marginTop: 16,
+      backgroundColor: theme.secondaryCard,
+      borderRadius: 14,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+    },
+    tooltipTitle: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: theme.text,
+      marginBottom: 10,
+    },
+    tooltipGrid: {
+      flexDirection: "row",
+      gap: 24,
+      marginBottom: 8,
+    },
+    tooltipCol: {
+      gap: 4,
+    },
+    tooltipStat: {
+      fontSize: 13,
+      color: theme.secondaryText,
+      lineHeight: 20,
+    },
+    tooltipBold: {
+      fontWeight: "700",
+      color: theme.text,
+    },
+    tooltipOutlier: {
+      fontSize: 12,
+      color: theme.status.error,
+      fontWeight: "600",
+      marginTop: 6,
+    },
+    varianceBar: {
+      marginTop: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    varianceLabel: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: theme.secondaryText,
+      minWidth: 80,
+    },
+    varianceTrack: {
+      flex: 1,
+      height: 6,
+      backgroundColor: theme.softPurple,
+      borderRadius: 3,
+      overflow: "hidden",
+    },
+    varianceFill: {
+      height: "100%",
+      borderRadius: 3,
+    },
+    emptyText: {
+      fontSize: 14,
+      color: theme.secondaryText,
+      textAlign: "center",
+      paddingVertical: 24,
+      fontWeight: "500",
+    },
+  });

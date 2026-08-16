@@ -20,13 +20,14 @@ import {
   Modal,
   Platform,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 import EmojiPicker from "@/components/chat/EmojiPicker";
 
@@ -63,6 +64,8 @@ const REMINDER_BANNER =
 
 export default function StudentMessagesScreen() {
   const { user } = useAuth();
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const insets = useSafeAreaInsets();
 
   // ── View state ──
@@ -399,7 +402,7 @@ export default function StudentMessagesScreen() {
           <Ionicons
             name={isPeer ? "person" : "shield-checkmark"}
             size={22}
-            color={isPeer ? "#8A63D2" : "#6D5BBF"}
+            color={isPeer ? theme.primary : theme.primaryDeep}
           />
         )}
       </View>
@@ -419,7 +422,7 @@ export default function StudentMessagesScreen() {
             presenceMap[item.uid] ? styles.presenceDotOnline : styles.presenceDotOffline,
           ]}
         />
-        <Ionicons name="chatbubble-outline" size={18} color="#8A63D2" />
+        <Ionicons name="chatbubble-outline" size={18} color={theme.primary} />
       </View>
     </Pressable>
   );
@@ -456,7 +459,7 @@ export default function StudentMessagesScreen() {
               <Ionicons
                 name="ban-outline"
                 size={14}
-                color={isMine ? "rgba(255,255,255,0.5)" : "#94A3B8"}
+                color={isMine ? "rgba(255,255,255,0.5)" : theme.secondaryText}
               />
               <Text
                 style={[
@@ -486,7 +489,7 @@ export default function StudentMessagesScreen() {
                 style={styles.retryBtn}
                 onPress={() => handleRetry(item)}
               >
-                <Ionicons name="refresh" size={12} color="#EF4444" />
+                <Ionicons name="refresh" size={12} color={theme.status.error} />
                 <Text style={styles.retryText}>Retry</Text>
               </Pressable>
             )}
@@ -515,17 +518,17 @@ export default function StudentMessagesScreen() {
     <>
       {/* Directory filter */}
       <View style={styles.searchBar}>
-        <Ionicons name="search" size={18} color="#94A3B8" />
+        <Ionicons name="search" size={18} color={theme.secondaryText} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search by name or department..."
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={theme.secondaryText}
           value={directoryFilter}
           onChangeText={setDirectoryFilter}
         />
         {directoryFilter.length > 0 && (
           <Pressable onPress={() => setDirectoryFilter("")}>
-            <Ionicons name="close-circle" size={18} color="#94A3B8" />
+            <Ionicons name="close-circle" size={18} color={theme.secondaryText} />
           </Pressable>
         )}
       </View>
@@ -542,7 +545,7 @@ export default function StudentMessagesScreen() {
           <Ionicons
             name="people"
             size={16}
-            color={directoryTab === "peers" ? "#8A63D2" : "#94A3B8"}
+            color={directoryTab === "peers" ? theme.primary : theme.secondaryText}
           />
           <Text
             style={[
@@ -563,7 +566,7 @@ export default function StudentMessagesScreen() {
           <Ionicons
             name="shield-checkmark"
             size={16}
-            color={directoryTab === "admins" ? "#8A63D2" : "#94A3B8"}
+            color={directoryTab === "admins" ? theme.primary : theme.secondaryText}
           />
           <Text
             style={[
@@ -579,7 +582,7 @@ export default function StudentMessagesScreen() {
       {/* User list */}
       {directoryLoading ? (
         <View style={styles.emptyState}>
-          <ActivityIndicator size="large" color="#8A63D2" />
+          <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.emptyText}>Loading users...</Text>
         </View>
       ) : currentList.length === 0 ? (
@@ -591,7 +594,7 @@ export default function StudentMessagesScreen() {
                 : "shield-checkmark-outline"
             }
             size={48}
-            color="#D1D5DB"
+            color={theme.border}
           />
           <Text style={styles.emptyTitle}>
             {directoryFilter
@@ -636,18 +639,18 @@ export default function StudentMessagesScreen() {
     <>
       {/* Friendly reminder banner */}
       <View style={styles.reminderBanner}>
-        <Ionicons name="heart-outline" size={14} color="#6D5BBF" />
+        <Ionicons name="heart-outline" size={14} color={theme.primaryDeep} />
         <Text style={styles.reminderText}>{REMINDER_BANNER}</Text>
       </View>
 
       {chatLoading ? (
         <View style={styles.emptyState}>
-          <ActivityIndicator size="large" color="#8A63D2" />
+          <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.emptyText}>Loading conversation...</Text>
         </View>
       ) : allMessages.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="chatbubble-outline" size={48} color="#D1D5DB" />
+          <Ionicons name="chatbubble-outline" size={48} color={theme.border} />
           <Text style={styles.emptyTitle}>Start the conversation</Text>
           <Text style={styles.emptyText}>
             Send a message to {chatPartnerName}.
@@ -669,7 +672,7 @@ export default function StudentMessagesScreen() {
       {partnerTyping && (
         <View style={styles.typingIndicator}>
           <Text style={styles.typingText}>{chatPartnerName} is typing</Text>
-          <ActivityIndicator size="small" color="#8A63D2" style={{ marginLeft: 6 }} />
+          <ActivityIndicator size="small" color={theme.primary} style={{ marginLeft: 6 }} />
         </View>
       )}
 
@@ -694,13 +697,13 @@ export default function StudentMessagesScreen() {
           <Ionicons
             name={showEmoji ? "keyboard" : ("happy-outline" as any)}
             size={24}
-            color={showEmoji ? "#8A63D2" : "#94A3B8"}
+            color={showEmoji ? theme.primary : theme.secondaryText}
           />
         </Pressable>
         <TextInput
           style={styles.textInput}
           placeholder="Type a message..."
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={theme.secondaryText}
           value={inputText}
           onChangeText={(text) => {
             setInputText(text);
@@ -728,7 +731,7 @@ export default function StudentMessagesScreen() {
           <Ionicons
             name="arrow-up-circle"
             size={32}
-            color={inputText.trim() ? "#8A63D2" : "#D1D5DB"}
+            color={inputText.trim() ? theme.primary : theme.border}
           />
         </Pressable>
       </View>
@@ -744,13 +747,13 @@ export default function StudentMessagesScreen() {
       >
         {/* Header */}
         <LinearGradient
-          colors={["#8A63D2", "#B794F6"]}
+          colors={theme.headerGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
           <View style={styles.header}>
             <Pressable style={styles.backBtn} onPress={handleBack}>
-              <Ionicons name="arrow-back" size={22} color="white" />
+              <Ionicons name="arrow-back" size={22} color={theme.onPrimary} />
             </Pressable>
             <View style={styles.headerCenter}>
               <View style={styles.headerTitleRow}>
@@ -767,7 +770,7 @@ export default function StudentMessagesScreen() {
                         styles.headerAvatarFallback,
                       ]}
                     >
-                      <Ionicons name="person" size={14} color="white" />
+                      <Ionicons name="person" size={14} color={theme.onPrimary} />
                     </View>
                   ))}
                 <Text style={styles.headerTitle} numberOfLines={1}>
@@ -779,7 +782,7 @@ export default function StudentMessagesScreen() {
               {viewMode === "chat" && (
                 <View style={styles.headerMeta}>
                   <View style={styles.headerBadge}>
-                    <Ionicons name="chatbubble" size={10} color="white" />
+                    <Ionicons name="chatbubble" size={10} color={theme.onPrimary} />
                     <Text style={styles.headerBadgeText}>Chat</Text>
                   </View>
                   <View style={styles.onlineIndicator}>
@@ -818,13 +821,13 @@ export default function StudentMessagesScreen() {
           <View style={styles.ctxMenu}>
             <Text style={styles.ctxTitle}>Message Options</Text>
             <Pressable style={styles.ctxRow} onPress={handleCopy}>
-              <Ionicons name="copy-outline" size={20} color="#8A63D2" />
+              <Ionicons name="copy-outline" size={20} color={theme.primary} />
               <Text style={styles.ctxLabel}>Copy</Text>
             </Pressable>
             <View style={styles.ctxDivider} />
             <Pressable style={styles.ctxRow} onPress={handleDelete}>
-              <Ionicons name="trash-outline" size={20} color="#EF4444" />
-              <Text style={[styles.ctxLabel, { color: "#EF4444" }]}>
+              <Ionicons name="trash-outline" size={20} color={theme.status.error} />
+              <Text style={[styles.ctxLabel, { color: theme.status.error }]}>
                 Delete
               </Text>
             </Pressable>
@@ -840,377 +843,378 @@ export default function StudentMessagesScreen() {
   }
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F2F8" },
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background },
 
-  // Header
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 14,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "700",
-    flexShrink: 1,
-  },
-  headerTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    maxWidth: "100%",
-  },
-  headerAvatar: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: "#7A54C4",
-  },
-  headerAvatarFallback: { alignItems: "center", justifyContent: "center" },
-  headerCenter: {
-    flex: 1,
-    alignItems: "center",
-  },
-  headerBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(255,255,255,0.25)",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    alignSelf: "center",
-  },
-  headerBadgeText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "white",
-  },
-  headerMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 3,
-    alignSelf: "center",
-  },
-  onlineIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  onlineDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  onlineDotActive: {
-    backgroundColor: "#4ADE80",
-  },
-  onlineDotInactive: {
-    backgroundColor: "rgba(255,255,255,0.4)",
-  },
-  onlineText: {
-    fontSize: 10,
-    fontWeight: "500",
-    color: "rgba(255,255,255,0.75)",
-  },
+    // Header
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      paddingBottom: 14,
+    },
+    backBtn: {
+      width: 40,
+      height: 40,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    headerTitle: {
+      color: theme.onPrimary,
+      fontSize: 18,
+      fontWeight: "700",
+      flexShrink: 1,
+    },
+    headerTitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      maxWidth: "100%",
+    },
+    headerAvatar: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: theme.primaryDeep,
+    },
+    headerAvatarFallback: { alignItems: "center", justifyContent: "center" },
+    headerCenter: {
+      flex: 1,
+      alignItems: "center",
+    },
+    headerBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      backgroundColor: "rgba(255,255,255,0.25)",
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 10,
+      alignSelf: "center",
+    },
+    headerBadgeText: {
+      fontSize: 10,
+      fontWeight: "600",
+      color: theme.onPrimary,
+    },
+    headerMeta: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginTop: 3,
+      alignSelf: "center",
+    },
+    onlineIndicator: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    onlineDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 4,
+    },
+    onlineDotActive: {
+      backgroundColor: theme.status.success,
+    },
+    onlineDotInactive: {
+      backgroundColor: "rgba(255,255,255,0.4)",
+    },
+    onlineText: {
+      fontSize: 10,
+      fontWeight: "500",
+      color: "rgba(255,255,255,0.75)",
+    },
 
-  // Empty state
-  emptyState: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 40,
-  },
-  emptyTitle: { fontSize: 17, fontWeight: "700", color: "#1E1B4B" },
-  emptyText: {
-    fontSize: 14,
-    color: "#64748B",
-    textAlign: "center",
-  },
+    // Empty state
+    emptyState: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: 40,
+    },
+    emptyTitle: { fontSize: 17, fontWeight: "700", color: theme.text },
+    emptyText: {
+      fontSize: 14,
+      color: theme.secondaryText,
+      textAlign: "center",
+    },
 
-  // Search bar
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "white",
-    margin: 16,
-    marginBottom: 8,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    height: 46,
-    gap: 8,
-    // @ts-ignore
-    boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: "#1E1B4B",
-    paddingVertical: 0,
-  },
+    // Search bar
+    searchBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.card,
+      margin: 16,
+      marginBottom: 8,
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      height: 46,
+      gap: 8,
+      // @ts-ignore
+      boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.06)",
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 15,
+      color: theme.text,
+      paddingVertical: 0,
+    },
 
-  // Tabs
-  tabBar: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    gap: 8,
-    marginBottom: 8,
-  },
-  tab: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: "white",
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.1)",
-  },
-  tabActive: {
-    backgroundColor: "#F3EEFF",
-    borderColor: "#8A63D2",
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#94A3B8",
-  },
-  tabTextActive: {
-    color: "#8A63D2",
-    fontWeight: "600",
-  },
+    // Tabs
+    tabBar: {
+      flexDirection: "row",
+      paddingHorizontal: 16,
+      gap: 8,
+      marginBottom: 8,
+    },
+    tab: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 20,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+    },
+    tabActive: {
+      backgroundColor: theme.softPurple,
+      borderColor: theme.primary,
+    },
+    tabText: {
+      fontSize: 14,
+      fontWeight: "500",
+      color: theme.secondaryText,
+    },
+    tabTextActive: {
+      color: theme.primary,
+      fontWeight: "600",
+    },
 
-  // User list
-  userList: {
-    paddingHorizontal: 16,
-    paddingBottom: 24,
-  },
-  userCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 8,
-    // @ts-ignore
-    boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
-    gap: 12,
-  },
-  userAvatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  userAvatarPeer: { backgroundColor: "#F3EEFF" },
-  userAvatarAdmin: { backgroundColor: "#EDE9FE" },
-  userInfo: { flex: 1 },
-  userName: { fontSize: 15, fontWeight: "600", color: "#1E1B4B" },
-  userRole: { fontSize: 13, color: "#64748B", marginTop: 2 },
-  userCardRight: {
-    alignItems: "center",
-    gap: 8,
-  },
-  presenceDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  presenceDotOnline: {
-    backgroundColor: "#22C55E",
-  },
-  presenceDotOffline: {
-    backgroundColor: "#D1D5DB",
-  },
+    // User list
+    userList: {
+      paddingHorizontal: 16,
+      paddingBottom: 24,
+    },
+    userCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.card,
+      borderRadius: 16,
+      padding: 14,
+      marginBottom: 8,
+      // @ts-ignore
+      boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.06)",
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+      gap: 12,
+    },
+    userAvatar: {
+      width: 46,
+      height: 46,
+      borderRadius: 23,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    userAvatarPeer: { backgroundColor: theme.softPurple },
+    userAvatarAdmin: { backgroundColor: theme.softPurple },
+    userInfo: { flex: 1 },
+    userName: { fontSize: 15, fontWeight: "600", color: theme.text },
+    userRole: { fontSize: 13, color: theme.secondaryText, marginTop: 2 },
+    userCardRight: {
+      alignItems: "center",
+      gap: 8,
+    },
+    presenceDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+    },
+    presenceDotOnline: {
+      backgroundColor: theme.status.success,
+    },
+    presenceDotOffline: {
+      backgroundColor: theme.border,
+    },
 
-  // Reminder banner
-  reminderBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#F3EEFF",
-    marginHorizontal: 16,
-    marginTop: 10,
-    marginBottom: 4,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "rgba(138, 99, 210, 0.12)",
-  },
-  reminderText: {
-    flex: 1,
-    fontSize: 12,
-    color: "#6D5BBF",
-    lineHeight: 17,
-  },
+    // Reminder banner
+    reminderBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: theme.softPurple,
+      marginHorizontal: 16,
+      marginTop: 10,
+      marginBottom: 4,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+    },
+    reminderText: {
+      flex: 1,
+      fontSize: 12,
+      color: theme.primaryDeep,
+      lineHeight: 17,
+    },
 
-  // Messages
-  messagesList: {
-    flexGrow: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  bubbleRow: { marginBottom: 8, flexDirection: "row" },
-  bubbleRowRight: { justifyContent: "flex-end" },
-  bubbleRowLeft: { justifyContent: "flex-start" },
-  bubble: {
-    maxWidth: "78%",
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  bubbleMine: {
-    backgroundColor: "#8A63D2",
-    borderBottomRightRadius: 4,
-  },
-  bubbleTheirs: {
-    backgroundColor: "white",
-    borderBottomLeftRadius: 4,
-    // @ts-ignore
-    boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
-  },
-  bubbleDeleted: {
-    backgroundColor: "rgba(148, 163, 184, 0.15)",
-    borderWidth: 1,
-    borderColor: "rgba(148, 163, 184, 0.2)",
-  },
-  bubbleText: {
-    fontSize: 15,
-    color: "#1E1B4B",
-    lineHeight: 20,
-  },
-  bubbleTextMine: { color: "white" },
-  bubbleFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    gap: 6,
-    marginTop: 4,
-  },
-  bubbleTime: { fontSize: 10, color: "#94A3B8" },
-  bubbleTimeMine: { color: "rgba(255,255,255,0.5)" },
-  deletedRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  deletedText: { fontSize: 13, color: "#94A3B8", fontStyle: "italic" },
-  deletedTextMine: { color: "rgba(255,255,255,0.5)" },
-  retryBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    backgroundColor: "rgba(239, 68, 68, 0.1)",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  retryText: { fontSize: 11, color: "#EF4444", fontWeight: "600" },
+    // Messages
+    messagesList: {
+      flexGrow: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+    },
+    bubbleRow: { marginBottom: 8, flexDirection: "row" },
+    bubbleRowRight: { justifyContent: "flex-end" },
+    bubbleRowLeft: { justifyContent: "flex-start" },
+    bubble: {
+      maxWidth: "78%",
+      borderRadius: 18,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    bubbleMine: {
+      backgroundColor: theme.primary,
+      borderBottomRightRadius: 4,
+    },
+    bubbleTheirs: {
+      backgroundColor: theme.card,
+      borderBottomLeftRadius: 4,
+      // @ts-ignore
+      boxShadow: "0px 2px 8px rgba(138, 99, 210, 0.08)",
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+    },
+    bubbleDeleted: {
+      backgroundColor: `${theme.secondaryText}26`,
+      borderWidth: 1,
+      borderColor: `${theme.secondaryText}33`,
+    },
+    bubbleText: {
+      fontSize: 15,
+      color: theme.text,
+      lineHeight: 20,
+    },
+    bubbleTextMine: { color: theme.onPrimary },
+    bubbleFooter: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "flex-end",
+      gap: 6,
+      marginTop: 4,
+    },
+    bubbleTime: { fontSize: 10, color: theme.secondaryText },
+    bubbleTimeMine: { color: "rgba(255,255,255,0.5)" },
+    deletedRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+    deletedText: { fontSize: 13, color: theme.secondaryText, fontStyle: "italic" },
+    deletedTextMine: { color: "rgba(255,255,255,0.5)" },
+    retryBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 3,
+      backgroundColor: `${theme.status.error}1A`,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 8,
+    },
+    retryText: { fontSize: 11, color: theme.status.error, fontWeight: "600" },
 
-  // Typing indicator
-  typingIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 6,
-    backgroundColor: "#F8F5FF",
-  },
-  typingText: {
-    fontSize: 12,
-    color: "#8A63D2",
-    fontStyle: "italic",
-  },
+    // Typing indicator
+    typingIndicator: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 20,
+      paddingVertical: 6,
+      backgroundColor: theme.backgroundAlt,
+    },
+    typingText: {
+      fontSize: 12,
+      color: theme.primary,
+      fontStyle: "italic",
+    },
 
-  // Input
-  inputBar: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(156, 126, 235, 0.08)",
-    backgroundColor: "white",
-    gap: 8,
-  },
-  textInput: {
-    flex: 1,
-    backgroundColor: "#FAF8FF",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: "#1E1B4B",
-    maxHeight: 100,
-  },
-  emojiBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  sendBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  sendBtnDisabled: { opacity: 0.5 },
+    // Input
+    inputBar: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderTopWidth: 1,
+      borderTopColor: theme.borderSoft,
+      backgroundColor: theme.card,
+      gap: 8,
+    },
+    textInput: {
+      flex: 1,
+      backgroundColor: theme.inputBg,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: theme.border,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      fontSize: 15,
+      color: theme.text,
+      maxHeight: 100,
+    },
+    emojiBtn: {
+      width: 40,
+      height: 40,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    sendBtn: {
+      width: 40,
+      height: 40,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    sendBtnDisabled: { opacity: 0.5 },
 
-  // Context menu
-  ctxOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  ctxMenu: {
-    backgroundColor: "white",
-    borderRadius: 18,
-    padding: 6,
-    width: 200,
-    // @ts-ignore
-    boxShadow: "0px 8px 24px rgba(0,0,0,0.15)",
-  },
-  ctxTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#64748B",
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 6,
-  },
-  ctxRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-  },
-  ctxLabel: { fontSize: 15, fontWeight: "600", color: "#1E1B4B" },
-  ctxDivider: {
-    height: 1,
-    backgroundColor: "#F1F5F9",
-    marginHorizontal: 14,
-  },
-});
+    // Context menu
+    ctxOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.3)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    ctxMenu: {
+      backgroundColor: theme.card,
+      borderRadius: 18,
+      padding: 6,
+      width: 200,
+      // @ts-ignore
+      boxShadow: "0px 8px 24px rgba(0,0,0,0.15)",
+    },
+    ctxTitle: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: theme.secondaryText,
+      paddingHorizontal: 14,
+      paddingTop: 10,
+      paddingBottom: 6,
+    },
+    ctxRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderRadius: 12,
+    },
+    ctxLabel: { fontSize: 15, fontWeight: "600", color: theme.text },
+    ctxDivider: {
+      height: 1,
+      backgroundColor: theme.border,
+      marginHorizontal: 14,
+    },
+  });

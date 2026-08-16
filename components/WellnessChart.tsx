@@ -8,6 +8,8 @@ import {
     View,
     useWindowDimensions,
 } from "react-native";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 const MOODS = [
   { id: "happy", emoji: "😄", color: "#FFD700", wellness: 5 },
@@ -43,6 +45,8 @@ export function WellnessChart({
   journalEntries,
   currentMonth,
 }: WellnessChartProps) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const { width: screenWidth } = useWindowDimensions();
   const [chartType, setChartType] = useState<"line" | "bar">("line");
   const CHART_WIDTH = Math.min(screenWidth - 72, 400);
@@ -88,7 +92,7 @@ export function WellnessChart({
   if (dataPoints.length === 0) {
     return (
       <View style={styles.chartEmptyState}>
-        <Ionicons name="analytics-outline" size={32} color="#ccc" />
+        <Ionicons name="analytics-outline" size={32} color={theme.border} />
         <Text style={styles.chartEmptyText}>
           Journal this month to see your wellness trend.
         </Text>
@@ -99,7 +103,7 @@ export function WellnessChart({
   if (chartType === "line" && dataPoints.length < 2) {
     return (
       <View style={styles.chartEmptyState}>
-        <Ionicons name="analytics-outline" size={32} color="#ccc" />
+        <Ionicons name="analytics-outline" size={32} color={theme.border} />
         <Text style={styles.chartEmptyText}>
           Journal at least 2 days this month to see your line chart trend.
         </Text>
@@ -147,7 +151,7 @@ export function WellnessChart({
   if (chartType === "line" && segments.length === 0) {
     return (
       <View style={styles.chartEmptyState}>
-        <Ionicons name="analytics-outline" size={32} color="#ccc" />
+        <Ionicons name="analytics-outline" size={32} color={theme.border} />
         <Text style={styles.chartEmptyText}>
           Not enough data yet. Keep journaling!
         </Text>
@@ -176,7 +180,7 @@ export function WellnessChart({
           <Ionicons
             name="analytics-outline"
             size={16}
-            color={chartType === "line" ? "#FFF" : "#555"}
+            color={chartType === "line" ? theme.onPrimary : theme.secondaryText}
           />
         </Pressable>
         <Pressable
@@ -189,7 +193,7 @@ export function WellnessChart({
           <Ionicons
             name="bar-chart-outline"
             size={16}
-            color={chartType === "bar" ? "#FFF" : "#555"}
+            color={chartType === "bar" ? theme.onPrimary : theme.secondaryText}
           />
         </Pressable>
       </View>
@@ -298,106 +302,107 @@ export function WellnessChart({
   );
 }
 
-const styles = StyleSheet.create({
-  chartContainer: {
-    flexDirection: "row",
-    height: CHART_HEIGHT + 20,
-    alignItems: "flex-end",
-  },
-  yAxis: {
-    width: 24,
-    height: CHART_HEIGHT,
-    justifyContent: "space-between",
-    paddingVertical: 16,
-    alignItems: "flex-end",
-    paddingRight: 4,
-  },
-  yLabel: {
-    fontSize: 10,
-    color: "#999",
-    fontWeight: "500",
-  },
-  chartArea: {
-    flex: 1,
-    height: CHART_HEIGHT,
-    position: "relative",
-    overflow: "hidden",
-  },
-  gridLine: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: "#F0F0F0",
-  },
-  lineSegment: {
-    position: "absolute",
-    height: 3,
-    borderRadius: 2,
-    transformOrigin: "left center",
-  },
-  chartDot: {
-    position: "absolute",
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    zIndex: 10,
-  },
-  chartEmptyState: {
-    alignItems: "center",
-    paddingVertical: 30,
-  },
-  chartEmptyText: {
-    fontSize: 13,
-    color: "#aaa",
-    textAlign: "center",
-    marginTop: 8,
-    paddingHorizontal: 20,
-    lineHeight: 18,
-  },
-  switchButton: {
-    marginTop: 12,
-    backgroundColor: "#4CAF50",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  switchButtonText: {
-    color: "white",
-    fontWeight: "600",
-  },
-  chartTypeSwitcher: {
-    flexDirection: "row",
-    alignSelf: "flex-end",
-    backgroundColor: "#f0f0f0",
-    borderRadius: 16,
-    padding: 4,
-    marginBottom: -10,
-    zIndex: 10,
-  },
-  chartTypeButton: {
-    padding: 8,
-    borderRadius: 12,
-  },
-  chartTypeButtonActive: {
-    backgroundColor: "#4CAF50",
-  },
-  // Bar Chart Styles
-  barChartContainer: {
-    position: "absolute",
-    bottom: 20,
-    left: 20,
-    right: 20,
-    height: 120,
-    flexDirection: "row",
-    alignItems: "flex-end",
-  },
-  barWrapper: {
-    height: "100%",
-    justifyContent: "flex-end",
-    alignItems: "center",
-  },
-  bar: {
-    borderRadius: 4,
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    chartContainer: {
+      flexDirection: "row",
+      height: CHART_HEIGHT + 20,
+      alignItems: "flex-end",
+    },
+    yAxis: {
+      width: 24,
+      height: CHART_HEIGHT,
+      justifyContent: "space-between",
+      paddingVertical: 16,
+      alignItems: "flex-end",
+      paddingRight: 4,
+    },
+    yLabel: {
+      fontSize: 10,
+      color: theme.secondaryText,
+      fontWeight: "500",
+    },
+    chartArea: {
+      flex: 1,
+      height: CHART_HEIGHT,
+      position: "relative",
+      overflow: "hidden",
+    },
+    gridLine: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      height: 1,
+      backgroundColor: theme.border,
+    },
+    lineSegment: {
+      position: "absolute",
+      height: 3,
+      borderRadius: 2,
+      transformOrigin: "left center",
+    },
+    chartDot: {
+      position: "absolute",
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      zIndex: 10,
+    },
+    chartEmptyState: {
+      alignItems: "center",
+      paddingVertical: 30,
+    },
+    chartEmptyText: {
+      fontSize: 13,
+      color: theme.secondaryText,
+      textAlign: "center",
+      marginTop: 8,
+      paddingHorizontal: 20,
+      lineHeight: 18,
+    },
+    switchButton: {
+      marginTop: 12,
+      backgroundColor: theme.status.success,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+    },
+    switchButtonText: {
+      color: theme.onPrimary,
+      fontWeight: "600",
+    },
+    chartTypeSwitcher: {
+      flexDirection: "row",
+      alignSelf: "flex-end",
+      backgroundColor: theme.inputBg,
+      borderRadius: 16,
+      padding: 4,
+      marginBottom: -10,
+      zIndex: 10,
+    },
+    chartTypeButton: {
+      padding: 8,
+      borderRadius: 12,
+    },
+    chartTypeButtonActive: {
+      backgroundColor: theme.status.success,
+    },
+    // Bar Chart Styles
+    barChartContainer: {
+      position: "absolute",
+      bottom: 20,
+      left: 20,
+      right: 20,
+      height: 120,
+      flexDirection: "row",
+      alignItems: "flex-end",
+    },
+    barWrapper: {
+      height: "100%",
+      justifyContent: "flex-end",
+      alignItems: "center",
+    },
+    bar: {
+      borderRadius: 4,
+    },
+  });

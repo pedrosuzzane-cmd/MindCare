@@ -9,6 +9,8 @@ import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 const POSITIVE_MOODS = new Set(["happy", "calm", "relaxed", "good"]);
 const NEUTRAL_MOODS = new Set(["neutral"]);
@@ -27,6 +29,8 @@ export default function MoodAnalyticsScreen() {
   const isWide = screenWidth >= 900;
   const responsivePadding = Math.min(Math.max(screenWidth * 0.03, 24), 64);
   const { user } = useAuth();
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [loading, setLoading] = useState(true);
   const [studentSummaries, setStudentSummaries] = useState<StudentSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -130,7 +134,7 @@ export default function MoodAnalyticsScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#8A63D2" />
+          <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.loadingText}>Loading mood analytics...</Text>
         </View>
       </SafeAreaView>
@@ -155,7 +159,7 @@ export default function MoodAnalyticsScreen() {
       <View style={styles.container}>
         <View style={[styles.header, isWide && { paddingHorizontal: responsivePadding }]}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={22} color="#0F172A" />
+            <Ionicons name="arrow-back" size={22} color={theme.text} />
           </Pressable>
           <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>Aggregate Mood Distribution</Text>
@@ -170,22 +174,22 @@ export default function MoodAnalyticsScreen() {
         >
           <View style={[styles.kpiRow, isWide && styles.kpiRowWide]}>
             <View style={styles.kpiCard}>
-              <View style={[styles.kpiIcon, { backgroundColor: "#EDE9FE" }]}>
-                <Ionicons name="people" size={18} color="#8A63D2" />
+              <View style={[styles.kpiIcon, { backgroundColor: theme.softPurple }]}>
+                <Ionicons name="people" size={18} color={theme.primary} />
               </View>
               <Text style={styles.kpiValue}>{totalStudents}</Text>
               <Text style={styles.kpiLabel}>Total Students</Text>
             </View>
             <View style={styles.kpiCard}>
               <View style={[styles.kpiIcon, { backgroundColor: "#DCFCE7" }]}>
-                <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
+                <Ionicons name="checkmark-circle" size={18} color={theme.status.success} />
               </View>
               <Text style={styles.kpiValue}>{assessedCount}</Text>
               <Text style={styles.kpiLabel}>Assessed</Text>
             </View>
             <View style={styles.kpiCard}>
               <View style={[styles.kpiIcon, { backgroundColor: "#FEF3C7" }]}>
-                <Ionicons name="happy" size={18} color="#D97706" />
+                <Ionicons name="happy" size={18} color={theme.status.warning} />
               </View>
               <Text style={styles.kpiValue}>{moodCounts.positive}</Text>
               <Text style={styles.kpiLabel}>Positive Moods</Text>
@@ -199,8 +203,8 @@ export default function MoodAnalyticsScreen() {
                 percentage={completionPct}
                 size={180}
                 strokeWidth={16}
-                color="#8A63D2"
-                trackColor="#F3EAFF"
+                color={theme.primary}
+                trackColor={theme.softPurple}
                 centerText={`${completionPct}%`}
                 centerSubtext={`${assessedCount}/${totalStudents}`}
                 label="Students who completed assessment"
@@ -218,9 +222,13 @@ export default function MoodAnalyticsScreen() {
                     size={isWide ? 150 : 130}
                     strokeWidth={isWide ? 14 : 12}
                     color={
-                      dept.percentage >= 70 ? "#22C55E" : dept.percentage >= 40 ? "#F59E0B" : "#EF4444"
+                      dept.percentage >= 70
+                        ? theme.status.success
+                        : dept.percentage >= 40
+                          ? theme.status.warning
+                          : theme.status.error
                     }
-                    trackColor="#F3EAFF"
+                    trackColor={theme.softPurple}
                     centerText={`${dept.percentage}%`}
                     centerSubtext={dept.label.split("(").pop()?.replace(")", "") || dept.label}
                   />
@@ -236,17 +244,17 @@ export default function MoodAnalyticsScreen() {
             </Text>
             <View style={styles.overallMoodRow}>
               <View style={styles.overallMoodCard}>
-                <View style={[styles.moodBar, { flex: moodCounts.positive, backgroundColor: "#22C55E" }]} />
+                <View style={[styles.moodBar, { flex: moodCounts.positive, backgroundColor: theme.status.success }]} />
                 <Text style={styles.moodPct}>{((moodCounts.positive / totalMoods) * 100).toFixed(1)}%</Text>
                 <Text style={styles.moodLabel}>Positive</Text>
               </View>
               <View style={styles.overallMoodCard}>
-                <View style={[styles.moodBar, { flex: moodCounts.neutral, backgroundColor: "#F59E0B" }]} />
+                <View style={[styles.moodBar, { flex: moodCounts.neutral, backgroundColor: theme.status.warning }]} />
                 <Text style={styles.moodPct}>{((moodCounts.neutral / totalMoods) * 100).toFixed(1)}%</Text>
                 <Text style={styles.moodLabel}>Neutral</Text>
               </View>
               <View style={styles.overallMoodCard}>
-                <View style={[styles.moodBar, { flex: moodCounts.distressed, backgroundColor: "#EF4444" }]} />
+                <View style={[styles.moodBar, { flex: moodCounts.distressed, backgroundColor: theme.status.error }]} />
                 <Text style={styles.moodPct}>{((moodCounts.distressed / totalMoods) * 100).toFixed(1)}%</Text>
                 <Text style={styles.moodLabel}>Distressed</Text>
               </View>
@@ -322,41 +330,42 @@ export default function MoodAnalyticsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F4F2F8" },
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: theme.background },
   container: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24 },
-  loadingText: { marginTop: 12, fontSize: 14, color: "#64748B", fontWeight: "600" },
-  errorText: { fontSize: 14, color: "#EF4444", marginBottom: 16, textAlign: "center" },
-  backBtn: { backgroundColor: "#8A63D2", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
-  backBtnText: { color: "white", fontWeight: "700", fontSize: 14 },
+  loadingText: { marginTop: 12, fontSize: 14, color: theme.secondaryText, fontWeight: "600" },
+  errorText: { fontSize: 14, color: theme.status.error, marginBottom: 16, textAlign: "center" },
+  backBtn: { backgroundColor: theme.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
+  backBtnText: { color: theme.onPrimary, fontWeight: "700", fontSize: 14 },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 24,
     paddingTop: 20,
     paddingBottom: 16,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: theme.border,
     gap: 12,
   },
-  backButton: { padding: 8, borderRadius: 999, backgroundColor: "#F1F5F9" },
+  backButton: { padding: 8, borderRadius: 999, backgroundColor: theme.inputBg },
   headerContent: { flex: 1 },
-  headerTitle: { color: "#0F172A", fontSize: 20, fontWeight: "800" },
-  headerSubtitle: { color: "#64748B", fontSize: 13, marginTop: 2 },
+  headerTitle: { color: theme.text, fontSize: 20, fontWeight: "800" },
+  headerSubtitle: { color: theme.secondaryText, fontSize: 13, marginTop: 2 },
   scrollContent: { padding: 24, paddingBottom: 40, gap: 24 },
   kpiRow: { flexDirection: "row", gap: 12 },
   kpiRowWide: { gap: 20 },
   kpiCard: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 16,
     padding: 16,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E9D5FF",
-    shadowColor: "#6D28D9",
+    borderColor: theme.border,
+    shadowColor: theme.primaryDeep,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
@@ -364,48 +373,48 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   kpiIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center" },
-  kpiValue: { fontSize: 22, fontWeight: "900", color: "#2D1B69" },
-  kpiLabel: { fontSize: 11, fontWeight: "700", color: "#8B5CF6", textAlign: "center" },
+  kpiValue: { fontSize: 22, fontWeight: "900", color: theme.text },
+  kpiLabel: { fontSize: 11, fontWeight: "700", color: theme.primary, textAlign: "center" },
   section: { gap: 16 },
-  sectionTitle: { fontSize: 16, fontWeight: "800", color: "#4C1D95", marginBottom: 4 },
+  sectionTitle: { fontSize: 16, fontWeight: "800", color: theme.primaryDeep, marginBottom: 4 },
   gaugeSection: { alignItems: "center", paddingVertical: 16 },
   deptGaugeRow: { flexDirection: "row", flexWrap: "wrap", gap: 12, justifyContent: "center" },
-  deptGaugeCard: { backgroundColor: "#FFFFFF", borderRadius: 16, padding: 12, borderWidth: 1, borderColor: "#E9D5FF" },
+  deptGaugeCard: { backgroundColor: theme.card, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: theme.border },
   overallMoodRow: { flexDirection: "row", gap: 12, height: 140 },
-  overallMoodHint: { fontSize: 12, color: "#94A3B8", marginBottom: 4, lineHeight: 17 },
+  overallMoodHint: { fontSize: 12, color: theme.secondaryText, marginBottom: 4, lineHeight: 17 },
   overallMoodCard: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 16,
     padding: 16,
     alignItems: "center",
     justifyContent: "flex-end",
     borderWidth: 1,
-    borderColor: "#E9D5FF",
-    shadowColor: "#6D28D9",
+    borderColor: theme.border,
+    shadowColor: theme.primaryDeep,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
   },
   moodBar: { width: "100%", borderRadius: 6, minHeight: 4, marginBottom: 8 },
-  moodPct: { fontSize: 18, fontWeight: "900", color: "#2D1B69" },
-  moodLabel: { fontSize: 11, fontWeight: "700", color: "#8B5CF6", marginTop: 2 },
+  moodPct: { fontSize: 18, fontWeight: "900", color: theme.text },
+  moodLabel: { fontSize: 11, fontWeight: "700", color: theme.primary, marginTop: 2 },
   moodBarCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 20,
     padding: 20,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
-    shadowColor: "#6D28D9",
+    borderColor: theme.border,
+    shadowColor: theme.primaryDeep,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
     shadowRadius: 22,
     elevation: 4,
   },
   moodBarHeader: { marginBottom: 16 },
-  moodBarTitle: { fontSize: 18, fontWeight: "800", color: "#2D1B69" },
-  moodBarSubtitle: { fontSize: 12, color: "#94A3B8", marginTop: 4, lineHeight: 18 },
+  moodBarTitle: { fontSize: 18, fontWeight: "800", color: theme.text },
+  moodBarSubtitle: { fontSize: 12, color: theme.secondaryText, marginTop: 4, lineHeight: 18 },
   moodBarLegend: {
     flexDirection: "row",
     justifyContent: "center",
@@ -413,13 +422,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3EAFF",
+    borderBottomColor: theme.borderSoft,
   },
   moodBarLegendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   moodBarLegendDot: { width: 10, height: 10, borderRadius: 5 },
-  moodBarLegendText: { fontSize: 12, fontWeight: "700", color: "#6B21A8" },
+  moodBarLegendText: { fontSize: 12, fontWeight: "700", color: theme.primaryDeep },
   moodBarEmpty: { paddingVertical: 32, alignItems: "center" },
-  moodBarEmptyText: { fontSize: 14, color: "#94A3B8", fontWeight: "500" },
+  moodBarEmptyText: { fontSize: 14, color: theme.secondaryText, fontWeight: "500" },
   moodBarChartRow: {
     flexDirection: "row",
     gap: 16,
@@ -429,10 +438,10 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   moodBarColumn: { alignItems: "center", gap: 6, width: 72 },
-  moodBarPctTop: { fontSize: 14, fontWeight: "800", color: "#581C87" },
+  moodBarPctTop: { fontSize: 14, fontWeight: "800", color: theme.primaryDeep },
   moodBarGroup: { flexDirection: "row", alignItems: "flex-end", gap: 4 },
   moodBarSingle: { alignItems: "center", gap: 2 },
   moodBarDept: { width: 14, borderRadius: 4 },
-  moodBarVal: { fontSize: 11, fontWeight: "700", color: "#64748B" },
-  moodBarDeptLabel: { fontSize: 13, fontWeight: "800", color: "#581C87", textAlign: "center", marginTop: 4 },
+  moodBarVal: { fontSize: 11, fontWeight: "700", color: theme.secondaryText },
+  moodBarDeptLabel: { fontSize: 13, fontWeight: "800", color: theme.primaryDeep, textAlign: "center", marginTop: 4 },
 });

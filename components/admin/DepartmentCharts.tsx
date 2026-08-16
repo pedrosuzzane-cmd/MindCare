@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
+import type { MindCareTheme } from "@/constants/theme";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 export interface DeptComparisonMetric {
@@ -29,16 +31,18 @@ interface ComparisonChartProps {
 }
 
 export function DepartmentComparisonChart({ data }: ComparisonChartProps) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   if (data.length === 0) {
     return (
       <View style={styles.emptyCard}>
-        <Ionicons name="bar-chart-outline" size={32} color="#CBD5E1" />
+        <Ionicons name="bar-chart-outline" size={32} color={theme.border} />
         <Text style={styles.emptyText}>No department data available</Text>
       </View>
     );
   }
 
-  return <View>{renderMobileBar(data)}</View>;
+  return <View>{renderMobileBar(data, theme)}</View>;
 }
 
 // ─── Component: DepartmentCorrelationScatter ───────────────────────────────
@@ -52,23 +56,25 @@ function deptAbbr(full: string): string {
 }
 
 export function DepartmentCorrelationScatter({ points }: ScatterPlotProps) {
+  const { theme } = useMindCareTheme();
   const deptColors: Record<string, string> = {};
   const uniqueDepts = [...new Set(points.map((p) => p.department))];
   const palette = ["#8A63D2", "#16A34A", "#D97706", "#0EA5E9", "#EC4899", "#F97316", "#06B6D4"];
   uniqueDepts.forEach((d, i) => {
     deptColors[d] = palette[i % palette.length];
   });
-  return renderMobileScatter(points, deptColors);
+  return renderMobileScatter(points, deptColors, theme);
 }
 
 // ─── Mobile Renderers ──────────────────────────────────────────────────────
-function renderMobileBar(data: DeptComparisonMetric[]) {
+function renderMobileBar(data: DeptComparisonMetric[], theme: MindCareTheme) {
   const maxScore = Math.max(...data.map((d) => d.avgScore), 1);
   const maxJournal = Math.max(...data.map((d) => d.journalCount), 1);
   const maxLsn = Math.max(...data.map((d) => d.lsnCount), 1);
   const maxAssessment = Math.max(...data.map((d) => d.assessmentCount), 1);
   const deptCount = data.length;
   const groupWidth = Math.max(56, Math.min(72, Math.floor(480 / deptCount)));
+  const styles = createStyles(theme);
 
   return (
     <>
@@ -114,12 +120,13 @@ function renderMobileBar(data: DeptComparisonMetric[]) {
   );
 }
 
-function renderMobileScatter(points: ScatterPoint[], deptColors: Record<string, string>) {
+function renderMobileScatter(points: ScatterPoint[], deptColors: Record<string, string>, theme: MindCareTheme) {
   const maxJournal = Math.max(...points.map((p) => p.journalCount), 1);
   const cellW = 20;
   const cellH = 20;
   const cols = 10;
   const rows = 8;
+  const styles = createStyles(theme);
 
   const cellMap = new Map<string, { points: ScatterPoint[]; dept: string; riskLevel: string }>();
 
@@ -201,128 +208,129 @@ function renderMobileScatter(points: ScatterPoint[], deptColors: Record<string, 
 }
 
 // ─── Styles ────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  chartFooter: {
-    marginTop: 12,
-    paddingHorizontal: 4,
-  },
-  chartFooterNote: {
-    fontSize: 12,
-    color: "#94A3B8",
-    fontStyle: "italic",
-    lineHeight: 18,
-  },
-  emptyCard: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 40,
-    gap: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: "#94A3B8",
-    fontWeight: "500",
-  },
-  scatterLegend: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 8,
-    paddingHorizontal: 4,
-  },
-  scatterRiskLegend: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  riskDotRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  riskDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  riskDotLabel: {
-    fontSize: 11,
-    color: "#64748B",
-    fontWeight: "500",
-  },
-  mobileScroll: {
-    marginBottom: 8,
-  },
-  mobileBarLegend: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 12,
-    marginTop: 4,
-    paddingHorizontal: 4,
-  },
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendLabel: {
-    fontSize: 11,
-    fontWeight: "500",
-    color: "#64748B",
-  },
-  mobileBarContainer: {
-    flexDirection: "row",
-    gap: 16,
-    paddingHorizontal: 4,
-    paddingBottom: 8,
-  },
-  mobileBarGroup: {
-    alignItems: "center",
-    gap: 4,
-    width: 56,
-  },
-  mobileBarLabel: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#334155",
-    marginBottom: 4,
-  },
-  mobileBarCol: {
-    alignItems: "center",
-    gap: 2,
-  },
-  mobileBar: {
-    width: 10,
-    borderRadius: 4,
-  },
-  mobileBarVal: {
-    fontSize: 9,
-    fontWeight: "600",
-    color: "#64748B",
-  },
-  mobileScatterGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    width: 200,
-    height: 160,
-  },
-  mobileScatterCell: {
-    width: 20,
-    height: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 0.5,
-    borderColor: "#F1F5F9",
-  },
-  mobileScatterDot: {
-    fontSize: 10,
-    color: "white",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    chartFooter: {
+      marginTop: 12,
+      paddingHorizontal: 4,
+    },
+    chartFooterNote: {
+      fontSize: 12,
+      color: theme.secondaryText,
+      fontStyle: "italic",
+      lineHeight: 18,
+    },
+    emptyCard: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 40,
+      gap: 8,
+    },
+    emptyText: {
+      fontSize: 14,
+      color: theme.secondaryText,
+      fontWeight: "500",
+    },
+    scatterLegend: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 8,
+      paddingHorizontal: 4,
+    },
+    scatterRiskLegend: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 12,
+    },
+    riskDotRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    riskDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+    riskDotLabel: {
+      fontSize: 11,
+      color: theme.secondaryText,
+      fontWeight: "500",
+    },
+    mobileScroll: {
+      marginBottom: 8,
+    },
+    mobileBarLegend: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: 12,
+      marginTop: 4,
+      paddingHorizontal: 4,
+    },
+    legendItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    legendDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+    legendLabel: {
+      fontSize: 11,
+      fontWeight: "500",
+      color: theme.secondaryText,
+    },
+    mobileBarContainer: {
+      flexDirection: "row",
+      gap: 16,
+      paddingHorizontal: 4,
+      paddingBottom: 8,
+    },
+    mobileBarGroup: {
+      alignItems: "center",
+      gap: 4,
+      width: 56,
+    },
+    mobileBarLabel: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: theme.text,
+      marginBottom: 4,
+    },
+    mobileBarCol: {
+      alignItems: "center",
+      gap: 2,
+    },
+    mobileBar: {
+      width: 10,
+      borderRadius: 4,
+    },
+    mobileBarVal: {
+      fontSize: 9,
+      fontWeight: "600",
+      color: theme.secondaryText,
+    },
+    mobileScatterGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      width: 200,
+      height: 160,
+    },
+    mobileScatterCell: {
+      width: 20,
+      height: 20,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 0.5,
+      borderColor: theme.border,
+    },
+    mobileScatterDot: {
+      fontSize: 10,
+      color: theme.onPrimary,
+    },
+  });

@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import type { MindCareTheme } from "@/constants/theme";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const HOURS = Array.from({ length: 12 }, (_, i) => `${i + 7}:00`);
@@ -60,6 +62,8 @@ export function generateMockHeatmapData(): HeatmapCell[] {
 }
 
 export function StressHeatmap({ data, title, subtitle }: StressHeatmapProps) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const { width: screenWidth } = useWindowDimensions();
   const isWide = screenWidth >= 900;
   const [selectedCell, setSelectedCell] = useState<HeatmapCell | null>(null);
@@ -174,135 +178,136 @@ export function StressHeatmap({ data, title, subtitle }: StressHeatmapProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
-    shadowColor: "#6D28D9",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 22,
-    elevation: 4,
-  },
-  containerWide: { padding: 28 },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 20,
-  },
-  headerContent: { flex: 1 },
-  title: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#2D1B69",
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#94A3B8",
-    marginTop: 4,
-    lineHeight: 20,
-  },
-  heatmapWrapper: { paddingBottom: 4 },
-  heatmapBody: { flexDirection: "row" },
-  dayLabelCol: { marginRight: 6 },
-  cornerPlaceholder: { justifyContent: "center", alignItems: "center" },
-  dayLabelCell: {
-    justifyContent: "center",
-    alignItems: "flex-end",
-    paddingRight: 6,
-  },
-  dayLabelText: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#334155",
-  },
-  hourRow: {
-    flexDirection: "row",
-    marginBottom: 2,
-  },
-  hourLabelCell: {
-    justifyContent: "center",
-    alignItems: "center",
-    height: 16,
-  },
-  hourLabelText: {
-    fontSize: 9,
-    fontWeight: "700",
-    color: "#64748B",
-    transform: [{ rotate: "-45deg" }],
-  },
-  cellRow: { flexDirection: "row" },
-  cell: {
-    borderRadius: 3,
-    justifyContent: "center",
-    alignItems: "center",
-    margin: 1,
-  },
-  cellSelected: {
-    borderWidth: 2,
-    borderColor: "#1E1B4B",
-  },
-  cellCount: {
-    fontWeight: "800",
-    color: "rgba(0,0,0,0.6)",
-  },
-  tooltip: {
-    marginTop: 16,
-    backgroundColor: "#F8F6FC",
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#EDE9FE",
-  },
-  tooltipTitle: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#2D1B69",
-    marginBottom: 8,
-  },
-  tooltipRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 4,
-  },
-  tooltipDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  tooltipText: {
-    fontSize: 13,
-    color: "#475569",
-    lineHeight: 20,
-  },
-  tooltipBold: {
-    fontWeight: "700",
-    color: "#1E1B4B",
-  },
-  legend: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    marginTop: 16,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#F3EAFF",
-  },
-  legendSwatch: {
-    width: 20,
-    height: 12,
-    borderRadius: 3,
-  },
-  legendLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#475569",
-    marginHorizontal: 6,
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: theme.border,
+      shadowColor: theme.primaryDeep,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.1,
+      shadowRadius: 22,
+      elevation: 4,
+    },
+    containerWide: { padding: 28 },
+    headerRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      marginBottom: 20,
+    },
+    headerContent: { flex: 1 },
+    title: {
+      fontSize: 20,
+      fontWeight: "800",
+      color: theme.text,
+    },
+    subtitle: {
+      fontSize: 14,
+      color: theme.secondaryText,
+      marginTop: 4,
+      lineHeight: 20,
+    },
+    heatmapWrapper: { paddingBottom: 4 },
+    heatmapBody: { flexDirection: "row" },
+    dayLabelCol: { marginRight: 6 },
+    cornerPlaceholder: { justifyContent: "center", alignItems: "center" },
+    dayLabelCell: {
+      justifyContent: "center",
+      alignItems: "flex-end",
+      paddingRight: 6,
+    },
+    dayLabelText: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: theme.text,
+    },
+    hourRow: {
+      flexDirection: "row",
+      marginBottom: 2,
+    },
+    hourLabelCell: {
+      justifyContent: "center",
+      alignItems: "center",
+      height: 16,
+    },
+    hourLabelText: {
+      fontSize: 9,
+      fontWeight: "700",
+      color: theme.secondaryText,
+      transform: [{ rotate: "-45deg" }],
+    },
+    cellRow: { flexDirection: "row" },
+    cell: {
+      borderRadius: 3,
+      justifyContent: "center",
+      alignItems: "center",
+      margin: 1,
+    },
+    cellSelected: {
+      borderWidth: 2,
+      borderColor: theme.text,
+    },
+    cellCount: {
+      fontWeight: "800",
+      color: "rgba(0,0,0,0.6)",
+    },
+    tooltip: {
+      marginTop: 16,
+      backgroundColor: theme.secondaryCard,
+      borderRadius: 14,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+    },
+    tooltipTitle: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: theme.text,
+      marginBottom: 8,
+    },
+    tooltipRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginBottom: 4,
+    },
+    tooltipDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+    },
+    tooltipText: {
+      fontSize: 13,
+      color: theme.secondaryText,
+      lineHeight: 20,
+    },
+    tooltipBold: {
+      fontWeight: "700",
+      color: theme.text,
+    },
+    legend: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 4,
+      marginTop: 16,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: theme.borderSoft,
+    },
+    legendSwatch: {
+      width: 20,
+      height: 12,
+      borderRadius: 3,
+    },
+    legendLabel: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: theme.secondaryText,
+      marginHorizontal: 6,
+    },
+  });

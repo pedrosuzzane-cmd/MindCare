@@ -11,17 +11,19 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 export default function AdminRequestResetScreen() {
-  const insets = useSafeAreaInsets();
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,9 +82,9 @@ export default function AdminRequestResetScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={{ flex: 1 }}
     >
-      <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
+      <SafeAreaView style={styles.container}>
         <LinearGradient
-          colors={["#E8E0F5", "#F4F2F8", "#E8E0F5"]}
+          colors={theme.softGradient}
           style={styles.gradient}
         >
           <TouchableWithoutFeedback
@@ -120,13 +122,13 @@ export default function AdminRequestResetScreen() {
                   accessibilityLabel="Request password reset"
                 >
                   <LinearGradient
-                    colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
+                    colors={theme.headerGradient}
                     style={styles.buttonGradient}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                   >
                     {loading ? (
-                      <ActivityIndicator color="white" />
+                      <ActivityIndicator color={theme.onPrimary} />
                     ) : (
                       <Text style={styles.buttonText}>Request Password Reset</Text>
                     )}
@@ -154,58 +156,59 @@ export default function AdminRequestResetScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F4F2F8",
-  },
-  gradient: {
-    flex: 1,
-    paddingHorizontal: 24,
-  },
-  scroll: {
-    flexGrow: 1,
-    paddingBottom: 40,
-  },
-  form: {
-    flex: 1,
-    marginTop: 28,
-  },
-  button: {
-    borderRadius: 25,
-    overflow: "hidden",
-    marginTop: 20,
-    // @ts-ignore - web only
-    boxShadow: "0px 10px 24px rgba(124, 58, 237, 0.25)",
-    elevation: 6,
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  buttonGradient: {
-    height: 56,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  helper: {
-    fontSize: 13,
-    color: "#6B7280",
-    textAlign: "center",
-    lineHeight: 19,
-    marginTop: 14,
-    paddingHorizontal: 8,
-  },
-  loginLink: {
-    color: "#7C3AED",
-    fontSize: 15,
-    fontWeight: "600",
-    textAlign: "center",
-    marginTop: 28,
-    paddingVertical: 8,
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    gradient: {
+      flex: 1,
+      paddingHorizontal: 24,
+    },
+    scroll: {
+      flexGrow: 1,
+      paddingBottom: 40,
+    },
+    form: {
+      flex: 1,
+      marginTop: 28,
+    },
+    button: {
+      borderRadius: 25,
+      overflow: "hidden",
+      marginTop: 20,
+      // @ts-ignore - web only
+      boxShadow: `0px 10px 24px ${theme.shadow}`,
+      elevation: 6,
+    },
+    buttonDisabled: {
+      opacity: 0.7,
+    },
+    buttonGradient: {
+      height: 56,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    buttonText: {
+      color: theme.onPrimary,
+      fontSize: 16,
+      fontWeight: "700",
+    },
+    helper: {
+      fontSize: 13,
+      color: theme.secondaryText,
+      textAlign: "center",
+      lineHeight: 19,
+      marginTop: 14,
+      paddingHorizontal: 8,
+    },
+    loginLink: {
+      color: theme.primary,
+      fontSize: 15,
+      fontWeight: "600",
+      textAlign: "center",
+      marginTop: 28,
+      paddingVertical: 8,
+    },
+  });

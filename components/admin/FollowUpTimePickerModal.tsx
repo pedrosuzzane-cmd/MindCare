@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import type { MindCareTheme } from "@/constants/theme";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 
 export type TimeValue = {
   hour: number;
@@ -46,6 +48,8 @@ export function FollowUpTimePickerModal({
   onCancel,
   onConfirm,
 }: FollowUpTimePickerModalProps) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [draft, setDraft] = useState<TimeValue | null>(() =>
     initialTime ? { ...initialTime } : defaultTime(),
   );
@@ -58,18 +62,18 @@ export function FollowUpTimePickerModal({
           <View style={styles.head}>
             <Text style={styles.title}>Select Follow-up Time</Text>
             <Pressable style={styles.closeBtn} onPress={onCancel} hitSlop={6}>
-              <Ionicons name="close" size={20} color="#6B7280" />
+              <Ionicons name="close" size={20} color={theme.secondaryText} />
             </Pressable>
           </View>
 
           {draft ? (
             <View style={styles.preview}>
-              <Ionicons name="time-outline" size={18} color="#6D28D9" />
+              <Ionicons name="time-outline" size={18} color={theme.primary} />
               <Text style={styles.previewText}>{formatDraft(draft)}</Text>
             </View>
           ) : (
             <View style={[styles.preview, styles.previewEmpty]}>
-              <Ionicons name="time-outline" size={18} color="#9CA3AF" />
+              <Ionicons name="time-outline" size={18} color={theme.secondaryText} />
               <Text style={styles.previewEmptyText}>No time selected</Text>
             </View>
           )}
@@ -163,149 +167,150 @@ export function FollowUpTimePickerModal({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(17,24,39,0.55)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
-  },
-  card: {
-    width: "100%",
-    maxWidth: 360,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 16,
-  },
-  head: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  title: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#1E1B4B",
-  },
-  closeBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "#F3F4F6",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  preview: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    marginTop: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: "#F5F0FF",
-  },
-  previewEmpty: {
-    backgroundColor: "#F9FAFB",
-  },
-  previewText: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#6D28D9",
-  },
-  previewEmptyText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#9CA3AF",
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#6B7280",
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-    marginTop: 12,
-    marginBottom: 6,
-  },
-  chipGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-  },
-  chipRow: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  chip: {
-    width: 40,
-    height: 34,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#F9FAFB",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  chipActive: {
-    borderColor: "#6D28D9",
-    backgroundColor: "#F5F0FF",
-  },
-  chipText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#4B5563",
-  },
-  chipTextActive: {
-    color: "#6D28D9",
-  },
-  periodChip: {
-    flex: 1,
-    height: 38,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#F9FAFB",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  footer: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 16,
-  },
-  footerBtn: {
-    height: 44,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  clearBtn: {
-    flex: 1,
-    backgroundColor: "#FEF2F2",
-  },
-  clearBtnText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#B91C1C",
-  },
-  cancelBtn: {
-    flex: 1,
-    backgroundColor: "#F3F4F6",
-  },
-  cancelBtnText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#4B5563",
-  },
-  doneBtn: {
-    flex: 1,
-    backgroundColor: "#6D28D9",
-  },
-  doneBtnText: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#FFFFFF",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      backgroundColor: "rgba(17,24,39,0.55)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 16,
+    },
+    card: {
+      width: "100%",
+      maxWidth: 360,
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 16,
+    },
+    head: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    title: {
+      flex: 1,
+      fontSize: 16,
+      fontWeight: "800",
+      color: theme.text,
+    },
+    closeBtn: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: theme.inputBg,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    preview: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      marginTop: 14,
+      paddingVertical: 12,
+      borderRadius: 12,
+      backgroundColor: theme.softPurple,
+    },
+    previewEmpty: {
+      backgroundColor: theme.inputBg,
+    },
+    previewText: {
+      fontSize: 20,
+      fontWeight: "800",
+      color: theme.primary,
+    },
+    previewEmptyText: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: theme.secondaryText,
+    },
+    sectionLabel: {
+      fontSize: 11,
+      fontWeight: "800",
+      color: theme.secondaryText,
+      textTransform: "uppercase",
+      letterSpacing: 0.4,
+      marginTop: 12,
+      marginBottom: 6,
+    },
+    chipGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    chipRow: {
+      flexDirection: "row",
+      gap: 6,
+    },
+    chip: {
+      width: 40,
+      height: 34,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.inputBg,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    chipActive: {
+      borderColor: theme.primary,
+      backgroundColor: theme.softPurple,
+    },
+    chipText: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: theme.secondaryText,
+    },
+    chipTextActive: {
+      color: theme.primary,
+    },
+    periodChip: {
+      flex: 1,
+      height: 38,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      backgroundColor: theme.inputBg,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    footer: {
+      flexDirection: "row",
+      gap: 10,
+      marginTop: 16,
+    },
+    footerBtn: {
+      height: 44,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    clearBtn: {
+      flex: 1,
+      backgroundColor: `${theme.status.error}1A`,
+    },
+    clearBtnText: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: theme.status.error,
+    },
+    cancelBtn: {
+      flex: 1,
+      backgroundColor: theme.inputBg,
+    },
+    cancelBtnText: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: theme.secondaryText,
+    },
+    doneBtn: {
+      flex: 1,
+      backgroundColor: theme.primary,
+    },
+    doneBtnText: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: theme.onPrimary,
+    },
+  });

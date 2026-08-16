@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Switch,
@@ -17,6 +16,9 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -25,6 +27,8 @@ function fmtTime(h: number, m: number, p: string) {
 }
 
 export default function RemindersScreen() {
+  const { theme } = useMindCareTheme();
+  const s = createStyles(theme);
   const { reminders, loading, add, toggle, remove, update } =
     useCustomReminders();
 
@@ -104,7 +108,7 @@ export default function RemindersScreen() {
   if (loading) {
     return (
       <SafeAreaView style={s.container}>
-        <ActivityIndicator style={{ marginTop: 60 }} color="#8A63D2" />
+        <ActivityIndicator style={{ marginTop: 60 }} color={theme.primary} />
       </SafeAreaView>
     );
   }
@@ -113,7 +117,7 @@ export default function RemindersScreen() {
     <SafeAreaView style={s.container}>
       {/* ── Header ── */}
       <LinearGradient
-        colors={["#8A63D2", "#7C5AC8"]}
+        colors={theme.headerGradient}
         style={s.headerGradient}
       >
         <View style={s.header}>
@@ -129,7 +133,7 @@ export default function RemindersScreen() {
             <Ionicons
               name={showForm ? "close" : "add"}
               size={24}
-              color="white"
+              color={theme.onPrimary}
             />
           </Pressable>
         </View>
@@ -155,7 +159,7 @@ export default function RemindersScreen() {
               value={title}
               onChangeText={setTitle}
               placeholder="e.g., Take medication"
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.secondaryText}
               maxLength={100}
             />
 
@@ -166,7 +170,7 @@ export default function RemindersScreen() {
               value={message}
               onChangeText={setMessage}
               placeholder="e.g., Drink water and stretch"
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.secondaryText}
               maxLength={200}
             />
 
@@ -176,11 +180,11 @@ export default function RemindersScreen() {
               style={s.timeField}
               onPress={() => setShowTimePicker(true)}
             >
-              <Ionicons name="alarm-outline" size={18} color="#8A63D2" />
+              <Ionicons name="alarm-outline" size={18} color={theme.primary} />
               <Text style={s.timeFieldText}>
                 {fmtTime(time.hour, time.minute, time.period)}
               </Text>
-              <Ionicons name="chevron-forward" size={16} color="#C4B5D0" />
+              <Ionicons name="chevron-forward" size={16} color={theme.secondaryText} />
             </Pressable>
             <ClockTimePicker
               visible={showTimePicker}
@@ -225,7 +229,7 @@ export default function RemindersScreen() {
               disabled={saving}
             >
               {saving ? (
-                <ActivityIndicator color="white" size="small" />
+                <ActivityIndicator color={theme.onPrimary} size="small" />
               ) : (
                 <Text style={s.saveBtnText}>Save Reminder</Text>
               )}
@@ -239,7 +243,7 @@ export default function RemindersScreen() {
             <Ionicons
               name="notifications-off-outline"
               size={48}
-              color="#C4B5D0"
+              color={theme.secondaryText}
             />
             <Text style={s.emptyTitle}>No reminders yet</Text>
             <Text style={s.emptyDesc}>
@@ -259,7 +263,7 @@ export default function RemindersScreen() {
                   <Ionicons
                     name="alarm-outline"
                     size={16}
-                    color={r.enabled ? "white" : "#999"}
+                    color={r.enabled ? theme.onPrimary : theme.secondaryText}
                   />
                   <Text
                     style={[
@@ -271,9 +275,9 @@ export default function RemindersScreen() {
                   </Text>
                 </View>
                 <Switch
-                  trackColor={{ false: "#E0E0E0", true: "#8A63D2" }}
-                  thumbColor="#FFFFFF"
-                  ios_backgroundColor="#E0E0E0"
+                  trackColor={{ false: theme.border, true: theme.primary }}
+                  thumbColor={theme.card}
+                  ios_backgroundColor={theme.border}
                   onValueChange={() => handleToggle(r.id)}
                   value={r.enabled}
                 />
@@ -299,7 +303,7 @@ export default function RemindersScreen() {
                   <Ionicons
                     name="trash-outline"
                     size={18}
-                    color="#EF4444"
+                    color={theme.status.error}
                   />
                 </Pressable>
               </View>
@@ -313,232 +317,233 @@ export default function RemindersScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F2F8" },
-  headerGradient: { paddingBottom: 20 },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: {
-    color: "white",
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  addBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  subtitle: {
-    fontSize: 13,
-    color: "rgba(255,255,255,0.85)",
-    textAlign: "center",
-    paddingHorizontal: 20,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: theme.background },
+    headerGradient: { paddingBottom: 20 },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 10,
+    },
+    backBtn: {
+      width: 40,
+      height: 40,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    headerTitle: {
+      color: theme.onPrimary,
+      fontSize: 20,
+      fontWeight: "700",
+    },
+    addBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: "rgba(255,255,255,0.2)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    subtitle: {
+      fontSize: 13,
+      color: "rgba(255,255,255,0.85)",
+      textAlign: "center",
+      paddingHorizontal: 20,
+    },
+    scrollContent: {
+      paddingHorizontal: 20,
+      paddingTop: 20,
+    },
 
-  /* ── Form ── */
-  formCard: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
-    // @ts-ignore
-    boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
-  },
-  formTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#1E1B4B",
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#7C6B93",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginTop: 14,
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: "#FAF8FF",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
-    fontSize: 15,
-    color: "#1E1B4B",
-  },
-  timeField: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FAF8FF",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
-    gap: 8,
-  },
-  timeFieldText: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1E1B4B",
-    fontVariant: ["tabular-nums"],
-  },
-  dayRow: {
-    flexDirection: "row",
-    gap: 6,
-    flexWrap: "wrap",
-  },
-  dayPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "#F3EAFF",
-  },
-  dayPillSelected: {
-    backgroundColor: "#8A63D2",
-  },
-  dayPillText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#8A63D2",
-  },
-  dayPillTextSelected: {
-    color: "white",
-  },
-  hint: {
-    fontSize: 12,
-    color: "#999",
-    marginTop: 6,
-  },
-  saveBtn: {
-    marginTop: 20,
-    backgroundColor: "#8A63D2",
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: "center",
-    // @ts-ignore
-    boxShadow: "0px 4px 12px rgba(138, 99, 210, 0.3)",
-  },
-  saveBtnText: {
-    color: "white",
-    fontSize: 15,
-    fontWeight: "700",
-  },
+    /* ── Form ── */
+    formCard: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 20,
+      marginBottom: 20,
+      // @ts-ignore
+      boxShadow: "0px 4px 16px rgba(138, 99, 210, 0.08)",
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+    },
+    formTitle: {
+      fontSize: 17,
+      fontWeight: "700",
+      color: theme.text,
+      marginBottom: 16,
+    },
+    label: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: theme.secondaryText,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      marginTop: 14,
+      marginBottom: 6,
+    },
+    input: {
+      backgroundColor: theme.inputBg,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      fontSize: 15,
+      color: theme.text,
+    },
+    timeField: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.inputBg,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      gap: 8,
+    },
+    timeFieldText: {
+      flex: 1,
+      fontSize: 16,
+      fontWeight: "700",
+      color: theme.text,
+      fontVariant: ["tabular-nums"],
+    },
+    dayRow: {
+      flexDirection: "row",
+      gap: 6,
+      flexWrap: "wrap",
+    },
+    dayPill: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: theme.softPurple,
+    },
+    dayPillSelected: {
+      backgroundColor: theme.primary,
+    },
+    dayPillText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: theme.primary,
+    },
+    dayPillTextSelected: {
+      color: theme.onPrimary,
+    },
+    hint: {
+      fontSize: 12,
+      color: theme.secondaryText,
+      marginTop: 6,
+    },
+    saveBtn: {
+      marginTop: 20,
+      backgroundColor: theme.primary,
+      paddingVertical: 14,
+      borderRadius: 14,
+      alignItems: "center",
+      // @ts-ignore
+      boxShadow: "0px 4px 12px rgba(138, 99, 210, 0.3)",
+    },
+    saveBtnText: {
+      color: theme.onPrimary,
+      fontSize: 15,
+      fontWeight: "700",
+    },
 
-  /* ── Empty State ── */
-  emptyState: {
-    alignItems: "center",
-    paddingTop: 80,
-    gap: 12,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#7C6B93",
-  },
-  emptyDesc: {
-    fontSize: 14,
-    color: "#999",
-    textAlign: "center",
-  },
+    /* ── Empty State ── */
+    emptyState: {
+      alignItems: "center",
+      paddingTop: 80,
+      gap: 12,
+    },
+    emptyTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: theme.text,
+    },
+    emptyDesc: {
+      fontSize: 14,
+      color: theme.secondaryText,
+      textAlign: "center",
+    },
 
-  /* ── Reminder Cards ── */
-  reminderCard: {
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    // @ts-ignore
-    boxShadow: "0px 2px 10px rgba(138, 99, 210, 0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.05)",
-  },
-  reminderTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  timePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  timePillActive: {
-    backgroundColor: "#8A63D2",
-  },
-  timePillInactive: {
-    backgroundColor: "#F1F5F9",
-  },
-  timePillText: {
-    fontSize: 14,
-    fontWeight: "700",
-    fontVariant: ["tabular-nums"],
-  },
-  timePillTextActive: {
-    color: "white",
-  },
-  timePillTextInactive: {
-    color: "#999",
-  },
-  reminderTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1E1B4B",
-  },
-  reminderMessage: {
-    fontSize: 13,
-    color: "#888",
-    marginTop: 4,
-  },
-  reminderBottom: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(156, 126, 235, 0.06)",
-  },
-  repeatLabel: {
-    fontSize: 12,
-    color: "#999",
-    fontWeight: "600",
-  },
-  deleteBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#FEF2F2",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-});
+    /* ── Reminder Cards ── */
+    reminderCard: {
+      backgroundColor: theme.card,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 12,
+      // @ts-ignore
+      boxShadow: "0px 2px 10px rgba(138, 99, 210, 0.06)",
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+    },
+    reminderTop: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 8,
+    },
+    timePill: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 12,
+    },
+    timePillActive: {
+      backgroundColor: theme.primary,
+    },
+    timePillInactive: {
+      backgroundColor: theme.inputBg,
+    },
+    timePillText: {
+      fontSize: 14,
+      fontWeight: "700",
+      fontVariant: ["tabular-nums"],
+    },
+    timePillTextActive: {
+      color: theme.onPrimary,
+    },
+    timePillTextInactive: {
+      color: theme.secondaryText,
+    },
+    reminderTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: theme.text,
+    },
+    reminderMessage: {
+      fontSize: 13,
+      color: theme.secondaryText,
+      marginTop: 4,
+    },
+    reminderBottom: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginTop: 10,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: theme.borderSoft,
+    },
+    repeatLabel: {
+      fontSize: 12,
+      color: theme.secondaryText,
+      fontWeight: "600",
+    },
+    deleteBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: `${theme.status.error}14`,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+  });

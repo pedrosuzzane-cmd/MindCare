@@ -43,6 +43,7 @@ import EmojiPicker from "@/components/chat/EmojiPicker";
 import Toast from "@/components/Toast";
 
 import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 import { useAuth } from "@/hooks/AuthContext";
 import { useStudentProfile } from "@/hooks/useStudentProfile";
 import {
@@ -105,24 +106,12 @@ const getInitials = (name: string) => {
     .join("");
 };
 
-// ── MindCare dark theme (Inbox screen only) ──
-const COLORS = {
-  background: "#0F0D15",
-  card: "#1E1B2E",
-  secondary: "#161224",
-  purple: "#6D28D9",
-  lightPurple: "#A78BFA",
-  primaryText: "#FFFFFF",
-  secondaryText: "#9CA3AF",
-  border: "rgba(139, 92, 246, 0.3)",
-  softBorder: "rgba(139, 92, 246, 0.12)",
-};
-
 export default function StudentMessagesScreen() {
   const { user } = useAuth();
   const userId = user?.uid;
   const insets = useSafeAreaInsets();
   const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
 
   // ── View state ──
   const [viewMode, setViewMode] = useState<ViewMode>("directory");
@@ -618,7 +607,7 @@ export default function StudentMessagesScreen() {
             <Ionicons
               name={isPeer ? "person" : "shield-checkmark"}
               size={22}
-              color={isPeer ? "#8A63D2" : "#6D5BBF"}
+              color={isPeer ? theme.primary : theme.accent.purple}
             />
           </View>
           <View
@@ -688,7 +677,7 @@ export default function StudentMessagesScreen() {
               <Ionicons
                 name="ban-outline"
                 size={14}
-                color={isMine ? "rgba(255,255,255,0.5)" : "#94A3B8"}
+                color={isMine ? "rgba(255,255,255,0.5)" : theme.secondaryText}
               />
               <Text
                 style={[styles.deletedText, isMine && styles.deletedTextMine]}
@@ -711,7 +700,7 @@ export default function StudentMessagesScreen() {
                 style={styles.retryBtn}
                 onPress={() => handleRetry(item)}
               >
-                <Ionicons name="refresh" size={12} color="#EF4444" />
+                <Ionicons name="refresh" size={12} color={theme.status.error} />
                 <Text style={styles.retryText}>Retry</Text>
               </Pressable>
             )}
@@ -764,12 +753,12 @@ export default function StudentMessagesScreen() {
           accessibilityRole="button"
           accessibilityLabel="Filter conversations"
         >
-          <Ionicons name="options-outline" size={16} color={COLORS.lightPurple} />
+          <Ionicons name="options-outline" size={16} color={theme.primary} />
           <Text style={styles.filterTriggerText}>{activeLabel}</Text>
           <Ionicons
             name={filterDropdownOpen ? "chevron-up" : "chevron-down"}
             size={16}
-            color={COLORS.secondaryText}
+            color={theme.secondaryText}
           />
         </Pressable>
 
@@ -797,7 +786,7 @@ export default function StudentMessagesScreen() {
                     <Ionicons
                       name={option.icon}
                       size={16}
-                      color={isActive ? COLORS.lightPurple : COLORS.secondaryText}
+                      color={isActive ? theme.primary : theme.secondaryText}
                     />
                     <Text
                       style={[
@@ -811,7 +800,7 @@ export default function StudentMessagesScreen() {
                       <Ionicons
                         name="checkmark"
                         size={16}
-                        color={COLORS.lightPurple}
+                        color={theme.primary}
                       />
                     )}
                   </Pressable>
@@ -824,17 +813,17 @@ export default function StudentMessagesScreen() {
 
       {/* Search */}
       <View style={styles.searchBar}>
-        <Ionicons name="search" size={18} color={COLORS.secondaryText} />
+        <Ionicons name="search" size={18} color={theme.secondaryText} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search conversations..."
-          placeholderTextColor={COLORS.secondaryText}
+          placeholderTextColor={theme.secondaryText}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
         {searchQuery.length > 0 && (
           <Pressable onPress={() => setSearchQuery("")}>
-            <Ionicons name="close-circle" size={18} color={COLORS.secondaryText} />
+            <Ionicons name="close-circle" size={18} color={theme.secondaryText} />
           </Pressable>
         )}
       </View>
@@ -842,7 +831,7 @@ export default function StudentMessagesScreen() {
       {/* Conversation list */}
       {inboxLoading ? (
         <View style={styles.emptyState}>
-          <ActivityIndicator size="large" color="#8A63D2" />
+          <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.emptyText}>Loading conversations...</Text>
         </View>
       ) : filteredConversations.length === 0 ? (
@@ -858,7 +847,7 @@ export default function StudentMessagesScreen() {
                     : "chatbubbles-outline"
             }
             size={48}
-            color="#D1D5DB"
+            color={theme.secondaryText}
           />
           <Text style={styles.emptyTitle}>{emptyStateMessage.title}</Text>
           {emptyStateMessage.message ? (
@@ -883,18 +872,18 @@ export default function StudentMessagesScreen() {
     <>
       {/* Friendly reminder banner */}
       <View style={styles.reminderBanner}>
-        <Ionicons name="heart-outline" size={14} color="#6D5BBF" />
+        <Ionicons name="heart-outline" size={14} color={theme.accent.purple} />
         <Text style={styles.reminderText}>{REMINDER_BANNER}</Text>
       </View>
 
       {chatLoading ? (
         <View style={styles.emptyState}>
-          <ActivityIndicator size="large" color="#8A63D2" />
+          <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.emptyText}>Loading conversation...</Text>
         </View>
       ) : allMessages.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="chatbubble-outline" size={48} color="#D1D5DB" />
+          <Ionicons name="chatbubble-outline" size={48} color={theme.secondaryText} />
           <Text style={styles.emptyTitle}>Start the conversation</Text>
           <Text style={styles.emptyText}>
             Send a message to {chatPartnerName}.
@@ -919,7 +908,7 @@ export default function StudentMessagesScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Scroll to latest messages"
-          style={[styles.scrollToBottomBtn, { backgroundColor: theme.primary }]}
+          style={styles.scrollToBottomBtn}
           onPress={jumpToBottom}
         >
           <Ionicons name="chevron-down" size={22} color={theme.onPrimary} />
@@ -932,7 +921,7 @@ export default function StudentMessagesScreen() {
           <Text style={styles.typingText}>{chatPartnerName} is typing</Text>
           <ActivityIndicator
             size="small"
-            color="#8A63D2"
+            color={theme.primary}
             style={{ marginLeft: 6 }}
           />
         </View>
@@ -964,13 +953,13 @@ export default function StudentMessagesScreen() {
           <Ionicons
             name={showEmoji ? "keyboard" : ("happy-outline" as any)}
             size={24}
-            color={showEmoji ? "#8A63D2" : "#94A3B8"}
+            color={showEmoji ? theme.primary : theme.secondaryText}
           />
         </Pressable>
         <TextInput
           style={styles.textInput}
           placeholder="Type a message..."
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={theme.secondaryText}
           value={inputText}
           onChangeText={(text) => {
             setInputText(text);
@@ -998,7 +987,7 @@ export default function StudentMessagesScreen() {
           <Ionicons
             name="arrow-up-circle"
             size={32}
-            color={inputText.trim() ? "#8A63D2" : "#D1D5DB"}
+            color={inputText.trim() ? theme.primary : theme.secondaryText}
           />
         </Pressable>
       </View>
@@ -1014,7 +1003,7 @@ export default function StudentMessagesScreen() {
       >
         {/* Header */}
         <LinearGradient
-          colors={["#8A63D2", "#B794F6"]}
+          colors={[theme.primary, "#B794F6"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
@@ -1081,7 +1070,7 @@ export default function StudentMessagesScreen() {
           accessibilityRole="button"
           accessibilityLabel="New conversation"
         >
-          <Ionicons name="add" size={28} color="#FFFFFF" />
+          <Ionicons name="add" size={28} color={theme.onPrimary} />
         </Pressable>
       )}
 
@@ -1104,7 +1093,7 @@ export default function StudentMessagesScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Close"
               >
-                <Ionicons name="close" size={22} color={COLORS.secondaryText} />
+                <Ionicons name="close" size={22} color={theme.secondaryText} />
               </Pressable>
             </View>
 
@@ -1113,11 +1102,11 @@ export default function StudentMessagesScreen() {
             </Text>
 
             <View style={styles.newChatSearch}>
-              <Ionicons name="search" size={18} color={COLORS.secondaryText} />
+              <Ionicons name="search" size={18} color={theme.secondaryText} />
               <TextInput
                 style={styles.newChatSearchInput}
                 placeholder="Search name..."
-                placeholderTextColor={COLORS.secondaryText}
+                placeholderTextColor={theme.secondaryText}
                 value={recipientQuery}
                 onChangeText={(text) => {
                   setRecipientQuery(text);
@@ -1135,7 +1124,7 @@ export default function StudentMessagesScreen() {
                   <Ionicons
                     name="close-circle"
                     size={18}
-                    color={COLORS.secondaryText}
+                    color={theme.secondaryText}
                   />
                 </Pressable>
               )}
@@ -1145,7 +1134,7 @@ export default function StudentMessagesScreen() {
               {recipientLoading ? (
                 <ActivityIndicator
                   size="small"
-                  color={COLORS.lightPurple}
+                  color={theme.primary}
                   style={{ marginTop: 16 }}
                 />
               ) : recipientQuery.trim() && recipientResults.length === 0 ? (
@@ -1222,7 +1211,7 @@ export default function StudentMessagesScreen() {
                         {isStarting && (
                           <ActivityIndicator
                             size="small"
-                            color={COLORS.lightPurple}
+                            color={theme.primary}
                           />
                         )}
                       </Pressable>
@@ -1257,13 +1246,13 @@ export default function StudentMessagesScreen() {
           <View style={styles.ctxMenu}>
             <Text style={styles.ctxTitle}>Message Options</Text>
             <Pressable style={styles.ctxRow} onPress={handleCopy}>
-              <Ionicons name="copy-outline" size={20} color="#8A63D2" />
+              <Ionicons name="copy-outline" size={20} color={theme.primary} />
               <Text style={styles.ctxLabel}>Copy</Text>
             </Pressable>
             <View style={styles.ctxDivider} />
             <Pressable style={styles.ctxRow} onPress={handleDelete}>
-              <Ionicons name="trash-outline" size={20} color="#EF4444" />
-              <Text style={[styles.ctxLabel, { color: "#EF4444" }]}>
+              <Ionicons name="trash-outline" size={20} color={theme.status.error} />
+              <Text style={[styles.ctxLabel, { color: theme.status.error }]}>
                 Delete
               </Text>
             </Pressable>
@@ -1274,8 +1263,9 @@ export default function StudentMessagesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
 
   // Header
   header: {
@@ -1309,7 +1299,7 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: "#7A54C4",
+    backgroundColor: theme.primary,
   },
   headerAvatarFallback: { alignItems: "center", justifyContent: "center" },
   headerCenter: {
@@ -1349,7 +1339,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   onlineDotActive: {
-    backgroundColor: "#4ADE80",
+    backgroundColor: theme.status.success,
   },
   onlineDotInactive: {
     backgroundColor: "rgba(255,255,255,0.4)",
@@ -1368,10 +1358,10 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 40,
   },
-  emptyTitle: { fontSize: 17, fontWeight: "700", color: COLORS.primaryText },
+  emptyTitle: { fontSize: 17, fontWeight: "700", color: theme.text },
   emptyText: {
     fontSize: 14,
-    color: COLORS.secondaryText,
+    color: theme.secondaryText,
     textAlign: "center",
   },
 
@@ -1387,10 +1377,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: COLORS.card,
+    backgroundColor: theme.card,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: COLORS.softBorder,
+    borderColor: theme.borderSoft,
     paddingHorizontal: 14,
     height: 44,
   },
@@ -1398,7 +1388,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: "600",
-    color: COLORS.primaryText,
+    color: theme.text,
   },
   filterBackdrop: {
     position: "absolute",
@@ -1413,10 +1403,10 @@ const styles = StyleSheet.create({
     top: 50,
     left: 0,
     right: 0,
-    backgroundColor: COLORS.card,
+    backgroundColor: theme.card,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: theme.border,
     paddingVertical: 6,
     zIndex: 1002,
     elevation: 10,
@@ -1430,16 +1420,16 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   dropdownItemActive: {
-    backgroundColor: "rgba(139, 92, 246, 0.15)",
+    backgroundColor: theme.softPurple,
   },
   dropdownItemText: {
     flex: 1,
     fontSize: 14,
     fontWeight: "500",
-    color: COLORS.secondaryText,
+    color: theme.secondaryText,
   },
   dropdownItemTextActive: {
-    color: COLORS.lightPurple,
+    color: theme.primary,
     fontWeight: "600",
   },
 
@@ -1447,7 +1437,7 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.card,
+    backgroundColor: theme.card,
     marginHorizontal: 16,
     marginTop: 8,
     marginBottom: 12,
@@ -1456,12 +1446,12 @@ const styles = StyleSheet.create({
     height: 46,
     gap: 8,
     borderWidth: 1,
-    borderColor: COLORS.softBorder,
+    borderColor: theme.borderSoft,
   },
   searchInput: {
     flex: 1,
     fontSize: 15,
-    color: COLORS.primaryText,
+    color: theme.text,
     paddingVertical: 0,
   },
 
@@ -1473,12 +1463,12 @@ const styles = StyleSheet.create({
   convRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.card,
+    backgroundColor: theme.card,
     borderRadius: 16,
     padding: 14,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: COLORS.softBorder,
+    borderColor: theme.borderSoft,
     gap: 12,
   },
   convAvatarWrapper: {
@@ -1491,8 +1481,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  convAvatarPeer: { backgroundColor: "rgba(139, 92, 246, 0.18)" },
-  convAvatarAdmin: { backgroundColor: "rgba(109, 91, 191, 0.22)" },
+  convAvatarPeer: { backgroundColor: theme.softPurple },
+  convAvatarAdmin: { backgroundColor: theme.secondaryCard },
   convInfo: { flex: 1 },
   convTop: {
     flexDirection: "row",
@@ -1503,18 +1493,18 @@ const styles = StyleSheet.create({
   convName: {
     fontSize: 15,
     fontWeight: "600",
-    color: COLORS.primaryText,
+    color: theme.text,
     flexShrink: 1,
   },
   convNameBold: { fontWeight: "800" },
-  convTime: { fontSize: 11, color: COLORS.secondaryText, marginLeft: 8 },
-  convLastMsg: { fontSize: 13, color: COLORS.secondaryText },
-  convLastMsgBold: { fontWeight: "600", color: COLORS.primaryText },
+  convTime: { fontSize: 11, color: theme.secondaryText, marginLeft: 8 },
+  convLastMsg: { fontSize: 13, color: theme.secondaryText },
+  convLastMsgBold: { fontWeight: "600", color: theme.text },
   unreadDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: COLORS.lightPurple,
+    backgroundColor: theme.primary,
   },
   convPresenceDot: {
     position: "absolute",
@@ -1524,13 +1514,13 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: COLORS.card,
+    borderColor: theme.card,
   },
   convPresenceDotOnline: {
-    backgroundColor: "#22C55E",
+    backgroundColor: theme.status.success,
   },
   convPresenceDotOffline: {
-    backgroundColor: "#4B5563",
+    backgroundColor: theme.secondaryText,
   },
 
   // Reminder banner
@@ -1538,7 +1528,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "rgba(139, 92, 246, 0.12)",
+    backgroundColor: theme.softPurple,
     marginHorizontal: 16,
     marginTop: 10,
     marginBottom: 4,
@@ -1546,12 +1536,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.softBorder,
+    borderColor: theme.borderSoft,
   },
   reminderText: {
     flex: 1,
     fontSize: 12,
-    color: COLORS.lightPurple,
+    color: theme.primary,
     lineHeight: 17,
   },
 
@@ -1570,8 +1560,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: theme.primary,
     // @ts-ignore
-    boxShadow: "0px 4px 12px rgba(124, 77, 204, 0.4)",
+    boxShadow: "0px 4px 12px " + theme.shadow,
     elevation: 4,
   },
   bubbleRow: { marginBottom: 8, flexDirection: "row" },
@@ -1584,23 +1575,23 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   bubbleMine: {
-    backgroundColor: "#8A63D2",
+    backgroundColor: theme.primary,
     borderBottomRightRadius: 4,
   },
   bubbleTheirs: {
-    backgroundColor: COLORS.card,
+    backgroundColor: theme.card,
     borderBottomLeftRadius: 4,
     borderWidth: 1,
-    borderColor: COLORS.softBorder,
+    borderColor: theme.borderSoft,
   },
   bubbleDeleted: {
-    backgroundColor: "rgba(148, 163, 184, 0.15)",
+    backgroundColor: theme.secondaryCard,
     borderWidth: 1,
-    borderColor: "rgba(148, 163, 184, 0.2)",
+    borderColor: theme.border,
   },
   bubbleText: {
     fontSize: 15,
-    color: COLORS.primaryText,
+    color: theme.text,
     lineHeight: 20,
   },
   bubbleTextMine: { color: "white" },
@@ -1611,10 +1602,10 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 4,
   },
-  bubbleTime: { fontSize: 10, color: "#94A3B8" },
+  bubbleTime: { fontSize: 10, color: theme.secondaryText },
   bubbleTimeMine: { color: "rgba(255,255,255,0.5)" },
   deletedRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  deletedText: { fontSize: 13, color: "#94A3B8", fontStyle: "italic" },
+  deletedText: { fontSize: 13, color: theme.secondaryText, fontStyle: "italic" },
   deletedTextMine: { color: "rgba(255,255,255,0.5)" },
   retryBtn: {
     flexDirection: "row",
@@ -1625,7 +1616,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 8,
   },
-  retryText: { fontSize: 11, color: "#EF4444", fontWeight: "600" },
+  retryText: { fontSize: 11, color: theme.status.error, fontWeight: "600" },
 
   // Typing indicator
   typingIndicator: {
@@ -1633,11 +1624,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 6,
-    backgroundColor: COLORS.secondary,
+    backgroundColor: theme.inputBg,
   },
   typingText: {
     fontSize: 12,
-    color: COLORS.lightPurple,
+    color: theme.primary,
     fontStyle: "italic",
   },
 
@@ -1648,20 +1639,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: COLORS.softBorder,
-    backgroundColor: COLORS.card,
+    borderTopColor: theme.borderSoft,
+    backgroundColor: theme.card,
     gap: 8,
   },
   textInput: {
     flex: 1,
-    backgroundColor: COLORS.secondary,
+    backgroundColor: theme.inputBg,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: COLORS.softBorder,
+    borderColor: theme.borderSoft,
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
-    color: COLORS.primaryText,
+    color: theme.text,
     maxHeight: 100,
   },
   emojiBtn: {
@@ -1686,7 +1677,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: COLORS.purple,
+    backgroundColor: theme.primary,
     alignItems: "center",
     justifyContent: "center",
     elevation: 8,
@@ -1707,10 +1698,10 @@ const styles = StyleSheet.create({
   newChatCard: {
     width: "100%",
     maxWidth: 420,
-    backgroundColor: COLORS.card,
+    backgroundColor: theme.card,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: COLORS.softBorder,
+    borderColor: theme.borderSoft,
     padding: 20,
     maxHeight: "80%",
     overflow: "hidden",
@@ -1724,28 +1715,28 @@ const styles = StyleSheet.create({
   newChatTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: COLORS.primaryText,
+    color: theme.text,
   },
   newChatSubtitle: {
     fontSize: 13,
-    color: COLORS.secondaryText,
+    color: theme.secondaryText,
     marginBottom: 14,
   },
   newChatSearch: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: COLORS.secondary,
+    backgroundColor: theme.inputBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.softBorder,
+    borderColor: theme.borderSoft,
     paddingHorizontal: 12,
     height: 44,
   },
   newChatSearchInput: {
     flex: 1,
     fontSize: 15,
-    color: COLORS.primaryText,
+    color: theme.text,
     paddingVertical: 0,
   },
   newChatResults: {
@@ -1758,7 +1749,7 @@ const styles = StyleSheet.create({
   },
   newChatEmpty: {
     fontSize: 13,
-    color: COLORS.secondaryText,
+    color: theme.secondaryText,
     textAlign: "center",
     paddingVertical: 16,
   },
@@ -1788,22 +1779,22 @@ const styles = StyleSheet.create({
   newChatResultAvatarInitials: {
     fontSize: 13,
     fontWeight: "700",
-    color: COLORS.lightPurple,
+    color: theme.primary,
   },
   newChatResultAvatarPeer: {
-    backgroundColor: "rgba(139, 92, 246, 0.18)",
+    backgroundColor: theme.softPurple,
   },
   newChatResultAvatarGuidance: {
-    backgroundColor: "rgba(109, 91, 191, 0.22)",
+    backgroundColor: theme.secondaryCard,
   },
   newChatResultName: {
     fontSize: 15,
     fontWeight: "600",
-    color: COLORS.primaryText,
+    color: theme.text,
   },
   newChatResultMeta: {
     fontSize: 12,
-    color: COLORS.secondaryText,
+    color: theme.secondaryText,
     marginTop: 2,
   },
 
@@ -1815,17 +1806,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   ctxMenu: {
-    backgroundColor: COLORS.card,
+    backgroundColor: theme.card,
     borderRadius: 18,
     padding: 6,
     width: 200,
     borderWidth: 1,
-    borderColor: COLORS.softBorder,
+    borderColor: theme.borderSoft,
   },
   ctxTitle: {
     fontSize: 13,
     fontWeight: "700",
-    color: COLORS.secondaryText,
+    color: theme.secondaryText,
     paddingHorizontal: 14,
     paddingTop: 10,
     paddingBottom: 6,
@@ -1838,10 +1829,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 12,
   },
-  ctxLabel: { fontSize: 15, fontWeight: "600", color: COLORS.primaryText },
+  ctxLabel: { fontSize: 15, fontWeight: "600", color: theme.text },
   ctxDivider: {
     height: 1,
-    backgroundColor: COLORS.softBorder,
+    backgroundColor: theme.borderSoft,
     marginHorizontal: 14,
   },
 });

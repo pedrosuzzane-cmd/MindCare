@@ -1,6 +1,7 @@
 import { useAuth } from "@/hooks/AuthContext";
 import { useJournal } from "@/hooks/useJournal";
 import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 import { ConstellationSky } from "@/components/constellation/ConstellationSky";
 import { DailyReflectionModal } from "@/components/constellation/DailyReflectionModal";
 import { MonthlySummary } from "@/components/constellation/MonthlySummary";
@@ -48,6 +49,7 @@ const SKY_STAR_LIMIT = 80;
 export default function ConstellationScreen() {
   const { user, role } = useAuth();
   const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const { entries, loading, loadError, reload, manualSync } = useJournal();
   const { width } = useWindowDimensions();
   const scrollRef = useRef<ScrollView>(null);
@@ -238,7 +240,7 @@ export default function ConstellationScreen() {
 
   return (
     <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
+      style={styles.container}
       edges={["top", "bottom"]}
     >
       <ScrollView
@@ -249,10 +251,10 @@ export default function ConstellationScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>
+          <Text style={styles.headerTitle}>
             ✨ Constellation Journal
           </Text>
-          <Text style={[styles.headerSubtitle, { color: theme.secondaryText }]}>
+          <Text style={styles.headerSubtitle}>
             Your reflections, written in the stars.
           </Text>
         </View>
@@ -260,17 +262,17 @@ export default function ConstellationScreen() {
         {showLoading ? (
           <View style={[styles.centerBox, { height: skyHeight }]}>
             <ActivityIndicator color={theme.primary} />
-            <Text style={[styles.centerText, { color: theme.secondaryText }]}>
+            <Text style={styles.centerText}>
               ✨ Preparing your constellation...
             </Text>
           </View>
         ) : showError ? (
           <View style={[styles.centerBox, { height: skyHeight }]}>
-            <Text style={[styles.centerTitle, { color: theme.text }]}>
+            <Text style={styles.centerTitle}>
               Your constellation could not be loaded.
             </Text>
             <Pressable
-              style={[styles.primaryButton, { backgroundColor: theme.primary }]}
+              style={styles.primaryButton}
               onPress={reload}
               accessibilityRole="button"
               accessibilityLabel="Try again"
@@ -299,7 +301,7 @@ export default function ConstellationScreen() {
                 Start writing to light up your first constellation.
               </Text>
               <Pressable
-                style={[styles.primaryButton, { backgroundColor: theme.primary }]}
+                style={styles.primaryButton}
                 onPress={writeJournal}
                 accessibilityRole="button"
                 accessibilityLabel="Write my first journal"
@@ -317,15 +319,15 @@ export default function ConstellationScreen() {
               <Pressable
                 onPress={goPrevMonth}
                 hitSlop={10}
-                style={[styles.monthArrow, { borderColor: theme.border }]}
+                style={styles.monthArrow}
                 accessibilityRole="button"
                 accessibilityLabel="Previous month"
               >
-                <Text style={[styles.monthArrowText, { color: theme.primary }]}>
+                <Text style={styles.monthArrowText}>
                   ◀
                 </Text>
               </Pressable>
-              <Text style={[styles.monthLabel, { color: theme.text }]}>
+              <Text style={styles.monthLabel}>
                 {monthLabel}
               </Text>
               <Pressable
@@ -334,7 +336,6 @@ export default function ConstellationScreen() {
                 hitSlop={10}
                 style={[
                   styles.monthArrow,
-                  { borderColor: theme.border },
                   viewingCurrentMonth && styles.monthArrowDisabled,
                 ]}
                 accessibilityRole="button"
@@ -375,10 +376,9 @@ export default function ConstellationScreen() {
                     Write a journal entry to light your first star ✨
                   </Text>
                   <Pressable
-                    style={[
-                      styles.primaryButton,
-                      { backgroundColor: theme.primary },
-                    ]}
+                style={[
+                  styles.primaryButton,
+                ]}
                     onPress={writeJournal}
                     accessibilityRole="button"
                     accessibilityLabel="Write a journal entry"
@@ -417,7 +417,7 @@ export default function ConstellationScreen() {
                     }
                   >
                     <Text
-                      style={[styles.fullSkyToggleText, { color: theme.primary }]}
+                      style={styles.fullSkyToggleText}
                     >
                       {fullSky
                         ? "Show fewer stars"
@@ -446,7 +446,7 @@ export default function ConstellationScreen() {
                 {/* Star guide */}
                 {legendCategories.length > 0 && (
                   <View style={styles.legendWrap}>
-                    <Text style={[styles.legendTitle, { color: theme.text }]}>
+                    <Text style={styles.legendTitle}>
                       ✨ Star Guide
                     </Text>
                     <View style={styles.legendRow}>
@@ -459,10 +459,7 @@ export default function ConstellationScreen() {
                             ]}
                           />
                           <Text
-                            style={[
-                              styles.legendLabel,
-                              { color: theme.secondaryText },
-                            ]}
+                            style={styles.legendLabel}
                           >
                             {c.name}
                           </Text>
@@ -493,9 +490,11 @@ export default function ConstellationScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.background,
   },
   scroll: {
     flex: 1,
@@ -511,10 +510,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 26,
     fontWeight: "800",
+    color: theme.text,
   },
   headerSubtitle: {
     fontSize: 14,
     marginTop: 4,
+    color: theme.secondaryText,
   },
   monthNav: {
     flexDirection: "row",
@@ -528,6 +529,7 @@ const styles = StyleSheet.create({
     height: 38,
     borderRadius: 19,
     borderWidth: 1,
+    borderColor: theme.border,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -537,12 +539,14 @@ const styles = StyleSheet.create({
   monthArrowText: {
     fontSize: 14,
     fontWeight: "800",
+    color: theme.primary,
   },
   monthLabel: {
     fontSize: 17,
     fontWeight: "800",
     minWidth: 130,
     textAlign: "center",
+    color: theme.text,
   },
   centerBox: {
     alignItems: "center",
@@ -552,11 +556,13 @@ const styles = StyleSheet.create({
   centerText: {
     fontSize: 14,
     fontWeight: "600",
+    color: theme.secondaryText,
   },
   centerTitle: {
     fontSize: 16,
     fontWeight: "700",
     textAlign: "center",
+    color: theme.text,
   },
   skyWrap: {
     borderRadius: 24,
@@ -589,6 +595,7 @@ const styles = StyleSheet.create({
   fullSkyToggleText: {
     fontSize: 13,
     fontWeight: "700",
+    color: theme.primary,
   },
   legendWrap: {
     marginTop: 16,
@@ -597,6 +604,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "800",
     marginBottom: 8,
+    color: theme.text,
   },
   legendRow: {
     flexDirection: "row",
@@ -618,6 +626,7 @@ const styles = StyleSheet.create({
   legendLabel: {
     fontSize: 13,
     fontWeight: "600",
+    color: theme.secondaryText,
   },
   emptyBox: {
     borderRadius: 24,
@@ -664,9 +673,10 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     paddingVertical: 14,
     paddingHorizontal: 28,
+    backgroundColor: theme.primary,
   },
   primaryButtonText: {
-    color: "#FFFFFF",
+    color: theme.onPrimary,
     fontSize: 16,
     fontWeight: "700",
   },

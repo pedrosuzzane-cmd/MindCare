@@ -1,5 +1,7 @@
 import { JournalEntry } from "@/services/journalService";
 import { Ionicons } from "@expo/vector-icons";
+import type { MindCareTheme } from "@/constants/theme";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 import React, { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { shadows } from "@/utils/shadows";
@@ -116,6 +118,8 @@ export function JournalCalendar({
   onCurrentMonthChange,
   onSelectedDateChange,
 }: JournalCalendarProps) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [isExpanded, setIsExpanded] = useState(false);
   const calendarDays = useMemo(
     () => getCalendarDays(currentMonth),
@@ -154,7 +158,7 @@ export function JournalCalendar({
     <View style={styles.calendarCard}>
       <View style={styles.calendarHeader}>
         <Pressable onPress={handlePreviousMonth} style={styles.monthButton}>
-          <Ionicons name="chevron-back" size={20} color="#333" />
+          <Ionicons name="chevron-back" size={20} color={theme.text} />
         </Pressable>
         <View style={styles.calendarTitleContainer}>
           <Text style={styles.calendarTitle}>
@@ -173,11 +177,11 @@ export function JournalCalendar({
             <Ionicons
               name={isExpanded ? "chevron-up" : "calendar-outline"}
               size={19}
-              color="#6D28D9"
+              color={theme.primary}
             />
           </Pressable>
           <Pressable onPress={handleNextMonth} style={styles.monthButton}>
-            <Ionicons name="chevron-forward" size={20} color="#6D28D9" />
+            <Ionicons name="chevron-forward" size={20} color={theme.primary} />
           </Pressable>
         </View>
       </View>
@@ -265,9 +269,10 @@ export function JournalCalendar({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
   calendarCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 24,
     padding: 18,
     marginBottom: 20,
@@ -285,7 +290,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 18,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: theme.inputBg,
   },
   calendarTitleContainer: {
     flexDirection: "row",
@@ -293,14 +298,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerActions: { flexDirection: "row", gap: 8 },
-  calendarTitle: { fontSize: 16, fontWeight: "800", color: "#3B0764" },
+  calendarTitle: { fontSize: 16, fontWeight: "800", color: theme.text },
   todayButton: {
-    backgroundColor: "#F3E8FF",
+    backgroundColor: theme.softPurple,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  todayButtonText: { color: "#6D28D9", fontWeight: "700", fontSize: 12 },
+  todayButtonText: { color: theme.primary, fontWeight: "700", fontSize: 12 },
   weekDaysRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -310,7 +315,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "center",
     fontSize: 12,
-    color: "#999",
+    color: theme.secondaryText,
     fontWeight: "600",
   },
   daysGrid: {
@@ -328,13 +333,13 @@ const styles = StyleSheet.create({
   },
   dayButtonFaded: { opacity: 0.35 },
   dayButtonDisabled: { opacity: 0.3 },
-  dayButtonSelected: { backgroundColor: "#7C3AED" },
-  dayLabel: { fontSize: 14, color: "#4C1D95", fontWeight: "700" },
-  dayLabelFaded: { color: "#999" },
-  dayLabelSelected: { color: "#FFFFFF" },
+  dayButtonSelected: { backgroundColor: theme.primary },
+  dayLabel: { fontSize: 14, color: theme.primaryDeep, fontWeight: "700" },
+  dayLabelFaded: { color: theme.secondaryText },
+  dayLabelSelected: { color: theme.onPrimary },
   dayMoodEmoji: { fontSize: 12, marginTop: 2 },
   dayLabelToday: {
-    color: "#7C3AED",
+    color: theme.primary,
     fontWeight: "800",
   },
   syncStatusIndicator: {
@@ -345,12 +350,12 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   compactDaysRow: { flexDirection: "row", justifyContent: "space-between", gap: 5 },
-  compactDay: { flex: 1, minWidth: 0, alignItems: "center", paddingVertical: 10, borderRadius: 15, backgroundColor: "#FAF5FF" },
+  compactDay: { flex: 1, minWidth: 0, alignItems: "center", paddingVertical: 10, borderRadius: 15, backgroundColor: theme.softPurple },
   compactDayDisabled: { opacity: 0.3 },
-  compactDaySelected: { backgroundColor: "#7C3AED" },
-  compactWeekday: { color: "#8B5CF6", fontSize: 10, fontWeight: "800" },
-  compactDayNumber: { color: "#4C1D95", fontSize: 16, fontWeight: "900", marginTop: 4 },
-  compactTextSelected: { color: "#FFFFFF" },
+  compactDaySelected: { backgroundColor: theme.primary },
+  compactWeekday: { color: theme.primary, fontSize: 10, fontWeight: "800" },
+  compactDayNumber: { color: theme.primaryDeep, fontSize: 16, fontWeight: "900", marginTop: 4 },
+  compactTextSelected: { color: theme.onPrimary },
   compactMood: { fontSize: 11, marginTop: 3 },
   compactMoodPlaceholder: { height: 14, marginTop: 3 },
 });

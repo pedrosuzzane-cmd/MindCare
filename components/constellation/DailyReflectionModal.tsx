@@ -45,6 +45,7 @@ export function DailyReflectionModal({
   onViewJournal,
 }: DailyReflectionModalProps) {
   const visible = date !== null;
+  const styles = createStyles(theme);
 
   return (
     <Modal
@@ -142,7 +143,7 @@ export function DailyReflectionModal({
                     accessibilityRole="button"
                     accessibilityLabel={`View journal: ${entry.title}`}
                   >
-                    <Ionicons name="book-outline" size={16} color="#FFFFFF" />
+                    <Ionicons name="book-outline" size={16} color={theme.onPrimary} />
                     <Text style={styles.buttonText}>View Journal</Text>
                   </Pressable>
                 </View>
@@ -167,115 +168,116 @@ export function DailyReflectionModal({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(10, 8, 18, 0.55)",
-  },
-  backdropTouch: {
-    flex: 1,
-  },
-  sheet: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderWidth: 1,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 24,
-    maxHeight: "85%",
-  },
-  grabber: {
-    width: 44,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: "rgba(138, 99, 210, 0.35)",
-    alignSelf: "center",
-    marginBottom: 16,
-  },
-  header: {
-    alignItems: "center",
-    marginBottom: 14,
-  },
-  eyebrow: {
-    fontSize: 13,
-    fontWeight: "800",
-    marginBottom: 4,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "800",
-    marginBottom: 2,
-  },
-  subtitle: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  list: {
-    flexShrink: 1,
-  },
-  listContent: {
-    paddingBottom: 8,
-    gap: 10,
-  },
-  card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "800",
-    marginBottom: 6,
-  },
-  tags: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 8,
-  },
-  tag: {
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  tagText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  time: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  preview: {
-    fontSize: 13,
-    lineHeight: 19,
-    marginBottom: 12,
-  },
-  button: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    alignSelf: "flex-start",
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 20,
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  closeButton: {
-    alignSelf: "center",
-    marginTop: 12,
-    padding: 6,
-  },
-  closeText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      justifyContent: "flex-end",
+      backgroundColor: "rgba(10, 8, 18, 0.55)",
+    },
+    backdropTouch: {
+      flex: 1,
+    },
+    sheet: {
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      borderWidth: 1,
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      paddingBottom: 24,
+      maxHeight: "85%",
+    },
+    grabber: {
+      width: 44,
+      height: 5,
+      borderRadius: 3,
+      backgroundColor: "rgba(138, 99, 210, 0.35)",
+      alignSelf: "center",
+      marginBottom: 16,
+    },
+    header: {
+      alignItems: "center",
+      marginBottom: 14,
+    },
+    eyebrow: {
+      fontSize: 13,
+      fontWeight: "800",
+      marginBottom: 4,
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: "800",
+      marginBottom: 2,
+    },
+    subtitle: {
+      fontSize: 13,
+      fontWeight: "600",
+    },
+    list: {
+      flexShrink: 1,
+    },
+    listContent: {
+      paddingBottom: 8,
+      gap: 10,
+    },
+    card: {
+      borderRadius: 16,
+      borderWidth: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    cardTitle: {
+      fontSize: 15,
+      fontWeight: "800",
+      marginBottom: 6,
+    },
+    tags: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 8,
+      marginBottom: 8,
+    },
+    tag: {
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+    },
+    tagText: {
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    time: {
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    preview: {
+      fontSize: 13,
+      lineHeight: 19,
+      marginBottom: 12,
+    },
+    button: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      alignSelf: "flex-start",
+      paddingVertical: 10,
+      paddingHorizontal: 18,
+      borderRadius: 20,
+    },
+    buttonText: {
+      color: theme.onPrimary,
+      fontSize: 14,
+      fontWeight: "700",
+    },
+    closeButton: {
+      alignSelf: "center",
+      marginTop: 12,
+      padding: 6,
+    },
+    closeText: {
+      fontSize: 14,
+      fontWeight: "600",
+    },
+  });

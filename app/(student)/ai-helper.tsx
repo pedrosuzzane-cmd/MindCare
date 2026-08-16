@@ -1,17 +1,9 @@
-import { Ionicons } from "@expo/vector-icons";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import { shadows } from "@/utils/shadows";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect } from "react";
-import {
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { shadows } from "@/utils/shadows";
-import { useMindCareTheme } from "@/contexts/ThemeContext";
+import { SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { auth } from "@/constants/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -29,10 +21,7 @@ export default function AIHelperScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient
-        colors={theme.softGradient}
-        style={styles.gradient}
-      >
+      <LinearGradient colors={theme.softGradient} style={styles.gradient}>
         <View style={styles.header}>
           <View style={{ width: 40 }} />
         </View>
@@ -42,19 +31,35 @@ export default function AIHelperScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <View style={[styles.introCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <Text style={[styles.introTitle, { color: theme.text }]}>AI Support Helper</Text>
+          <View
+            style={[
+              styles.introCard,
+              { backgroundColor: theme.card, borderColor: theme.border },
+            ]}
+          >
+            <Text style={[styles.introTitle, { color: theme.text }]}>
+              AI Support Helper
+            </Text>
             <Text style={[styles.introText, { color: theme.secondaryText }]}>
               Chat with our AI helper for support, coping ideas, and gentle
               guidance whenever you need a moment to talk things through.
             </Text>
           </View>
 
-          <View style={styles.safeReminderCard}>
-            <Text style={styles.safeReminderTitle}>Important Reminder</Text>
-            <Text style={styles.safeReminderText}>
-              These suggestions can help, but if you feel overwhelmed, it’s best
-              to talk with a trusted counselor, teacher, family member, or
+          <View
+            style={[
+              styles.safeReminderCard,
+              { backgroundColor: theme.softPurple, borderColor: theme.border },
+            ]}
+          >
+            <Text style={[styles.safeReminderTitle, { color: theme.primary }]}>
+              Important Reminder
+            </Text>
+            <Text
+              style={[styles.safeReminderText, { color: theme.secondaryText }]}
+            >
+              These suggestions can help, but if you feel overwhelmed, it&apos;s
+              best to talk with a trusted counselor, teacher, family member, or
               friend. Seeking human support is always a strong step.
             </Text>
           </View>
@@ -84,33 +89,27 @@ const styles = StyleSheet.create({
   scrollContainer: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingBottom: 40 },
   introCard: {
-    backgroundColor: "white",
     borderRadius: 20,
     padding: 18,
     marginBottom: 18,
     ...(shadows.custom(2, 8, 0.08, 3, "#8A63D2") as any),
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
   },
   introTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#333",
     marginBottom: 8,
   },
-  introText: { fontSize: 14, color: "#666", lineHeight: 20 },
+  introText: { fontSize: 14, lineHeight: 20 },
   safeReminderCard: {
-    backgroundColor: "#F3EAFF",
     borderRadius: 20,
     padding: 18,
     borderWidth: 1,
-    borderColor: "#E0D0FF",
   },
   safeReminderTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#8A63D2",
     marginBottom: 8,
   },
-  safeReminderText: { fontSize: 14, color: "#3B2F6B", lineHeight: 20 },
+  safeReminderText: { fontSize: 14, lineHeight: 20 },
 });

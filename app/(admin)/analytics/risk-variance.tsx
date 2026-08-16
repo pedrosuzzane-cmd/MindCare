@@ -9,13 +9,15 @@ import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 const DEPARTMENTS = ["CITCS", "COA", "CCJE", "CTE", "CON", "COE", "CAFA", "CHTM"];
 
-const getBoxColor = (median: number): string => {
-  if (median <= 20) return "#22C55E";
-  if (median <= 50) return "#F59E0B";
-  return "#EF4444";
+const getBoxColor = (theme: MindCareTheme, median: number): string => {
+  if (median <= 20) return theme.status.success;
+  if (median <= 50) return theme.status.warning;
+  return theme.status.error;
 };
 
 export default function RiskTrendsScreen() {
@@ -23,6 +25,8 @@ export default function RiskTrendsScreen() {
   const isWide = screenWidth >= 900;
   const responsivePadding = Math.min(Math.max(screenWidth * 0.03, 24), 64);
   const { user } = useAuth();
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [loading, setLoading] = useState(true);
   const [studentSummaries, setStudentSummaries] = useState<StudentSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -106,11 +110,11 @@ export default function RiskTrendsScreen() {
           max: whiskerMax,
           outliers,
           count,
-          boxColor: count > 0 ? getBoxColor(median) : "#E2E8F0",
+          boxColor: count > 0 ? getBoxColor(theme, median) : theme.border,
         };
       })
       .sort((a, b) => b.median - a.median);
-  }, [studentSummaries]);
+  }, [studentSummaries, theme]);
 
   const highRiskDepts = useMemo(() => {
     return boxWhiskerData
@@ -131,7 +135,7 @@ export default function RiskTrendsScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#8A63D2" />
+          <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.loadingText}>Loading risk trends...</Text>
         </View>
       </SafeAreaView>
@@ -156,7 +160,7 @@ export default function RiskTrendsScreen() {
       <View style={styles.container}>
         <View style={[styles.header, isWide && { paddingHorizontal: responsivePadding }]}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={22} color="#0F172A" />
+            <Ionicons name="arrow-back" size={22} color={theme.text} />
           </Pressable>
           <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>Wellness Score Variance</Text>
@@ -171,17 +175,17 @@ export default function RiskTrendsScreen() {
         >
           <View style={[styles.kpiRow, isWide && styles.kpiRowWide]}>
             <View style={styles.kpiCard}>
-              <Ionicons name="people" size={20} color="#8A63D2" />
+              <Ionicons name="people" size={20} color={theme.primary} />
               <Text style={styles.kpiValue}>{totalAssessed}</Text>
               <Text style={styles.kpiLabel}>Students Assessed</Text>
             </View>
             <View style={styles.kpiCard}>
-              <Ionicons name="warning" size={20} color="#EF4444" />
+              <Ionicons name="warning" size={20} color={theme.status.error} />
               <Text style={styles.kpiValue}>{highRiskCount}</Text>
               <Text style={styles.kpiLabel}>Elevated Concern</Text>
             </View>
             <View style={styles.kpiCard}>
-              <Ionicons name="stats-chart" size={20} color="#D97706" />
+              <Ionicons name="stats-chart" size={20} color={theme.status.warning} />
               <Text style={styles.kpiValue}>{boxWhiskerData.length}</Text>
               <Text style={styles.kpiLabel}>Depts Analyzed</Text>
             </View>
@@ -190,7 +194,7 @@ export default function RiskTrendsScreen() {
           {(highRiskDepts.length > 0 || highVarianceDepts.length > 0) && (
             <View style={styles.alertCard}>
               <View style={styles.alertHeader}>
-                <Ionicons name="information-circle" size={18} color="#D97706" />
+                <Ionicons name="information-circle" size={18} color={theme.status.warning} />
                 <Text style={styles.alertTitle}>Aggregate Wellness Insights</Text>
               </View>
               {highRiskDepts.length > 0 && (
@@ -212,7 +216,7 @@ export default function RiskTrendsScreen() {
 
           <View style={styles.explanationCard}>
             <View style={styles.explanationHeader}>
-              <Ionicons name="school-outline" size={20} color="#8A63D2" />
+              <Ionicons name="school-outline" size={20} color={theme.primary} />
               <Text style={styles.explanationTitle}>Administrator Guide: Understanding Wellness Score Variance & Scoring</Text>
             </View>
 
@@ -242,7 +246,7 @@ export default function RiskTrendsScreen() {
 
             <View style={styles.guideRow}>
               <View style={styles.guideItem}>
-                <View style={[styles.guideBullet, { backgroundColor: "#2D1B69" }]} />
+                <View style={[styles.guideBullet, { backgroundColor: theme.text }]} />
                 <View style={styles.guideItemContent}>
                   <Text style={styles.guideItemTitle}>The Center Line (Median / Q2)</Text>
                   <Text style={styles.guideItemText}>
@@ -251,7 +255,7 @@ export default function RiskTrendsScreen() {
                 </View>
               </View>
               <View style={styles.guideItem}>
-                <View style={[styles.guideBullet, { backgroundColor: "#8A63D2" }]} />
+                <View style={[styles.guideBullet, { backgroundColor: theme.primary }]} />
                 <View style={styles.guideItemContent}>
                   <Text style={styles.guideItemTitle}>The Box (Interquartile Range / IQR)</Text>
                   <Text style={styles.guideItemText}>
@@ -260,7 +264,7 @@ export default function RiskTrendsScreen() {
                 </View>
               </View>
               <View style={styles.guideItem}>
-                <View style={[styles.guideBullet, { backgroundColor: "#94A3B8" }]} />
+                <View style={[styles.guideBullet, { backgroundColor: theme.secondaryText }]} />
                 <View style={styles.guideItemContent}>
                   <Text style={styles.guideItemTitle}>The Whiskers (Range)</Text>
                   <Text style={styles.guideItemText}>
@@ -269,7 +273,7 @@ export default function RiskTrendsScreen() {
                 </View>
               </View>
               <View style={styles.guideItem}>
-                <View style={[styles.guideBullet, { backgroundColor: "#EF4444" }]} />
+                <View style={[styles.guideBullet, { backgroundColor: theme.status.error }]} />
                 <View style={styles.guideItemContent}>
                   <Text style={styles.guideItemTitle}>Outliers (Red Crosses)</Text>
                   <Text style={styles.guideItemText}>
@@ -300,13 +304,13 @@ export default function RiskTrendsScreen() {
               </View>
               {boxWhiskerData.map((d) => (
                 <View key={d.label} style={styles.summaryTableRow}>
-                  <Text style={[styles.summaryTableCell, { flex: 1.5, fontWeight: "700", color: "#2D1B69" }]}>
+                  <Text style={[styles.summaryTableCell, { flex: 1.5, fontWeight: "700", color: theme.text }]}>
                     {d.label}
                   </Text>
                   <Text style={styles.summaryTableCell}>{d.count}</Text>
                   <Text style={styles.summaryTableCell}>{d.median}</Text>
                   <Text style={styles.summaryTableCell}>{d.q3 - d.q1}</Text>
-                  <Text style={[styles.summaryTableCell, d.outliers.length > 0 ? { color: "#EF4444", fontWeight: "700" } : {}]}>
+                  <Text style={[styles.summaryTableCell, d.outliers.length > 0 ? { color: theme.status.error, fontWeight: "700" } : {}]}>
                     {d.outliers.length > 0 ? d.outliers.length : "0"}
                   </Text>
                   <Text style={styles.summaryTableCell}>{d.min}–{d.max}</Text>
@@ -320,49 +324,50 @@ export default function RiskTrendsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F4F2F8" },
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: theme.background },
   container: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24 },
-  loadingText: { marginTop: 12, fontSize: 14, color: "#64748B", fontWeight: "600" },
-  errorText: { fontSize: 14, color: "#EF4444", marginBottom: 16, textAlign: "center" },
-  backBtn: { backgroundColor: "#8A63D2", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
-  backBtnText: { color: "white", fontWeight: "700", fontSize: 14 },
+  loadingText: { marginTop: 12, fontSize: 14, color: theme.secondaryText, fontWeight: "600" },
+  errorText: { fontSize: 14, color: theme.status.error, marginBottom: 16, textAlign: "center" },
+  backBtn: { backgroundColor: theme.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
+  backBtnText: { color: theme.onPrimary, fontWeight: "700", fontSize: 14 },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 24,
     paddingTop: 20,
     paddingBottom: 16,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: theme.border,
     gap: 12,
   },
-  backButton: { padding: 8, borderRadius: 999, backgroundColor: "#F1F5F9" },
+  backButton: { padding: 8, borderRadius: 999, backgroundColor: theme.inputBg },
   headerContent: { flex: 1 },
-  headerTitle: { color: "#0F172A", fontSize: 20, fontWeight: "800" },
-  headerSubtitle: { color: "#64748B", fontSize: 13, marginTop: 2 },
+  headerTitle: { color: theme.text, fontSize: 20, fontWeight: "800" },
+  headerSubtitle: { color: theme.secondaryText, fontSize: 13, marginTop: 2 },
   scrollContent: { padding: 24, paddingBottom: 40, gap: 24 },
   kpiRow: { flexDirection: "row", gap: 12 },
   kpiRowWide: { gap: 20 },
   kpiCard: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 16,
     padding: 16,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E9D5FF",
-    shadowColor: "#6D28D9",
+    borderColor: theme.border,
+    shadowColor: theme.primaryDeep,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
     gap: 8,
   },
-  kpiValue: { fontSize: 22, fontWeight: "900", color: "#2D1B69" },
-  kpiLabel: { fontSize: 11, fontWeight: "700", color: "#8B5CF6", textAlign: "center" },
+  kpiValue: { fontSize: 22, fontWeight: "900", color: theme.text },
+  kpiLabel: { fontSize: 11, fontWeight: "700", color: theme.primary, textAlign: "center" },
   alertCard: {
     backgroundColor: "#FFFBEB",
     borderRadius: 16,
@@ -375,33 +380,33 @@ const styles = StyleSheet.create({
   alertText: { fontSize: 13, color: "#78350F", lineHeight: 20 },
   alertBold: { fontWeight: "700" },
   summaryTable: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
-    shadowColor: "#6D28D9",
+    borderColor: theme.border,
+    shadowColor: theme.primaryDeep,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
   },
-  summaryTableTitle: { fontSize: 15, fontWeight: "800", color: "#2D1B69", marginBottom: 12 },
-  summaryTableHeader: { flexDirection: "row", borderBottomWidth: 2, borderBottomColor: "#EDE9FE", paddingBottom: 8, marginBottom: 4 },
-  summaryTableRow: { flexDirection: "row", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#F8F6FC" },
-  summaryTableCell: { flex: 1, fontSize: 13, color: "#475569", fontWeight: "600", textAlign: "center" },
-  headerCell: { fontSize: 11, fontWeight: "800", color: "#8B5CF6", textTransform: "uppercase" },
+  summaryTableTitle: { fontSize: 15, fontWeight: "800", color: theme.text, marginBottom: 12 },
+  summaryTableHeader: { flexDirection: "row", borderBottomWidth: 2, borderBottomColor: theme.softPurple, paddingBottom: 8, marginBottom: 4 },
+  summaryTableRow: { flexDirection: "row", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.borderSoft },
+  summaryTableCell: { flex: 1, fontSize: 13, color: theme.secondaryText, fontWeight: "600", textAlign: "center" },
+  headerCell: { fontSize: 11, fontWeight: "800", color: theme.primary, textTransform: "uppercase" },
   explanationCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
+    borderColor: theme.border,
   },
   explanationHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 14 },
-  explanationTitle: { fontSize: 16, fontWeight: "800", color: "#2D1B69", flex: 1 },
-  guideSectionTitle: { fontSize: 14, fontWeight: "800", color: "#4C1D95", marginBottom: 6 },
-  guideText: { fontSize: 13, color: "#64748B", lineHeight: 20, marginBottom: 12 },
+  explanationTitle: { fontSize: 16, fontWeight: "800", color: theme.text, flex: 1 },
+  guideSectionTitle: { fontSize: 14, fontWeight: "800", color: theme.primaryDeep, marginBottom: 6 },
+  guideText: { fontSize: 13, color: theme.secondaryText, lineHeight: 20, marginBottom: 12 },
   guideScaleRow: { gap: 10, marginBottom: 4 },
   guideScaleItem: {
     borderRadius: 10,
@@ -411,11 +416,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   guideScaleLabel: { fontSize: 14, fontWeight: "800", marginBottom: 2 },
-  guideScaleDesc: { fontSize: 13, lineHeight: 18, color: "#475569" },
+  guideScaleDesc: { fontSize: 13, lineHeight: 18, color: theme.secondaryText },
   guideRow: { gap: 12 },
   guideItem: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   guideBullet: { width: 12, height: 12, borderRadius: 6, marginTop: 4, flexShrink: 0 },
   guideItemContent: { flex: 1 },
-  guideItemTitle: { fontSize: 14, fontWeight: "700", color: "#1E1B4B", marginBottom: 2 },
-  guideItemText: { fontSize: 13, color: "#475569", lineHeight: 18 },
+  guideItemTitle: { fontSize: 14, fontWeight: "700", color: theme.text, marginBottom: 2 },
+  guideItemText: { fontSize: 13, color: theme.secondaryText, lineHeight: 18 },
 });

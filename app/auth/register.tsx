@@ -19,6 +19,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import NetInfo from "@react-native-community/netinfo";
 import { AccessibleText } from "@/components/AccessibleText";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 // Firebase imports
 import { auth } from "@/constants/firebase";
@@ -388,6 +390,9 @@ function LsnDocumentPreview({
   onRemove: () => void;
   progress?: number;
 }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
+
   if (!lsnDocument || lsnDocument.canceled) {
     return (
       <Pressable
@@ -395,7 +400,7 @@ function LsnDocumentPreview({
         onPress={onReplace}
         android_ripple={{ borderless: false, color: "rgba(124,58,237,0.15)" }}
       >
-        <Ionicons name="cloud-upload-outline" size={22} color="#7C3AED" />
+        <Ionicons name="cloud-upload-outline" size={22} color={theme.primary} />
         <Text style={styles.uploadButtonText}>
           Select File (PDF, JPG, PNG)
         </Text>
@@ -413,7 +418,7 @@ function LsnDocumentPreview({
         <Image source={{ uri: asset.uri }} style={styles.documentThumbnail} />
       ) : (
         <View style={styles.documentBadge}>
-          <Ionicons name="document-text-outline" size={26} color="#7C3AED" />
+          <Ionicons name="document-text-outline" size={26} color={theme.primary} />
         </View>
       )}
       <View style={styles.documentPreviewInfo}>
@@ -435,20 +440,23 @@ function LsnDocumentPreview({
         onPress={onReplace}
         hitSlop={8}
       >
-        <Ionicons name="refresh-outline" size={20} color="#7C3AED" />
+        <Ionicons name="refresh-outline" size={20} color={theme.primary} />
       </Pressable>
       <Pressable
         style={styles.documentActionButton}
         onPress={onRemove}
         hitSlop={8}
       >
-        <Ionicons name="trash-outline" size={20} color="#EF4444" />
+        <Ionicons name="trash-outline" size={20} color={theme.status.error} />
       </Pressable>
     </View>
   );
 }
 
 function ReviewRow({ label, value }: { label: string; value: string }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
+
   return (
     <View style={styles.reviewRow}>
       <Text style={styles.reviewRowLabel}>{label}</Text>
@@ -460,6 +468,8 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
 }
 
 export default function RegisterScreen() {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [activeTab, setActiveTab] = useState<1 | 2 | 3 | 4>(1);
 
   const [formData, setFormData] = useState({
@@ -939,7 +949,7 @@ export default function RegisterScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={20} color="#0F172A" />
+            <Ionicons name="arrow-back" size={20} color={theme.text} />
           </Pressable>
           <Text style={styles.headerTitle}>Create New Account</Text>
           <View style={styles.headerSpacer} />
@@ -1107,10 +1117,10 @@ export default function RegisterScreen() {
                       {profileImageUri ? (
                         <Image source={{ uri: profileImageUri }} style={styles.avatarImage} />
                       ) : (
-                        <Ionicons name="person" size={36} color="#94A3B8" />
+                        <Ionicons name="person" size={36} color={theme.secondaryText} />
                       )}
                       <View style={styles.avatarOverlay}>
-                        <Ionicons name="camera" size={18} color="white" />
+                        <Ionicons name="camera" size={18} color={theme.onPrimary} />
                       </View>
                     </View>
                     <Text style={styles.avatarLabel}>Optional: Tap to add profile photo</Text>
@@ -1119,7 +1129,7 @@ export default function RegisterScreen() {
 
                 <View style={styles.inputContainer}>
                   <View style={styles.inputHeader}>
-                    <Ionicons name="person-outline" size={18} color="#64748B" />
+                    <Ionicons name="person-outline" size={18} color={theme.secondaryText} />
                     <Text style={styles.inputLabel}>Full Name *</Text>
                   </View>
                   <TextInput
@@ -1129,7 +1139,7 @@ export default function RegisterScreen() {
                         styles.inputError,
                     ]}
                     placeholder="Enter your full name"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={theme.secondaryText}
                     value={formData.fullName}
                     onChangeText={(text) => {
                       setFormData((prev) => ({ ...prev, fullName: text }));
@@ -1145,7 +1155,7 @@ export default function RegisterScreen() {
 
                 <View style={styles.inputContainer}>
                   <View style={styles.inputHeader}>
-                    <Ionicons name="mail-outline" size={18} color="#64748B" />
+                    <Ionicons name="mail-outline" size={18} color={theme.secondaryText} />
                     <Text style={styles.inputLabel}>Email Address *</Text>
                   </View>
                   <TextInput
@@ -1154,7 +1164,7 @@ export default function RegisterScreen() {
                       validationErrors.includes("email") && styles.inputError,
                     ]}
                     placeholder="Enter your email address"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={theme.secondaryText}
                     value={formData.email}
                     onChangeText={(text) => {
                       setFormData((prev) => ({ ...prev, email: text }));
@@ -1174,7 +1184,7 @@ export default function RegisterScreen() {
                     <Ionicons
                       name="calendar-outline"
                       size={18}
-                      color="#64748B"
+                      color={theme.secondaryText}
                     />
                     <Text style={styles.inputLabel}>Date of Birth *</Text>
                   </View>
@@ -1185,7 +1195,7 @@ export default function RegisterScreen() {
                         styles.inputError,
                     ]}
                     placeholder="MM/DD/YYYY"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={theme.secondaryText}
                     value={formData.dateOfBirth}
                     onChangeText={(text) => {
                       handleDateOfBirthChange(text);
@@ -1202,7 +1212,7 @@ export default function RegisterScreen() {
 
                 <View style={styles.inputContainer}>
                   <View style={styles.inputHeader}>
-                    <Ionicons name="call-outline" size={18} color="#64748B" />
+                    <Ionicons name="call-outline" size={18} color={theme.secondaryText} />
                     <Text style={styles.inputLabel}>
                       Phone Number / Contact No *
                     </Text>
@@ -1214,7 +1224,7 @@ export default function RegisterScreen() {
                         styles.inputError,
                     ]}
                     placeholder="0912 345 6789"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={theme.secondaryText}
                     value={mobileNumberDisplay}
                     onChangeText={(text) => {
                       const { formattedValue, rawValue } =
@@ -1259,7 +1269,7 @@ export default function RegisterScreen() {
 
                 <View style={styles.inputContainer}>
                   <View style={styles.inputHeader}>
-                    <Ionicons name="card-outline" size={18} color="#64748B" />
+                    <Ionicons name="card-outline" size={18} color={theme.secondaryText} />
                     <Text style={styles.inputLabel}>School ID Number *</Text>
                   </View>
                   <TextInput
@@ -1269,7 +1279,7 @@ export default function RegisterScreen() {
                         styles.inputError,
                     ]}
                     placeholder="XX-XXXX-XXX"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={theme.secondaryText}
                     value={formData.schoolId}
                     onChangeText={(text) => {
                       setFormData((prev) => ({
@@ -1289,7 +1299,7 @@ export default function RegisterScreen() {
 
                 <View style={styles.inputContainer}>
                   <View style={styles.inputHeader}>
-                    <Ionicons name="business-outline" size={18} color="#64748B" />
+                    <Ionicons name="business-outline" size={18} color={theme.secondaryText} />
                     <Text style={styles.inputLabel}>College / University *</Text>
                   </View>
                   <TextInput
@@ -1298,7 +1308,7 @@ export default function RegisterScreen() {
                       validationErrors.includes("college") && styles.inputError,
                     ]}
                     placeholder="Search college..."
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={theme.secondaryText}
                     value={formData.college ? formData.college : collegeSearch}
                     editable={!formData.college}
                     onChangeText={(text) => setCollegeSearch(text)}
@@ -1352,7 +1362,7 @@ export default function RegisterScreen() {
 
                 <View style={styles.inputContainer}>
                   <View style={styles.inputHeader}>
-                    <Ionicons name="school-outline" size={18} color="#64748B" />
+                    <Ionicons name="school-outline" size={18} color={theme.secondaryText} />
                     <Text style={styles.inputLabel}>Department *</Text>
                   </View>
                   {(() => {
@@ -1367,7 +1377,7 @@ export default function RegisterScreen() {
                                 styles.inputError,
                             ]}
                             placeholder="Search department..."
-                            placeholderTextColor="#94A3B8"
+                            placeholderTextColor={theme.secondaryText}
                             value={
                               formData.department
                                 ? formData.department
@@ -1418,7 +1428,7 @@ export default function RegisterScreen() {
                             styles.inputError,
                         ]}
                         placeholder="Type your department..."
-                        placeholderTextColor="#94A3B8"
+                        placeholderTextColor={theme.secondaryText}
                         value={
                           formData.department
                             ? formData.department
@@ -1458,7 +1468,7 @@ export default function RegisterScreen() {
 
                 <View style={styles.inputContainer}>
                   <View style={styles.inputHeader}>
-                    <Ionicons name="book-outline" size={18} color="#64748B" />
+                    <Ionicons name="book-outline" size={18} color={theme.secondaryText} />
                     <Text style={styles.inputLabel}>
                       Academic Program / Course *
                     </Text>
@@ -1483,7 +1493,7 @@ export default function RegisterScreen() {
                                 styles.inputError,
                             ]}
                             placeholder="Search program..."
-                            placeholderTextColor="#94A3B8"
+                            placeholderTextColor={theme.secondaryText}
                             value={
                               formData.academicProgram
                                 ? formData.academicProgram
@@ -1561,7 +1571,7 @@ export default function RegisterScreen() {
                               styles.inputError,
                           ]}
                           placeholder="Type your program..."
-                          placeholderTextColor="#94A3B8"
+                          placeholderTextColor={theme.secondaryText}
                           value={
                             formData.academicProgram
                               ? formData.academicProgram
@@ -1607,7 +1617,7 @@ export default function RegisterScreen() {
                     <Ionicons
                       name="library-outline"
                       size={18}
-                      color="#64748B"
+                      color={theme.secondaryText}
                     />
                     <Text style={styles.inputLabel}>Year Level *</Text>
                   </View>
@@ -1679,7 +1689,7 @@ export default function RegisterScreen() {
 
                 <View style={styles.inputContainer}>
                   <View style={styles.inputHeader}>
-                    <Ionicons name="flag-outline" size={18} color="#64748B" />
+                    <Ionicons name="flag-outline" size={18} color={theme.secondaryText} />
                     <Text style={styles.inputLabel}>Nationality *</Text>
                   </View>
                   <TextInput
@@ -1689,7 +1699,7 @@ export default function RegisterScreen() {
                         styles.inputError,
                     ]}
                     placeholder="Enter your nationality"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={theme.secondaryText}
                     value={formData.nationality}
                     onChangeText={(text) => {
                       setFormData((prev) => ({ ...prev, nationality: text }));
@@ -1708,7 +1718,7 @@ export default function RegisterScreen() {
                     <Ionicons
                       name="document-outline"
                       size={18}
-                      color="#64748B"
+                      color={theme.secondaryText}
                     />
                     <Text style={styles.inputLabel}>Citizenship *</Text>
                   </View>
@@ -1749,7 +1759,7 @@ export default function RegisterScreen() {
 
                 <View style={styles.inputContainer}>
                   <View style={styles.inputHeader}>
-                    <Ionicons name="people-outline" size={18} color="#64748B" />
+                    <Ionicons name="people-outline" size={18} color={theme.secondaryText} />
                     <Text style={styles.inputLabel}>Civil Status *</Text>
                   </View>
                   <View style={styles.optionsWrap}>
@@ -1798,7 +1808,7 @@ export default function RegisterScreen() {
                     <Ionicons
                       name="person-circle-outline"
                       size={18}
-                      color="#64748B"
+                      color={theme.secondaryText}
                     />
                     <Text style={styles.inputLabel}>Gender Identity *</Text>
                   </View>
@@ -1839,13 +1849,13 @@ export default function RegisterScreen() {
 
                 <View style={styles.inputContainer}>
                   <View style={styles.inputHeader}>
-                    <Ionicons name="book-outline" size={18} color="#64748B" />
+                    <Ionicons name="book-outline" size={18} color={theme.secondaryText} />
                     <Text style={styles.inputLabel}>Religious Affiliation</Text>
                   </View>
                   <TextInput
                     style={styles.input}
                     placeholder="Enter your religious affiliation"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={theme.secondaryText}
                     value={formData.religiousAffiliation}
                     onChangeText={(text) =>
                       setFormData((prev) => ({
@@ -1859,13 +1869,13 @@ export default function RegisterScreen() {
 
                 <View style={styles.inputContainer}>
                   <View style={styles.inputHeader}>
-                    <Ionicons name="globe-outline" size={18} color="#64748B" />
+                    <Ionicons name="globe-outline" size={18} color={theme.secondaryText} />
                     <Text style={styles.inputLabel}>Cultural Affiliation</Text>
                   </View>
                   <TextInput
                     style={styles.input}
                     placeholder="Enter your cultural affiliation"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={theme.secondaryText}
                     value={formData.culturalAffiliation}
                     onChangeText={(text) =>
                       setFormData((prev) => ({
@@ -1882,7 +1892,7 @@ export default function RegisterScreen() {
                     <Ionicons
                       name="location-outline"
                       size={18}
-                      color="#64748B"
+                      color={theme.secondaryText}
                     />
                     <Text style={styles.inputLabel}>Provincial Address *</Text>
                   </View>
@@ -1894,7 +1904,7 @@ export default function RegisterScreen() {
                         styles.inputError,
                     ]}
                     placeholder="Enter your provincial address"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={theme.secondaryText}
                     value={formData.provincialAddress}
                     onChangeText={(text) => {
                       setFormData((prev) => ({
@@ -1918,7 +1928,7 @@ export default function RegisterScreen() {
                     <Ionicons
                       name="help-buoy-outline"
                       size={18}
-                      color="#64748B"
+                      color={theme.secondaryText}
                     />
                     <Text style={styles.inputLabel}>
                       Emergency Contact Person
@@ -1927,7 +1937,7 @@ export default function RegisterScreen() {
                   <TextInput
                     style={styles.input}
                     placeholder="Name and contact number"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={theme.secondaryText}
                     value={formData.emergencyContactPerson}
                     onChangeText={(text) =>
                       setFormData((prev) => ({
@@ -1942,7 +1952,7 @@ export default function RegisterScreen() {
                 {/* LSN Section */}
                 <View style={styles.inputContainer}>
                   <View style={styles.inputHeader}>
-                    <Ionicons name="body-outline" size={18} color="#64748B" />
+                    <Ionicons name="body-outline" size={18} color={theme.secondaryText} />
                     <Text style={styles.inputLabel}>
                       Learner with Special Needs (LSN)
                     </Text>
@@ -2040,7 +2050,7 @@ export default function RegisterScreen() {
                         <Ionicons
                           name="information-circle-outline"
                           size={18}
-                          color="#64748B"
+                          color={theme.secondaryText}
                         />
                         <Text style={styles.inputLabel}>
                           Type of Special Need (Optional)
@@ -2049,7 +2059,7 @@ export default function RegisterScreen() {
                       <TextInput
                         style={styles.input}
                         placeholder="e.g., Visual Impairment, Dyslexia"
-                        placeholderTextColor="#94A3B8"
+                        placeholderTextColor={theme.secondaryText}
                         value={specialNeedsType}
                         onChangeText={setSpecialNeedsType}
                       />
@@ -2060,7 +2070,7 @@ export default function RegisterScreen() {
                         <Ionicons
                           name="cloud-upload-outline"
                           size={18}
-                          color="#7C3AED"
+                          color={theme.primary}
                         />
                         <Text style={styles.inputLabel}>
                           Supporting Document
@@ -2138,7 +2148,7 @@ export default function RegisterScreen() {
                       <Ionicons
                         name="lock-closed-outline"
                         size={16}
-                        color="#64748B"
+                        color={theme.secondaryText}
                       />
                       <Text style={styles.privacyNoticeText}>
                         Your document is uploaded securely and handled
@@ -2286,7 +2296,7 @@ export default function RegisterScreen() {
                         <Ionicons
                           name="document-attach-outline"
                           size={18}
-                          color="#7C3AED"
+                          color={theme.primary}
                         />
                         <Text style={styles.reviewDocTitle}>
                           Document Verification
@@ -2368,7 +2378,7 @@ export default function RegisterScreen() {
           <View style={styles.modalOverlay}>
             <View style={styles.modalContainer}>
               <View style={styles.summaryIconContainer}>
-                <Ionicons name="clipboard-outline" size={28} color="#7C3AED" />
+                <Ionicons name="clipboard-outline" size={28} color={theme.primary} />
               </View>
               <Text style={styles.modalTitle}>Confirm Your Details</Text>
               <Text style={styles.modalSubtitle}>
@@ -2447,7 +2457,7 @@ export default function RegisterScreen() {
                   <TextInput
                     style={styles.passwordInput}
                     placeholder="Create a password"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={theme.secondaryText}
                     value={password}
                     onChangeText={setPassword}
                     secureTextEntry={!showPasswords}
@@ -2461,7 +2471,7 @@ export default function RegisterScreen() {
                   <TextInput
                     style={styles.passwordInput}
                     placeholder="Re-enter your password"
-                    placeholderTextColor="#94A3B8"
+                    placeholderTextColor={theme.secondaryText}
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
                     secureTextEntry={!showPasswords}
@@ -2481,7 +2491,7 @@ export default function RegisterScreen() {
                         : "close-circle"
                     }
                     size={16}
-                    color={password.length >= 8 ? "#8A63D2" : "#999"}
+                    color={password.length >= 8 ? theme.primary : theme.secondaryText}
                   />
                   <Text style={styles.requirementText}>
                     At least 8 characters
@@ -2495,7 +2505,7 @@ export default function RegisterScreen() {
                         : "close-circle"
                     }
                     size={16}
-                    color={/[A-Z]/.test(password) ? "#8A63D2" : "#999"}
+                    color={/[A-Z]/.test(password) ? theme.primary : theme.secondaryText}
                   />
                   <Text style={styles.requirementText}>
                     Contains an uppercase letter (A-Z)
@@ -2509,7 +2519,7 @@ export default function RegisterScreen() {
                         : "close-circle"
                     }
                     size={16}
-                    color={/[a-z]/.test(password) ? "#8A63D2" : "#999"}
+                    color={/[a-z]/.test(password) ? theme.primary : theme.secondaryText}
                   />
                   <Text style={styles.requirementText}>
                     Contains a lowercase letter (a-z)
@@ -2523,7 +2533,7 @@ export default function RegisterScreen() {
                         : "close-circle"
                     }
                     size={16}
-                    color={/[0-9]/.test(password) ? "#8A63D2" : "#999"}
+                    color={/[0-9]/.test(password) ? theme.primary : theme.secondaryText}
                   />
                   <Text style={styles.requirementText}>
                     Contains a number (0-9)
@@ -2537,7 +2547,7 @@ export default function RegisterScreen() {
                         : "close-circle"
                     }
                     size={16}
-                    color={/[^A-Za-z0-9]/.test(password) ? "#8A63D2" : "#999"}
+                    color={/[^A-Za-z0-9]/.test(password) ? theme.primary : theme.secondaryText}
                   />
                   <Text style={styles.requirementText}>
                     Contains a special character (!@#$%^&* etc.)
@@ -2569,7 +2579,7 @@ export default function RegisterScreen() {
                 <Ionicons
                   name={showPasswords ? "eye-outline" : "eye-off-outline"}
                   size={18}
-                  color="#7C3AED"
+                  color={theme.primary}
                 />
                 <Text style={styles.showPasswordLabel}>
                   {showPasswords ? "Hide passwords" : "Show passwords"}
@@ -2615,14 +2625,14 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: MindCareTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F4F7FE",
+    backgroundColor: theme.background,
   },
   mainLayout: {
     flex: 1,
-    backgroundColor: "#F4F7FE",
+    backgroundColor: theme.background,
   },
   header: {
     flexDirection: "row",
@@ -2631,12 +2641,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 20,
     paddingBottom: 16,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: theme.border,
   },
   headerTitle: {
-    color: "#0F172A",
+    color: theme.text,
     fontSize: 18,
     fontWeight: "800",
     flex: 1,
@@ -2649,7 +2659,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: theme.inputBg,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -2662,7 +2672,7 @@ const styles = StyleSheet.create({
   },
   tabNavContainer: {
     flexDirection: "row",
-    backgroundColor: "#E2E8F0",
+    backgroundColor: theme.border,
     borderRadius: 16,
     padding: 4,
     marginBottom: 20,
@@ -2677,7 +2687,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   tabNavItemActive: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     // @ts-ignore - web only
     boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.05)",
   },
@@ -2685,47 +2695,47 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: "#CBD5E1",
+    backgroundColor: theme.border,
     alignItems: "center",
     justifyContent: "center",
   },
   tabBadgeActive: {
-    backgroundColor: "#7C3AED",
+    backgroundColor: theme.primary,
   },
   tabBadgeText: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: theme.onPrimary,
   },
   tabBadgeTextActive: {
-    color: "#FFFFFF",
+    color: theme.onPrimary,
   },
   tabNavText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#64748B",
+    color: theme.secondaryText,
   },
   tabNavTextActive: {
-    color: "#0F172A",
+    color: theme.text,
   },
   stepTitle: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#0F172A",
+    color: theme.text,
     marginBottom: 4,
   },
   stepSubtitle: {
     fontSize: 13,
-    color: "#64748B",
+    color: theme.secondaryText,
     marginBottom: 24,
     fontWeight: "600",
   },
   formCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 24,
     padding: 24,
     borderWidth: 1,
-    borderColor: "#F1F5F9",
+    borderColor: theme.border,
     // @ts-ignore - web only
     boxShadow: "0px 6px 20px rgba(0, 0, 0, 0.04)",
   },
@@ -2739,27 +2749,27 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 13,
-    color: "#334155",
+    color: theme.text,
     marginLeft: 8,
     fontWeight: "700",
   },
   input: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: theme.inputBg,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 16,
     fontSize: 15,
-    color: "#0F172A",
+    color: theme.text,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: theme.border,
     fontWeight: "600",
   },
   inputError: {
-    borderColor: "#EF4444",
+    borderColor: theme.status.error,
     borderWidth: 1.5,
   },
   fieldError: {
-    color: "#EF4444",
+    color: theme.status.error,
     fontSize: 12,
     marginTop: 4,
     marginBottom: 4,
@@ -2768,21 +2778,21 @@ const styles = StyleSheet.create({
   passwordInputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: theme.inputBg,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: theme.border,
   },
   passwordInput: {
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 15,
-    color: "#0F172A",
+    color: theme.text,
     fontWeight: "600",
   },
   requirementsBox: {
-    backgroundColor: "white",
+    backgroundColor: theme.card,
     padding: 16,
     borderRadius: 12,
     marginBottom: 16,
@@ -2793,7 +2803,7 @@ const styles = StyleSheet.create({
   requirementsTitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#333",
+    color: theme.text,
     marginBottom: 12,
   },
   requirementItem: {
@@ -2803,7 +2813,7 @@ const styles = StyleSheet.create({
   },
   requirementText: {
     fontSize: 14,
-    color: "#666",
+    color: theme.secondaryText,
     marginLeft: 8,
   },
   eyeIconButton: {
@@ -2812,7 +2822,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   nextStepButton: {
-    backgroundColor: "#7C3AED",
+    backgroundColor: theme.primary,
     flexDirection: "row",
     paddingVertical: 16,
     borderRadius: 16,
@@ -2821,10 +2831,10 @@ const styles = StyleSheet.create({
     marginTop: 12,
     gap: 8,
     // @ts-ignore - web only
-    boxShadow: "0px 6px 16px rgba(124, 58, 237, 0.3)",
+    boxShadow: "0px 6px 16px " + theme.shadow,
   },
   nextStepButtonText: {
-    color: "#FFFFFF",
+    color: theme.onPrimary,
     fontSize: 15,
     fontWeight: "800",
   },
@@ -2835,7 +2845,7 @@ const styles = StyleSheet.create({
   },
   prevStepButton: {
     flex: 1,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: theme.inputBg,
     flexDirection: "row",
     paddingVertical: 16,
     borderRadius: 16,
@@ -2844,27 +2854,27 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   prevStepButtonText: {
-    color: "#334155",
+    color: theme.text,
     fontSize: 15,
     fontWeight: "700",
   },
   createAccountButton: {
     flex: 2,
-    backgroundColor: "#7C3AED",
+    backgroundColor: theme.primary,
     paddingVertical: 16,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
     // @ts-ignore - web only
-    boxShadow: "0px 6px 16px rgba(124, 58, 237, 0.3)",
+    boxShadow: "0px 6px 16px " + theme.shadow,
   },
   createAccountButtonText: {
-    color: "#FFFFFF",
+    color: theme.onPrimary,
     fontSize: 15,
     fontWeight: "800",
   },
   errorText: {
-    color: "#EF4444",
+    color: theme.status.error,
     textAlign: "center",
     marginBottom: 12,
     fontWeight: "600",
@@ -2875,49 +2885,49 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 24,
     borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
+    borderTopColor: theme.border,
     paddingTop: 16,
   },
   loginText: {
-    color: "#64748B",
+    color: theme.secondaryText,
     fontSize: 14,
     fontWeight: "600",
   },
   loginLink: {
-    color: "#7C3AED",
+    color: theme.primary,
     fontSize: 14,
     fontWeight: "800",
   },
   dropdownContainer: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 12,
     marginTop: 6,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: theme.border,
     maxHeight: 200,
   },
   dropdownOption: {
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
+    borderBottomColor: theme.border,
   },
   dropdownText: {
     fontSize: 14,
-    color: "#0F172A",
+    color: theme.text,
     fontWeight: "600",
   },
   selectedTag: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#7C3AED",
+    backgroundColor: theme.primary,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginTop: 8,
   },
   selectedTagText: {
-    color: "white",
+    color: theme.onPrimary,
     fontSize: 13,
     fontWeight: "700",
     flex: 1,
@@ -2929,26 +2939,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: theme.inputBg,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: theme.border,
   },
   listOptionSelected: {
-    backgroundColor: "#EDE9FE",
-    borderColor: "#7C3AED",
+    backgroundColor: theme.softPurple,
+    borderColor: theme.primary,
   },
   listOptionText: {
     fontSize: 14,
-    color: "#334155",
+    color: theme.text,
     fontWeight: "600",
   },
   listOptionSelectedText: {
-    color: "#7C3AED",
+    color: theme.primary,
     fontWeight: "800",
   },
   helpText: {
     fontSize: 13,
-    color: "#94A3B8",
+    color: theme.secondaryText,
     fontStyle: "italic",
     paddingVertical: 8,
   },
@@ -2957,7 +2967,7 @@ const styles = StyleSheet.create({
   },
   subFieldLabel: {
     fontSize: 12,
-    color: "#64748B",
+    color: theme.secondaryText,
     fontWeight: "700",
     marginBottom: 6,
     textTransform: "uppercase",
@@ -2969,21 +2979,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: theme.inputBg,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: theme.border,
     gap: 10,
   },
   radioOptionSelected: {
-    backgroundColor: "#EDE9FE",
-    borderColor: "#7C3AED",
+    backgroundColor: theme.softPurple,
+    borderColor: theme.primary,
   },
   radioOuter: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: "#CBD5E1",
+    borderColor: theme.border,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -2991,30 +3001,30 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: "#7C3AED",
+    backgroundColor: theme.primary,
   },
   radioOptionText: {
     fontSize: 14,
-    color: "#334155",
+    color: theme.text,
     fontWeight: "600",
     flex: 1,
   },
   radioOptionTextSelected: {
-    color: "#7C3AED",
+    color: theme.primary,
     fontWeight: "800",
   },
   conditionalSection: {
-    backgroundColor: "#FAF5FF",
+    backgroundColor: theme.softPurple,
     borderRadius: 16,
     padding: 16,
     marginTop: 12,
     borderWidth: 1,
-    borderColor: "#EDE9FE",
+    borderColor: theme.border,
   },
   uploadButton: {
-    backgroundColor: "#F3E8FF",
+    backgroundColor: theme.softPurple,
     borderWidth: 1,
-    borderColor: "#C4B5FD",
+    borderColor: theme.border,
     borderStyle: "dashed",
     borderRadius: 16,
     paddingVertical: 20,
@@ -3024,48 +3034,48 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   uploadButtonText: {
-    color: "#7C3AED",
+    color: theme.primary,
     fontWeight: "700",
   },
   filePreview: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: theme.border,
   },
   fileName: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#0F172A",
+    color: theme.text,
   },
   fileStatus: {
     fontSize: 12,
-    color: "#16A34A",
+    color: theme.status.success,
     fontWeight: "700",
   },
   documentPreviewContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: theme.border,
   },
   documentThumbnail: {
     width: 52,
     height: 52,
     borderRadius: 10,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: theme.inputBg,
   },
   documentBadge: {
     width: 52,
     height: 52,
     borderRadius: 10,
-    backgroundColor: "#F3E8FF",
+    backgroundColor: theme.softPurple,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -3081,30 +3091,30 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     padding: 12,
     borderRadius: 12,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: theme.border,
   },
   privacyNoticeText: {
     flex: 1,
     fontSize: 12,
-    color: "#64748B",
+    color: theme.secondaryText,
     lineHeight: 18,
     fontWeight: "500",
   },
   progressBarContainer: {
     height: 6,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: theme.border,
     borderRadius: 3,
     marginTop: 4,
     overflow: "hidden",
   },
   progressBar: {
     height: "100%",
-    backgroundColor: "#16A34A",
+    backgroundColor: theme.status.success,
     borderRadius: 3,
   },
   agreementContainer: {
@@ -3119,39 +3129,39 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: "#CBD5E1",
+    borderColor: theme.border,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: theme.inputBg,
   },
   checkboxChecked: {
-    backgroundColor: "#7C3AED",
-    borderColor: "#7C3AED",
+    backgroundColor: theme.primary,
+    borderColor: theme.primary,
   },
   agreementText: {
     flex: 1,
     fontSize: 13,
-    color: "#64748B",
+    color: theme.secondaryText,
     fontWeight: "600",
   },
   privacyLink: {
-    color: "#7C3AED",
+    color: theme.primary,
     fontWeight: "800",
     textDecorationLine: "underline",
   },
   reviewSection: {
-    backgroundColor: "#F8FAFC",
+    backgroundColor: theme.inputBg,
     borderRadius: 16,
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: theme.border,
   },
   reviewSectionTitle: {
     fontSize: 13,
     fontWeight: "800",
-    color: "#7C3AED",
+    color: theme.primary,
     textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 10,
@@ -3162,29 +3172,29 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     paddingVertical: 7,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: theme.border,
   },
   reviewRowLabel: {
     fontSize: 13,
-    color: "#64748B",
+    color: theme.secondaryText,
     fontWeight: "600",
     flex: 1,
     paddingRight: 12,
   },
   reviewRowValue: {
     fontSize: 13,
-    color: "#0F172A",
+    color: theme.text,
     fontWeight: "700",
     flex: 1.4,
     textAlign: "right",
   },
   reviewDocBlock: {
     marginTop: 10,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#EDE9FE",
+    borderColor: theme.border,
   },
   reviewDocHeader: {
     flexDirection: "row",
@@ -3195,11 +3205,11 @@ const styles = StyleSheet.create({
   reviewDocTitle: {
     fontSize: 13,
     fontWeight: "800",
-    color: "#7C3AED",
+    color: theme.primary,
   },
   reviewDocHint: {
     fontSize: 12,
-    color: "#64748B",
+    color: theme.secondaryText,
     marginTop: 8,
     fontWeight: "500",
     lineHeight: 17,
@@ -3208,17 +3218,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#F0FDF4",
+    backgroundColor: `${theme.status.success}1A`,
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#BBF7D0",
+    borderColor: `${theme.status.success}40`,
     marginBottom: 4,
   },
   agreementSummaryText: {
     flex: 1,
     fontSize: 13,
-    color: "#166534",
+    color: theme.status.success,
     fontWeight: "600",
   },
   // Modal Styles
@@ -3230,7 +3240,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   modalContainer: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 24,
     padding: 24,
     width: "100%",
@@ -3242,12 +3252,12 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#0F172A",
+    color: theme.text,
     marginBottom: 8,
   },
   modalSubtitle: {
     fontSize: 14,
-    color: "#64748B",
+    color: theme.secondaryText,
     textAlign: "center",
     marginBottom: 20,
     fontWeight: "500",
@@ -3258,7 +3268,7 @@ const styles = StyleSheet.create({
   },
   modalInputLabel: {
     fontSize: 14,
-    color: "#334155",
+    color: theme.text,
     marginBottom: 6,
     fontWeight: "700",
   },
@@ -3275,35 +3285,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalCancelButton: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: theme.inputBg,
   },
   modalConfirmButton: {
-    backgroundColor: "#7C3AED",
+    backgroundColor: theme.primary,
   },
   modalCancelText: {
-    color: "#334155",
+    color: theme.text,
     fontWeight: "700",
   },
   modalConfirmText: {
-    color: "white",
+    color: theme.onPrimary,
     fontWeight: "700",
   },
   summaryIconContainer: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#F3EAFF",
+    backgroundColor: theme.softPurple,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
   },
   summaryCard: {
     width: "100%",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: theme.inputBg,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: theme.border,
     marginBottom: 4,
   },
   summaryRow: {
@@ -3314,25 +3324,25 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 13,
-    color: "#64748B",
+    color: theme.secondaryText,
     fontWeight: "600",
     flexShrink: 0,
   },
   summaryValue: {
     fontSize: 14,
-    color: "#0F172A",
+    color: theme.text,
     fontWeight: "700",
     flex: 1,
     textAlign: "right",
   },
   summaryDivider: {
     height: 1,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: theme.border,
     marginVertical: 10,
   },
   modalSubtitleEmail: {
     fontWeight: "700",
-    color: "#7C3AED",
+    color: theme.primary,
   },
   showPasswordRow: {
     flexDirection: "row",
@@ -3344,7 +3354,7 @@ const styles = StyleSheet.create({
   },
   showPasswordLabel: {
     fontSize: 13,
-    color: "#7C3AED",
+    color: theme.primary,
     fontWeight: "600",
   },
   avatarSection: {
@@ -3359,11 +3369,11 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#F3EEFF",
+    backgroundColor: theme.softPurple,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "#E9D5FF",
+    borderColor: theme.border,
     position: "relative",
     overflow: "hidden",
   },
@@ -3383,7 +3393,7 @@ const styles = StyleSheet.create({
   },
   avatarLabel: {
     fontSize: 12,
-    color: "#8A63D2",
+    color: theme.primary,
     fontWeight: "600",
   },
 });

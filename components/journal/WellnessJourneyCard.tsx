@@ -1,16 +1,12 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useMemo } from "react";
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { getTodaysEncouragement } from "@/constants/encouragements";
 import { getWellnessActivities } from "@/constants/wellnessActivities";
+import type { MindCareTheme } from "@/constants/theme";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 import { JournalEntry } from "@/services/journalService";
 import { getCategory, getMood } from "@/utils/journalOptions";
 import { getReflectionSummary } from "@/utils/journalReflection";
@@ -22,10 +18,6 @@ interface WellnessJourneyCardProps {
   onWriteJournal: () => void;
   onOpenEntry: (id: string) => void;
 }
-
-const ACCENT = "#8A63D2";
-const ACCENT_LIGHT = "#9C7EEB";
-const ACCENT_DARK = "#7C5AC8";
 
 const MOODS_NEEDING_CARE = new Set([
   "stressed",
@@ -81,16 +73,16 @@ export function WellnessJourneyCard({
   onWriteJournal,
   onOpenEntry,
 }: WellnessJourneyCardProps) {
-  const scheme = useColorScheme() ?? "light";
-  const dark = scheme === "dark";
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
 
   const colors = {
-    card: dark ? "#1E1E24" : "#FFFFFF",
-    textPrimary: dark ? "#ECEDEE" : "#2D2640",
-    textSecondary: dark ? "#9BA1A6" : "#8B7FA8",
-    border: dark ? "rgba(156, 126, 235, 0.22)" : "rgba(156, 126, 235, 0.06)",
-    softBg: dark ? "#2A2A33" : "#F5F3F8",
-    accentSoft: dark ? "#2A2138" : "#F9F4FF",
+    primary: theme.primary,
+    onPrimary: theme.onPrimary,
+    textPrimary: theme.text,
+    textSecondary: theme.secondaryText,
+    softBg: theme.secondaryCard,
+    accentSoft: theme.softPurple,
   };
 
   const sorted = useMemo(
@@ -187,7 +179,7 @@ export function WellnessJourneyCard({
     return (
       <Animated.View entering={FadeIn.duration(250)}>
         <LinearGradient
-          colors={[ACCENT_LIGHT, ACCENT, ACCENT_DARK]}
+          colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.hero}
@@ -207,7 +199,7 @@ export function WellnessJourneyCard({
             <Ionicons
               name="checkmark-circle"
               size={20}
-              color="#FFFFFF"
+              color={theme.onPrimary}
               accessible={true}
               accessibilityLabel="Goal: write your first journal"
             />
@@ -223,7 +215,7 @@ export function WellnessJourneyCard({
             <Ionicons
               name="create-outline"
               size={20}
-              color={ACCENT}
+              color={theme.primary}
               accessible={true}
               accessibilityLabel=""
             />
@@ -239,10 +231,7 @@ export function WellnessJourneyCard({
   return (
     <Animated.View
       entering={FadeIn.duration(250)}
-      style={[
-        styles.card,
-        { backgroundColor: colors.card, borderColor: colors.border },
-      ]}
+      style={styles.card}
     >
       {/* Header */}
       <View style={styles.headerRow}>
@@ -250,7 +239,7 @@ export function WellnessJourneyCard({
           <Ionicons
             name="flower-outline"
             size={20}
-            color="#FFFFFF"
+            color={theme.onPrimary}
             accessible={true}
             accessibilityLabel="Wellness journey"
           />
@@ -283,7 +272,7 @@ export function WellnessJourneyCard({
             </Text>
           </View>
 
-          <SectionLabel label="Statistics" colors={colors} />
+          <SectionLabel label="Statistics" colors={colors} styles={styles} />
           <Animated.View entering={FadeIn.duration(250)}>
             <View style={styles.statsGrid}>
               <StatTile
@@ -291,6 +280,7 @@ export function WellnessJourneyCard({
                 label="Journal Entries"
                 value={`${stats.total}`}
                 colors={colors}
+                styles={styles}
               />
               <StatTile
                 icon="happy-outline"
@@ -298,12 +288,14 @@ export function WellnessJourneyCard({
                 value={getMood(latest?.mood)?.label ?? "Balanced"}
                 valueEmoji={getMood(latest?.mood)?.emoji}
                 colors={colors}
+                styles={styles}
               />
               <StatTile
                 icon="flame-outline"
                 label="Current Streak"
                 value={`${stats.streak} Day${stats.streak === 1 ? "" : "s"}`}
                 colors={colors}
+                styles={styles}
               />
             </View>
           </Animated.View>
@@ -311,7 +303,7 @@ export function WellnessJourneyCard({
       ) : (
         <>
           {/* Section 1: Journal Statistics */}
-          <SectionLabel label="Journal Statistics" colors={colors} />
+          <SectionLabel label="Journal Statistics" colors={colors} styles={styles} />
           <Animated.View entering={FadeIn.duration(250)}>
             <View style={styles.statsGrid}>
               <StatTile
@@ -319,12 +311,14 @@ export function WellnessJourneyCard({
                 label="Total Journals"
                 value={`${stats.total}`}
                 colors={colors}
+                styles={styles}
               />
               <StatTile
                 icon="flame-outline"
                 label="Current Streak"
                 value={`${stats.streak} day${stats.streak === 1 ? "" : "s"}`}
                 colors={colors}
+                styles={styles}
               />
               <StatTile
                 icon="happy-outline"
@@ -332,12 +326,14 @@ export function WellnessJourneyCard({
                 value={getMood(stats.dominantMood)?.label ?? "Balanced"}
                 valueEmoji={getMood(stats.dominantMood)?.emoji}
                 colors={colors}
+                styles={styles}
               />
               <StatTile
                 icon="pricetag-outline"
                 label="Favorite Category"
                 value={getCategory(stats.favoriteCategory)?.name ?? "General"}
                 colors={colors}
+                styles={styles}
               />
             </View>
           </Animated.View>
@@ -347,10 +343,11 @@ export function WellnessJourneyCard({
             timeline={weeklyTimeline}
             getMoodEmoji={getMoodEmoji}
             colors={colors}
+            styles={styles}
           />
 
           {/* Section 3: Reflection Summary */}
-          <SectionLabel label="Reflection Summary" colors={colors} />
+          <SectionLabel label="Reflection Summary" colors={colors} styles={styles} />
           <Animated.View entering={FadeIn.duration(250)}>
             <View style={[styles.reflectionCard, { backgroundColor: colors.accentSoft }]}>
               <Text style={[styles.reflectionText, { color: colors.textPrimary }]}>
@@ -381,13 +378,13 @@ export function WellnessJourneyCard({
           </Animated.View>
 
           {/* Section 4: Today's Encouragement */}
-          <SectionLabel label="Today's Encouragement" colors={colors} />
+          <SectionLabel label="Today's Encouragement" colors={colors} styles={styles} />
           <Animated.View entering={FadeIn.duration(250)}>
             <View style={[styles.encouragement, { backgroundColor: colors.softBg }]}>
               <Ionicons
                 name="chatbubble-ellipses-outline"
                 size={18}
-                color={ACCENT}
+                color={theme.primary}
                 accessible={true}
                 accessibilityLabel="Encouragement"
               />
@@ -402,10 +399,11 @@ export function WellnessJourneyCard({
             hasTodayEntry={hasTodayEntry}
             onPress={onWriteJournal}
             colors={colors}
+            styles={styles}
           />
 
           {/* Section 6: Recent Reflection Preview */}
-          <SectionLabel label="Recent Reflection" colors={colors} />
+          <SectionLabel label="Recent Reflection" colors={colors} styles={styles} />
           {latestReflection ? (
             <Animated.View entering={FadeIn.duration(250)}>
               <Pressable
@@ -420,7 +418,7 @@ export function WellnessJourneyCard({
                   <MaterialCommunityIcons
                     name="star-four-points"
                     size={18}
-                    color={ACCENT}
+                    color={theme.primary}
                     accessible={true}
                     accessibilityLabel=""
                   />
@@ -437,7 +435,7 @@ export function WellnessJourneyCard({
                   <Ionicons
                     name="arrow-forward"
                     size={16}
-                    color={ACCENT}
+                    color={theme.primary}
                     accessible={true}
                     accessibilityLabel=""
                   />
@@ -450,7 +448,7 @@ export function WellnessJourneyCard({
                 <Ionicons
                   name="time-outline"
                   size={18}
-                  color={ACCENT}
+                  color={theme.primary}
                   accessible={true}
                   accessibilityLabel=""
                 />
@@ -467,14 +465,14 @@ export function WellnessJourneyCard({
           )}
 
           {/* Section 7: Suggested Wellness Activity */}
-          <SectionLabel label="Suggested Wellness Activity" colors={colors} />
+          <SectionLabel label="Suggested Wellness Activity" colors={colors} styles={styles} />
           <Animated.View entering={FadeIn.duration(250)}>
             <View style={[styles.activityCard, { backgroundColor: colors.softBg }]}>
               <View style={styles.activityHeader}>
                 <Feather
                   name="activity"
                   size={16}
-                  color={ACCENT}
+                  color={theme.primary}
                   accessible={true}
                   accessibilityLabel=""
                 />
@@ -503,9 +501,11 @@ export function WellnessJourneyCard({
 function SectionLabel({
   label,
   colors,
+  styles,
 }: {
   label: string;
   colors: { textSecondary: string };
+  styles: ReturnType<typeof createStyles>;
 }) {
   return (
     <View style={styles.sectionLabelRow}>
@@ -523,19 +523,26 @@ function StatTile({
   value,
   valueEmoji,
   colors,
+  styles,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   value: string;
   valueEmoji?: string;
-  colors: { softBg: string; textPrimary: string; textSecondary: string };
+  colors: {
+    primary: string;
+    softBg: string;
+    textPrimary: string;
+    textSecondary: string;
+  };
+  styles: ReturnType<typeof createStyles>;
 }) {
   return (
     <View style={[styles.statTile, { backgroundColor: colors.softBg }]}>
       <Ionicons
         name={icon}
         size={18}
-        color={ACCENT}
+        color={colors.primary}
         accessible={true}
         accessibilityLabel={label}
       />
@@ -561,14 +568,22 @@ function GoalRow({
   hasTodayEntry,
   onPress,
   colors,
+  styles,
 }: {
   hasTodayEntry: boolean;
   onPress: () => void;
-  colors: { softBg: string; textPrimary: string; textSecondary: string };
+  colors: {
+    onPrimary: string;
+    primary: string;
+    softBg: string;
+    textPrimary: string;
+    textSecondary: string;
+  };
+  styles: ReturnType<typeof createStyles>;
 }) {
   return (
     <>
-      <SectionLabel label="Today's Goal" colors={colors} />
+      <SectionLabel label="Today's Goal" colors={colors} styles={styles} />
       <Pressable
         onPress={onPress}
         disabled={hasTodayEntry}
@@ -587,7 +602,7 @@ function GoalRow({
           <Ionicons
             name={hasTodayEntry ? "checkmark" : "ellipse-outline"}
             size={18}
-            color={hasTodayEntry ? "#FFFFFF" : ACCENT}
+            color={hasTodayEntry ? colors.onPrimary : colors.primary}
             accessible={false}
           />
         </View>
@@ -606,14 +621,16 @@ function WeeklyTimeline({
   timeline,
   getMoodEmoji,
   colors,
+  styles,
 }: {
   timeline: { day: { date: Date; label: string }; mood: string | null }[];
   getMoodEmoji: (mood: string) => string;
-  colors: { textSecondary: string; textPrimary: string };
+  colors: { primary: string; textSecondary: string; textPrimary: string };
+  styles: ReturnType<typeof createStyles>;
 }) {
   return (
     <>
-      <SectionLabel label="Weekly Mood Timeline" colors={colors} />
+      <SectionLabel label="Weekly Mood Timeline" colors={colors} styles={styles} />
       <View style={styles.timelineRow}>
         {timeline.map(({ day, mood }) => {
           const isToday = sameDay(day.date, new Date());
@@ -634,7 +651,7 @@ function WeeklyTimeline({
                 style={[
                   styles.timelineDay,
                   { color: colors.textSecondary },
-                  isToday && { color: ACCENT, fontWeight: "800" },
+                  isToday && { color: colors.primary, fontWeight: "800" },
                 ]}
               >
                 {day.label}
@@ -647,11 +664,14 @@ function WeeklyTimeline({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
   card: {
     borderRadius: 20,
     padding: 24,
     marginBottom: 20,
+    backgroundColor: theme.card,
+    borderColor: theme.border,
     ...(shadows.sm("#000") as any),
     borderWidth: 1,
   },
@@ -677,7 +697,7 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: theme.onPrimary,
     marginBottom: 8,
     textAlign: "center",
   },
@@ -710,21 +730,21 @@ const styles = StyleSheet.create({
   heroGoalText: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: theme.onPrimary,
   },
   heroButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.onPrimary,
     borderRadius: 25,
     paddingVertical: 14,
     paddingHorizontal: 24,
     minHeight: 48,
   },
   heroButtonText: {
-    color: ACCENT,
+    color: theme.primary,
     fontSize: 15,
     fontWeight: "700",
   },
@@ -738,7 +758,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: ACCENT,
+    backgroundColor: theme.primary,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -778,7 +798,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: ACCENT,
+    backgroundColor: theme.primary,
   },
   sectionLabel: {
     fontSize: 12,
@@ -863,7 +883,7 @@ const styles = StyleSheet.create({
   },
   reflectionBullet: {
     fontSize: 14,
-    color: ACCENT,
+    color: theme.primary,
     fontWeight: "800",
   },
   encouragement: {
@@ -893,13 +913,13 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     borderWidth: 2,
-    borderColor: ACCENT,
+    borderColor: theme.primary,
     alignItems: "center",
     justifyContent: "center",
   },
   goalCheckDone: {
-    backgroundColor: ACCENT,
-    borderColor: ACCENT,
+    backgroundColor: theme.primary,
+    borderColor: theme.primary,
   },
   goalText: {
     flex: 1,
@@ -911,7 +931,7 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.18)",
+    borderColor: theme.border,
   },
   reflectionReadyRow: {
     flexDirection: "row",
@@ -922,7 +942,7 @@ const styles = StyleSheet.create({
   reflectionReadyText: {
     fontSize: 15,
     fontWeight: "800",
-    color: ACCENT,
+    color: theme.primary,
   },
   previewText: {
     fontSize: 13,
@@ -938,7 +958,7 @@ const styles = StyleSheet.create({
   viewReflectionText: {
     fontSize: 14,
     fontWeight: "700",
-    color: ACCENT,
+    color: theme.primary,
   },
   reflectionEmpty: {
     flexDirection: "row",

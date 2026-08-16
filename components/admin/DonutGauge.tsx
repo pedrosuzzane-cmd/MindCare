@@ -1,6 +1,8 @@
 import React from "react";
 import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import Svg, { Circle, G, Text as SvgText } from "react-native-svg";
+import type { MindCareTheme } from "@/constants/theme";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 
 interface DonutGaugeProps {
   percentage: number;
@@ -17,12 +19,16 @@ export function DonutGauge({
   percentage,
   size = 160,
   strokeWidth = 14,
-  color = "#8A63D2",
-  trackColor = "#F3EAFF",
+  color,
+  trackColor,
   centerText,
   centerSubtext,
   label,
 }: DonutGaugeProps) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
+  const resolvedColor = color ?? theme.primary;
+  const resolvedTrackColor = trackColor ?? theme.softPurple;
   const clamped = Math.min(Math.max(percentage, 0), 100);
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -37,7 +43,7 @@ export function DonutGauge({
             cx={center}
             cy={center}
             r={radius}
-            stroke={trackColor}
+            stroke={resolvedTrackColor}
             strokeWidth={strokeWidth}
             fill="none"
           />
@@ -45,7 +51,7 @@ export function DonutGauge({
             cx={center}
             cy={center}
             r={radius}
-            stroke={color}
+            stroke={resolvedColor}
             strokeWidth={strokeWidth}
             fill="none"
             strokeDasharray={circumference}
@@ -59,7 +65,7 @@ export function DonutGauge({
           textAnchor="middle"
           fontSize={size * 0.18}
           fontWeight="900"
-          fill="#2D1B69"
+          fill={theme.text}
         >
           {centerText || `${clamped}%`}
         </SvgText>
@@ -70,7 +76,7 @@ export function DonutGauge({
             textAnchor="middle"
             fontSize={size * 0.08}
             fontWeight="600"
-            fill="#8B5CF6"
+            fill={theme.primary}
           >
             {centerSubtext}
           </SvgText>
@@ -97,10 +103,13 @@ export function MultiDonutGauge({
   segments,
   size = 140,
   strokeWidth = 12,
-  trackColor = "#F3EAFF",
+  trackColor,
 }: MultiDonutGaugeProps) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const { width: screenWidth } = useWindowDimensions();
   const isWide = screenWidth >= 900;
+  const resolvedTrackColor = trackColor ?? theme.softPurple;
 
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -124,7 +133,7 @@ export function MultiDonutGauge({
                   cx={center}
                   cy={center}
                   r={radius}
-                  stroke={trackColor}
+                  stroke={resolvedTrackColor}
                   strokeWidth={strokeWidth}
                   fill="none"
                 />
@@ -156,7 +165,7 @@ export function MultiDonutGauge({
                 textAnchor="middle"
                 fontSize={size * 0.07}
                 fontWeight="600"
-                fill="#64748B"
+                fill={theme.secondaryText}
               >
                 {seg.label}
               </SvgText>
@@ -168,27 +177,28 @@ export function MultiDonutGauge({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    alignItems: "center",
-    gap: 8,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#6B21A8",
-    textAlign: "center",
-  },
-  multiContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 16,
-    justifyContent: "center",
-  },
-  multiContainerWide: {
-    gap: 24,
-  },
-  segmentRow: {
-    alignItems: "center",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      alignItems: "center",
+      gap: 8,
+    },
+    label: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: theme.primaryDeep,
+      textAlign: "center",
+    },
+    multiContainer: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 16,
+      justifyContent: "center",
+    },
+    multiContainerWide: {
+      gap: 24,
+    },
+    segmentRow: {
+      alignItems: "center",
+    },
+  });

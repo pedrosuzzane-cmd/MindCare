@@ -7,19 +7,23 @@ import {
   Alert,
   Pressable,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { shadows } from "@/utils/shadows";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 import { useJournal } from "@/hooks/useJournal";
 import { JournalCalendar } from "@/components/student/JournalCalendar";
 import { WellnessJourneyCard } from "@/components/journal/WellnessJourneyCard";
 
 export default function DailyJournalScreen() {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const {
     entries: journalEntries,
     loading,
@@ -97,7 +101,7 @@ export default function DailyJournalScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#8A63D2", "#7C5AC8"]}
+        colors={theme.headerGradient}
         style={styles.headerGradient}
       >
         {/* Header */}
@@ -113,9 +117,9 @@ export default function DailyJournalScreen() {
             disabled={syncing}
           >
             {syncing ? (
-              <ActivityIndicator color="white" size="small" />
+              <ActivityIndicator color={theme.onPrimary} size="small" />
             ) : (
-              <Ionicons name="sync-outline" size={22} color="white" />
+              <Ionicons name="sync-outline" size={22} color={theme.onPrimary} />
             )}
           </TouchableOpacity>
         </View>
@@ -136,7 +140,7 @@ export default function DailyJournalScreen() {
           <RefreshControl
             refreshing={syncing}
             onRefresh={onRefresh}
-              colors={["#7C5AC8", "#8A63D2"]}
+            colors={[...theme.headerGradient]}
           />
         }
       >
@@ -171,12 +175,12 @@ export default function DailyJournalScreen() {
           }}
         >
           <LinearGradient
-            colors={["#9C7EEB", "#8A63D2"]}
+            colors={theme.headerGradient}
             style={styles.writeJournalGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
           >
-            <Ionicons name="create-outline" size={20} color="white" />
+            <Ionicons name="create-outline" size={20} color={theme.onPrimary} />
             <Text style={styles.writeJournalBtnText}>
               {getEntryForDate(new Date()) ? "View Today's Journal" : "Write Today's Journal"}
             </Text>
@@ -221,7 +225,7 @@ export default function DailyJournalScreen() {
                   })
                 }
               >
-                <Ionicons name="book-outline" size={18} color="#8A63D2" />
+                <Ionicons name="book-outline" size={18} color={theme.primary} />
                 <View style={styles.recentInfo}>
                   <Text style={styles.recentTitle} numberOfLines={1}>
                     {entry.title || "Untitled"}
@@ -242,134 +246,135 @@ export default function DailyJournalScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F4F2F8",
-  },
-  headerGradient: {
-    paddingBottom: 10,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "white",
-  },
-  headerTitleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  syncingText: {
-    fontSize: 14,
-    color: "rgba(255, 255, 255, 0.8)",
-    fontWeight: "500",
-  },
-  placeholder: {
-    width: 44,
-  },
-  syncButton: {
-    width: 44,
-    height: 44,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  subtitleContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-  },
-  headerSubtitle: {
-    fontSize: 15,
-    color: "rgba(255, 255, 255, 0.9)",
-    textAlign: "center",
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 14,
-    paddingBottom: 40,
-  },
-  writeJournalBtn: {
-    borderRadius: 14,
-    overflow: "hidden",
-    marginBottom: 20,
-  },
-  writeJournalGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-    gap: 8,
-  },
-  writeJournalBtnText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#2D2640",
-    marginBottom: 14,
-  },
-  // Recent journals
-  recentCard: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 20,
-    ...(shadows.sm("#000") as any),
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
-  },
-  recentHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  seeAllText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#8A63D2",
-  },
-  recentRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0ECF6",
-  },
-  recentInfo: {
-    flex: 1,
-  },
-  recentTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#2D2640",
-  },
-  recentDate: {
-    fontSize: 12,
-    color: "#8B7FA8",
-    marginTop: 2,
-  },
-  recentMood: {
-    fontSize: 20,
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    headerGradient: {
+      paddingBottom: 10,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 10,
+    },
+    backButton: {
+      width: 44,
+      height: 44,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    headerTitle: {
+      fontSize: 22,
+      fontWeight: "700",
+      color: theme.onPrimary,
+    },
+    headerTitleContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    syncingText: {
+      fontSize: 14,
+      color: "rgba(255, 255, 255, 0.8)",
+      fontWeight: "500",
+    },
+    placeholder: {
+      width: 44,
+    },
+    syncButton: {
+      width: 44,
+      height: 44,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    subtitleContainer: {
+      paddingHorizontal: 20,
+      paddingBottom: 10,
+    },
+    headerSubtitle: {
+      fontSize: 15,
+      color: "rgba(255, 255, 255, 0.9)",
+      textAlign: "center",
+    },
+    scrollContainer: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingHorizontal: 20,
+      paddingTop: 14,
+      paddingBottom: 40,
+    },
+    writeJournalBtn: {
+      borderRadius: 14,
+      overflow: "hidden",
+      marginBottom: 20,
+    },
+    writeJournalGradient: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 14,
+      gap: 8,
+    },
+    writeJournalBtnText: {
+      color: theme.onPrimary,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: theme.text,
+      marginBottom: 14,
+    },
+    // Recent journals
+    recentCard: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 18,
+      marginBottom: 20,
+      ...(shadows.sm("#000") as any),
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+    },
+    recentHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    seeAllText: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: theme.primary,
+    },
+    recentRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.borderSoft,
+    },
+    recentInfo: {
+      flex: 1,
+    },
+    recentTitle: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: theme.text,
+    },
+    recentDate: {
+      fontSize: 12,
+      color: theme.secondaryText,
+      marginTop: 2,
+    },
+    recentMood: {
+      fontSize: 20,
+    },
+  });

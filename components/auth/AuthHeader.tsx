@@ -1,3 +1,4 @@
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -17,18 +18,23 @@ export default function AuthHeader({
   subtitle,
   reassurance,
 }: AuthHeaderProps) {
+  const { theme } = useMindCareTheme();
+
   return (
     <View>
       {onBack ? (
         <View style={styles.navRow}>
           <Pressable
-            style={styles.backButton}
+            style={[
+              styles.backButton,
+              { backgroundColor: theme.card, borderColor: theme.border },
+            ]}
             onPress={onBack}
             accessibilityRole="button"
             accessibilityLabel="Go back"
             hitSlop={8}
           >
-            <Ionicons name="arrow-back" size={22} color="#4B5563" />
+            <Ionicons name="arrow-back" size={22} color={theme.secondaryText} />
           </Pressable>
         </View>
       ) : null}
@@ -44,10 +50,16 @@ export default function AuthHeader({
         </LinearGradient>
       </View>
 
-      <Text style={styles.title}>{title}</Text>
-      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      <Text style={[styles.title, { color: theme.primary }]}>{title}</Text>
+      {subtitle ? (
+        <Text style={[styles.subtitle, { color: theme.secondaryText }]}>
+          {subtitle}
+        </Text>
+      ) : null}
       {reassurance ? (
-        <Text style={styles.reassurance}>{reassurance}</Text>
+        <Text style={[styles.reassurance, { color: theme.primary }]}>
+          {reassurance}
+        </Text>
       ) : null}
     </View>
   );
@@ -63,10 +75,10 @@ const styles = StyleSheet.create({
   backButton: {
     width: 44,
     height: 44,
-    backgroundColor: "white",
     borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
     // @ts-ignore - web only
     boxShadow: "0px 2px 4px rgba(0,0,0,0.08)",
     elevation: 3,
@@ -89,20 +101,17 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "700",
-    color: "#5B21B6",
     textAlign: "center",
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: "#6B7280",
     textAlign: "center",
     lineHeight: 23,
     paddingHorizontal: 8,
   },
   reassurance: {
     fontSize: 14,
-    color: "#8A63D2",
     textAlign: "center",
     lineHeight: 20,
     marginTop: 10,

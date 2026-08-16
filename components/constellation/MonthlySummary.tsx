@@ -42,8 +42,7 @@ export function MonthlySummary({
             style={[
               styles.chip,
               {
-                backgroundColor:
-                  theme.mode === "dark" ? "#2A2240" : "#FFFFFF",
+                backgroundColor: theme.card,
                 borderColor: theme.border,
               },
             ]}

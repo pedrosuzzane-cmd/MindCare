@@ -1,5 +1,6 @@
 import { HapticTab } from "@/components/haptic-tab";
 import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 import { useAnnouncements } from "@/contexts/AnnouncementsContext";
 import { Tabs } from "expo-router";
 import React, { useEffect, useRef } from "react";
@@ -14,8 +15,8 @@ function TabIcon({
   focused: boolean;
 }) {
   const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const scale = useRef(new Animated.Value(focused ? 1 : 0.9)).current;
-
   useEffect(() => {
     Animated.spring(scale, {
       toValue: focused ? 1 : 0.9,
@@ -47,6 +48,7 @@ function TabIcon({
 
 function TabLabel({ label, focused }: { label: string; focused: boolean }) {
   const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   return (
     <Text
       style={[
@@ -64,6 +66,7 @@ function TabLabel({ label, focused }: { label: string; focused: boolean }) {
 
 export default function TabLayout() {
   const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const { unreadCount } = useAnnouncements();
   const insets = useSafeAreaInsets();
   const tabBarHeight =
@@ -160,7 +163,8 @@ export default function TabLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
   iconContainer: {
     width: 42,
     height: 32,
@@ -187,12 +191,12 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 8,
     paddingHorizontal: 4,
-    backgroundColor: "#DC2626",
+    backgroundColor: theme.status.error,
     alignItems: "center",
     justifyContent: "center",
   },
   badgeText: {
-    color: "#FFFFFF",
+    color: theme.onPrimary,
     fontSize: 10,
     fontWeight: "700",
   },

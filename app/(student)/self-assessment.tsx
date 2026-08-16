@@ -6,13 +6,15 @@ import {
     ActivityIndicator,
     Alert,
     Pressable,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { shadows } from "@/utils/shadows";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 import { auth, db } from "@/constants/firebase";
 import {
@@ -271,6 +273,8 @@ const DISCLAIMER =
   "This assessment is intended for educational and self-awareness purposes only. It does not diagnose mental health conditions or replace evaluation by a licensed mental health professional. If your responses indicate higher levels of emotional distress, or if you feel unable to cope, please consider reaching out to a trusted adult, school guidance counselor, psychologist, or other qualified mental health professional.";
 
 export default function SelfAssessmentScreen() {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -358,7 +362,7 @@ export default function SelfAssessmentScreen() {
         <View
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
-          <ActivityIndicator size="large" color="#8A63D2" />
+          <ActivityIndicator size="large" color={theme.primary} />
         </View>
       </SafeAreaView>
     );
@@ -367,7 +371,7 @@ export default function SelfAssessmentScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#9C7EEB", "#8A63D2"]}
+        colors={theme.headerGradient}
         style={styles.headerGradient}
       >
         <View style={styles.header}>
@@ -434,7 +438,7 @@ export default function SelfAssessmentScreen() {
           <Ionicons
             name="information-circle-outline"
             size={18}
-            color="#8A63D2"
+            color={theme.primary}
           />
           <Text style={styles.disclaimerText}>{DISCLAIMER}</Text>
         </View>
@@ -462,7 +466,7 @@ export default function SelfAssessmentScreen() {
             disabled={!isAnswered()}
           >
             <LinearGradient
-              colors={["#9C7EEB", "#8A63D2"]}
+              colors={theme.headerGradient}
               style={styles.nextButton}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -471,7 +475,7 @@ export default function SelfAssessmentScreen() {
                 {isLastQuestion ? "Complete" : "Next"}
               </Text>
               {!isLastQuestion && (
-                <Ionicons name="arrow-forward" size={20} color="white" />
+                <Ionicons name="arrow-forward" size={20} color={theme.onPrimary} />
               )}
             </LinearGradient>
           </Pressable>
@@ -481,179 +485,180 @@ export default function SelfAssessmentScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F4F2F8",
-  },
-  headerGradient: {
-    paddingBottom: 20,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "white",
-  },
-  placeholder: {
-    width: 40,
-  },
-  subtitleContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "rgba(255, 255, 255, 0.9)",
-    textAlign: "center",
-    fontWeight: "600",
-  },
-  progressContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-  },
-  progressText: {
-    fontSize: 14,
-    color: "rgba(255, 255, 255, 0.8)",
-    textAlign: "center",
-    fontWeight: "500",
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
-  },
-  questionCard: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 16,
-    ...(shadows.sm("#000") as any),
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
-  },
-  questionText: {
-    fontSize: 18,
-    color: "#333",
-    textAlign: "center",
-    marginBottom: 24,
-    lineHeight: 24,
-  },
-  ratingContainer: {
-    alignItems: "center",
-  },
-  ratingList: {
-    width: "100%",
-  },
-  ratingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    paddingVertical: 6,
-  },
-  ratingRowLabel: {
-    flex: 1,
-    fontSize: 14,
-    color: "#666",
-    marginRight: 12,
-  },
-  ratingButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#F5F5F5",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "transparent",
-    marginVertical: 6,
-  },
-  selectedRating: {
-    backgroundColor: "#8A63D2",
-    borderColor: "#8A63D2",
-  },
-  ratingButtonText: {
-    fontSize: 16,
-    color: "#666",
-    fontWeight: "600",
-  },
-  selectedRatingText: {
-    color: "white",
-  },
-  buttonContainerRow: {
-    marginTop: 20,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  previousButtonContainer: {
-    flex: 1,
-  },
-  previousButton: {
-    backgroundColor: "white",
-    borderRadius: 25,
-    paddingVertical: 12,
-    width: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#8A63D2",
-  },
-  previousButtonText: {
-    color: "#8A63D2",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  nextButtonContainer: {
-    borderRadius: 25,
-    flex: 1,
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  nextButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: 25,
-    gap: 10,
-    width: "100%",
-  },
-  nextButtonText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "white",
-  },
-  disclaimerCard: {
-    backgroundColor: "rgba(138, 99, 210, 0.08)",
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-  },
-  disclaimerText: {
-    fontSize: 12,
-    color: "#666",
-    flex: 1,
-    lineHeight: 18,
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    headerGradient: {
+      paddingBottom: 20,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 10,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: theme.onPrimary,
+    },
+    placeholder: {
+      width: 40,
+    },
+    subtitleContainer: {
+      paddingHorizontal: 20,
+      paddingBottom: 10,
+    },
+    subtitle: {
+      fontSize: 14,
+      color: "rgba(255, 255, 255, 0.9)",
+      textAlign: "center",
+      fontWeight: "600",
+    },
+    progressContainer: {
+      paddingHorizontal: 20,
+      paddingBottom: 10,
+    },
+    progressText: {
+      fontSize: 14,
+      color: "rgba(255, 255, 255, 0.8)",
+      textAlign: "center",
+      fontWeight: "500",
+    },
+    scrollContainer: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 40,
+    },
+    questionCard: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 24,
+      marginBottom: 16,
+      ...(shadows.sm("#000") as any),
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+    },
+    questionText: {
+      fontSize: 18,
+      color: theme.text,
+      textAlign: "center",
+      marginBottom: 24,
+      lineHeight: 24,
+    },
+    ratingContainer: {
+      alignItems: "center",
+    },
+    ratingList: {
+      width: "100%",
+    },
+    ratingRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      width: "100%",
+      paddingVertical: 6,
+    },
+    ratingRowLabel: {
+      flex: 1,
+      fontSize: 14,
+      color: theme.secondaryText,
+      marginRight: 12,
+    },
+    ratingButton: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: theme.inputBg,
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 2,
+      borderColor: "transparent",
+      marginVertical: 6,
+    },
+    selectedRating: {
+      backgroundColor: theme.primary,
+      borderColor: theme.primary,
+    },
+    ratingButtonText: {
+      fontSize: 16,
+      color: theme.secondaryText,
+      fontWeight: "600",
+    },
+    selectedRatingText: {
+      color: theme.onPrimary,
+    },
+    buttonContainerRow: {
+      marginTop: 20,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    previousButtonContainer: {
+      flex: 1,
+    },
+    previousButton: {
+      backgroundColor: theme.card,
+      borderRadius: 25,
+      paddingVertical: 12,
+      width: "100%",
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: theme.primary,
+    },
+    previousButtonText: {
+      color: theme.primary,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    nextButtonContainer: {
+      borderRadius: 25,
+      flex: 1,
+    },
+    disabledButton: {
+      opacity: 0.5,
+    },
+    nextButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 12,
+      borderRadius: 25,
+      gap: 10,
+      width: "100%",
+    },
+    nextButtonText: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: theme.onPrimary,
+    },
+    disclaimerCard: {
+      backgroundColor: `${theme.primary}14`,
+      borderRadius: 16,
+      padding: 16,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 10,
+    },
+    disclaimerText: {
+      fontSize: 12,
+      color: theme.secondaryText,
+      flex: 1,
+      lineHeight: 18,
+    },
+  });

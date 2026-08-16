@@ -60,6 +60,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { v4 as uuidv4 } from "uuid";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 type RiskLevel = "low" | "normal" | "high";
 
@@ -69,11 +71,11 @@ const RISK_LABELS: Record<RiskLevel, string> = {
   high: "High",
 };
 
-const RISK_COLORS: Record<RiskLevel, string> = {
-  low: "#16A34A",
-  normal: "#D97706",
-  high: "#DB2777",
-};
+const RISK_COLORS = (theme: MindCareTheme): Record<RiskLevel, string> => ({
+  low: theme.status.success,
+  normal: theme.status.warning,
+  high: theme.status.error,
+});
 
 const CONCERN_LABELS: Record<RiskLevel, string> = {
   low: "Low",
@@ -303,6 +305,8 @@ function Badge({
   bg?: string;
   icon?: keyof typeof Ionicons.glyphMap;
 }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   return (
     <View style={[styles.badge, { backgroundColor: bg ?? `${color}18` }]}>
       {icon ? <Ionicons name={icon} size={11} color={color} /> : null}
@@ -326,6 +330,8 @@ function KpiCard({
   bg: string;
   onPress?: () => void;
 }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   return (
     <Pressable
       style={styles.kpiCard}
@@ -342,13 +348,14 @@ function KpiCard({
 }
 
 function PriorityBadge({ priority }: { priority: TriagePriority }) {
+  const { theme } = useMindCareTheme();
   const config: Record<
     TriagePriority,
     { label: string; color: string; bg: string }
   > = {
-    high: { label: "HIGH", color: "#BE123C", bg: "#FFE4E6" },
-    medium: { label: "MEDIUM", color: "#B45309", bg: "#FEF3C7" },
-    monitor: { label: "MONITOR", color: "#0F766E", bg: "#CCFBF1" },
+    high: { label: "HIGH", color: theme.status.error, bg: "#FFE4E6" },
+    medium: { label: "MEDIUM", color: theme.status.warning, bg: "#FEF3C7" },
+    monitor: { label: "MONITOR", color: theme.accent.teal, bg: "#CCFBF1" },
   };
   const c = config[priority];
   return <Badge label={c.label} color={c.color} bg={c.bg} />;
@@ -361,6 +368,8 @@ function FilterGroup({
   title: string;
   children: React.ReactNode;
 }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   return (
     <View style={styles.filterGroup}>
       <Text style={styles.filterGroupTitle}>{title}</Text>
@@ -378,6 +387,8 @@ function FilterOptionChip({
   active: boolean;
   onPress: () => void;
 }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   return (
     <Pressable
       style={[styles.filterOptChip, active && styles.filterOptChipActive]}
@@ -402,6 +413,8 @@ export default function StudentManagementScreen() {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const isWide = screenWidth >= 900;
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
 
   // Deep-link default filters: apply only explicitly provided params; otherwise
   // start with no restrictive filters so the directory never shows a misleading
@@ -1125,7 +1138,7 @@ export default function StudentManagementScreen() {
 
   const renderRiskBadge = (s: StudentManagementEntry) => {
     const rl = (s.latestRiskLevel ?? "low") as RiskLevel;
-    return <Badge label={RISK_LABELS[rl]} color={RISK_COLORS[rl]} />;
+    return <Badge label={RISK_LABELS[rl]} color={RISK_COLORS(theme)[rl]} />;
   };
 
   const renderSupportBadge = (s: StudentManagementEntry) => {
@@ -1159,7 +1172,7 @@ export default function StudentManagementScreen() {
         style={[styles.triageActionBtn, styles.triageActionPrimary]}
         onPress={() => openWorkflow([uid])}
       >
-        <Ionicons name="add" size={13} color="#FFFFFF" />
+        <Ionicons name="add" size={13} color={theme.onPrimary} />
         <Text style={[styles.triageActionText, { color: "#FFFFFF" }]}>
           Record Support
         </Text>
@@ -1326,7 +1339,7 @@ export default function StudentManagementScreen() {
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={["#312E81", "#4C1D95", "#6D28D9"]}
+        colors={theme.headerGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.header, { paddingTop: insets.top + 10 }]}
@@ -1598,7 +1611,7 @@ export default function StudentManagementScreen() {
                         ]}
                         onPress={() => openWorkflow([item.student.uid])}
                       >
-                        <Ionicons name="add" size={13} color="#FFFFFF" />
+                        <Ionicons name="add" size={13} color={theme.onPrimary} />
                         <Text
                           style={[
                             styles.triageActionText,
@@ -2066,7 +2079,7 @@ export default function StudentManagementScreen() {
                   onPress={applyEdit}
                 >
                   {editBusy ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
+                    <ActivityIndicator color={theme.onPrimary} size="small" />
                   ) : (
                     <Text style={styles.primaryBtnText}>Save</Text>
                   )}
@@ -2145,7 +2158,7 @@ export default function StudentManagementScreen() {
                   onPress={runConfirm}
                 >
                   {confirmBusy ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
+                    <ActivityIndicator color={theme.onPrimary} size="small" />
                   ) : (
                     <Text style={styles.primaryBtnText}>
                       {confirm.kind === "archive"
@@ -2336,7 +2349,7 @@ export default function StudentManagementScreen() {
                     value={lsnOnly}
                     onValueChange={setLsnOnly}
                     trackColor={{ false: "#E5E7EB", true: "#8A63D2" }}
-                    thumbColor="#FFFFFF"
+                    thumbColor={theme.onPrimary}
                   />
                   <Text style={styles.lsnText}>LSN students only</Text>
                 </View>
@@ -2973,7 +2986,7 @@ export default function StudentManagementScreen() {
               >
                 {wfSaving ? (
                   <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <ActivityIndicator color="#FFFFFF" size="small" />
+                    <ActivityIndicator color={theme.onPrimary} size="small" />
                     <Text style={[styles.primaryBtnText, { marginLeft: 8 }]}>
                       Saving…
                     </Text>
@@ -3167,7 +3180,7 @@ export default function StudentManagementScreen() {
                   onPress={runDelete}
                 >
                   {deleteBusy ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
+                    <ActivityIndicator color={theme.onPrimary} size="small" />
                   ) : (
                     <Text style={styles.primaryBtnText}>
                       Delete Permanently
@@ -3198,6 +3211,8 @@ export default function StudentManagementScreen() {
  * administrative support metadata only — no journal content is shown here.
  */
 function StudentContext({ student }: { student?: StudentManagementEntry }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [showConcernInfo, setShowConcernInfo] = useState(false);
   if (!student) {
     return <Text style={styles.emptyText}>No student selected.</Text>;
@@ -3245,7 +3260,12 @@ function StudentContext({ student }: { student?: StudentManagementEntry }) {
               color="#6B7280"
             />
           </Text>
-          <Text style={[styles.contextChipValue, { color: RISK_COLORS[risk] }]}>
+          <Text
+            style={[
+              styles.contextChipValue,
+              { color: RISK_COLORS(theme)[risk] },
+            ]}
+          >
             ● {CONCERN_LABELS[risk]}
           </Text>
         </Pressable>
@@ -3274,6 +3294,8 @@ function StudentContext({ student }: { student?: StudentManagementEntry }) {
 // ─── Support history (append-only) ──────────────────────────────────────────
 
 function SupportHistory({ workflows }: { workflows: SupportWorkflow[] }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   if (workflows.length === 0) return null;
   const sorted = [...workflows].sort(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
@@ -3332,6 +3354,8 @@ function StudentProfileModal({
   onChangeStatus: (uid: string) => void;
   onCompleteWf: (wf: SupportWorkflow) => void;
 }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [deptName, setDeptName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -3386,7 +3410,7 @@ function StudentProfileModal({
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={[styles.wizardSheet, { maxHeight: "90%" }]}>
           <LinearGradient
-            colors={["#312E81", "#6D28D9"]}
+            colors={theme.headerGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.profileHeader}
@@ -3402,7 +3426,7 @@ function StudentProfileModal({
               <Text style={styles.profileSub}>{student.email ?? ""}</Text>
             </View>
             <Pressable onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={20} color="#FFFFFF" />
+              <Ionicons name="close" size={20} color={theme.onPrimary} />
             </Pressable>
           </LinearGradient>
 
@@ -3462,7 +3486,7 @@ function StudentProfileModal({
               <View style={styles.profileBadges}>
                 <Badge
                   label={`Risk: ${RISK_LABELS[risk]}`}
-                  color={RISK_COLORS[risk]}
+                  color={RISK_COLORS(theme)[risk]}
                 />
               </View>
               <ProfileRow
@@ -3619,10 +3643,12 @@ function ProfileSection({
   children: React.ReactNode;
   action?: React.ReactNode;
 }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   return (
     <View style={styles.profileSection}>
       <View style={styles.profileSectionHead}>
-        <Ionicons name={icon} size={16} color="#6D28D9" />
+        <Ionicons name={icon} size={16} color={theme.primary} />
         <Text style={styles.profileSectionTitle}>{title}</Text>
         {action ?? null}
       </View>
@@ -3632,6 +3658,8 @@ function ProfileSection({
 }
 
 function ProfileRow({ label, value }: { label: string; value: string }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   return (
     <View style={styles.profileRow}>
       <Text style={styles.profileRowLabel}>{label}</Text>
@@ -3644,7 +3672,7 @@ function ProfileRow({ label, value }: { label: string; value: string }) {
 
 // ─── Styles ─────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const createStyles = (theme: MindCareTheme) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: "#F5F4FA",
@@ -3676,7 +3704,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   headerTitle: {
-    color: "#FFFFFF",
+    color: theme.onPrimary,
     fontSize: 22,
     fontWeight: "900",
   },
@@ -3693,7 +3721,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderRadius: 12,
@@ -3744,7 +3772,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   retryText: {
-    color: "#FFFFFF",
+    color: theme.onPrimary,
     fontSize: 12,
     fontWeight: "800",
   },
@@ -3756,7 +3784,7 @@ const styles = StyleSheet.create({
   kpiCard: {
     flexBasis: "30%",
     flexGrow: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
@@ -3782,7 +3810,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   section: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 14,
     padding: 12,
     borderWidth: 1,
@@ -3866,7 +3894,7 @@ const styles = StyleSheet.create({
   },
   // Triage queue (compact cards)
   triageCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "#EEECF7",
@@ -3908,7 +3936,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
   },
   triageActionPrimary: {
     backgroundColor: "#6D28D9",
@@ -3951,7 +3979,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     height: 40,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     maxWidth: 150,
   },
   statusSelectText: {
@@ -3980,7 +4008,7 @@ const styles = StyleSheet.create({
     color: "#6D28D9",
   },
   filterBtnTextActive: {
-    color: "#FFFFFF",
+    color: theme.onPrimary,
   },
   clearBtn: {
     flexDirection: "row",
@@ -4037,7 +4065,7 @@ const styles = StyleSheet.create({
   emptyClearText: {
     fontSize: 13,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: theme.onPrimary,
   },
   // Advanced filter groups (drawer/modal)
   advancedBody: {
@@ -4066,7 +4094,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
   },
   filterOptChipActive: {
     borderColor: "#6D28D9",
@@ -4078,7 +4106,7 @@ const styles = StyleSheet.create({
     color: "#4B5563",
   },
   filterOptChipTextActive: {
-    color: "#FFFFFF",
+    color: theme.onPrimary,
   },
   lsnRow: {
     flexDirection: "row",
@@ -4120,7 +4148,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   tableCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "#EEECF7",
@@ -4235,7 +4263,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   studentCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "#EEECF7",
@@ -4273,7 +4301,7 @@ const styles = StyleSheet.create({
   emptyCard: {
     alignItems: "center",
     paddingVertical: 40,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: "#EEECF7",
@@ -4300,7 +4328,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -4318,7 +4346,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 12,
     right: 12,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 16,
     padding: 12,
     paddingTop: 10,
@@ -4365,7 +4393,7 @@ const styles = StyleSheet.create({
   sheet: {
     width: "100%",
     maxWidth: 440,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 18,
     padding: 16,
   },
@@ -4433,7 +4461,7 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     fontSize: 14,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: theme.onPrimary,
   },
   primaryBtnDisabled: {
     backgroundColor: "#E6E1F2",
@@ -4492,7 +4520,7 @@ const styles = StyleSheet.create({
   wizardSheet: {
     width: "100%",
     maxWidth: 480,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 20,
     padding: 16,
   },
@@ -4619,7 +4647,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
   },
   assigneeChipActive: {
     borderColor: "#6D28D9",
@@ -4664,7 +4692,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     marginBottom: 6,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
   },
   wfActionRowActive: {
     borderColor: "#6D28D9",
@@ -4720,7 +4748,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarTextLarge: {
-    color: "#FFFFFF",
+    color: theme.onPrimary,
     fontSize: 15,
     fontWeight: "800",
   },
@@ -4743,7 +4771,7 @@ const styles = StyleSheet.create({
   contextChip: {
     flexGrow: 1,
     flexBasis: "45%",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#EEECF7",
@@ -4861,12 +4889,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   profileAvatarText: {
-    color: "#FFFFFF",
+    color: theme.onPrimary,
     fontSize: 16,
     fontWeight: "800",
   },
   profileName: {
-    color: "#FFFFFF",
+    color: theme.onPrimary,
     fontSize: 17,
     fontWeight: "900",
   },
@@ -5053,7 +5081,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 14,
     paddingVertical: 12,
     borderWidth: 1,

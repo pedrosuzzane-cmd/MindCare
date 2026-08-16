@@ -12,6 +12,8 @@ import {
   Text,
   View,
 } from "react-native";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 interface EmojiPickerProps {
   onSelect: (emoji: string) => void;
@@ -120,6 +122,8 @@ const CATEGORIES: Category[] = [
 ];
 
 export default function EmojiPicker({ onSelect }: EmojiPickerProps) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [activeCategory, setActiveCategory] = useState("smileys");
   const category = CATEGORIES.find((c) => c.key === activeCategory) || CATEGORIES[0];
 
@@ -166,47 +170,48 @@ export default function EmojiPicker({ onSelect }: EmojiPickerProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: "white",
-    borderTopWidth: 1,
-    borderTopColor: "rgba(156, 126, 235, 0.08)",
-    maxHeight: 280,
-  },
-  tabBar: {
-    maxHeight: 44,
-  },
-  tabBarContent: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 4,
-  },
-  tab: {
-    width: 38,
-    height: 30,
-    borderRadius: 14,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F8F5FF",
-  },
-  tabActive: {
-    backgroundColor: "#E9D5FF",
-  },
-  tabIcon: {
-    fontSize: 16,
-  },
-  grid: {
-    paddingHorizontal: 8,
-    paddingBottom: 8,
-  },
-  emojiCell: {
-    flex: 1,
-    aspectRatio: 1,
-    maxWidth: "12.5%",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  emoji: {
-    fontSize: 24,
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: theme.card,
+      borderTopWidth: 1,
+      borderTopColor: theme.borderSoft,
+      maxHeight: 280,
+    },
+    tabBar: {
+      maxHeight: 44,
+    },
+    tabBarContent: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      gap: 4,
+    },
+    tab: {
+      width: 38,
+      height: 30,
+      borderRadius: 14,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: theme.secondaryCard,
+    },
+    tabActive: {
+      backgroundColor: theme.softPurple,
+    },
+    tabIcon: {
+      fontSize: 16,
+    },
+    grid: {
+      paddingHorizontal: 8,
+      paddingBottom: 8,
+    },
+    emojiCell: {
+      flex: 1,
+      aspectRatio: 1,
+      maxWidth: "12.5%",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    emoji: {
+      fontSize: 24,
+    },
+  });

@@ -59,6 +59,13 @@ export interface MindCareTheme {
     teal: string;
     rose: string;
   };
+  /** Semantic status colors (theme-aware for contrast) */
+  status: {
+    success: string;
+    warning: string;
+    error: string;
+    info: string;
+  };
   /** On-primary text (buttons inside primary surfaces) */
   onPrimary: string;
 }
@@ -92,6 +99,12 @@ export const lightTheme: MindCareTheme = {
     teal: "#0F766E",
     rose: "#B56576",
   },
+  status: {
+    success: "#0E9F6E",
+    warning: "#B45309",
+    error: "#DC2626",
+    info: "#0284C7",
+  },
   onPrimary: "#FFFFFF",
 };
 
@@ -123,6 +136,12 @@ export const darkTheme: MindCareTheme = {
     amber: "#F0A94A",
     teal: "#2DD4BF",
     rose: "#E47E93",
+  },
+  status: {
+    success: "#34D399",
+    warning: "#F0A94A",
+    error: "#F87171",
+    info: "#38BDF8",
   },
   onPrimary: "#FFFFFF",
 };

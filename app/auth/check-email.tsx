@@ -10,18 +10,20 @@ import {
   ActivityIndicator,
   Linking,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 const OTP_TOTAL_SECONDS = 5 * 60;
 
 export default function CheckEmailScreen() {
-  const insets = useSafeAreaInsets();
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const email = resetFlow.getEmail();
   const [expiresAt, setExpiresAt] = useState(
     () => Date.now() + OTP_TOTAL_SECONDS * 1000,
@@ -92,9 +94,9 @@ export default function CheckEmailScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
+    <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#E8E0F5", "#F4F2F8", "#E8E0F5"]}
+        colors={theme.softGradient}
         style={styles.gradient}
       >
         <ScrollView
@@ -127,12 +129,12 @@ export default function CheckEmailScreen() {
               accessibilityLabel="Open email app"
             >
               <LinearGradient
-                colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
+                colors={theme.headerGradient}
                 style={styles.emailButtonGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                <Ionicons name="open-outline" size={20} color="white" />
+                <Ionicons name="open-outline" size={20} color={theme.onPrimary} />
                 <Text style={styles.emailButtonText}>Open Email App</Text>
               </LinearGradient>
             </Pressable>
@@ -158,7 +160,7 @@ export default function CheckEmailScreen() {
                 }
               >
                 {loading ? (
-                  <ActivityIndicator size="small" color="#7C3AED" />
+                  <ActivityIndicator size="small" color={theme.primary} />
                 ) : (
                   <Text
                     style={[
@@ -194,83 +196,84 @@ export default function CheckEmailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F4F2F8",
-  },
-  gradient: {
-    flex: 1,
-    paddingHorizontal: 24,
-  },
-  scroll: {
-    flexGrow: 1,
-    paddingBottom: 40,
-  },
-  body: {
-    flex: 1,
-    marginTop: 24,
-  },
-  emailButton: {
-    borderRadius: 25,
-    overflow: "hidden",
-    marginTop: 20,
-    // @ts-ignore - web only
-    boxShadow: "0px 10px 24px rgba(124, 58, 237, 0.25)",
-    elevation: 6,
-  },
-  emailButtonGradient: {
-    height: 56,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-  },
-  emailButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  enterCodeLink: {
-    color: "#7C3AED",
-    fontSize: 15,
-    fontWeight: "600",
-    textAlign: "center",
-    marginTop: 22,
-    paddingVertical: 8,
-  },
-  resendSection: {
-    alignItems: "center",
-    marginTop: 28,
-  },
-  resendHint: {
-    fontSize: 14,
-    color: "#6B7280",
-    marginBottom: 8,
-  },
-  resendText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#7C3AED",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  resendTextDisabled: {
-    color: "#9CA3AF",
-  },
-  errorText: {
-    color: "#EF4444",
-    textAlign: "center",
-    fontSize: 14,
-    fontWeight: "500",
-    marginTop: 16,
-  },
-  changeEmailLink: {
-    color: "#6B7280",
-    fontSize: 14,
-    fontWeight: "600",
-    textAlign: "center",
-    marginTop: 20,
-    paddingVertical: 8,
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    gradient: {
+      flex: 1,
+      paddingHorizontal: 24,
+    },
+    scroll: {
+      flexGrow: 1,
+      paddingBottom: 40,
+    },
+    body: {
+      flex: 1,
+      marginTop: 24,
+    },
+    emailButton: {
+      borderRadius: 25,
+      overflow: "hidden",
+      marginTop: 20,
+      // @ts-ignore - web only
+      boxShadow: `0px 10px 24px ${theme.shadow}`,
+      elevation: 6,
+    },
+    emailButtonGradient: {
+      height: 56,
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 8,
+    },
+    emailButtonText: {
+      color: theme.onPrimary,
+      fontSize: 16,
+      fontWeight: "700",
+    },
+    enterCodeLink: {
+      color: theme.primary,
+      fontSize: 15,
+      fontWeight: "600",
+      textAlign: "center",
+      marginTop: 22,
+      paddingVertical: 8,
+    },
+    resendSection: {
+      alignItems: "center",
+      marginTop: 28,
+    },
+    resendHint: {
+      fontSize: 14,
+      color: theme.secondaryText,
+      marginBottom: 8,
+    },
+    resendText: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: theme.primary,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+    },
+    resendTextDisabled: {
+      color: theme.secondaryText,
+    },
+    errorText: {
+      color: theme.status.error,
+      textAlign: "center",
+      fontSize: 14,
+      fontWeight: "500",
+      marginTop: 16,
+    },
+    changeEmailLink: {
+      color: theme.secondaryText,
+      fontSize: 14,
+      fontWeight: "600",
+      textAlign: "center",
+      marginTop: 20,
+      paddingVertical: 8,
+    },
+  });

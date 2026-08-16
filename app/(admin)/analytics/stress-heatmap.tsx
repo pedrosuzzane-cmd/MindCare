@@ -7,6 +7,8 @@ import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 const MOOD_WELLNESS: Record<string, number> = {
   happy: 5, calm: 5, relaxed: 5, good: 4, neutral: 3,
@@ -21,6 +23,8 @@ export default function StressHeatmapScreen() {
   const isWide = screenWidth >= 900;
   const responsivePadding = Math.min(Math.max(screenWidth * 0.03, 24), 64);
   const { user } = useAuth();
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [loading, setLoading] = useState(true);
   const [studentSummaries, setStudentSummaries] = useState<StudentSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -120,7 +124,7 @@ export default function StressHeatmapScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#8A63D2" />
+          <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.loadingText}>Loading stress heatmap...</Text>
         </View>
       </SafeAreaView>
@@ -145,7 +149,7 @@ export default function StressHeatmapScreen() {
       <View style={styles.container}>
         <View style={[styles.header, isWide && { paddingHorizontal: responsivePadding }]}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={22} color="#0F172A" />
+            <Ionicons name="arrow-back" size={22} color={theme.text} />
           </Pressable>
           <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>Stress Pattern Heatmap</Text>
@@ -181,7 +185,7 @@ export default function StressHeatmapScreen() {
 
           <View style={styles.explanationCard}>
             <View style={styles.explanationHeader}>
-              <Ionicons name="information-circle-outline" size={18} color="#8A63D2" />
+              <Ionicons name="information-circle-outline" size={18} color={theme.primary} />
               <Text style={styles.explanationTitle}>How Stress Intensity Is Calculated</Text>
             </View>
             <Text style={styles.explanationText}>
@@ -228,61 +232,62 @@ export default function StressHeatmapScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F4F2F8" },
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: theme.background },
   container: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center", padding: 24 },
-  loadingText: { marginTop: 12, fontSize: 14, color: "#64748B", fontWeight: "600" },
-  errorText: { fontSize: 14, color: "#EF4444", marginBottom: 16, textAlign: "center" },
-  backBtn: { backgroundColor: "#8A63D2", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
-  backBtnText: { color: "white", fontWeight: "700", fontSize: 14 },
+  loadingText: { marginTop: 12, fontSize: 14, color: theme.secondaryText, fontWeight: "600" },
+  errorText: { fontSize: 14, color: theme.status.error, marginBottom: 16, textAlign: "center" },
+  backBtn: { backgroundColor: theme.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
+  backBtnText: { color: theme.onPrimary, fontWeight: "700", fontSize: 14 },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 24,
     paddingTop: 20,
     paddingBottom: 16,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: theme.border,
     gap: 12,
   },
-  backButton: { padding: 8, borderRadius: 999, backgroundColor: "#F1F5F9" },
+  backButton: { padding: 8, borderRadius: 999, backgroundColor: theme.inputBg },
   headerContent: { flex: 1 },
-  headerTitle: { color: "#0F172A", fontSize: 20, fontWeight: "800" },
-  headerSubtitle: { color: "#64748B", fontSize: 13, marginTop: 2 },
+  headerTitle: { color: theme.text, fontSize: 20, fontWeight: "800" },
+  headerSubtitle: { color: theme.secondaryText, fontSize: 13, marginTop: 2 },
   scrollContent: { padding: 24, paddingBottom: 40, gap: 24 },
   summaryRow: { flexDirection: "row", gap: 12 },
   summaryRowWide: { gap: 20 },
   summaryCard: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 16,
     padding: 16,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E9D5FF",
-    shadowColor: "#6D28D9",
+    borderColor: theme.border,
+    shadowColor: theme.primaryDeep,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
   },
-  summaryValue: { fontSize: 22, fontWeight: "900", color: "#2D1B69" },
-  summaryLabel: { fontSize: 11, fontWeight: "700", color: "#8B5CF6", marginTop: 4, textAlign: "center" },
+  summaryValue: { fontSize: 22, fontWeight: "900", color: theme.text },
+  summaryLabel: { fontSize: 11, fontWeight: "700", color: theme.primary, marginTop: 4, textAlign: "center" },
   explanationCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 16,
     padding: 22,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
+    borderColor: theme.border,
   },
   explanationHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 14 },
-  explanationTitle: { fontSize: 18, fontWeight: "800", color: "#2D1B69", flex: 1 },
-  explanationText: { fontSize: 15, color: "#475569", lineHeight: 24, marginBottom: 16 },
+  explanationTitle: { fontSize: 18, fontWeight: "800", color: theme.text, flex: 1 },
+  explanationText: { fontSize: 15, color: theme.secondaryText, lineHeight: 24, marginBottom: 16 },
   explanationScaleRow: { flexDirection: "row", justifyContent: "space-between", gap: 8, marginBottom: 16 },
   explanationScaleItem: { alignItems: "center", gap: 6, flex: 1 },
   explanationDot: { width: 28, height: 28, borderRadius: 8 },
-  explanationScaleLabel: { fontSize: 12, fontWeight: "700", color: "#334155", textAlign: "center" },
-  explanationScaleVal: { fontSize: 11, fontWeight: "600", color: "#64748B" },
+  explanationScaleLabel: { fontSize: 12, fontWeight: "700", color: theme.text, textAlign: "center" },
+  explanationScaleVal: { fontSize: 11, fontWeight: "600", color: theme.secondaryText },
 });

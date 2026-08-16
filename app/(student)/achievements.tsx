@@ -6,14 +6,16 @@ import {
   Animated,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { shadows } from "@/utils/shadows";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 import {
   ACHIEVEMENT_CATEGORIES,
@@ -21,9 +23,6 @@ import {
   AchievementWithStatus,
   useAchievements,
 } from "@/hooks/useAchievements";
-
-const PRIMARY = "#8A63D2";
-const PRIMARY_LIGHT = "#9C7EEB";
 
 interface LevelInfo {
   level: number;
@@ -109,6 +108,8 @@ function categoryLabel(id: AchievementCategory): string {
 }
 
 export default function AchievementsScreen() {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const { achievements, totalEarned, loading } = useAchievements();
   const [selectedAchievement, setSelectedAchievement] =
     useState<AchievementWithStatus | null>(null);
@@ -145,7 +146,11 @@ export default function AchievementsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#9C7EEB", "#8A63D2", "#7C5AC8"]}
+        colors={[
+          theme.headerGradient[0],
+          theme.headerGradient[1],
+          theme.headerGradient[1],
+        ]}
         style={styles.headerGradient}
       >
         {/* Header */}
@@ -185,7 +190,7 @@ export default function AchievementsScreen() {
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={PRIMARY} />
+          <ActivityIndicator size="large" color={theme.primary} />
         </View>
       ) : (
         <ScrollView
@@ -356,6 +361,8 @@ function NextAchievementCard({
 }: {
   achievement: AchievementWithStatus;
 }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const remaining = Math.max(0, achievement.target - achievement.current);
   const percent = progressPercent(achievement.current, achievement.target);
 
@@ -393,6 +400,8 @@ function AchievementCard({
   achievement: AchievementWithStatus;
   onPress: () => void;
 }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [scaleAnim] = useState(() => new Animated.Value(1));
 
   const handlePressIn = () => {
@@ -445,7 +454,7 @@ function AchievementCard({
 
           {achievement.unlocked ? (
             <View style={styles.cardCompletedRow}>
-              <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
+              <Ionicons name="checkmark-circle" size={16} color={theme.status.success} />
               <Text style={styles.cardCompletedText}>Completed</Text>
               <View style={styles.cardRewardPill}>
                 <Text style={styles.cardRewardText}>{achievement.reward}</Text>
@@ -473,466 +482,467 @@ function AchievementCard({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F4F2F8",
-  },
-  headerGradient: {
-    paddingBottom: 24,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "white",
-  },
-  placeholder: {
-    width: 40,
-  },
-  summaryContainer: {
-    alignItems: "center",
-    paddingHorizontal: 24,
-  },
-  summaryEmoji: {
-    fontSize: 40,
-    marginBottom: 8,
-  },
-  summaryTitle: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: "white",
-    marginBottom: 6,
-  },
-  summarySubtitle: {
-    fontSize: 13,
-    color: "rgba(255, 255, 255, 0.9)",
-    textAlign: "center",
-    lineHeight: 18,
-    marginBottom: 14,
-  },
-  summaryCount: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "white",
-    marginBottom: 8,
-  },
-  progressBarContainer: {
-    width: "80%",
-    height: 8,
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
-    borderRadius: 4,
-    overflow: "hidden",
-  },
-  progressBarFill: {
-    height: "100%",
-    backgroundColor: "white",
-    borderRadius: 4,
-  },
-  summaryLevel: {
-    marginTop: 10,
-    fontSize: 13,
-    fontWeight: "600",
-    color: "rgba(255, 255, 255, 0.95)",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 40,
-  },
-  // Next step card
-  nextCard: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.18)",
-    ...(shadows.sm("#8A63D2") as any),
-    marginBottom: 18,
-  },
-  nextHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  nextLabel: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: PRIMARY,
-    letterSpacing: 0.5,
-  },
-  nextBody: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    marginBottom: 14,
-  },
-  nextEmojiCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#F3EEFB",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  nextEmoji: {
-    fontSize: 26,
-  },
-  nextInfo: {
-    flex: 1,
-  },
-  nextTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#333",
-    marginBottom: 3,
-  },
-  nextProgressText: {
-    fontSize: 13,
-    color: "#777",
-    fontWeight: "600",
-  },
-  nextProgressBar: {
-    width: "100%",
-    height: 8,
-    backgroundColor: "#F0EBF9",
-    borderRadius: 4,
-    overflow: "hidden",
-    marginBottom: 8,
-  },
-  nextProgressFill: {
-    height: "100%",
-    backgroundColor: PRIMARY_LIGHT,
-    borderRadius: 4,
-  },
-  nextRemaining: {
-    fontSize: 12,
-    color: "#8A63D2",
-    fontWeight: "700",
-  },
-  // All-complete state
-  allCompleteCard: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 20,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.18)",
-    ...(shadows.sm("#8A63D2") as any),
-    marginBottom: 18,
-  },
-  allCompleteEmoji: {
-    fontSize: 40,
-    marginBottom: 8,
-  },
-  allCompleteTitle: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#333",
-    marginBottom: 6,
-    textAlign: "center",
-  },
-  allCompleteSubtitle: {
-    fontSize: 13,
-    color: "#777",
-    lineHeight: 18,
-    textAlign: "center",
-  },
-  // Category pills
-  categoryRow: {
-    gap: 8,
-    paddingRight: 8,
-    marginBottom: 18,
-  },
-  categoryPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: "white",
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.25)",
-  },
-  categoryPillActive: {
-    backgroundColor: PRIMARY,
-    borderColor: PRIMARY,
-  },
-  categoryPillText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#6B5B8A",
-  },
-  categoryPillTextActive: {
-    color: "white",
-  },
-  // Section heading
-  sectionHeadingRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#333",
-    letterSpacing: 0.5,
-  },
-  sectionCount: {
-    fontSize: 12,
-    color: "#999",
-    fontWeight: "600",
-  },
-  list: {
-    gap: 12,
-  },
-  // Achievement cards (single column)
-  card: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.1)",
-    ...(shadows.sm("#000") as any),
-  },
-  cardPressable: {
-    padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
-  cardEmojiContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#F5F5F5",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  cardEmojiUnlocked: {
-    backgroundColor: "#F0FDF4",
-  },
-  cardEmoji: {
-    fontSize: 26,
-  },
-  cardBody: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#333",
-    marginBottom: 3,
-  },
-  cardTitleLocked: {
-    color: "#555",
-  },
-  cardDescription: {
-    fontSize: 12,
-    color: "#999",
-    lineHeight: 16,
-    marginBottom: 8,
-  },
-  cardCompletedRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  cardCompletedText: {
-    fontSize: 13,
-    color: "#16A34A",
-    fontWeight: "700",
-  },
-  cardRewardPill: {
-    marginLeft: "auto",
-    backgroundColor: "#F3EEFB",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  cardRewardText: {
-    fontSize: 11,
-    color: PRIMARY,
-    fontWeight: "700",
-  },
-  cardProgressBlock: {
-    width: "100%",
-  },
-  cardProgressTopRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 5,
-  },
-  cardProgressCount: {
-    fontSize: 12,
-    color: "#666",
-    fontWeight: "600",
-  },
-  cardProgressPercent: {
-    fontSize: 12,
-    color: PRIMARY,
-    fontWeight: "800",
-  },
-  cardProgressBar: {
-    width: "100%",
-    height: 6,
-    backgroundColor: "#F0EBF9",
-    borderRadius: 3,
-    overflow: "hidden",
-  },
-  cardProgressFill: {
-    height: "100%",
-    backgroundColor: PRIMARY_LIGHT,
-    borderRadius: 3,
-  },
-  // Modal
-  modalOverlay: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 100,
-  },
-  modalContent: {
-    width: "82%",
-    backgroundColor: "white",
-    borderRadius: 24,
-    padding: 28,
-    alignItems: "center",
-    // @ts-ignore — web-only shadow property
-    boxShadow: "0px 16px 48px rgba(0,0,0,0.15)",
-  },
-  modalEmojiCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "#F5F5F5",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  modalEmojiCircleUnlocked: {
-    backgroundColor: "#F0FDF4",
-  },
-  modalEmoji: {
-    fontSize: 36,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#333",
-    textAlign: "center",
-    marginBottom: 4,
-  },
-  modalCategory: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: PRIMARY,
-    marginBottom: 10,
-    letterSpacing: 0.5,
-  },
-  modalDescription: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  modalDivider: {
-    width: "60%",
-    height: 1,
-    backgroundColor: "#F0F0F0",
-    marginBottom: 12,
-  },
-  modalRequirement: {
-    fontSize: 13,
-    color: "#888",
-    textAlign: "center",
-    fontStyle: "italic",
-    marginBottom: 12,
-  },
-  modalDate: {
-    fontSize: 12,
-    color: PRIMARY,
-    fontWeight: "500",
-    marginBottom: 16,
-  },
-  modalProgressContainer: {
-    width: "100%",
-    alignItems: "center",
-    marginBottom: 14,
-  },
-  modalProgressCount: {
-    fontSize: 13,
-    color: "#555",
-    fontWeight: "700",
-    marginBottom: 6,
-  },
-  modalProgressBar: {
-    width: "100%",
-    height: 8,
-    backgroundColor: "#F0F0F0",
-    borderRadius: 4,
-    overflow: "hidden",
-    marginBottom: 6,
-  },
-  modalProgressFill: {
-    height: "100%",
-    backgroundColor: PRIMARY_LIGHT,
-    borderRadius: 4,
-  },
-  modalProgressText: {
-    fontSize: 12,
-    color: "#999",
-    fontWeight: "500",
-  },
-  modalRewardRow: {
-    backgroundColor: "#F3EEFB",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 16,
-    marginBottom: 18,
-  },
-  modalRewardText: {
-    fontSize: 13,
-    color: PRIMARY,
-    fontWeight: "700",
-  },
-  modalCloseButton: {
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    backgroundColor: PRIMARY,
-    borderRadius: 25,
-  },
-  modalCloseText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "white",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    headerGradient: {
+      paddingBottom: 24,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 10,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: theme.onPrimary,
+    },
+    placeholder: {
+      width: 40,
+    },
+    summaryContainer: {
+      alignItems: "center",
+      paddingHorizontal: 24,
+    },
+    summaryEmoji: {
+      fontSize: 40,
+      marginBottom: 8,
+    },
+    summaryTitle: {
+      fontSize: 22,
+      fontWeight: "800",
+      color: theme.onPrimary,
+      marginBottom: 6,
+    },
+    summarySubtitle: {
+      fontSize: 13,
+      color: "rgba(255, 255, 255, 0.9)",
+      textAlign: "center",
+      lineHeight: 18,
+      marginBottom: 14,
+    },
+    summaryCount: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: theme.onPrimary,
+      marginBottom: 8,
+    },
+    progressBarContainer: {
+      width: "80%",
+      height: 8,
+      backgroundColor: "rgba(255, 255, 255, 0.3)",
+      borderRadius: 4,
+      overflow: "hidden",
+    },
+    progressBarFill: {
+      height: "100%",
+      backgroundColor: "white",
+      borderRadius: 4,
+    },
+    summaryLevel: {
+      marginTop: 10,
+      fontSize: 13,
+      fontWeight: "600",
+      color: "rgba(255, 255, 255, 0.95)",
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    scrollContainer: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingHorizontal: 20,
+      paddingTop: 18,
+      paddingBottom: 40,
+    },
+    // Next step card
+    nextCard: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 18,
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+      ...(shadows.sm(theme.primary) as any),
+      marginBottom: 18,
+    },
+    nextHeaderRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    nextLabel: {
+      fontSize: 12,
+      fontWeight: "800",
+      color: theme.primary,
+      letterSpacing: 0.5,
+    },
+    nextBody: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 14,
+      marginBottom: 14,
+    },
+    nextEmojiCircle: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: theme.softPurple,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    nextEmoji: {
+      fontSize: 26,
+    },
+    nextInfo: {
+      flex: 1,
+    },
+    nextTitle: {
+      fontSize: 16,
+      fontWeight: "800",
+      color: theme.text,
+      marginBottom: 3,
+    },
+    nextProgressText: {
+      fontSize: 13,
+      color: theme.secondaryText,
+      fontWeight: "600",
+    },
+    nextProgressBar: {
+      width: "100%",
+      height: 8,
+      backgroundColor: theme.inputBg,
+      borderRadius: 4,
+      overflow: "hidden",
+      marginBottom: 8,
+    },
+    nextProgressFill: {
+      height: "100%",
+      backgroundColor: theme.primary,
+      borderRadius: 4,
+    },
+    nextRemaining: {
+      fontSize: 12,
+      color: theme.primary,
+      fontWeight: "700",
+    },
+    // All-complete state
+    allCompleteCard: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 20,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+      ...(shadows.sm(theme.primary) as any),
+      marginBottom: 18,
+    },
+    allCompleteEmoji: {
+      fontSize: 40,
+      marginBottom: 8,
+    },
+    allCompleteTitle: {
+      fontSize: 16,
+      fontWeight: "800",
+      color: theme.text,
+      marginBottom: 6,
+      textAlign: "center",
+    },
+    allCompleteSubtitle: {
+      fontSize: 13,
+      color: theme.secondaryText,
+      lineHeight: 18,
+      textAlign: "center",
+    },
+    // Category pills
+    categoryRow: {
+      gap: 8,
+      paddingRight: 8,
+      marginBottom: 18,
+    },
+    categoryPill: {
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: theme.card,
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+    },
+    categoryPillActive: {
+      backgroundColor: theme.primary,
+      borderColor: theme.primary,
+    },
+    categoryPillText: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: theme.secondaryText,
+    },
+    categoryPillTextActive: {
+      color: theme.onPrimary,
+    },
+    // Section heading
+    sectionHeadingRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    sectionTitle: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: theme.text,
+      letterSpacing: 0.5,
+    },
+    sectionCount: {
+      fontSize: 12,
+      color: theme.secondaryText,
+      fontWeight: "600",
+    },
+    list: {
+      gap: 12,
+    },
+    // Achievement cards (single column)
+    card: {
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      overflow: "hidden",
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+      ...(shadows.sm("#000") as any),
+    },
+    cardPressable: {
+      padding: 16,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 14,
+    },
+    cardEmojiContainer: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: theme.inputBg,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    cardEmojiUnlocked: {
+      backgroundColor: `${theme.status.success}1A`,
+    },
+    cardEmoji: {
+      fontSize: 26,
+    },
+    cardBody: {
+      flex: 1,
+    },
+    cardTitle: {
+      fontSize: 15,
+      fontWeight: "800",
+      color: theme.text,
+      marginBottom: 3,
+    },
+    cardTitleLocked: {
+      color: theme.secondaryText,
+    },
+    cardDescription: {
+      fontSize: 12,
+      color: theme.secondaryText,
+      lineHeight: 16,
+      marginBottom: 8,
+    },
+    cardCompletedRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    cardCompletedText: {
+      fontSize: 13,
+      color: theme.status.success,
+      fontWeight: "700",
+    },
+    cardRewardPill: {
+      marginLeft: "auto",
+      backgroundColor: theme.softPurple,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    cardRewardText: {
+      fontSize: 11,
+      color: theme.primary,
+      fontWeight: "700",
+    },
+    cardProgressBlock: {
+      width: "100%",
+    },
+    cardProgressTopRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 5,
+    },
+    cardProgressCount: {
+      fontSize: 12,
+      color: theme.secondaryText,
+      fontWeight: "600",
+    },
+    cardProgressPercent: {
+      fontSize: 12,
+      color: theme.primary,
+      fontWeight: "800",
+    },
+    cardProgressBar: {
+      width: "100%",
+      height: 6,
+      backgroundColor: theme.inputBg,
+      borderRadius: 3,
+      overflow: "hidden",
+    },
+    cardProgressFill: {
+      height: "100%",
+      backgroundColor: theme.primary,
+      borderRadius: 3,
+    },
+    // Modal
+    modalOverlay: {
+      position: "absolute",
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 100,
+    },
+    modalContent: {
+      width: "82%",
+      backgroundColor: theme.card,
+      borderRadius: 24,
+      padding: 28,
+      alignItems: "center",
+      // @ts-ignore — web-only shadow property
+      boxShadow: "0px 16px 48px rgba(0,0,0,0.15)",
+    },
+    modalEmojiCircle: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor: theme.inputBg,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    modalEmojiCircleUnlocked: {
+      backgroundColor: `${theme.status.success}1A`,
+    },
+    modalEmoji: {
+      fontSize: 36,
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: "800",
+      color: theme.text,
+      textAlign: "center",
+      marginBottom: 4,
+    },
+    modalCategory: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: theme.primary,
+      marginBottom: 10,
+      letterSpacing: 0.5,
+    },
+    modalDescription: {
+      fontSize: 14,
+      color: theme.secondaryText,
+      textAlign: "center",
+      lineHeight: 20,
+      marginBottom: 12,
+    },
+    modalDivider: {
+      width: "60%",
+      height: 1,
+      backgroundColor: theme.borderSoft,
+      marginBottom: 12,
+    },
+    modalRequirement: {
+      fontSize: 13,
+      color: theme.secondaryText,
+      textAlign: "center",
+      fontStyle: "italic",
+      marginBottom: 12,
+    },
+    modalDate: {
+      fontSize: 12,
+      color: theme.primary,
+      fontWeight: "500",
+      marginBottom: 16,
+    },
+    modalProgressContainer: {
+      width: "100%",
+      alignItems: "center",
+      marginBottom: 14,
+    },
+    modalProgressCount: {
+      fontSize: 13,
+      color: theme.text,
+      fontWeight: "700",
+      marginBottom: 6,
+    },
+    modalProgressBar: {
+      width: "100%",
+      height: 8,
+      backgroundColor: theme.borderSoft,
+      borderRadius: 4,
+      overflow: "hidden",
+      marginBottom: 6,
+    },
+    modalProgressFill: {
+      height: "100%",
+      backgroundColor: theme.primary,
+      borderRadius: 4,
+    },
+    modalProgressText: {
+      fontSize: 12,
+      color: theme.secondaryText,
+      fontWeight: "500",
+    },
+    modalRewardRow: {
+      backgroundColor: theme.softPurple,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 16,
+      marginBottom: 18,
+    },
+    modalRewardText: {
+      fontSize: 13,
+      color: theme.primary,
+      fontWeight: "700",
+    },
+    modalCloseButton: {
+      paddingHorizontal: 32,
+      paddingVertical: 12,
+      backgroundColor: theme.primary,
+      borderRadius: 25,
+    },
+    modalCloseText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: theme.onPrimary,
+    },
+  });

@@ -14,11 +14,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import ChatBubble from "@/components/chat/ChatBubble";
 import ChatInput from "@/components/chat/ChatInput";
@@ -26,9 +26,13 @@ import SuggestedQuestions from "@/components/chat/SuggestedQuestions";
 import TypingIndicator from "@/components/chat/TypingIndicator";
 import { useChat } from "@/hooks/useChat";
 import { useNetwork } from "@/contexts/NetworkContext";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 export default function AiChatScreen() {
   const { isConnected } = useNetwork();
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const { messages, isTyping, error, sendMessage, clearChat } = useChat(isConnected ?? false);
   const flatListRef = useRef<FlatList>(null);
 
@@ -59,12 +63,12 @@ export default function AiChatScreen() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <LinearGradient
-        colors={["#7C4DFF", "#2196F3", "#00BCD4"]}
+        colors={theme.headerGradient}
         style={styles.headerGradient}
       >
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color="white" />
+            <Ionicons name="arrow-back" size={24} color={theme.onPrimary} />
           </Pressable>
           <View style={styles.headerCenter}>
             <View style={styles.headerIconWrap}>
@@ -81,7 +85,7 @@ export default function AiChatScreen() {
             </View>
           </View>
           <Pressable style={styles.clearButton} onPress={clearChat}>
-            <Ionicons name="refresh-outline" size={22} color="white" />
+            <Ionicons name="refresh-outline" size={22} color={theme.onPrimary} />
           </Pressable>
         </View>
       </LinearGradient>
@@ -89,7 +93,7 @@ export default function AiChatScreen() {
       {/* Error Banner */}
       {error && (
         <View style={styles.errorBanner}>
-          <Ionicons name="alert-circle" size={18} color="#D32F2F" />
+          <Ionicons name="alert-circle" size={18} color={theme.status.error} />
           <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
@@ -97,7 +101,7 @@ export default function AiChatScreen() {
       {/* Offline Banner */}
       {!isConnected && !error && (
         <View style={styles.offlineBanner}>
-          <Ionicons name="cloud-offline-outline" size={14} color="#F59E0B" />
+          <Ionicons name="cloud-offline-outline" size={14} color={theme.status.warning} />
           <Text style={styles.offlineBannerText}>
             No internet. Messages won&apos;t send.
           </Text>
@@ -135,95 +139,96 @@ export default function AiChatScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
-  headerGradient: {
-    paddingBottom: 12,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerCenter: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  headerIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-    overflow: "hidden",
-  },
-  headerIconImage: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "white",
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: "rgba(255, 255, 255, 0.8)",
-    marginTop: 2,
-  },
-  clearButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  errorBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFE0E0",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  errorText: {
-    fontSize: 13,
-    color: "#D32F2F",
-    flex: 1,
-  },
-  offlineBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFFBEB",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 6,
-  },
-  offlineBannerText: {
-    fontSize: 12,
-    color: "#92400E",
-    flex: 1,
-  },
-  chatContainer: {
-    flex: 1,
-  },
-  messagesList: {
-    flexGrow: 1,
-    paddingVertical: 16,
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    headerGradient: {
+      paddingBottom: 12,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 8,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    headerCenter: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    headerIconWrap: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: "rgba(255,255,255,0.2)",
+      justifyContent: "center",
+      alignItems: "center",
+      overflow: "hidden",
+    },
+    headerIconImage: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+    },
+    headerTitle: {
+      fontSize: 17,
+      fontWeight: "700",
+      color: theme.onPrimary,
+    },
+    headerSubtitle: {
+      fontSize: 12,
+      color: "rgba(255, 255, 255, 0.8)",
+      marginTop: 2,
+    },
+    clearButton: {
+      width: 40,
+      height: 40,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    errorBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: `${theme.status.error}1A`,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      gap: 8,
+    },
+    errorText: {
+      fontSize: 13,
+      color: theme.status.error,
+      flex: 1,
+    },
+    offlineBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: `${theme.status.warning}1A`,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      gap: 6,
+    },
+    offlineBannerText: {
+      fontSize: 12,
+      color: theme.status.warning,
+      flex: 1,
+    },
+    chatContainer: {
+      flex: 1,
+    },
+    messagesList: {
+      flexGrow: 1,
+      paddingVertical: 16,
+    },
+  });

@@ -7,6 +7,8 @@
 
 import { API_URL } from "@/backend/config";
 import { auth } from "@/constants/firebase";
+import type { MindCareTheme } from "@/constants/theme";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/hooks/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -66,15 +68,17 @@ function initials(name: string): string {
 }
 
 function RoleBadge({ isSuper }: { isSuper: boolean }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   return isSuper ? (
     <View style={[styles.badge, styles.badgeSuper]}>
-      <Ionicons name="shield-checkmark" size={12} color="#7C3AED" />
-      <Text style={[styles.badgeText, { color: "#6D28D9" }]}>Super Admin</Text>
+      <Ionicons name="shield-checkmark" size={12} color={theme.primary} />
+      <Text style={[styles.badgeText, { color: theme.primary }]}>Super Admin</Text>
     </View>
   ) : (
     <View style={[styles.badge, styles.badgeAdmin]}>
-      <Ionicons name="shield-outline" size={12} color="#047857" />
-      <Text style={[styles.badgeText, { color: "#047857" }]}>Admin</Text>
+      <Ionicons name="shield-outline" size={12} color={theme.status.success} />
+      <Text style={[styles.badgeText, { color: theme.status.success }]}>Admin</Text>
     </View>
   );
 }
@@ -94,6 +98,8 @@ function StatTile({
   icon: keyof typeof Ionicons.glyphMap;
   highlighted?: boolean;
 }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   return (
     <View
       style={[
@@ -107,7 +113,7 @@ function StatTile({
       <View style={[styles.statIcon, { backgroundColor: bg }]}>
         <Ionicons name={icon} size={14} color={color} />
       </View>
-      <Text style={[styles.statValue, highlighted && { color: "white" }]}>{value}</Text>
+      <Text style={[styles.statValue, highlighted && { color: theme.onPrimary }]}>{value}</Text>
       <Text style={[styles.statLabel, highlighted && { color: "rgba(255,255,255,0.85)" }]}>
         {label}
       </Text>
@@ -116,6 +122,8 @@ function StatTile({
 }
 
 export function AdminAccountsPanel() {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const { user } = useAuth();
   const [admins, setAdmins] = useState<AdminEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -410,7 +418,7 @@ export function AdminAccountsPanel() {
 
   return (
     <View style={styles.root}>
-      <LinearGradient colors={["#7C3AED", "#9B6BF2"]} style={styles.headerBand}>
+      <LinearGradient colors={theme.headerGradient} style={styles.headerBand}>
         <View style={styles.header}>
           <View style={styles.titleWrap}>
             <Text style={styles.headerTitle}>Admin Accounts</Text>
@@ -425,7 +433,7 @@ export function AdminAccountsPanel() {
               accessibilityRole="button"
               accessibilityLabel="Create administrator"
             >
-              <Ionicons name="person-add" size={20} color="#FFFFFF" />
+              <Ionicons name="person-add" size={20} color={theme.onPrimary} />
             </Pressable>
             <Pressable
               style={styles.iconButton}
@@ -433,7 +441,7 @@ export function AdminAccountsPanel() {
               accessibilityRole="button"
               accessibilityLabel="Refresh administrators"
             >
-              <Ionicons name="refresh" size={20} color="#FFFFFF" />
+              <Ionicons name="refresh" size={20} color={theme.onPrimary} />
             </Pressable>
           </View>
         </View>
@@ -442,23 +450,23 @@ export function AdminAccountsPanel() {
           <StatTile
             label="Total"
             value={admins.length}
-            color="#B45309"
-            bg="#FDE68A"
+            color={theme.status.warning}
+            bg={`${theme.status.warning}33`}
             icon="people-outline"
             highlighted
           />
           <StatTile
             label="Super Admins"
             value={superCount}
-            color="#6D28D9"
-            bg="#DDD6FE"
+            color={theme.primary}
+            bg={`${theme.primary}33`}
             icon="shield-checkmark-outline"
           />
           <StatTile
             label="Admins"
             value={standardCount}
-            color="#047857"
-            bg="#A7F3D0"
+            color={theme.status.success}
+            bg={`${theme.status.success}33`}
             icon="shield-outline"
           />
         </View>
@@ -481,18 +489,18 @@ export function AdminAccountsPanel() {
       >
         {admins.length > 0 && (
           <View style={styles.searchBox}>
-            <Ionicons name="search-outline" size={18} color="#9CA3AF" />
+            <Ionicons name="search-outline" size={18} color={theme.secondaryText} />
             <TextInput
               style={styles.searchInput}
               value={query}
               onChangeText={setQuery}
               placeholder="Search by name, email, or position"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={theme.secondaryText}
               autoCapitalize="none"
             />
             {query.length > 0 && (
               <Pressable onPress={() => setQuery("")} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                <Ionicons name="close-circle" size={18} color={theme.secondaryText} />
               </Pressable>
             )}
           </View>
@@ -500,12 +508,12 @@ export function AdminAccountsPanel() {
 
         {loading ? (
           <View style={styles.center}>
-            <ActivityIndicator size="large" color="#7C3AED" />
+            <ActivityIndicator size="large" color={theme.primary} />
           </View>
         ) : admins.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
-              <Ionicons name="people-circle-outline" size={40} color="#7C3AED" />
+              <Ionicons name="people-circle-outline" size={40} color={theme.primary} />
             </View>
             <Text style={styles.emptyTitle}>No administrators yet</Text>
             <Text style={styles.emptyText}>
@@ -515,7 +523,7 @@ export function AdminAccountsPanel() {
         ) : visible.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
-              <Ionicons name="search-outline" size={40} color="#7C3AED" />
+              <Ionicons name="search-outline" size={40} color={theme.primary} />
             </View>
             <Text style={styles.emptyTitle}>No results</Text>
             <Text style={styles.emptyText}>
@@ -531,13 +539,13 @@ export function AdminAccountsPanel() {
                   <View
                     style={[
                       styles.avatar,
-                      { backgroundColor: admin.isSuperAdmin ? "#EDE9FE" : "#D1FAE5" },
+                      { backgroundColor: admin.isSuperAdmin ? theme.softPurple : `${theme.status.success}1A` },
                     ]}
                   >
                     <Text
                       style={[
                         styles.avatarText,
-                        { color: admin.isSuperAdmin ? "#6D28D9" : "#047857" },
+                        { color: admin.isSuperAdmin ? theme.primary : theme.status.success },
                       ]}
                     >
                       {initials(admin.displayName || "A")}
@@ -553,12 +561,12 @@ export function AdminAccountsPanel() {
                     <Text style={styles.cardEmail}>{admin.email || "—"}</Text>
                     {admin.position ? (
                       <View style={styles.metaRow}>
-                        <Ionicons name="briefcase-outline" size={12} color="#9CA3AF" />
+                        <Ionicons name="briefcase-outline" size={12} color={theme.secondaryText} />
                         <Text style={styles.cardMeta}>{admin.position}</Text>
                       </View>
                     ) : null}
                     <View style={styles.metaRow}>
-                      <Ionicons name="calendar-outline" size={12} color="#9CA3AF" />
+                      <Ionicons name="calendar-outline" size={12} color={theme.secondaryText} />
                       <Text style={styles.cardMeta}>
                         Joined {timeAgo(admin.createdAtMs)}
                       </Text>
@@ -575,7 +583,7 @@ export function AdminAccountsPanel() {
                       accessibilityRole="button"
                       accessibilityLabel={`Edit ${admin.displayName || admin.email}`}
                     >
-                      <Ionicons name="create-outline" size={16} color="#6D28D9" />
+                      <Ionicons name="create-outline" size={16} color={theme.primary} />
                       <Text style={styles.editButtonText}>Edit</Text>
                     </Pressable>
                     <Pressable
@@ -586,9 +594,9 @@ export function AdminAccountsPanel() {
                       accessibilityLabel={`Revoke ${admin.displayName || admin.email}`}
                     >
                       {actingUid === admin.uid ? (
-                        <ActivityIndicator size="small" color="#B45309" />
+                        <ActivityIndicator size="small" color={theme.status.warning} />
                       ) : (
-                        <Ionicons name="shield-outline" size={16} color="#B45309" />
+                        <Ionicons name="shield-outline" size={16} color={theme.status.warning} />
                       )}
                       <Text style={styles.revokeButtonText}>Revoke</Text>
                     </Pressable>
@@ -600,9 +608,9 @@ export function AdminAccountsPanel() {
                       accessibilityLabel={`Delete ${admin.displayName || admin.email}`}
                     >
                       {actingUid === admin.uid ? (
-                        <ActivityIndicator size="small" color="#B91C1C" />
+                        <ActivityIndicator size="small" color={theme.status.error} />
                       ) : (
-                        <Ionicons name="trash-outline" size={16} color="#B91C1C" />
+                        <Ionicons name="trash-outline" size={16} color={theme.status.error} />
                       )}
                       <Text style={styles.deleteButtonText}>Delete</Text>
                     </Pressable>
@@ -624,7 +632,7 @@ export function AdminAccountsPanel() {
           <View style={styles.modal}>
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderIcon}>
-                <Ionicons name="create-outline" size={20} color="#7C3AED" />
+                <Ionicons name="create-outline" size={20} color={theme.primary} />
               </View>
               <View style={styles.modalHeaderText}>
                 <Text style={styles.modalTitle}>
@@ -645,7 +653,7 @@ export function AdminAccountsPanel() {
                 value={form.displayName}
                 onChangeText={(v) => setForm({ ...form, displayName: v })}
                 placeholder="Full name"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={theme.secondaryText}
               />
               <Text style={styles.label}>Position</Text>
               <TextInput
@@ -653,7 +661,7 @@ export function AdminAccountsPanel() {
                 value={form.position}
                 onChangeText={(v) => setForm({ ...form, position: v })}
                 placeholder="Position"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={theme.secondaryText}
               />
               <Text style={styles.label}>Contact number</Text>
               <TextInput
@@ -661,7 +669,7 @@ export function AdminAccountsPanel() {
                 value={form.contactNo}
                 onChangeText={(v) => setForm({ ...form, contactNo: v })}
                 placeholder="Contact number"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={theme.secondaryText}
                 keyboardType="phone-pad"
               />
               <Text style={styles.label}>College</Text>
@@ -670,7 +678,7 @@ export function AdminAccountsPanel() {
                 value={form.college}
                 onChangeText={(v) => setForm({ ...form, college: v })}
                 placeholder="College"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={theme.secondaryText}
               />
               <Text style={styles.label}>School ID</Text>
               <TextInput
@@ -678,7 +686,7 @@ export function AdminAccountsPanel() {
                 value={form.schoolId}
                 onChangeText={(v) => setForm({ ...form, schoolId: v })}
                 placeholder="School ID"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={theme.secondaryText}
                 autoCapitalize="characters"
               />
 
@@ -692,8 +700,8 @@ export function AdminAccountsPanel() {
                 <Switch
                   value={form.isSuperAdmin}
                   onValueChange={(v) => setForm({ ...form, isSuperAdmin: v })}
-                  trackColor={{ false: "#D1D5DB", true: "#A78BFA" }}
-                  thumbColor={form.isSuperAdmin ? "#7C3AED" : "#F4F4F5"}
+                  trackColor={{ false: theme.border, true: theme.primary }}
+                  thumbColor={form.isSuperAdmin ? theme.primary : theme.card}
                 />
               </View>
             </ScrollView>
@@ -714,7 +722,7 @@ export function AdminAccountsPanel() {
                 accessibilityRole="button"
               >
                 {saving ? (
-                  <ActivityIndicator size="small" color="white" />
+                  <ActivityIndicator size="small" color={theme.onPrimary} />
                 ) : (
                   <Text style={styles.modalSaveText}>Save</Text>
                 )}
@@ -734,7 +742,7 @@ export function AdminAccountsPanel() {
           <View style={styles.modal}>
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderIcon}>
-                <Ionicons name="person-add" size={20} color="#7C3AED" />
+                <Ionicons name="person-add" size={20} color={theme.primary} />
               </View>
               <View style={styles.modalHeaderText}>
                 <Text style={styles.modalTitle}>Create Administrator</Text>
@@ -755,7 +763,7 @@ export function AdminAccountsPanel() {
                 value={createForm.email}
                 onChangeText={(v) => setCreateForm({ ...createForm, email: v })}
                 placeholder="name@example.com"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={theme.secondaryText}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 autoComplete="email"
@@ -766,7 +774,7 @@ export function AdminAccountsPanel() {
                 value={createForm.displayName}
                 onChangeText={(v) => setCreateForm({ ...createForm, displayName: v })}
                 placeholder="Full name"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={theme.secondaryText}
               />
               <Text style={styles.label}>Password</Text>
               <TextInput
@@ -774,7 +782,7 @@ export function AdminAccountsPanel() {
                 value={createForm.password}
                 onChangeText={(v) => setCreateForm({ ...createForm, password: v })}
                 placeholder="At least 12 characters"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={theme.secondaryText}
                 secureTextEntry
                 autoCapitalize="none"
               />
@@ -786,7 +794,7 @@ export function AdminAccountsPanel() {
                   setCreateForm({ ...createForm, confirmPassword: v })
                 }
                 placeholder="Re-enter password"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={theme.secondaryText}
                 secureTextEntry
                 autoCapitalize="none"
               />
@@ -796,7 +804,7 @@ export function AdminAccountsPanel() {
                 value={createForm.position}
                 onChangeText={(v) => setCreateForm({ ...createForm, position: v })}
                 placeholder="Position"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={theme.secondaryText}
               />
               <Text style={styles.label}>Contact number</Text>
               <TextInput
@@ -804,7 +812,7 @@ export function AdminAccountsPanel() {
                 value={createForm.contactNo}
                 onChangeText={(v) => setCreateForm({ ...createForm, contactNo: v })}
                 placeholder="Contact number"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={theme.secondaryText}
                 keyboardType="phone-pad"
               />
               <Text style={styles.label}>College</Text>
@@ -813,7 +821,7 @@ export function AdminAccountsPanel() {
                 value={createForm.college}
                 onChangeText={(v) => setCreateForm({ ...createForm, college: v })}
                 placeholder="College"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={theme.secondaryText}
               />
               <Text style={styles.label}>School ID</Text>
               <TextInput
@@ -821,7 +829,7 @@ export function AdminAccountsPanel() {
                 value={createForm.schoolId}
                 onChangeText={(v) => setCreateForm({ ...createForm, schoolId: v })}
                 placeholder="School ID"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={theme.secondaryText}
                 autoCapitalize="characters"
               />
 
@@ -837,8 +845,8 @@ export function AdminAccountsPanel() {
                   onValueChange={(v) =>
                     setCreateForm({ ...createForm, isSuperAdmin: v })
                   }
-                  trackColor={{ false: "#D1D5DB", true: "#A78BFA" }}
-                  thumbColor={createForm.isSuperAdmin ? "#7C3AED" : "#F4F4F5"}
+                  trackColor={{ false: theme.border, true: theme.primary }}
+                  thumbColor={createForm.isSuperAdmin ? theme.primary : theme.card}
                 />
               </View>
             </ScrollView>
@@ -859,7 +867,7 @@ export function AdminAccountsPanel() {
                 accessibilityRole="button"
               >
                 {saving ? (
-                  <ActivityIndicator size="small" color="white" />
+                  <ActivityIndicator size="small" color={theme.onPrimary} />
                 ) : (
                   <Text style={styles.modalSaveText}>Create Admin</Text>
                 )}
@@ -872,391 +880,392 @@ export function AdminAccountsPanel() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: "#F8F7FB",
-  },
-  headerBand: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 16,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  titleWrap: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#FFFFFF",
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.85)",
-    marginTop: 2,
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.22)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerActions: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  statsRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 16,
-  },
-  statTile: {
-    flex: 1,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    alignItems: "center",
-  },
-  statIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#FFFFFF",
-  },
-  statLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "rgba(255,255,255,0.8)",
-    marginTop: 1,
-  },
-  errorText: {
-    color: "#DC2626",
-    fontSize: 14,
-    fontWeight: "600",
-    textAlign: "center",
-    backgroundColor: "#FEE2E2",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
-  content: {
-    flex: 1,
-  },
-  scroll: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 48,
-  },
-  searchBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    height: 46,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#F1F0F6",
-    // @ts-ignore - web only
-    boxShadow: "0px 2px 8px rgba(91,33,182,0.08)",
-    elevation: 2,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: "#1F2937",
-  },
-  center: {
-    paddingVertical: 80,
-    alignItems: "center",
-  },
-  empty: {
-    alignItems: "center",
-    paddingVertical: 64,
-    gap: 10,
-  },
-  emptyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "#EDE9FE",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  emptyTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#374151",
-  },
-  emptyText: {
-    fontSize: 13,
-    color: "#6B7280",
-    textAlign: "center",
-    lineHeight: 19,
-    maxWidth: 280,
-  },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#F1F0F6",
-    // @ts-ignore - web only
-    boxShadow: "0px 4px 14px rgba(91,33,182,0.08)",
-    elevation: 3,
-  },
-  cardTop: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  avatarText: {
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  cardInfo: {
-    flex: 1,
-  },
-  nameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  cardName: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#1F2937",
-  },
-  youTag: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#7C3AED",
-    backgroundColor: "#EDE9FE",
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    overflow: "hidden",
-  },
-  cardEmail: {
-    fontSize: 13,
-    color: "#6B7280",
-    marginTop: 2,
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 4,
-  },
-  cardMeta: {
-    fontSize: 12,
-    color: "#9CA3AF",
-  },
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  badgeSuper: {
-    backgroundColor: "#EDE9FE",
-  },
-  badgeAdmin: {
-    backgroundColor: "#D1FAE5",
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  cardActions: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 14,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    height: 40,
-    borderRadius: 10,
-  },
-  editButton: {
-    backgroundColor: "#EDE9FE",
-    borderWidth: 1,
-    borderColor: "#DDD6FE",
-  },
-  editButtonText: {
-    color: "#6D28D9",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  revokeButton: {
-    backgroundColor: "#FEF3C7",
-    borderWidth: 1,
-    borderColor: "#FDE68A",
-  },
-  revokeButtonText: {
-    color: "#B45309",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  deleteButton: {
-    backgroundColor: "#FEE2E2",
-    borderWidth: 1,
-    borderColor: "#FECACA",
-  },
-  deleteButtonText: {
-    color: "#B91C1C",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(30,20,50,0.55)",
-    justifyContent: "center",
-    padding: 20,
-  },
-  modal: {
-    backgroundColor: "white",
-    borderRadius: 22,
-    padding: 20,
-    maxHeight: "88%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F0F6",
-  },
-  modalHeaderIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#EDE9FE",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalHeaderText: {
-    flex: 1,
-  },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: "800",
-    color: "#1F2937",
-  },
-  modalSubtitle: {
-    fontSize: 13,
-    color: "#6B7280",
-    marginTop: 2,
-  },
-  modalBody: {
-    paddingTop: 4,
-    paddingBottom: 4,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#374151",
-    marginTop: 12,
-    marginBottom: 6,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: "#1F2937",
-    backgroundColor: "#F9FAFB",
-  },
-  switchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 16,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: "#F1F0F6",
-  },
-  switchText: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  switchTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#1F2937",
-  },
-  switchHint: {
-    fontSize: 12,
-    color: "#9CA3AF",
-    marginTop: 2,
-  },
-  modalActions: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 16,
-  },
-  modalCancel: {
-    flex: 1,
-    height: 46,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F3F4F6",
-  },
-  modalCancelText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#374151",
-  },
-  modalSave: {
-    flex: 1,
-    height: 46,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#7C3AED",
-  },
-  modalSaveText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "white",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    headerBand: {
+      paddingHorizontal: 20,
+      paddingTop: 8,
+      paddingBottom: 16,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    titleWrap: {
+      flex: 1,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: "800",
+      color: theme.onPrimary,
+    },
+    headerSubtitle: {
+      fontSize: 12,
+      color: "rgba(255,255,255,0.85)",
+      marginTop: 2,
+    },
+    iconButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: "rgba(255,255,255,0.22)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    headerActions: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    statsRow: {
+      flexDirection: "row",
+      gap: 10,
+      marginTop: 16,
+    },
+    statTile: {
+      flex: 1,
+      backgroundColor: "rgba(255,255,255,0.12)",
+      borderWidth: 1,
+      borderColor: "rgba(255,255,255,0.18)",
+      borderRadius: 14,
+      paddingVertical: 10,
+      paddingHorizontal: 6,
+      alignItems: "center",
+    },
+    statIcon: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 4,
+    },
+    statValue: {
+      fontSize: 18,
+      fontWeight: "800",
+      color: theme.onPrimary,
+    },
+    statLabel: {
+      fontSize: 10,
+      fontWeight: "700",
+      color: "rgba(255,255,255,0.8)",
+      marginTop: 1,
+    },
+    errorText: {
+      color: theme.status.error,
+      fontSize: 14,
+      fontWeight: "600",
+      textAlign: "center",
+      backgroundColor: `${theme.status.error}1A`,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+    },
+    content: {
+      flex: 1,
+    },
+    scroll: {
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      paddingBottom: 48,
+    },
+    searchBox: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: theme.card,
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      height: 46,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+      // @ts-ignore - web only
+      boxShadow: `0px 2px 8px ${theme.shadow}`,
+      elevation: 2,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 14,
+      color: theme.text,
+    },
+    center: {
+      paddingVertical: 80,
+      alignItems: "center",
+    },
+    empty: {
+      alignItems: "center",
+      paddingVertical: 64,
+      gap: 10,
+    },
+    emptyIcon: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor: theme.softPurple,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    emptyTitle: {
+      fontSize: 17,
+      fontWeight: "800",
+      color: theme.text,
+    },
+    emptyText: {
+      fontSize: 13,
+      color: theme.secondaryText,
+      textAlign: "center",
+      lineHeight: 19,
+      maxWidth: 280,
+    },
+    card: {
+      backgroundColor: theme.card,
+      borderRadius: 18,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: theme.borderSoft,
+      // @ts-ignore - web only
+      boxShadow: `0px 4px 14px ${theme.shadow}`,
+      elevation: 3,
+    },
+    cardTop: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 12,
+    },
+    avatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    avatarText: {
+      fontSize: 15,
+      fontWeight: "800",
+    },
+    cardInfo: {
+      flex: 1,
+    },
+    nameRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    cardName: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: theme.text,
+    },
+    youTag: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: theme.primary,
+      backgroundColor: theme.softPurple,
+      borderRadius: 8,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      overflow: "hidden",
+    },
+    cardEmail: {
+      fontSize: 13,
+      color: theme.secondaryText,
+      marginTop: 2,
+    },
+    metaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      marginTop: 4,
+    },
+    cardMeta: {
+      fontSize: 12,
+      color: theme.secondaryText,
+    },
+    badge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      borderRadius: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    badgeSuper: {
+      backgroundColor: theme.softPurple,
+    },
+    badgeAdmin: {
+      backgroundColor: `${theme.status.success}1A`,
+    },
+    badgeText: {
+      fontSize: 12,
+      fontWeight: "700",
+    },
+    cardActions: {
+      flexDirection: "row",
+      gap: 8,
+      marginTop: 14,
+    },
+    actionButton: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      height: 40,
+      borderRadius: 10,
+    },
+    editButton: {
+      backgroundColor: theme.softPurple,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    editButtonText: {
+      color: theme.primary,
+      fontSize: 13,
+      fontWeight: "700",
+    },
+    revokeButton: {
+      backgroundColor: `${theme.status.warning}1A`,
+      borderWidth: 1,
+      borderColor: `${theme.status.warning}40`,
+    },
+    revokeButtonText: {
+      color: theme.status.warning,
+      fontSize: 13,
+      fontWeight: "700",
+    },
+    deleteButton: {
+      backgroundColor: `${theme.status.error}1A`,
+      borderWidth: 1,
+      borderColor: `${theme.status.error}40`,
+    },
+    deleteButtonText: {
+      color: theme.status.error,
+      fontSize: 13,
+      fontWeight: "700",
+    },
+    buttonDisabled: {
+      opacity: 0.6,
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(30,20,50,0.55)",
+      justifyContent: "center",
+      padding: 20,
+    },
+    modal: {
+      backgroundColor: theme.card,
+      borderRadius: 22,
+      padding: 20,
+      maxHeight: "88%",
+    },
+    modalHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      paddingBottom: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.borderSoft,
+    },
+    modalHeaderIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: theme.softPurple,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    modalHeaderText: {
+      flex: 1,
+    },
+    modalTitle: {
+      fontSize: 17,
+      fontWeight: "800",
+      color: theme.text,
+    },
+    modalSubtitle: {
+      fontSize: 13,
+      color: theme.secondaryText,
+      marginTop: 2,
+    },
+    modalBody: {
+      paddingTop: 4,
+      paddingBottom: 4,
+    },
+    label: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: theme.text,
+      marginTop: 12,
+      marginBottom: 6,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 14,
+      color: theme.text,
+      backgroundColor: theme.inputBg,
+    },
+    switchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginTop: 16,
+      paddingTop: 14,
+      borderTopWidth: 1,
+      borderTopColor: theme.borderSoft,
+    },
+    switchText: {
+      flex: 1,
+      paddingRight: 12,
+    },
+    switchTitle: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: theme.text,
+    },
+    switchHint: {
+      fontSize: 12,
+      color: theme.secondaryText,
+      marginTop: 2,
+    },
+    modalActions: {
+      flexDirection: "row",
+      gap: 10,
+      marginTop: 16,
+    },
+    modalCancel: {
+      flex: 1,
+      height: 46,
+      borderRadius: 12,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: theme.inputBg,
+    },
+    modalCancelText: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: theme.text,
+    },
+    modalSave: {
+      flex: 1,
+      height: 46,
+      borderRadius: 12,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: theme.primary,
+    },
+    modalSaveText: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: theme.onPrimary,
+    },
+  });

@@ -14,19 +14,20 @@ import {
   PanResponder,
   Platform,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import ChatBubble from "@/components/chat/ChatBubble";
 import ChatInput from "@/components/chat/ChatInput";
 import SuggestedQuestions from "@/components/chat/SuggestedQuestions";
 import TypingIndicator from "@/components/chat/TypingIndicator";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 import { shadows } from "@/utils/shadows";
 import { useChat } from "@/hooks/useChat";
 import { useNetwork } from "@/contexts/NetworkContext";
@@ -36,6 +37,8 @@ const FAB_SIZE = 60;
 const MINI_SIZE = 56;
 
 export default function GeminiChat() {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const { isConnected } = useNetwork();
   const { messages, isTyping, error, sendMessage, clearChat } = useChat(
     isConnected ?? false,
@@ -292,7 +295,7 @@ export default function GeminiChat() {
             )}
           </View>
           <View style={styles.miniExpandIcon}>
-            <Ionicons name="expand-outline" size={14} color="#8A63D2" />
+            <Ionicons name="expand-outline" size={14} color={theme.primary} />
           </View>
         </Pressable>
       )}
@@ -311,13 +314,13 @@ export default function GeminiChat() {
           >
           {/* Header */}
           <LinearGradient
-            colors={["#8A63D2", "#B794F6"]}
+            colors={theme.headerGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
             <View style={styles.header}>
               <Pressable style={styles.headerBackBtn} onPress={handleBack}>
-                <Ionicons name="arrow-back" size={22} color="white" />
+                <Ionicons name="arrow-back" size={22} color={theme.onPrimary} />
               </Pressable>
 
               <View style={styles.headerCenter}>
@@ -343,14 +346,14 @@ export default function GeminiChat() {
                   <Ionicons
                     name="remove-outline"
                     size={20}
-                    color="white"
+                    color={theme.onPrimary}
                   />
                 </Pressable>
                 <Pressable style={styles.headerAction} onPress={clearChat}>
                   <Ionicons
                     name="refresh-outline"
                     size={20}
-                    color="white"
+                    color={theme.onPrimary}
                   />
                 </Pressable>
               </View>
@@ -360,7 +363,7 @@ export default function GeminiChat() {
           {/* Error Banner */}
           {error && (
             <View style={styles.errorBanner}>
-              <Ionicons name="alert-circle" size={14} color="#D32F2F" />
+              <Ionicons name="alert-circle" size={14} color={theme.status.error} />
               <Text style={styles.errorText}>{error}</Text>
             </View>
           )}
@@ -371,7 +374,7 @@ export default function GeminiChat() {
               <Ionicons
                 name="cloud-offline-outline"
                 size={14}
-                color="#F59E0B"
+                color={theme.status.warning}
               />
               <Text style={styles.offlineBannerText}>
                 No internet. Messages won&apos;t send.
@@ -409,221 +412,222 @@ export default function GeminiChat() {
   );
 }
 
-const styles = StyleSheet.create({
-  /* FAB */
-  fab: {
-    position: "absolute",
-    width: FAB_SIZE,
-    height: FAB_SIZE,
-    borderRadius: FAB_SIZE / 2,
-    backgroundColor: "#8A63D2",
-    justifyContent: "center",
-    alignItems: "center",
-    ...(shadows.custom(4, 10, 0.35, 10, "#8A63D2") as any),
-    zIndex: 1002,
-  },
-  fabGlow: {
-    position: "absolute",
-    width: FAB_SIZE + 12,
-    height: FAB_SIZE + 12,
-    borderRadius: (FAB_SIZE + 12) / 2,
-    backgroundColor: "#8A63D2",
-    zIndex: 1000,
-  },
-  fabPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.95 }],
-  },
-  fabImage: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  /* Greeting popup */
-  greetingBubble: {
-    position: "absolute",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    borderBottomRightRadius: 4,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    maxWidth: 220,
-    ...(shadows.custom(3, 8, 0.15, 8, "#000") as any),
-    zIndex: 1003,
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.15)",
-  },
-  greetingText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1E1B4B",
-    lineHeight: 20,
-  },
-  greetingArrow: {
-    position: "absolute",
-    bottom: 8,
-    right: -6,
-    width: 0,
-    height: 0,
-    borderTopColor: "transparent",
-    borderTopWidth: 6,
-    borderBottomColor: "transparent",
-    borderBottomWidth: 6,
-    borderLeftColor: "#FFFFFF",
-    borderLeftWidth: 6,
-  },
-  offlineDot: {
-    position: "absolute",
-    top: 2,
-    right: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: "#EF4444",
-    borderWidth: 2,
-    borderColor: "#8A63D2",
-  },
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    /* FAB */
+    fab: {
+      position: "absolute",
+      width: FAB_SIZE,
+      height: FAB_SIZE,
+      borderRadius: FAB_SIZE / 2,
+      backgroundColor: theme.primary,
+      justifyContent: "center",
+      alignItems: "center",
+      ...(shadows.custom(4, 10, 0.35, 10, theme.primary) as any),
+      zIndex: 1002,
+    },
+    fabGlow: {
+      position: "absolute",
+      width: FAB_SIZE + 12,
+      height: FAB_SIZE + 12,
+      borderRadius: (FAB_SIZE + 12) / 2,
+      backgroundColor: theme.primary,
+      zIndex: 1000,
+    },
+    fabPressed: {
+      opacity: 0.85,
+      transform: [{ scale: 0.95 }],
+    },
+    fabImage: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+    },
+    /* Greeting popup */
+    greetingBubble: {
+      position: "absolute",
+      backgroundColor: theme.card,
+      borderRadius: 16,
+      borderBottomRightRadius: 4,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      maxWidth: 220,
+      ...(shadows.custom(3, 8, 0.15, 8, "#000") as any),
+      zIndex: 1003,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    greetingText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: theme.text,
+      lineHeight: 20,
+    },
+    greetingArrow: {
+      position: "absolute",
+      bottom: 8,
+      right: -6,
+      width: 0,
+      height: 0,
+      borderTopColor: "transparent",
+      borderTopWidth: 6,
+      borderBottomColor: "transparent",
+      borderBottomWidth: 6,
+      borderLeftColor: theme.card,
+      borderLeftWidth: 6,
+    },
+    offlineDot: {
+      position: "absolute",
+      top: 2,
+      right: 2,
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      backgroundColor: theme.status.error,
+      borderWidth: 2,
+      borderColor: theme.primary,
+    },
 
-  /* ─── Minimized Draggable Box ─────────────────────────────────────── */
-  miniBox: {
-    position: "absolute",
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 28,
-    paddingLeft: 4,
-    paddingRight: 14,
-    paddingVertical: 6,
-    gap: 8,
-    ...(shadows.custom(3, 8, 0.2, 10, "#000") as any),
-    zIndex: 1001,
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.15)",
-  },
-  miniImage: {
-    width: MINI_SIZE - 12,
-    height: MINI_SIZE - 12,
-    borderRadius: (MINI_SIZE - 12) / 2,
-  },
-  miniInfo: {
-    flex: 1,
-  },
-  miniName: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#1E1B4B",
-  },
-  miniHint: {
-    fontSize: 10,
-    color: "#8A63D2",
-    marginTop: 1,
-  },
-  miniExpandIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#F3EAFF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
+    /* ─── Minimized Draggable Box ─────────────────────────────────────── */
+    miniBox: {
+      position: "absolute",
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.card,
+      borderRadius: 28,
+      paddingLeft: 4,
+      paddingRight: 14,
+      paddingVertical: 6,
+      gap: 8,
+      ...(shadows.custom(3, 8, 0.2, 10, "#000") as any),
+      zIndex: 1001,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    miniImage: {
+      width: MINI_SIZE - 12,
+      height: MINI_SIZE - 12,
+      borderRadius: (MINI_SIZE - 12) / 2,
+    },
+    miniInfo: {
+      flex: 1,
+    },
+    miniName: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: theme.text,
+    },
+    miniHint: {
+      fontSize: 10,
+      color: theme.primary,
+      marginTop: 1,
+    },
+    miniExpandIcon: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: theme.softPurple,
+      justifyContent: "center",
+      alignItems: "center",
+    },
 
-  /* ─── Full-Screen Modal ───────────────────────────────────────────── */
-  modalRoot: {
-    flex: 1,
-    backgroundColor: "#F4F2F8",
-  },
+    /* ─── Full-Screen Modal ───────────────────────────────────────────── */
+    modalRoot: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
 
-  /* Header */
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 14,
-  },
-  headerBackBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerCenter: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-  },
-  headerIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-    overflow: "hidden",
-  },
-  headerIconImage: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "white",
-  },
-  headerSubtitle: {
-    fontSize: 11,
-    color: "rgba(255,255,255,0.7)",
-    marginTop: 1,
-  },
-  headerActions: {
-    flexDirection: "row",
-    gap: 4,
-  },
-  headerAction: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+    /* Header */
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      paddingBottom: 14,
+    },
+    headerBackBtn: {
+      width: 40,
+      height: 40,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    headerCenter: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      flex: 1,
+    },
+    headerIconWrap: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: "rgba(255,255,255,0.2)",
+      justifyContent: "center",
+      alignItems: "center",
+      overflow: "hidden",
+    },
+    headerIconImage: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+    },
+    headerTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: theme.onPrimary,
+    },
+    headerSubtitle: {
+      fontSize: 11,
+      color: "rgba(255,255,255,0.7)",
+      marginTop: 1,
+    },
+    headerActions: {
+      flexDirection: "row",
+      gap: 4,
+    },
+    headerAction: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      justifyContent: "center",
+      alignItems: "center",
+    },
 
-  /* Banners */
-  errorBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFF0F0",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 6,
-  },
-  errorText: {
-    fontSize: 12,
-    color: "#D32F2F",
-    flex: 1,
-  },
-  offlineBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFFBEB",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 6,
-  },
-  offlineBannerText: {
-    fontSize: 12,
-    color: "#92400E",
-    flex: 1,
-  },
+    /* Banners */
+    errorBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: `${theme.status.error}14`,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      gap: 6,
+    },
+    errorText: {
+      fontSize: 12,
+      color: theme.status.error,
+      flex: 1,
+    },
+    offlineBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: `${theme.status.warning}14`,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      gap: 6,
+    },
+    offlineBannerText: {
+      fontSize: 12,
+      color: theme.status.warning,
+      flex: 1,
+    },
 
-  /* Chat area */
-  chatArea: {
-    flex: 1,
-  },
-  messagesList: {
-    flexGrow: 1,
-    paddingVertical: 8,
-  },
-});
+    /* Chat area */
+    chatArea: {
+      flex: 1,
+    },
+    messagesList: {
+      flexGrow: 1,
+      paddingVertical: 8,
+    },
+  });

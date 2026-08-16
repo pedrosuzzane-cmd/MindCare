@@ -16,6 +16,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/hooks/AuthContext";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 import {
   fetchAuditLogs,
   fetchSafeguardingCases,
@@ -76,6 +78,9 @@ export default function SafeguardingScreen() {
   const [noteText, setNoteText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const listRef = useRef<FlatList<SafeguardingCase>>(null);
+
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
 
   // Always start at the top so navigation never lands mid-list.
   useEffect(() => {
@@ -240,7 +245,7 @@ export default function SafeguardingScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient colors={["#8A63D2", "#6D28D9"]}>
+      <LinearGradient colors={theme.headerGradient}>
         <View style={styles.header}>
           <Pressable style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={22} color="white" />
@@ -256,7 +261,7 @@ export default function SafeguardingScreen() {
       </LinearGradient>
 
       <View style={styles.restrictedBanner}>
-        <Ionicons name="lock-closed-outline" size={16} color="#6D28D9" />
+        <Ionicons name="lock-closed-outline" size={16} color={theme.primary} />
         <Text style={styles.restrictedBannerText}>
           Authorized guidance office staff only. Every change is recorded in the audit log.
         </Text>
@@ -264,7 +269,7 @@ export default function SafeguardingScreen() {
 
       {loading ? (
         <View style={styles.centerState}>
-          <ActivityIndicator size="large" color="#8A63D2" />
+          <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.stateText}>Loading safeguarding queue...</Text>
         </View>
       ) : (
@@ -314,12 +319,12 @@ export default function SafeguardingScreen() {
             renderItem={renderCaseCard}
             showsVerticalScrollIndicator={true}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#8A63D2" />
+              <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.primary} />
             }
             contentContainerStyle={styles.list}
             ListEmptyComponent={
               <View style={styles.centerState}>
-                <Ionicons name="shield-checkmark-outline" size={48} color="#22C55E" />
+                <Ionicons name="shield-checkmark-outline" size={48} color={theme.status.success} />
                 <Text style={styles.stateTitle}>No cases in this queue</Text>
                 <Text style={styles.stateText}>
                   Cases appear here when the guidance office opens a follow-up on
@@ -332,7 +337,7 @@ export default function SafeguardingScreen() {
           {auditLogs.length > 0 && (
             <View style={styles.auditSection}>
               <View style={styles.auditHeader}>
-                <Ionicons name="document-text-outline" size={16} color="#6D28D9" />
+                <Ionicons name="document-text-outline" size={16} color={theme.primary} />
                 <Text style={styles.auditTitle}>Recent Audit Log</Text>
               </View>
               {auditLogs.slice(0, 5).map((log) => (
@@ -374,7 +379,7 @@ export default function SafeguardingScreen() {
                   <Text style={styles.modalCaseName}>{selectedCase.studentName}</Text>
                 </View>
                 <Pressable onPress={() => setSelectedCase(null)} style={styles.modalClose}>
-                  <Ionicons name="close" size={20} color="#64748B" />
+                  <Ionicons name="close" size={20} color={theme.secondaryText} />
                 </Pressable>
               </View>
 
@@ -415,7 +420,7 @@ export default function SafeguardingScreen() {
                 onChangeText={setNoteText}
                 placeholder="Note for the follow-up record (no clinical language needed)"
                 multiline
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={theme.secondaryText}
               />
               <Pressable
                 style={[styles.primaryButton, submitting && styles.buttonDisabled]}
@@ -451,8 +456,9 @@ export default function SafeguardingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F2F8" },
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -475,13 +481,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#F3E8FF",
+    backgroundColor: theme.softPurple,
     borderBottomWidth: 1,
-    borderBottomColor: "#E9D5FF",
+    borderBottomColor: theme.border,
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
-  restrictedBannerText: { flex: 1, fontSize: 12, color: "#6D28D9", lineHeight: 17 },
+  restrictedBannerText: { flex: 1, fontSize: 12, color: theme.primary, lineHeight: 17 },
   centerState: {
     flex: 1,
     justifyContent: "center",
@@ -490,8 +496,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     paddingVertical: 40,
   },
-  stateTitle: { fontSize: 17, fontWeight: "700", color: "#1E1B4B", marginTop: 4 },
-  stateText: { fontSize: 14, color: "#64748B", textAlign: "center" },
+  stateTitle: { fontSize: 17, fontWeight: "700", color: theme.text, marginTop: 4 },
+  stateText: { fontSize: 14, color: theme.secondaryText, textAlign: "center" },
   summaryRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -514,21 +520,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 16,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
+    borderColor: theme.border,
   },
-  tabChipActive: { backgroundColor: "#6D28D9", borderColor: "#6D28D9" },
-  tabChipText: { fontSize: 12, fontWeight: "700", color: "#6D28D9" },
-  tabChipTextActive: { color: "#FFFFFF" },
+  tabChipActive: { backgroundColor: theme.primary, borderColor: theme.primary },
+  tabChipText: { fontSize: 12, fontWeight: "700", color: theme.primary },
+  tabChipTextActive: { color: theme.onPrimary },
   list: { padding: 16, paddingBottom: 40 },
   caseCard: {
-    backgroundColor: "white",
+    backgroundColor: theme.card,
     borderRadius: 18,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.12)",
+    borderColor: theme.borderSoft,
   },
   caseCardPressed: { opacity: 0.92 },
   caseCardHeader: {
@@ -538,43 +544,43 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   caseIdentity: { flex: 1, paddingRight: 10 },
-  caseNumber: { fontSize: 12, fontWeight: "700", color: "#8A63D2", marginBottom: 2 },
-  caseName: { fontSize: 16, fontWeight: "700", color: "#1E1B4B" },
+  caseNumber: { fontSize: 12, fontWeight: "700", color: theme.primary, marginBottom: 2 },
+  caseName: { fontSize: 16, fontWeight: "700", color: theme.text },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
   statusBadgeText: { fontSize: 11, fontWeight: "700" },
-  caseReason: { fontSize: 13, color: "#475569", lineHeight: 19, marginBottom: 10 },
+  caseReason: { fontSize: 13, color: theme.secondaryText, lineHeight: 19, marginBottom: 10 },
   caseCardFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
     borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
+    borderTopColor: theme.borderSoft,
     paddingTop: 8,
   },
-  caseMeta: { fontSize: 12, color: "#64748B", fontWeight: "600" },
+  caseMeta: { fontSize: 12, color: theme.secondaryText, fontWeight: "600" },
   auditSection: {
     marginHorizontal: 16,
     marginBottom: 24,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
+    borderColor: theme.border,
   },
   auditHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 },
-  auditTitle: { fontSize: 13, fontWeight: "800", color: "#4C1D95" },
+  auditTitle: { fontSize: 13, fontWeight: "800", color: theme.primaryDeep },
   auditRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginBottom: 8 },
-  auditDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#8A63D2", marginTop: 5 },
+  auditDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.primary, marginTop: 5 },
   auditRowBody: { flex: 1 },
-  auditAction: { fontSize: 12, fontWeight: "700", color: "#1E1B4B" },
-  auditNote: { fontSize: 12, color: "#64748B", marginTop: 1 },
-  auditMeta: { fontSize: 11, color: "#94A3B8", fontWeight: "600", marginTop: 1 },
+  auditAction: { fontSize: 12, fontWeight: "700", color: theme.text },
+  auditNote: { fontSize: 12, color: theme.secondaryText, marginTop: 1 },
+  auditMeta: { fontSize: 11, color: theme.secondaryText, fontWeight: "600", marginTop: 1 },
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(15, 23, 42, 0.5)",
     justifyContent: "flex-end",
   },
   modalCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
@@ -587,8 +593,8 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: 10,
   },
-  modalCaseNumber: { fontSize: 13, fontWeight: "700", color: "#8A63D2" },
-  modalCaseName: { fontSize: 19, fontWeight: "800", color: "#1E1B4B", marginTop: 2 },
+  modalCaseNumber: { fontSize: 13, fontWeight: "700", color: theme.primary },
+  modalCaseName: { fontSize: 19, fontWeight: "800", color: theme.text, marginTop: 2 },
   modalClose: { padding: 6 },
   modalStatusRow: {
     flexDirection: "row",
@@ -597,55 +603,56 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     marginBottom: 12,
   },
-  modalMeta: { fontSize: 12, color: "#64748B", fontWeight: "600" },
+  modalMeta: { fontSize: 12, color: theme.secondaryText, fontWeight: "600" },
   modalLabel: {
     fontSize: 12,
     fontWeight: "800",
-    color: "#8A63D2",
+    color: theme.primary,
     textTransform: "uppercase",
     letterSpacing: 0.4,
     marginTop: 14,
     marginBottom: 6,
   },
-  modalReason: { fontSize: 14, color: "#334155", lineHeight: 20 },
+  modalReason: { fontSize: 14, color: theme.text, lineHeight: 20 },
   historyList: { gap: 6, maxHeight: 180 },
   historyRow: {
-    backgroundColor: "#F8F5FF",
+    backgroundColor: theme.secondaryCard,
     borderRadius: 10,
     padding: 10,
   },
-  historyAction: { fontSize: 13, fontWeight: "700", color: "#4C1D95" },
-  historyMeta: { fontSize: 11, color: "#94A3B8", marginTop: 2, fontWeight: "600" },
-  historyNote: { fontSize: 12, color: "#64748B", marginTop: 4, lineHeight: 17 },
-  historyEmpty: { fontSize: 13, color: "#94A3B8" },
+  historyAction: { fontSize: 13, fontWeight: "700", color: theme.primaryDeep },
+  historyMeta: { fontSize: 11, color: theme.secondaryText, marginTop: 2, fontWeight: "600" },
+  historyNote: { fontSize: 12, color: theme.secondaryText, marginTop: 4, lineHeight: 17 },
+  historyEmpty: { fontSize: 13, color: theme.secondaryText },
   noteInput: {
     borderWidth: 1,
-    borderColor: "#E9D5FF",
+    borderColor: theme.border,
     borderRadius: 12,
     padding: 12,
     minHeight: 72,
     fontSize: 13,
-    color: "#1E1B4B",
+    color: theme.text,
+    backgroundColor: theme.inputBg,
     textAlignVertical: "top",
   },
   primaryButton: {
-    backgroundColor: "#6D28D9",
+    backgroundColor: theme.primary,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
     marginTop: 10,
   },
-  primaryButtonText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
+  primaryButtonText: { color: theme.onPrimary, fontWeight: "700", fontSize: 14 },
   buttonDisabled: { opacity: 0.5 },
   actionRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
   actionButton: {
-    backgroundColor: "#EDE9FE",
+    backgroundColor: theme.softPurple,
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderWidth: 1,
-    borderColor: "#C4B5FD",
+    borderColor: theme.primary,
   },
-  actionButtonText: { color: "#5B21B6", fontWeight: "700", fontSize: 13 },
-  noActionsText: { fontSize: 13, color: "#94A3B8", fontStyle: "italic" },
+  actionButtonText: { color: theme.primaryDeep, fontWeight: "700", fontSize: 13 },
+  noActionsText: { fontSize: 13, color: theme.secondaryText, fontStyle: "italic" },
 });

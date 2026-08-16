@@ -28,6 +28,8 @@ import Svg, {
   Rect,
   Text as SvgText,
 } from "react-native-svg";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 import { auth, db } from "@/constants/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -134,34 +136,34 @@ interface ProfileData {
 }
 
 // ─── Student Detail Design Tokens ────────────────────────────────────────────
-const DETAIL_COLORS = {
-  bg: "#F7F5FC",
-  surface: "#FFFFFF",
-  border: "#EDE9FE",
-  borderStrong: "#E6DCF7",
-  purple: "#8A63D2",
-  purpleDeep: "#6D48B8",
-  purpleSoft: "#EEE7FA",
-  text: "#1F2340",
-  textMuted: "#6F748A",
-  textFaint: "#A0A6B8",
-} as const;
 
 type RiskLevelType = "low" | "moderate" | "high";
 
-const RISK_META: Record<
+const RISK_META = (
+  theme: MindCareTheme,
+): Record<
   RiskLevelType,
   { label: string; color: string; bg: string; dot: string }
-> = {
-  low: { label: "Low Concern", color: "#0E9F6E", bg: "#E7F7F0", dot: "#10B981" },
+> => ({
+  low: {
+    label: "Low Concern",
+    color: theme.status.success,
+    bg: "#E7F7F0",
+    dot: theme.accent.green,
+  },
   moderate: {
     label: "Moderate Concern",
-    color: "#B45309",
+    color: theme.status.warning,
     bg: "#FDF3E3",
-    dot: "#F59E0B",
+    dot: theme.accent.amber,
   },
-  high: { label: "High Concern", color: "#DC2626", bg: "#FDE8E8", dot: "#EF4444" },
-};
+  high: {
+    label: "High Concern",
+    color: theme.status.error,
+    bg: "#FDE8E8",
+    dot: theme.status.error,
+  },
+});
 
 const riskFromLatestScore = (score?: number): RiskLevelType | null => {
   if (score === undefined || score === null) return null;
@@ -241,6 +243,8 @@ const REGISTRATION_GROUPS: {
 
 // ─── Accessible ⓘ tooltip (hover + keyboard focus) ───────────────────────────
 function InfoTooltip({ text }: { text: string }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [visible, setVisible] = useState(false);
   const [interacting, setInteracting] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -288,7 +292,7 @@ function InfoTooltip({ text }: { text: string }) {
           pressed && styles.infoIconPressed,
         ]}
       >
-        <Ionicons name="information-circle-outline" size={18} color={DETAIL_COLORS.textFaint} />
+        <Ionicons name="information-circle-outline" size={18} color={theme.secondaryText} />
       </Pressable>
       {visible && (
         <View style={styles.infoTooltip} pointerEvents="none">
@@ -302,8 +306,8 @@ function InfoTooltip({ text }: { text: string }) {
 // ─── Reusable card with consistent section header ────────────────────────────
 function SectionCard({
   icon,
-  iconColor = DETAIL_COLORS.purple,
-  iconBg = DETAIL_COLORS.purpleSoft,
+  iconColor,
+  iconBg,
   title,
   info,
   children,
@@ -315,11 +319,18 @@ function SectionCard({
   info?: string;
   children: ReactNode;
 }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   return (
     <View style={styles.card}>
       <View style={styles.sectionHeaderRow}>
-        <View style={[styles.sectionIconCircle, { backgroundColor: iconBg }]}>
-          <Ionicons name={icon} size={18} color={iconColor} />
+        <View
+          style={[
+            styles.sectionIconCircle,
+            { backgroundColor: iconBg ?? theme.softPurple },
+          ]}
+        >
+          <Ionicons name={icon} size={18} color={iconColor ?? theme.primary} />
         </View>
         <Text style={styles.sectionTitle}>{title}</Text>
         {info ? <InfoTooltip text={info} /> : null}
@@ -332,6 +343,8 @@ function SectionCard({
 
 // ─── Concern level pill ───────────────────────────────────────────────────────
 function RiskPill({ risk }: { risk: RiskLevelType | null }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   if (!risk) {
     return (
       <View style={styles.riskPill}>
@@ -339,7 +352,7 @@ function RiskPill({ risk }: { risk: RiskLevelType | null }) {
       </View>
     );
   }
-  const meta = RISK_META[risk];
+  const meta = RISK_META(theme)[risk];
   return (
     <View style={[styles.riskPill, { backgroundColor: meta.bg }]}>
       <View style={[styles.riskPillDot, { backgroundColor: meta.dot }]} />
@@ -351,8 +364,8 @@ function RiskPill({ risk }: { risk: RiskLevelType | null }) {
 // ─── Compact wellness snapshot tile ──────────────────────────────────────────
 function SnapshotTile({
   icon,
-  iconColor = DETAIL_COLORS.purple,
-  iconBg = DETAIL_COLORS.purpleSoft,
+  iconColor,
+  iconBg,
   emoji,
   value,
   label,
@@ -366,13 +379,20 @@ function SnapshotTile({
   label: string;
   sub?: string;
 }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   return (
     <View style={styles.snapshotTile}>
-      <View style={[styles.snapshotIcon, { backgroundColor: iconBg }]}>
+      <View
+        style={[
+          styles.snapshotIcon,
+          { backgroundColor: iconBg ?? theme.softPurple },
+        ]}
+      >
         {emoji ? (
           <Text style={styles.snapshotEmoji}>{emoji}</Text>
         ) : icon ? (
-          <Ionicons name={icon} size={20} color={iconColor} />
+          <Ionicons name={icon} size={20} color={iconColor ?? theme.primary} />
         ) : null}
       </View>
       <Text style={styles.snapshotValue} numberOfLines={1}>
@@ -392,6 +412,8 @@ function SnapshotTile({
 
 export default function StudentDetailScreen() {
   const { uid } = useLocalSearchParams<{ uid: string }>();
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [loading, setLoading] = useState(true);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -606,7 +628,7 @@ export default function StudentDetailScreen() {
           <Ionicons
             name="trending-up-outline"
             size={36}
-            color={DETAIL_COLORS.textFaint}
+            color={theme.secondaryText}
           />
           <Text style={styles.emptyMoodsText}>No assessments taken yet</Text>
           <Text style={styles.emptyMoodsSubtext}>
@@ -649,7 +671,7 @@ export default function StudentDetailScreen() {
       const first = inBucket[0];
       const last = inBucket[inBucket.length - 1];
       const concern = riskFromLatestScore(b.avgScore) ?? "low";
-      const meta = RISK_META[concern];
+      const meta = RISK_META(theme)[concern];
       return {
         x: xStart + i * xSpacing,
         y: yFor(b.avgScore),
@@ -670,7 +692,7 @@ export default function StudentDetailScreen() {
     const modLineY = yFor(21);
     const tooltipW = 220;
     const hoveredPt = hoveredTrendIdx !== null ? pts[hoveredTrendIdx] : null;
-    const riskMeta = RISK_META[latestRisk ?? "low"];
+    const riskMeta = RISK_META(theme)[latestRisk ?? "low"];
 
     return (
       <View>
@@ -710,7 +732,7 @@ export default function StudentDetailScreen() {
                   y1={gy}
                   x2={plotRight}
                   y2={gy}
-                  stroke="#EFEBFA"
+                  stroke={theme.borderSoft}
                   strokeWidth={1}
                 />
               );
@@ -721,7 +743,7 @@ export default function StudentDetailScreen() {
               y1={chartTop}
               x2={yAxisX}
               y2={chartBottom}
-              stroke="#E8DFF6"
+              stroke={theme.border}
               strokeWidth={1}
             />
             {yTicks.map((t) => (
@@ -731,7 +753,7 @@ export default function StudentDetailScreen() {
                 y1={yFor(t)}
                 x2={yAxisX}
                 y2={yFor(t)}
-                stroke="#D9CFF0"
+                stroke={theme.border}
                 strokeWidth={1}
               />
             ))}
@@ -742,7 +764,7 @@ export default function StudentDetailScreen() {
                 y={yFor(t) + 3}
                 fontSize={9}
                 fontWeight="600"
-                fill={DETAIL_COLORS.textFaint}
+                fill={theme.secondaryText}
                 textAnchor="end"
               >
                 {t}
@@ -754,7 +776,7 @@ export default function StudentDetailScreen() {
               y1={highLineY}
               x2={plotRight}
               y2={highLineY}
-              stroke="#EF4444"
+              stroke={theme.status.error}
               strokeOpacity={0.3}
               strokeWidth={1}
               strokeDasharray="5 4"
@@ -764,7 +786,7 @@ export default function StudentDetailScreen() {
               y1={modLineY}
               x2={plotRight}
               y2={modLineY}
-              stroke="#F59E0B"
+              stroke={theme.status.warning}
               strokeOpacity={0.35}
               strokeWidth={1}
               strokeDasharray="5 4"
@@ -775,7 +797,7 @@ export default function StudentDetailScreen() {
               y={chartTop + (highLineY - chartTop) / 2 + 3}
               fontSize={9}
               fontWeight="700"
-              fill="#DC2626"
+              fill={theme.status.error}
               fillOpacity={0.6}
               textAnchor="end"
             >
@@ -786,7 +808,7 @@ export default function StudentDetailScreen() {
               y={highLineY + (modLineY - highLineY) / 2 + 3}
               fontSize={9}
               fontWeight="700"
-              fill="#B45309"
+              fill={theme.status.warning}
               fillOpacity={0.6}
               textAnchor="end"
             >
@@ -797,7 +819,7 @@ export default function StudentDetailScreen() {
               y={modLineY + (chartBottom - modLineY) / 2 + 3}
               fontSize={9}
               fontWeight="700"
-              fill="#0E9F6E"
+              fill={theme.status.success}
               fillOpacity={0.65}
               textAnchor="end"
             >
@@ -808,7 +830,7 @@ export default function StudentDetailScreen() {
               <Polyline
                 points={polyPoints}
                 fill="none"
-                stroke={DETAIL_COLORS.purple}
+                stroke={theme.primary}
                 strokeWidth={2}
                 strokeLinejoin="round"
                 strokeLinecap="round"
@@ -840,7 +862,7 @@ export default function StudentDetailScreen() {
                       y={Math.max(p.y - 10, 9)}
                       fontSize={10}
                       fontWeight="800"
-                      fill={DETAIL_COLORS.text}
+                      fill={theme.text}
                       textAnchor="middle"
                     >
                       {p.score}
@@ -970,7 +992,7 @@ export default function StudentDetailScreen() {
           <Ionicons
             name="clipboard-outline"
             size={16}
-            color={DETAIL_COLORS.textMuted}
+            color={theme.secondaryText}
           />
           <Text style={styles.totalMoodsText}>
             {assessments.length} assessment
@@ -989,7 +1011,7 @@ export default function StudentDetailScreen() {
       <View style={styles.mainLayout}>
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={20} color="#2D1B69" />
+            <Ionicons name="arrow-back" size={20} color={theme.text} />
           </Pressable>
           <Text style={styles.headerTitle} numberOfLines={1}>
             Student Details
@@ -999,12 +1021,12 @@ export default function StudentDetailScreen() {
 
         {loading ? (
           <View style={styles.stateCard}>
-            <ActivityIndicator size="large" color="#6366F1" />
+            <ActivityIndicator size="large" color={theme.primary} />
             <Text style={styles.stateText}>Loading student information...</Text>
           </View>
         ) : !profile ? (
           <View style={styles.stateCard}>
-            <Ionicons name="alert-circle-outline" size={40} color="#EF4444" />
+            <Ionicons name="alert-circle-outline" size={40} color={theme.status.error} />
             <Text style={styles.stateText}>
               Unable to load student profile.
             </Text>
@@ -1068,7 +1090,7 @@ export default function StudentDetailScreen() {
                     )}
                   </View>
                   <View style={styles.avatarCameraBadge}>
-                    <Ionicons name="camera" size={12} color="white" />
+                    <Ionicons name="camera" size={12} color={theme.onPrimary} />
                   </View>
                 </Pressable>
                 <View style={styles.profileInfo}>
@@ -1098,7 +1120,7 @@ export default function StudentDetailScreen() {
                   <Ionicons
                     name="book-outline"
                     size={13}
-                    color={DETAIL_COLORS.purple}
+                    color={theme.primary}
                   />
                   <Text style={styles.statusPillText}>
                     {journalEntries.length} Journal
@@ -1108,7 +1130,7 @@ export default function StudentDetailScreen() {
                   <Ionicons
                     name="fitness-outline"
                     size={13}
-                    color={DETAIL_COLORS.purple}
+                    color={theme.primary}
                   />
                   <Text style={styles.statusPillText}>
                     {assessments.length} Assessment
@@ -1120,7 +1142,7 @@ export default function StudentDetailScreen() {
                 <Ionicons
                   name="time-outline"
                   size={12}
-                  color={DETAIL_COLORS.textFaint}
+                  color={theme.secondaryText}
                 />
                 <Text style={styles.lastUpdatedText}>
                   Last updated: {lastUpdatedLabel}
@@ -1136,17 +1158,23 @@ export default function StudentDetailScreen() {
               <SnapshotTile
                 icon="fitness-outline"
                 iconColor={
-                  latestRisk ? RISK_META[latestRisk].color : DETAIL_COLORS.textFaint
+                  latestRisk
+                    ? RISK_META(theme)[latestRisk].color
+                    : theme.secondaryText
                 }
-                iconBg={latestRisk ? RISK_META[latestRisk].bg : "#F1F3F8"}
+                iconBg={
+                  latestRisk
+                    ? RISK_META(theme)[latestRisk].bg
+                    : theme.inputBg
+                }
                 value={latestRisk ? latestRisk.toUpperCase() : "—"}
                 label="Concern"
                 sub={latestScore !== undefined ? `${latestScore}/80` : undefined}
               />
               <SnapshotTile
                 icon="book-outline"
-                iconColor={DETAIL_COLORS.purple}
-                iconBg={DETAIL_COLORS.purpleSoft}
+                iconColor={theme.primary}
+                iconBg={theme.softPurple}
                 value={String(journalEntries.length)}
                 label="Journals"
                 sub={
@@ -1157,7 +1185,7 @@ export default function StudentDetailScreen() {
               />
               <SnapshotTile
                 emoji="😊"
-                iconBg="#F1EFF9"
+                iconBg={theme.softPurple}
                 value={latestMoodLabel}
                 label="Recent Mood"
                 sub={
@@ -1168,8 +1196,8 @@ export default function StudentDetailScreen() {
               />
               <SnapshotTile
                 icon="stats-chart-outline"
-                iconColor={DETAIL_COLORS.purple}
-                iconBg={DETAIL_COLORS.purpleSoft}
+                iconColor={theme.primary}
+                iconBg={theme.softPurple}
                 value={latestScore !== undefined ? `${latestScore}/80` : "—"}
                 label="Assessment"
                 sub={
@@ -1193,7 +1221,7 @@ export default function StudentDetailScreen() {
                       <Ionicons
                         name={group.icon}
                         size={15}
-                        color={DETAIL_COLORS.purple}
+                        color={theme.primary}
                       />
                     </View>
                     <Text style={styles.regGroupTitle}>{group.title}</Text>
@@ -1223,7 +1251,7 @@ export default function StudentDetailScreen() {
                     <Ionicons
                       name="body-outline"
                       size={15}
-                      color={DETAIL_COLORS.purple}
+                      color={theme.primary}
                     />
                   </View>
                   <Text style={styles.regGroupTitle}>
@@ -1250,7 +1278,7 @@ export default function StudentDetailScreen() {
                       <Ionicons
                         name="document-text-outline"
                         size={24}
-                        color="#7C3AED"
+                        color={theme.primary}
                       />
                       <View style={{ flex: 1, marginLeft: 10 }}>
                         <Text style={styles.docTitle}>Verification Document</Text>
@@ -1281,9 +1309,15 @@ export default function StudentDetailScreen() {
             <SectionCard
               icon="fitness-outline"
               iconColor={
-                latestRisk ? RISK_META[latestRisk].color : DETAIL_COLORS.purple
+                latestRisk
+                  ? RISK_META(theme)[latestRisk].color
+                  : theme.primary
               }
-              iconBg={latestRisk ? RISK_META[latestRisk].bg : DETAIL_COLORS.purpleSoft}
+              iconBg={
+                latestRisk
+                  ? RISK_META(theme)[latestRisk].bg
+                  : theme.softPurple
+              }
               title="Current Wellness Status"
               info="A general classification based on the student's latest self-assessment. It is intended to support awareness and should not be treated as a clinical diagnosis."
             >
@@ -1293,19 +1327,19 @@ export default function StudentDetailScreen() {
                     <View
                       style={[
                         styles.wellnessBadge,
-                        { backgroundColor: RISK_META[latestRisk].bg },
+                        { backgroundColor: RISK_META(theme)[latestRisk].bg },
                       ]}
                     >
                       <View
                         style={[
                           styles.wellnessBadgeDot,
-                          { backgroundColor: RISK_META[latestRisk].dot },
+                          { backgroundColor: RISK_META(theme)[latestRisk].dot },
                         ]}
                       />
                       <Text
                         style={[
                           styles.wellnessBadgeText,
-                          { color: RISK_META[latestRisk].color },
+                          { color: RISK_META(theme)[latestRisk].color },
                         ]}
                       >
                         {latestRisk === "high"
@@ -1332,7 +1366,7 @@ export default function StudentDetailScreen() {
                             Math.max(((latestScore || 0) / 80) * 100, 2),
                             100,
                           )}%`,
-                          backgroundColor: RISK_META[latestRisk].dot,
+                          backgroundColor: RISK_META(theme)[latestRisk].dot,
                         },
                       ]}
                     />
@@ -1344,7 +1378,7 @@ export default function StudentDetailScreen() {
                             Math.max(((latestScore || 0) / 80) * 100, 2),
                             100,
                           )}%`,
-                          backgroundColor: RISK_META[latestRisk].dot,
+                          backgroundColor: RISK_META(theme)[latestRisk].dot,
                         },
                       ]}
                     />
@@ -1367,7 +1401,7 @@ export default function StudentDetailScreen() {
                   <Ionicons
                     name="clipboard-outline"
                     size={36}
-                    color={DETAIL_COLORS.textFaint}
+                    color={theme.secondaryText}
                   />
                   <Text style={styles.emptyMoodsText}>No assessment yet</Text>
                   <Text style={styles.emptyMoodsSubtext}>
@@ -1461,7 +1495,7 @@ export default function StudentDetailScreen() {
                     <Ionicons
                       name="journal-outline"
                       size={16}
-                      color={DETAIL_COLORS.textMuted}
+                      color={theme.secondaryText}
                     />
                     <Text style={styles.totalMoodsText}>
                       {journalEntries.length} total journal
@@ -1513,7 +1547,7 @@ export default function StudentDetailScreen() {
                 ))}
               </View>
               <View style={styles.journeyNote}>
-                <Ionicons name="leaf" size={14} color={DETAIL_COLORS.purple} />
+                <Ionicons name="leaf" size={14} color={theme.primary} />
                 <Text style={styles.journeyNoteText}>
                   {journeyDoneCount === journeySteps.length
                     ? "You've been checking in consistently — keep it up."
@@ -1538,7 +1572,7 @@ export default function StudentDetailScreen() {
                         <Ionicons
                           name={item.icon}
                           size={16}
-                          color={DETAIL_COLORS.purple}
+                          color={theme.primary}
                         />
                       </View>
                       <Text style={styles.activityLabel}>{item.label}</Text>
@@ -1553,7 +1587,7 @@ export default function StudentDetailScreen() {
                   <Ionicons
                     name="time-outline"
                     size={36}
-                    color={DETAIL_COLORS.textFaint}
+                    color={theme.secondaryText}
                   />
                   <Text style={styles.emptyMoodsText}>No activity yet</Text>
                   <Text style={styles.emptyMoodsSubtext}>
@@ -1570,9 +1604,10 @@ export default function StudentDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: DETAIL_COLORS.bg },
-  mainLayout: { flex: 1, backgroundColor: DETAIL_COLORS.bg },
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
+  mainLayout: { flex: 1, backgroundColor: theme.background },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -1580,20 +1615,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 20,
     paddingBottom: 16,
-    backgroundColor: DETAIL_COLORS.surface,
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: DETAIL_COLORS.border,
+    borderBottomColor: theme.border,
   },
   backButton: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: DETAIL_COLORS.purpleSoft,
+    backgroundColor: theme.softPurple,
     justifyContent: "center",
     alignItems: "center",
   },
   headerTitle: {
-    color: DETAIL_COLORS.text,
+    color: theme.text,
     fontSize: 18,
     fontWeight: "800",
     flex: 1,
@@ -1603,7 +1638,7 @@ const styles = StyleSheet.create({
   headerSpacer: { width: 38 },
   scrollContent: { padding: 24, paddingBottom: 40 },
   stateCard: {
-    backgroundColor: DETAIL_COLORS.surface,
+    backgroundColor: theme.card,
     borderRadius: 20,
     padding: 32,
     alignItems: "center",
@@ -1615,17 +1650,17 @@ const styles = StyleSheet.create({
   },
   stateText: {
     marginTop: 12,
-    color: DETAIL_COLORS.textMuted,
+    color: theme.secondaryText,
     fontSize: 14,
     textAlign: "center",
   },
   card: {
-    backgroundColor: DETAIL_COLORS.surface,
+    backgroundColor: theme.card,
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: DETAIL_COLORS.border,
+    borderColor: theme.border,
     // @ts-ignore - web only
     boxShadow: "0px 6px 20px rgba(138, 99, 210, 0.06)",
   },
@@ -1644,12 +1679,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: "800",
-    color: DETAIL_COLORS.text,
+    color: theme.text,
     marginLeft: 8,
   },
   divider: {
     height: 1,
-    backgroundColor: DETAIL_COLORS.border,
+    backgroundColor: theme.border,
     marginBottom: 14,
   },
   tooltipAnchor: {
@@ -1665,7 +1700,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   infoIconHover: {
-    backgroundColor: DETAIL_COLORS.purpleSoft,
+    backgroundColor: theme.softPurple,
   },
   infoIconPressed: {
     opacity: 0.6,
@@ -1695,7 +1730,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: "#F1F3F8",
+    backgroundColor: theme.inputBg,
   },
   riskPillDot: {
     width: 8,
@@ -1709,7 +1744,7 @@ const styles = StyleSheet.create({
   noRiskText: {
     fontSize: 12,
     fontWeight: "700",
-    color: DETAIL_COLORS.textMuted,
+    color: theme.secondaryText,
   },
   avatarPressable: {
     position: "relative",
@@ -1719,13 +1754,13 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: DETAIL_COLORS.purple,
+    backgroundColor: theme.primary,
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
   },
   avatarText: {
-    color: "white",
+    color: theme.onPrimary,
     fontSize: 24,
     fontWeight: "800",
   },
@@ -1736,7 +1771,7 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: DETAIL_COLORS.purple,
+    backgroundColor: theme.primary,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
@@ -1750,12 +1785,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   profileCard: {
-    backgroundColor: DETAIL_COLORS.surface,
+    backgroundColor: theme.card,
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: DETAIL_COLORS.border,
+    borderColor: theme.border,
     // @ts-ignore - web only
     boxShadow: "0px 6px 20px rgba(138, 99, 210, 0.06)",
   },
@@ -1769,22 +1804,22 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 18,
     fontWeight: "800",
-    color: DETAIL_COLORS.text,
+    color: theme.text,
   },
   profileSub: {
     fontSize: 13,
     fontWeight: "600",
-    color: DETAIL_COLORS.purple,
+    color: theme.primary,
     marginTop: 2,
   },
   profileDept: {
     fontSize: 12,
     fontWeight: "500",
-    color: DETAIL_COLORS.textMuted,
+    color: theme.secondaryText,
     marginTop: 2,
   },
   profileIdBox: {
-    backgroundColor: DETAIL_COLORS.purpleSoft,
+    backgroundColor: theme.softPurple,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -1794,14 +1829,14 @@ const styles = StyleSheet.create({
   profileIdLabel: {
     fontSize: 10,
     fontWeight: "700",
-    color: DETAIL_COLORS.purple,
+    color: theme.primary,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   profileId: {
     fontSize: 13,
     fontWeight: "800",
-    color: DETAIL_COLORS.purpleDeep,
+    color: theme.primaryDeep,
     marginTop: 1,
     maxWidth: 120,
   },
@@ -1813,13 +1848,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 14,
     borderTopWidth: 1,
-    borderTopColor: "#F3F0FB",
+    borderTopColor: theme.borderSoft,
   },
   statusPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    backgroundColor: "#F6F3FC",
+    backgroundColor: theme.inputBg,
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -1827,7 +1862,7 @@ const styles = StyleSheet.create({
   statusPillText: {
     fontSize: 12,
     fontWeight: "700",
-    color: DETAIL_COLORS.purple,
+    color: theme.primary,
   },
   lastUpdatedRow: {
     flexDirection: "row",
@@ -1838,7 +1873,7 @@ const styles = StyleSheet.create({
   lastUpdatedText: {
     fontSize: 11,
     fontWeight: "500",
-    color: DETAIL_COLORS.textFaint,
+    color: theme.secondaryText,
   },
   snapshotHeadingRow: {
     flexDirection: "row",
@@ -1848,7 +1883,7 @@ const styles = StyleSheet.create({
   snapshotEyebrow: {
     fontSize: 12,
     fontWeight: "800",
-    color: DETAIL_COLORS.textMuted,
+    color: theme.secondaryText,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
@@ -1859,10 +1894,10 @@ const styles = StyleSheet.create({
   },
   snapshotTile: {
     flex: 1,
-    backgroundColor: DETAIL_COLORS.surface,
+    backgroundColor: theme.card,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: DETAIL_COLORS.border,
+    borderColor: theme.border,
     padding: 12,
     // @ts-ignore - web only
     boxShadow: "0px 4px 14px rgba(138, 99, 210, 0.05)",
@@ -1881,18 +1916,18 @@ const styles = StyleSheet.create({
   snapshotValue: {
     fontSize: 14,
     fontWeight: "800",
-    color: DETAIL_COLORS.text,
+    color: theme.text,
   },
   snapshotLabel: {
     fontSize: 11,
     fontWeight: "600",
-    color: DETAIL_COLORS.textMuted,
+    color: theme.secondaryText,
     marginTop: 2,
   },
   snapshotSub: {
     fontSize: 10,
     fontWeight: "500",
-    color: DETAIL_COLORS.textFaint,
+    color: theme.secondaryText,
     marginTop: 2,
   },
   regGroup: {
@@ -1907,7 +1942,7 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: DETAIL_COLORS.purpleSoft,
+    backgroundColor: theme.softPurple,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 8,
@@ -1915,7 +1950,7 @@ const styles = StyleSheet.create({
   regGroupTitle: {
     fontSize: 13,
     fontWeight: "800",
-    color: DETAIL_COLORS.text,
+    color: theme.text,
   },
   infoRow: {
     flexDirection: "row",
@@ -1923,18 +1958,18 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F0FB",
+    borderBottomColor: theme.borderSoft,
   },
   infoLabel: {
     flex: 1,
     fontSize: 13,
-    color: DETAIL_COLORS.textMuted,
+    color: theme.secondaryText,
     fontWeight: "600",
     paddingRight: 8,
   },
   infoValue: {
     fontSize: 13,
-    color: DETAIL_COLORS.text,
+    color: theme.text,
     fontWeight: "700",
     flex: 1,
     textAlign: "right",
@@ -1942,38 +1977,38 @@ const styles = StyleSheet.create({
   documentCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FAF8FE",
+    backgroundColor: theme.secondaryCard,
     borderRadius: 14,
     padding: 12,
     marginTop: 12,
     borderWidth: 1,
-    borderColor: DETAIL_COLORS.border,
+    borderColor: theme.border,
   },
   docTitle: {
     fontSize: 11,
     fontWeight: "600",
-    color: DETAIL_COLORS.textMuted,
+    color: theme.secondaryText,
   },
   docName: {
     fontSize: 13,
     fontWeight: "700",
-    color: DETAIL_COLORS.text,
+    color: theme.text,
   },
   viewDocButton: {
-    backgroundColor: DETAIL_COLORS.purple,
+    backgroundColor: theme.primary,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
   },
   viewDocText: {
-    color: "#FFFFFF",
+    color: theme.onPrimary,
     fontSize: 12,
     fontWeight: "800",
   },
   noDocText: {
     fontSize: 12,
     fontWeight: "600",
-    color: DETAIL_COLORS.textFaint,
+    color: theme.secondaryText,
   },
   wellnessBody: {
     paddingTop: 4,
@@ -2010,18 +2045,18 @@ const styles = StyleSheet.create({
   scoreLabel: {
     fontSize: 13,
     fontWeight: "700",
-    color: DETAIL_COLORS.textMuted,
+    color: theme.secondaryText,
   },
   scoreValue: {
     fontSize: 14,
     fontWeight: "800",
-    color: DETAIL_COLORS.text,
+    color: theme.text,
   },
   scoreBar: {
     position: "relative",
     height: 10,
     borderRadius: 5,
-    backgroundColor: "#F1EDFB",
+    backgroundColor: theme.inputBg,
     marginTop: 4,
   },
   scoreBarFill: {
@@ -2047,22 +2082,22 @@ const styles = StyleSheet.create({
   scoreScaleText: {
     fontSize: 10,
     fontWeight: "600",
-    color: DETAIL_COLORS.textFaint,
+    color: theme.secondaryText,
   },
   scoreMeta: {
     fontSize: 12,
-    color: DETAIL_COLORS.textMuted,
+    color: theme.secondaryText,
     marginTop: 12,
     fontStyle: "italic",
   },
   trendFirstTitle: {
     fontSize: 15,
     fontWeight: "800",
-    color: DETAIL_COLORS.text,
+    color: theme.text,
   },
   trendFirstSub: {
     fontSize: 12,
-    color: DETAIL_COLORS.textMuted,
+    color: theme.secondaryText,
     lineHeight: 18,
     marginTop: 4,
   },
@@ -2082,7 +2117,7 @@ const styles = StyleSheet.create({
   trendXLabel: {
     fontSize: 10,
     fontWeight: "600",
-    color: DETAIL_COLORS.textFaint,
+    color: theme.secondaryText,
     textAlign: "center",
     overflow: "hidden",
   },
@@ -2145,10 +2180,10 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 14,
     padding: 12,
-    backgroundColor: "#FAF8FE",
+    backgroundColor: theme.secondaryCard,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: DETAIL_COLORS.border,
+    borderColor: theme.border,
   },
   trendSummaryCell: {
     flexGrow: 1,
@@ -2158,14 +2193,14 @@ const styles = StyleSheet.create({
   trendSummaryLabel: {
     fontSize: 10,
     fontWeight: "700",
-    color: DETAIL_COLORS.textFaint,
+    color: theme.secondaryText,
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
   trendSummaryValue: {
     fontSize: 14,
     fontWeight: "800",
-    color: DETAIL_COLORS.text,
+    color: theme.text,
     marginTop: 3,
   },
   trendSummaryStatusRow: {
@@ -2188,13 +2223,13 @@ const styles = StyleSheet.create({
   },
   emptyMoodsText: {
     fontSize: 15,
-    color: DETAIL_COLORS.textMuted,
+    color: theme.secondaryText,
     fontWeight: "700",
     marginTop: 8,
   },
   emptyMoodsSubtext: {
     fontSize: 12,
-    color: DETAIL_COLORS.textFaint,
+    color: theme.secondaryText,
     marginTop: 4,
     textAlign: "center",
   },
@@ -2217,18 +2252,18 @@ const styles = StyleSheet.create({
   },
   barLabel: {
     fontSize: 12,
-    color: DETAIL_COLORS.textMuted,
+    color: theme.secondaryText,
     fontWeight: "600",
   },
   barTrack: {
     flex: 1,
     height: 22,
-    backgroundColor: "#F6F3FC",
+    backgroundColor: theme.inputBg,
     borderRadius: 11,
     overflow: "hidden",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: DETAIL_COLORS.border,
+    borderColor: theme.border,
   },
   barFill: {
     height: "100%",
@@ -2238,7 +2273,7 @@ const styles = StyleSheet.create({
   barCount: {
     fontSize: 13,
     fontWeight: "800",
-    color: DETAIL_COLORS.text,
+    color: theme.text,
     width: 28,
     textAlign: "right",
   },
@@ -2251,7 +2286,7 @@ const styles = StyleSheet.create({
   moodChip: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: DETAIL_COLORS.purpleSoft,
+    backgroundColor: theme.softPurple,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -2259,7 +2294,7 @@ const styles = StyleSheet.create({
   moodChipText: {
     fontSize: 12,
     fontWeight: "700",
-    color: DETAIL_COLORS.purple,
+    color: theme.primary,
   },
   totalMoodsRow: {
     flexDirection: "row",
@@ -2268,12 +2303,12 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: "#F3F0FB",
+    borderTopColor: theme.borderSoft,
     gap: 6,
   },
   totalMoodsText: {
     fontSize: 13,
-    color: DETAIL_COLORS.textMuted,
+    color: theme.secondaryText,
     fontWeight: "600",
   },
   journeyRow: {
@@ -2294,15 +2329,15 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#F1EDFB",
+    backgroundColor: theme.inputBg,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: DETAIL_COLORS.border,
+    borderColor: theme.border,
   },
   journeyDotDone: {
-    backgroundColor: DETAIL_COLORS.purpleSoft,
-    borderColor: DETAIL_COLORS.purple,
+    backgroundColor: theme.softPurple,
+    borderColor: theme.primary,
   },
   journeyEmoji: {
     fontSize: 18,
@@ -2310,21 +2345,21 @@ const styles = StyleSheet.create({
   journeyConnector: {
     flex: 1,
     height: 2,
-    backgroundColor: "#EFEAFA",
+    backgroundColor: theme.borderSoft,
     marginHorizontal: 6,
   },
   journeyConnectorDone: {
-    backgroundColor: DETAIL_COLORS.purple,
+    backgroundColor: theme.primary,
   },
   journeyTitle: {
     fontSize: 12,
     fontWeight: "800",
-    color: DETAIL_COLORS.text,
+    color: theme.text,
     textAlign: "center",
   },
   journeyDesc: {
     fontSize: 10,
-    color: DETAIL_COLORS.textMuted,
+    color: theme.secondaryText,
     textAlign: "center",
     marginTop: 2,
     lineHeight: 13,
@@ -2332,13 +2367,13 @@ const styles = StyleSheet.create({
   journeyCheck: {
     fontSize: 10,
     fontWeight: "800",
-    color: DETAIL_COLORS.textFaint,
+    color: theme.secondaryText,
     marginTop: 6,
     textTransform: "uppercase",
     letterSpacing: 0.4,
   },
   journeyCheckDone: {
-    color: "#0E9F6E",
+    color: theme.status.success,
   },
   journeyNote: {
     flexDirection: "row",
@@ -2347,12 +2382,12 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: "#F3F0FB",
+    borderTopColor: theme.borderSoft,
   },
   journeyNoteText: {
     flex: 1,
     fontSize: 12,
-    color: DETAIL_COLORS.textMuted,
+    color: theme.secondaryText,
     fontWeight: "600",
   },
   activityRow: {
@@ -2360,13 +2395,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F0FB",
+    borderBottomColor: theme.borderSoft,
   },
   activityIconCircle: {
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: DETAIL_COLORS.purpleSoft,
+    backgroundColor: theme.softPurple,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
@@ -2375,11 +2410,11 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: "600",
-    color: DETAIL_COLORS.text,
+    color: theme.text,
   },
   activityTime: {
     fontSize: 12,
     fontWeight: "600",
-    color: DETAIL_COLORS.textMuted,
+    color: theme.secondaryText,
   },
 });

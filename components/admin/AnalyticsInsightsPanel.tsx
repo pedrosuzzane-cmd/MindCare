@@ -17,6 +17,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import type { MindCareTheme } from "@/constants/theme";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 import type { StudentSummary } from "@/services/adminFirestoreService";
 import { fetchFollowUpQueueCounts } from "@/services/safeguardingService";
 import {
@@ -38,9 +40,15 @@ interface AnalyticsInsightsPanelProps {
 }
 
 function DeltaBadge({ label }: { label: string }) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const up = label === "up";
   const down = label === "down";
-  const color = up ? "#16A34A" : down ? "#DC2626" : "#94A3B8";
+  const color = up
+    ? theme.status.success
+    : down
+      ? theme.status.error
+      : theme.secondaryText;
   const icon = up ? "arrow-up" : down ? "arrow-down" : "remove";
   return (
     <View style={[styles.deltaBadge, { backgroundColor: `${color}18` }]}>
@@ -55,6 +63,8 @@ function DeltaBadge({ label }: { label: string }) {
 export default function AnalyticsInsightsPanel({
   students,
 }: AnalyticsInsightsPanelProps) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [followUpCounts, setFollowUpCounts] = useState({
     pendingReview: 0,
     inProgress: 0,
@@ -158,7 +168,7 @@ export default function AnalyticsInsightsPanel({
       <View style={styles.trendRow}>
         <View style={styles.trendCard}>
           <View style={styles.trendCardHeader}>
-            <Ionicons name="pulse" size={16} color="#8A63D2" />
+            <Ionicons name="pulse" size={16} color={theme.primary} />
             <Text style={styles.trendCardTitle}>Wellness Trend</Text>
           </View>
           <Text style={styles.trendValue}>
@@ -175,7 +185,7 @@ export default function AnalyticsInsightsPanel({
         </View>
         <View style={styles.trendCard}>
           <View style={styles.trendCardHeader}>
-            <Ionicons name="checkbox" size={16} color="#8A63D2" />
+            <Ionicons name="checkbox" size={16} color={theme.primary} />
             <Text style={styles.trendCardTitle}>Assessment Participation</Text>
           </View>
           <Text style={styles.trendValue}>
@@ -198,7 +208,7 @@ export default function AnalyticsInsightsPanel({
         {recommendedActions.map((action, i) => (
           <View key={i} style={styles.actionRow}>
             <View style={styles.actionIcon}>
-              <Ionicons name="flag-outline" size={14} color="#6D28D9" />
+              <Ionicons name="flag-outline" size={14} color={theme.primary} />
             </View>
             <View style={styles.actionBody}>
               <Text style={styles.actionTitle}>{action.title}</Text>
@@ -296,7 +306,7 @@ export default function AnalyticsInsightsPanel({
           ]}
           onPress={() => router.push("/(admin)/safeguarding")}
         >
-          <Ionicons name="shield-checkmark-outline" size={14} color="#FFFFFF" />
+          <Ionicons name="shield-checkmark-outline" size={14} color={theme.onPrimary} />
           <Text style={styles.queueButtonText}>Open Follow-Up Queue</Text>
         </Pressable>
       </View>
@@ -336,153 +346,154 @@ export default function AnalyticsInsightsPanel({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { gap: 12, marginTop: 8 },
-  sectionHeader: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#4C1D95",
-    marginTop: 4,
-  },
-  sectionHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-    marginTop: 4,
-  },
-  alertsGrid: { gap: 10 },
-  alertCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
-  },
-  alertHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
-  alertTitle: { fontSize: 13, fontWeight: "800", color: "#2D1B69", flex: 1 },
-  alertText: { fontSize: 12, color: "#64748B", lineHeight: 18 },
-  alertFootnote: { fontSize: 11, color: "#94A3B8", lineHeight: 16 },
-  deltaBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  deltaText: { fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
-  trendRow: { flexDirection: "row", gap: 10 },
-  trendCard: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
-  },
-  trendCardHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
-  trendCardTitle: { fontSize: 13, fontWeight: "800", color: "#2D1B69", flex: 1 },
-  trendValue: { fontSize: 24, fontWeight: "900", color: "#581C87" },
-  trendLabel: { fontSize: 11, color: "#8B5CF6", fontWeight: "700", marginTop: 2 },
-  trendHint: { fontSize: 11, color: "#94A3B8", marginTop: 6, lineHeight: 15 },
-  actionsCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
-    gap: 12,
-  },
-  actionRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  actionIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
-    backgroundColor: "#EDE9FE",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 2,
-  },
-  actionBody: { flex: 1 },
-  actionTitle: { fontSize: 13, fontWeight: "700", color: "#1E1B4B" },
-  actionDesc: { fontSize: 12, color: "#64748B", lineHeight: 17, marginTop: 2 },
-  suppressedTag: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#B45309",
-    backgroundColor: "#FEF3C7",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  emptyCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
-    alignItems: "center",
-  },
-  emptyText: { fontSize: 13, color: "#94A3B8" },
-  deptTable: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
-  },
-  deptTableHeader: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#EDE9FE",
-    paddingBottom: 8,
-  },
-  deptTableRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F8F6FC",
-  },
-  deptCell: {
-    flex: 1,
-    fontSize: 12,
-    color: "#475569",
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  deptCellDept: { flex: 1.6, alignItems: "flex-start", textAlign: "left" },
-  deptName: { fontSize: 12, fontWeight: "800", color: "#2D1B69" },
-  deptCount: { fontSize: 10, color: "#94A3B8", fontWeight: "600", marginTop: 2 },
-  suppressedText: { fontSize: 11, color: "#94A3B8", fontStyle: "italic" },
-  flatText: { fontSize: 11, color: "#94A3B8" },
-  moreText: { fontSize: 11, color: "#8A63D2", fontWeight: "700", marginTop: 8 },
-  queueButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#6D28D9",
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 12,
-  },
-  queueButtonText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
-  safeguardingGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  safeguardCard: {
-    flexGrow: 1,
-    flexBasis: "30%",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    padding: 12,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
-  },
-  safeguardValue: { fontSize: 20, fontWeight: "900", color: "#581C87" },
-  safeguardLabel: { fontSize: 11, color: "#8B5CF6", fontWeight: "700", marginTop: 2, textAlign: "center" },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: { gap: 12, marginTop: 8 },
+    sectionHeader: {
+      fontSize: 15,
+      fontWeight: "800",
+      color: theme.text,
+      marginTop: 4,
+    },
+    sectionHeaderRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 8,
+      marginTop: 4,
+    },
+    alertsGrid: { gap: 10 },
+    alertCard: {
+      backgroundColor: theme.card,
+      borderRadius: 16,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    alertHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
+    alertTitle: { fontSize: 13, fontWeight: "800", color: theme.text, flex: 1 },
+    alertText: { fontSize: 12, color: theme.secondaryText, lineHeight: 18 },
+    alertFootnote: { fontSize: 11, color: theme.secondaryText, lineHeight: 16 },
+    deltaBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 10,
+    },
+    deltaText: { fontSize: 10, fontWeight: "800", textTransform: "uppercase" },
+    trendRow: { flexDirection: "row", gap: 10 },
+    trendCard: {
+      flex: 1,
+      backgroundColor: theme.card,
+      borderRadius: 16,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    trendCardHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
+    trendCardTitle: { fontSize: 13, fontWeight: "800", color: theme.text, flex: 1 },
+    trendValue: { fontSize: 24, fontWeight: "900", color: theme.primaryDeep },
+    trendLabel: { fontSize: 11, color: theme.primary, fontWeight: "700", marginTop: 2 },
+    trendHint: { fontSize: 11, color: theme.secondaryText, marginTop: 6, lineHeight: 15 },
+    actionsCard: {
+      backgroundColor: theme.card,
+      borderRadius: 16,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: theme.border,
+      gap: 12,
+    },
+    actionRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+    actionIcon: {
+      width: 26,
+      height: 26,
+      borderRadius: 8,
+      backgroundColor: theme.softPurple,
+      justifyContent: "center",
+      alignItems: "center",
+      marginTop: 2,
+    },
+    actionBody: { flex: 1 },
+    actionTitle: { fontSize: 13, fontWeight: "700", color: theme.text },
+    actionDesc: { fontSize: 12, color: theme.secondaryText, lineHeight: 17, marginTop: 2 },
+    suppressedTag: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: theme.status.warning,
+      backgroundColor: `${theme.status.warning}1A`,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 10,
+    },
+    emptyCard: {
+      backgroundColor: theme.card,
+      borderRadius: 16,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: theme.border,
+      alignItems: "center",
+    },
+    emptyText: { fontSize: 13, color: theme.secondaryText },
+    deptTable: {
+      backgroundColor: theme.card,
+      borderRadius: 16,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    deptTableHeader: {
+      flexDirection: "row",
+      borderBottomWidth: 1,
+      borderBottomColor: theme.borderSoft,
+      paddingBottom: 8,
+    },
+    deptTableRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.borderSoft,
+    },
+    deptCell: {
+      flex: 1,
+      fontSize: 12,
+      color: theme.secondaryText,
+      fontWeight: "700",
+      textAlign: "center",
+    },
+    deptCellDept: { flex: 1.6, alignItems: "flex-start", textAlign: "left" },
+    deptName: { fontSize: 12, fontWeight: "800", color: theme.text },
+    deptCount: { fontSize: 10, color: theme.secondaryText, fontWeight: "600", marginTop: 2 },
+    suppressedText: { fontSize: 11, color: theme.secondaryText, fontStyle: "italic" },
+    flatText: { fontSize: 11, color: theme.secondaryText },
+    moreText: { fontSize: 11, color: theme.primary, fontWeight: "700", marginTop: 8 },
+    queueButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      backgroundColor: theme.primary,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 12,
+    },
+    queueButtonText: { color: theme.onPrimary, fontSize: 12, fontWeight: "700" },
+    safeguardingGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    safeguardCard: {
+      flexGrow: 1,
+      flexBasis: "30%",
+      backgroundColor: theme.card,
+      borderRadius: 14,
+      padding: 12,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    safeguardValue: { fontSize: 20, fontWeight: "900", color: theme.primaryDeep },
+    safeguardLabel: { fontSize: 11, color: theme.primary, fontWeight: "700", marginTop: 2, textAlign: "center" },
+  });

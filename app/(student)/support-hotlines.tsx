@@ -1,18 +1,17 @@
+import { shadows } from "@/utils/shadows";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
 import React from "react";
 import {
-  Alert,
-  Linking,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    Alert,
+    Linking,
+    Pressable,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
-import { shadows } from "@/utils/shadows";
 
 interface SupportHotline {
   id: string;
@@ -112,7 +111,7 @@ export default function SupportHotlinesScreen() {
           `Please text HOME to 741741 for crisis support`,
         );
       }
-    } catch (error) {
+    } catch {
       Alert.alert(
         "Error",
         "Unable to open the application. The service may not be available on your device.",
@@ -328,12 +327,12 @@ const styles = StyleSheet.create({
     color: "#FF4757",
   },
   hotlineCard: {
-    backgroundColor: "white",
+    backgroundColor: "#1E1B2E",
     borderRadius: 20,
     padding: 20,
     ...(shadows.sm("#000") as any),
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
+    borderColor: "rgba(156, 126, 235, 0.12)",
   },
   cardHeader: {
     flexDirection: "row",

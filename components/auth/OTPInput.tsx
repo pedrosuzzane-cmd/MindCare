@@ -1,3 +1,4 @@
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 import { useEffect, useRef } from "react";
 import { StyleSheet, TextInput, View } from "react-native";
 
@@ -20,6 +21,7 @@ export default function OTPInput({
 }: OTPInputProps) {
   const refs = useRef<(TextInput | null)[]>([]);
   const prevLen = useRef(0);
+  const { theme } = useMindCareTheme();
 
   // Auto-submit only when the code transitions to a full length,
   // so editing a complete code does not re-submit on every keystroke.
@@ -28,7 +30,7 @@ export default function OTPInput({
       onComplete?.(value);
     }
     prevLen.current = value.length;
-  }, [value, length]);
+  }, [value, length, onComplete]);
 
   const handleChange = (text: string, index: number) => {
     const clean = text.replace(/[^0-9]/g, "");
@@ -64,7 +66,11 @@ export default function OTPInput({
           }}
           style={[
             styles.box,
-            value.length === i && styles.boxActive,
+            {
+              backgroundColor: theme.inputBg,
+              borderColor: value.length === i ? theme.primary : theme.border,
+              color: theme.text,
+            },
             error ? styles.boxError : null,
           ]}
           value={value[i] || ""}
@@ -92,17 +98,11 @@ const styles = StyleSheet.create({
     flex: 1,
     aspectRatio: 0.82,
     maxWidth: 56,
-    backgroundColor: "#FFFFFF",
     borderWidth: 1.5,
-    borderColor: "#E5E7EB",
     borderRadius: 14,
     fontSize: 24,
     fontWeight: "700",
-    color: "#1F2937",
     textAlign: "center",
-  },
-  boxActive: {
-    borderColor: "#7C3AED",
   },
   boxError: {
     borderColor: "#EF4444",

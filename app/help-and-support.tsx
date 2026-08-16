@@ -6,12 +6,14 @@ import {
     Alert,
     Linking,
     Pressable,
-    SafeAreaView,
     ScrollView,
     StyleSheet,
     Text,
     View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 const FAQS = [
   {
@@ -37,6 +39,9 @@ const FAQS = [
 ];
 
 export default function HelpAndSupportScreen() {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
+
   const handleContactSupport = async () => {
     const email = "support@youruniversity.edu";
     const url = `mailto:${email}?subject=MindCare App Support`;
@@ -54,10 +59,10 @@ export default function HelpAndSupportScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient colors={["#F0F8FF", "#E8F4FD"]} style={styles.gradient}>
+      <LinearGradient colors={theme.softGradient} style={styles.gradient}>
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#666" />
+            <Ionicons name="arrow-back" size={24} color={theme.secondaryText} />
           </Pressable>
           <Text style={styles.headerTitle}>Help & Support</Text>
           <View style={{ width: 40 }} />
@@ -85,7 +90,7 @@ export default function HelpAndSupportScreen() {
             style={styles.contactButton}
             onPress={handleContactSupport}
           >
-            <Ionicons name="mail-outline" size={20} color="white" />
+            <Ionicons name="mail-outline" size={20} color={theme.onPrimary} />
             <Text style={styles.contactButtonText}>Contact Support</Text>
           </Pressable>
         </ScrollView>
@@ -94,81 +99,82 @@ export default function HelpAndSupportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  gradient: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#2196F3",
-    marginBottom: 16,
-    marginTop: 12,
-  },
-  faqItem: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  faqQuestion: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 8,
-  },
-  faqAnswer: {
-    fontSize: 14,
-    color: "#666",
-    lineHeight: 22,
-  },
-  contactText: {
-    fontSize: 14,
-    color: "#666",
-    lineHeight: 22,
-    marginBottom: 16,
-  },
-  contactButton: {
-    backgroundColor: "#2196F3",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-    borderRadius: 25,
-    gap: 8,
-  },
-  contactButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    gradient: {
+      flex: 1,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: theme.text,
+    },
+    scrollContainer: {
+      flex: 1,
+    },
+    scrollContent: {
+      padding: 20,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: theme.primary,
+      marginBottom: 16,
+      marginTop: 12,
+    },
+    faqItem: {
+      backgroundColor: theme.card,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+    },
+    faqQuestion: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: theme.text,
+      marginBottom: 8,
+    },
+    faqAnswer: {
+      fontSize: 14,
+      color: theme.secondaryText,
+      lineHeight: 22,
+    },
+    contactText: {
+      fontSize: 14,
+      color: theme.secondaryText,
+      lineHeight: 22,
+      marginBottom: 16,
+    },
+    contactButton: {
+      backgroundColor: theme.primary,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 14,
+      borderRadius: 25,
+      gap: 8,
+    },
+    contactButtonText: {
+      color: theme.onPrimary,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+  });

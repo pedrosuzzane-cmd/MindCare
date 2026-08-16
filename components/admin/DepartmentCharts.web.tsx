@@ -14,6 +14,8 @@ import {
   Scatter,
   ZAxis,
 } from "recharts";
+import type { MindCareTheme } from "@/constants/theme";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 import {
   formatDepartmentName,
   getDepartmentCode,
@@ -40,12 +42,6 @@ export interface ScatterPoint {
   riskLevel: "low" | "normal" | "high";
 }
 
-const RISK_COLORS: Record<string, string> = {
-  low: "#22C55E",
-  normal: "#EAB308",
-  high: "#EF4444",
-};
-
 // ─── Helpers ──────────────────────────────────────────────────────────────
 function concernLabel(risk: string): string {
   if (risk === "low") return "Lower concern";
@@ -55,6 +51,8 @@ function concernLabel(risk: string): string {
 
 // ─── Custom Tooltip ────────────────────────────────────────────────────────
 const CustomTooltip = ({ active, payload, label }: any) => {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   if (!active || !payload?.length) return null;
   const first = payload[0]?.payload;
   const title = formatDepartmentName(String(label));
@@ -85,6 +83,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 const ScatterTooltip = ({ active, payload }: any) => {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
@@ -107,10 +107,12 @@ interface ComparisonChartProps {
 }
 
 export function DepartmentComparisonChart({ data }: ComparisonChartProps) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   if (data.length === 0) {
     return (
       <View style={styles.emptyCard}>
-        <Ionicons name="bar-chart-outline" size={32} color="#CBD5E1" />
+        <Ionicons name="bar-chart-outline" size={32} color={theme.border} />
         <Text style={styles.emptyText}>No department data available</Text>
       </View>
     );
@@ -135,16 +137,16 @@ export function DepartmentComparisonChart({ data }: ComparisonChartProps) {
     <View>
       <ResponsiveContainer width="100%" height={360}>
         <BarChart data={barData} margin={{ top: 20, right: 20, left: 0, bottom: 60 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#EEF2F7" />
+          <CartesianGrid strokeDasharray="3 3" stroke={theme.border} />
           <XAxis
             dataKey="dept"
-            tick={{ fill: "#334155", fontSize: 13, fontWeight: "700" }}
-            axisLine={{ stroke: "#E2E8F0" }}
+            tick={{ fill: theme.text, fontSize: 13, fontWeight: "700" }}
+            axisLine={{ stroke: theme.border }}
             tickLine={false}
           />
-          <YAxis tick={{ fill: "#475569", fontSize: 11.5 }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fill: theme.secondaryText, fontSize: 11.5 }} axisLine={false} tickLine={false} />
           <Tooltip content={<CustomTooltip />} />
-          <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 13, paddingTop: 12, color: "#334155" }} />
+          <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 13, paddingTop: 12, color: theme.text }} />
           <Bar dataKey="Avg Score" fill="#8A63D2" radius={[4, 4, 0, 0]} maxBarSize={24} />
           <Bar dataKey="Journals" fill="#16A34A" radius={[4, 4, 0, 0]} maxBarSize={24} />
           <Bar dataKey="LSN" fill="#D97706" radius={[4, 4, 0, 0]} maxBarSize={24} />
@@ -167,6 +169,13 @@ interface ScatterPlotProps {
 }
 
 export function DepartmentCorrelationScatter({ points }: ScatterPlotProps) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
+  const riskColors = {
+    low: theme.status.success,
+    normal: theme.status.warning,
+    high: theme.status.error,
+  };
   const deptColors: Record<string, string> = {};
   const uniqueDepts = [...new Set(points.map((p) => p.department))];
   const palette = ["#8A63D2", "#16A34A", "#D97706", "#0EA5E9", "#EC4899", "#F97316", "#06B6D4"];
@@ -178,26 +187,26 @@ export function DepartmentCorrelationScatter({ points }: ScatterPlotProps) {
     <View>
       <ResponsiveContainer width="100%" height={400}>
         <ScatterChart margin={{ top: 20, right: 30, left: 10, bottom: 50 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#EEF2F7" />
+          <CartesianGrid strokeDasharray="3 3" stroke={theme.border} />
           <XAxis
             dataKey="journalCount"
             name="Journal Entries"
-            tick={{ fill: "#334155", fontSize: 11.5 }}
-            axisLine={{ stroke: "#E2E8F0" }}
+            tick={{ fill: theme.text, fontSize: 11.5 }}
+            axisLine={{ stroke: theme.border }}
             tickLine={false}
           />
           <YAxis
             dataKey="avgScore"
             name="Avg Assessment Score"
             domain={[0, 80]}
-            tick={{ fill: "#334155", fontSize: 11.5 }}
+            tick={{ fill: theme.text, fontSize: 11.5 }}
             axisLine={false}
             tickLine={false}
             label={{
               value: "Concern Indicator →",
               angle: -90,
               position: "insideLeft",
-              style: { fill: "#64748B", fontSize: 12, fontWeight: "600" },
+              style: { fill: theme.secondaryText, fontSize: 12, fontWeight: "600" },
             }}
           />
           <ZAxis range={[60, 60]} />
@@ -218,15 +227,15 @@ export function DepartmentCorrelationScatter({ points }: ScatterPlotProps) {
         <Text style={styles.chartFooterNote}>Point color = Department</Text>
         <View style={styles.scatterRiskLegend}>
           <View style={styles.riskDotRow}>
-            <View style={[styles.riskDot, { backgroundColor: RISK_COLORS.low }]} />
+            <View style={[styles.riskDot, { backgroundColor: riskColors.low }]} />
             <Text style={styles.riskDotLabel}>Lower concern</Text>
           </View>
           <View style={styles.riskDotRow}>
-            <View style={[styles.riskDot, { backgroundColor: RISK_COLORS.normal }]} />
+            <View style={[styles.riskDot, { backgroundColor: riskColors.normal }]} />
             <Text style={styles.riskDotLabel}>Moderate concern</Text>
           </View>
           <View style={styles.riskDotRow}>
-            <View style={[styles.riskDot, { backgroundColor: RISK_COLORS.high }]} />
+            <View style={[styles.riskDot, { backgroundColor: riskColors.high }]} />
             <Text style={styles.riskDotLabel}>Elevated concern</Text>
           </View>
         </View>
@@ -245,92 +254,93 @@ export function DepartmentCorrelationScatter({ points }: ScatterPlotProps) {
 }
 
 // ─── Styles ────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  tooltip: {
-    backgroundColor: "#2A1745",
-    borderRadius: 10,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "#6D28D9",
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    maxWidth: 260,
-  },
-  tooltipLabel: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#F8FAFC",
-    marginBottom: 4,
-  },
-  tooltipValue: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#D1D5DB",
-    marginTop: 2,
-  },
-  tooltipMuted: {
-    fontSize: 11,
-    color: "#A1A1AA",
-    marginTop: 4,
-    fontWeight: "600",
-  },
-  tooltipNote: {
-    fontSize: 10,
-    color: "#A1A1AA",
-    fontStyle: "italic",
-    marginTop: 6,
-    lineHeight: 14,
-  },
-  chartFooter: {
-    marginTop: 12,
-    paddingHorizontal: 4,
-  },
-  chartFooterNote: {
-    fontSize: 12,
-    color: "#94A3B8",
-    fontStyle: "italic",
-    lineHeight: 18,
-  },
-  emptyCard: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 40,
-    gap: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: "#94A3B8",
-    fontWeight: "500",
-  },
-  scatterLegend: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 8,
-    paddingHorizontal: 4,
-  },
-  scatterRiskLegend: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  riskDotRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  riskDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  riskDotLabel: {
-    fontSize: 11,
-    color: "#64748B",
-    fontWeight: "500",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    tooltip: {
+      backgroundColor: theme.card,
+      borderRadius: 10,
+      padding: 10,
+      borderWidth: 1,
+      borderColor: theme.border,
+      elevation: 8,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+      maxWidth: 260,
+    },
+    tooltipLabel: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: theme.text,
+      marginBottom: 4,
+    },
+    tooltipValue: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: theme.secondaryText,
+      marginTop: 2,
+    },
+    tooltipMuted: {
+      fontSize: 11,
+      color: theme.secondaryText,
+      marginTop: 4,
+      fontWeight: "600",
+    },
+    tooltipNote: {
+      fontSize: 10,
+      color: theme.secondaryText,
+      fontStyle: "italic",
+      marginTop: 6,
+      lineHeight: 14,
+    },
+    chartFooter: {
+      marginTop: 12,
+      paddingHorizontal: 4,
+    },
+    chartFooterNote: {
+      fontSize: 12,
+      color: theme.secondaryText,
+      fontStyle: "italic",
+      lineHeight: 18,
+    },
+    emptyCard: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 40,
+      gap: 8,
+    },
+    emptyText: {
+      fontSize: 14,
+      color: theme.secondaryText,
+      fontWeight: "500",
+    },
+    scatterLegend: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: 8,
+      marginTop: 8,
+      paddingHorizontal: 4,
+    },
+    scatterRiskLegend: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 12,
+    },
+    riskDotRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+    },
+    riskDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+    riskDotLabel: {
+      fontSize: 11,
+      color: theme.secondaryText,
+      fontWeight: "500",
+    },
+  });

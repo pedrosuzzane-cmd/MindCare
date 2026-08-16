@@ -9,6 +9,8 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 export interface MultiSelectItem {
   key: string;
@@ -29,18 +31,20 @@ interface Props {
   onCancel: () => void;
 }
 
-const ACCENT = "#8A63D2";
-
 export default function MultiSelectModal({
   visible,
   title,
   items,
   selected = [],
   maxSelection,
-  accentColor = ACCENT,
+  accentColor,
   onConfirm,
   onCancel,
 }: Props) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
+  const resolvedAccent = accentColor ?? theme.primary;
+
   const [query, setQuery] = useState("");
 
   const [sel, setSel] = useState<string[]>([]);
@@ -83,16 +87,16 @@ export default function MultiSelectModal({
           <View style={styles.header}>
             <Text style={styles.title}>{title}</Text>
             <Pressable onPress={onCancel} style={styles.closeBtn}>
-              <Ionicons name="close" size={20} color="#6B7280" />
+              <Ionicons name="close" size={20} color={theme.secondaryText} />
             </Pressable>
           </View>
 
           <View style={styles.searchRow}>
-            <Ionicons name="search" size={16} color="#9CA3AF" />
+            <Ionicons name="search" size={16} color={theme.secondaryText} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search..."
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={theme.secondaryText}
               value={query}
               onChangeText={setQuery}
             />
@@ -111,27 +115,27 @@ export default function MultiSelectModal({
                 return (
                   <Pressable
                     key={item.key}
-                    style={[styles.row, checked && { borderColor: accentColor }]}
+                    style={[styles.row, checked && { borderColor: resolvedAccent }]}
                     onPress={() => toggle(item.key)}
                   >
                     <View
                       style={[
                         styles.checkbox,
                         {
-                          borderColor: checked ? accentColor : "#D1D5DB",
-                          backgroundColor: checked ? accentColor : "transparent",
+                          borderColor: checked ? resolvedAccent : theme.border,
+                          backgroundColor: checked ? resolvedAccent : "transparent",
                         },
                       ]}
                     >
                       {checked && (
-                        <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                        <Ionicons name="checkmark" size={14} color={theme.onPrimary} />
                       )}
                     </View>
                     {item.icon && (
                       <Ionicons
                         name={item.icon}
                         size={18}
-                        color={item.color ?? accentColor}
+                        color={item.color ?? resolvedAccent}
                       />
                     )}
                     <View style={styles.rowText}>
@@ -153,7 +157,7 @@ export default function MultiSelectModal({
             <Pressable
               style={[
                 styles.confirmBtn,
-                { backgroundColor: accentColor },
+                { backgroundColor: resolvedAccent },
                 sel.length === 0 && styles.confirmBtnDisabled,
               ]}
               disabled={sel.length === 0}
@@ -170,135 +174,136 @@ export default function MultiSelectModal({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: "rgba(17,24,39,0.55)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
-  },
-  sheet: {
-    width: "100%",
-    maxWidth: 460,
-    maxHeight: "80%",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    paddingBottom: 12,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 10,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: "#1E1B4B",
-  },
-  closeBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F3F4F6",
-  },
-  searchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    paddingHorizontal: 12,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: "#F3F4F6",
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: "#111827",
-  },
-  list: {
-    flexGrow: 0,
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  empty: {
-    textAlign: "center",
-    color: "#9CA3AF",
-    paddingVertical: 24,
-    fontSize: 14,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    marginBottom: 8,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rowText: {
-    flex: 1,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  desc: {
-    fontSize: 12,
-    color: "#6B7280",
-    marginTop: 2,
-  },
-  footer: {
-    flexDirection: "row",
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  cancelBtn: {
-    flex: 1,
-    height: 44,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F3F4F6",
-  },
-  cancelText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#4B5563",
-  },
-  confirmBtn: {
-    flex: 2,
-    height: 44,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  confirmBtnDisabled: {
-    opacity: 0.45,
-  },
-  confirmText: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#FFFFFF",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      backgroundColor: "rgba(17,24,39,0.55)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 16,
+    },
+    sheet: {
+      width: "100%",
+      maxWidth: 460,
+      maxHeight: "80%",
+      backgroundColor: theme.card,
+      borderRadius: 18,
+      paddingBottom: 12,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 10,
+    },
+    title: {
+      fontSize: 16,
+      fontWeight: "800",
+      color: theme.text,
+    },
+    closeBtn: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.inputBg,
+    },
+    searchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginHorizontal: 16,
+      marginBottom: 8,
+      paddingHorizontal: 12,
+      height: 40,
+      borderRadius: 10,
+      backgroundColor: theme.inputBg,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 14,
+      color: theme.text,
+    },
+    list: {
+      flexGrow: 0,
+    },
+    listContent: {
+      paddingHorizontal: 16,
+      paddingBottom: 8,
+    },
+    empty: {
+      textAlign: "center",
+      color: theme.secondaryText,
+      paddingVertical: 24,
+      fontSize: 14,
+    },
+    row: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.border,
+      marginBottom: 8,
+    },
+    checkbox: {
+      width: 22,
+      height: 22,
+      borderRadius: 6,
+      borderWidth: 1.5,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    rowText: {
+      flex: 1,
+    },
+    label: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: theme.text,
+    },
+    desc: {
+      fontSize: 12,
+      color: theme.secondaryText,
+      marginTop: 2,
+    },
+    footer: {
+      flexDirection: "row",
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingTop: 8,
+    },
+    cancelBtn: {
+      flex: 1,
+      height: 44,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.inputBg,
+    },
+    cancelText: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: theme.secondaryText,
+    },
+    confirmBtn: {
+      flex: 2,
+      height: 44,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    confirmBtnDisabled: {
+      opacity: 0.45,
+    },
+    confirmText: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: theme.onPrimary,
+    },
+  });

@@ -6,13 +6,15 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 import { shadows } from "@/utils/shadows";
 
 import { auth, db } from "@/constants/firebase";
@@ -40,6 +42,8 @@ interface Answer {
 }
 
 export default function InitialProfileSurveyScreen() {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<{ [key: string]: Answer }>({});
   const [surveyLocked, setSurveyLocked] = useState(false);
@@ -234,7 +238,7 @@ export default function InitialProfileSurveyScreen() {
             <TextInput
               style={styles.textInput}
               placeholder="Enter your answer..."
-              placeholderTextColor="#999"
+              placeholderTextColor={theme.secondaryText}
               value={answer?.text || ""}
               onChangeText={handleTextInput}
               keyboardType="default"
@@ -313,7 +317,7 @@ export default function InitialProfileSurveyScreen() {
         <View
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
-          <ActivityIndicator size="large" color="#9C27B0" />
+          <ActivityIndicator size="large" color={theme.primary} />
         </View>
       </SafeAreaView>
     );
@@ -323,7 +327,7 @@ export default function InitialProfileSurveyScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <LinearGradient
-          colors={["#9C27B0", "#7B1FA2"]}
+          colors={theme.headerGradient}
           style={styles.headerGradient}
         >
           <View style={styles.header}>
@@ -331,7 +335,7 @@ export default function InitialProfileSurveyScreen() {
               style={styles.backButton}
               onPress={() => router.replace("/dashboard")}
             >
-              <Ionicons name="arrow-back" size={24} color="white" />
+              <Ionicons name="arrow-back" size={24} color={theme.onPrimary} />
             </Pressable>
             <Text style={styles.headerTitle}>Survey Locked</Text>
             <View style={styles.placeholder} />
@@ -344,7 +348,7 @@ export default function InitialProfileSurveyScreen() {
               Our records show you have already completed the initial profile
               survey.
             </Text>
-            <Text style={{ textAlign: "center", color: "#666", marginTop: 12 }}>
+            <Text style={{ textAlign: "center", color: theme.secondaryText, marginTop: 12 }}>
               You cannot retake it now. Contact support if you need to update
               your responses.
             </Text>
@@ -364,13 +368,13 @@ export default function InitialProfileSurveyScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#9C27B0", "#7B1FA2"]}
+        colors={theme.headerGradient}
         style={styles.headerGradient}
       >
         {/* Header */}
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color="white" />
+            <Ionicons name="arrow-back" size={24} color={theme.onPrimary} />
           </Pressable>
           <Text style={styles.headerTitle}>Initial Profile Survey</Text>
           <View style={styles.placeholder} />
@@ -415,7 +419,7 @@ export default function InitialProfileSurveyScreen() {
             disabled={!isAnswered()}
           >
             <LinearGradient
-              colors={["#9C27B0", "#2196F3"]}
+              colors={theme.headerGradient}
               style={styles.nextButton}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -424,7 +428,7 @@ export default function InitialProfileSurveyScreen() {
                 {isLastQuestion ? "Complete Profile" : "Next"}
               </Text>
               {!isLastQuestion && (
-                <Ionicons name="arrow-forward" size={20} color="white" />
+                <Ionicons name="arrow-forward" size={20} color={theme.onPrimary} />
               )}
             </LinearGradient>
           </Pressable>
@@ -434,175 +438,176 @@ export default function InitialProfileSurveyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F5F5F5",
-  },
-  headerGradient: {
-    paddingBottom: 20,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "white",
-  },
-  placeholder: {
-    width: 40,
-  },
-  subtitleContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "rgba(255, 255, 255, 0.9)",
-    textAlign: "center",
-  },
-  progressContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-  },
-  progressText: {
-    fontSize: 14,
-    color: "rgba(255, 255, 255, 0.8)",
-    textAlign: "center",
-    fontWeight: "500",
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
-  },
-  questionCard: {
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 30,
-    ...(shadows.custom(4, 12, 0.1, 5, "#000") as any),
-  },
-  questionText: {
-    fontSize: 18,
-    color: "#333",
-    textAlign: "center",
-    marginBottom: 32,
-    lineHeight: 24,
-  },
-  ratingContainer: {
-    gap: 16,
-  },
-  ratingRow: {
-    marginBottom: 16,
-  },
-  ratingLabel: {
-    fontSize: 16,
-    color: "#333",
-    marginBottom: 8,
-    fontWeight: "500",
-  },
-  ratingScale: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  textInputContainer: {
-    marginTop: 16,
-  },
-  textInput: {
-    backgroundColor: "#F8F8F8",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    fontSize: 16,
-    color: "#333",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-  },
-  multipleChoiceContainer: {
-    marginTop: 16,
-    gap: 8,
-  },
-  optionButton: {
-    backgroundColor: "#F8F8F8",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-  },
-  selectedOption: {
-    backgroundColor: "#9C27B0",
-    borderColor: "#9C27B0",
-  },
-  optionText: {
-    fontSize: 14,
-    color: "#333",
-    textAlign: "center",
-  },
-  selectedOptionText: {
-    color: "white",
-    fontWeight: "500",
-  },
-  ratingButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#F5F5F5",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "transparent",
-  },
-  selectedRating: {
-    backgroundColor: "#9C27B0",
-    borderColor: "#9C27B0",
-  },
-  ratingButtonText: {
-    fontSize: 12,
-    color: "#666",
-    fontWeight: "600",
-  },
-  selectedRatingText: {
-    color: "white",
-  },
-  buttonContainer: {
-    marginTop: 20,
-  },
-  nextButtonContainer: {
-    borderRadius: 25,
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  nextButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
-    borderRadius: 25,
-    gap: 8,
-  },
-  nextButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "white",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    headerGradient: {
+      paddingBottom: 20,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 10,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: theme.onPrimary,
+    },
+    placeholder: {
+      width: 40,
+    },
+    subtitleContainer: {
+      paddingHorizontal: 20,
+      paddingBottom: 10,
+    },
+    subtitle: {
+      fontSize: 14,
+      color: "rgba(255, 255, 255, 0.9)",
+      textAlign: "center",
+    },
+    progressContainer: {
+      paddingHorizontal: 20,
+      paddingBottom: 10,
+    },
+    progressText: {
+      fontSize: 14,
+      color: "rgba(255, 255, 255, 0.8)",
+      textAlign: "center",
+      fontWeight: "500",
+    },
+    scrollContainer: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 40,
+    },
+    questionCard: {
+      backgroundColor: theme.card,
+      borderRadius: 16,
+      padding: 24,
+      marginBottom: 30,
+      ...(shadows.custom(4, 12, 0.1, 5, theme.shadow) as any),
+    },
+    questionText: {
+      fontSize: 18,
+      color: theme.text,
+      textAlign: "center",
+      marginBottom: 32,
+      lineHeight: 24,
+    },
+    ratingContainer: {
+      gap: 16,
+    },
+    ratingRow: {
+      marginBottom: 16,
+    },
+    ratingLabel: {
+      fontSize: 16,
+      color: theme.text,
+      marginBottom: 8,
+      fontWeight: "500",
+    },
+    ratingScale: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    textInputContainer: {
+      marginTop: 16,
+    },
+    textInput: {
+      backgroundColor: theme.inputBg,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: 8,
+      fontSize: 16,
+      color: theme.text,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    multipleChoiceContainer: {
+      marginTop: 16,
+      gap: 8,
+    },
+    optionButton: {
+      backgroundColor: theme.inputBg,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    selectedOption: {
+      backgroundColor: theme.primary,
+      borderColor: theme.primary,
+    },
+    optionText: {
+      fontSize: 14,
+      color: theme.text,
+      textAlign: "center",
+    },
+    selectedOptionText: {
+      color: theme.onPrimary,
+      fontWeight: "500",
+    },
+    ratingButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: theme.inputBg,
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 2,
+      borderColor: "transparent",
+    },
+    selectedRating: {
+      backgroundColor: theme.primary,
+      borderColor: theme.primary,
+    },
+    ratingButtonText: {
+      fontSize: 12,
+      color: theme.secondaryText,
+      fontWeight: "600",
+    },
+    selectedRatingText: {
+      color: theme.onPrimary,
+    },
+    buttonContainer: {
+      marginTop: 20,
+    },
+    nextButtonContainer: {
+      borderRadius: 25,
+    },
+    disabledButton: {
+      opacity: 0.5,
+    },
+    nextButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 16,
+      borderRadius: 25,
+      gap: 8,
+    },
+    nextButtonText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: theme.onPrimary,
+    },
+  });

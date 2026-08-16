@@ -1,16 +1,17 @@
 import {
-  HIGH_RISK_SAVED_NOTE,
-  HIGH_RISK_SUPPORT_MESSAGE,
-  HIGH_RISK_TITLE,
-  MODERATE_SUPPORT_MESSAGE,
-  MODERATE_SUPPORT_TITLE,
+    HIGH_RISK_SAVED_NOTE,
+    HIGH_RISK_SUPPORT_MESSAGE,
+    HIGH_RISK_TITLE,
+    MODERATE_SUPPORT_MESSAGE,
+    MODERATE_SUPPORT_TITLE,
 } from "@/constants/crisisSupport";
+import type { MindCareTheme } from "@/constants/theme";
 import { useMindCareTheme } from "@/contexts/ThemeContext";
 import { useJournal } from "@/hooks/useJournal";
 import { getCategory, getMood } from "@/utils/journalOptions";
 import {
-  getActiveReflection,
-  getReflectionStatusLabel,
+    getActiveReflection,
+    getReflectionStatusLabel,
 } from "@/utils/journalReflection";
 import { shadows } from "@/utils/shadows";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,12 +19,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 import Animated, { FadeIn, FadeInDown, ZoomIn } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -32,6 +33,7 @@ export default function JournalSavedScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const { entries, loading } = useJournal();
   const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [showReflection, setShowReflection] = useState(false);
 
   const entry = params.id ? entries.find((e) => e.id === params.id) : undefined;
@@ -67,9 +69,7 @@ export default function JournalSavedScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: theme.background }]}
-      >
+      <SafeAreaView style={styles.container}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={theme.primary} />
         </View>
@@ -79,17 +79,11 @@ export default function JournalSavedScreen() {
 
   if (!entry) {
     return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: theme.background }]}
-      >
+      <SafeAreaView style={styles.container}>
         <View style={styles.center}>
-          <Text style={[styles.notFoundText, { color: theme.secondaryText }]}>
-            Journal entry not found.
-          </Text>
+          <Text style={styles.notFoundText}>Journal entry not found.</Text>
           <Pressable onPress={() => router.replace("/daily-journal")}>
-            <Text style={[styles.backLink, { color: theme.primary }]}>
-              Back to Journal
-            </Text>
+            <Text style={styles.backLink}>Back to Journal</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -100,16 +94,10 @@ export default function JournalSavedScreen() {
   // student toward crisis support. The journal itself is always saved.
   if (isHighRisk) {
     return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: theme.background }]}
-        edges={["top", "bottom"]}
-      >
+      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={[
-            styles.content,
-            { backgroundColor: theme.background },
-          ]}
+          contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
           <CrisisSupportView theme={theme} />
@@ -120,41 +108,26 @@ export default function JournalSavedScreen() {
 
   if (!reflection) {
     return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: theme.background }]}
-        edges={["top", "bottom"]}
-      >
+      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={[
-            styles.content,
-            { backgroundColor: theme.background },
-          ]}
+          contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
           <Animated.View
             entering={ZoomIn.duration(450)}
-            style={[
-              styles.emojiWrap,
-              { backgroundColor: theme.softPurple, borderColor: theme.border },
-            ]}
+            style={styles.emojiWrap}
           >
             <Text style={styles.emoji}>✅</Text>
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(120).duration(420)}>
-            <Text style={[styles.title, { color: theme.text }]}>
-              Journal Saved!
-            </Text>
+            <Text style={styles.title}>Journal Saved!</Text>
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(200).duration(420)}>
-            <Text style={[styles.subtitle, { color: theme.secondaryText }]}>
-              {successMessage}
-            </Text>
-            <Text style={[styles.reassuranceText, { color: theme.primary }]}>
-              {reassuranceText}
-            </Text>
+            <Text style={styles.subtitle}>{successMessage}</Text>
+            <Text style={styles.reassuranceText}>{reassuranceText}</Text>
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(280).duration(420)}>
@@ -195,13 +168,7 @@ export default function JournalSavedScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View
-          entering={ZoomIn.duration(450)}
-          style={[
-            styles.emojiWrap,
-            { backgroundColor: theme.softPurple, borderColor: theme.border },
-          ]}
-        >
+        <Animated.View entering={ZoomIn.duration(450)} style={styles.emojiWrap}>
           <Text style={styles.emoji}>🎉</Text>
         </Animated.View>
 
@@ -222,30 +189,21 @@ export default function JournalSavedScreen() {
 
         {isModerate && (
           <Animated.View entering={FadeIn.duration(400)}>
-            <View
-              style={[
-                styles.moderateCard,
-                { backgroundColor: theme.card, borderColor: theme.border },
-              ]}
-            >
+            <View style={styles.moderateCard}>
               <View style={styles.moderateHeader}>
                 <Text style={styles.moderateEmoji}>💜</Text>
-                <Text style={[styles.moderateTitle, { color: theme.text }]}>
+                <Text style={styles.moderateTitle}>
                   {MODERATE_SUPPORT_TITLE}
                 </Text>
               </View>
-              <Text
-                style={[styles.moderateMessage, { color: theme.secondaryText }]}
-              >
+              <Text style={styles.moderateMessage}>
                 {MODERATE_SUPPORT_MESSAGE}
               </Text>
               <Pressable
                 onPress={() => router.push("/support-hotlines")}
                 hitSlop={6}
               >
-                <Text style={[styles.moderateLink, { color: theme.primary }]}>
-                  View support contacts →
-                </Text>
+                <Text style={styles.moderateLink}>View support contacts →</Text>
               </Pressable>
             </View>
           </Animated.View>
@@ -597,6 +555,7 @@ function CrisisSupportView({
 }: {
   theme: ReturnType<typeof useMindCareTheme>["theme"];
 }) {
+  const styles = createStyles(theme);
   return (
     <>
       <Animated.View
@@ -668,319 +627,329 @@ function CrisisSupportView({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  notFoundText: {
-    color: "#666",
-    fontSize: 15,
-  },
-  backLink: {
-    color: "#8A63D2",
-    fontWeight: "600",
-    marginTop: 12,
-  },
-  scroll: {
-    flex: 1,
-  },
-  content: {
-    padding: 24,
-    alignItems: "center",
-  },
-  emojiWrap: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: "#F3E8FF",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-  },
-  emoji: {
-    fontSize: 48,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: "800",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  subtitle: {
-    fontSize: 15,
-    textAlign: "center",
-    lineHeight: 22,
-    marginBottom: 8,
-  },
-  reassuranceText: {
-    fontSize: 13,
-    textAlign: "center",
-    marginBottom: 28,
-    fontWeight: "600",
-  },
-  primaryButton: {
-    borderRadius: 25,
-    overflow: "hidden",
-    alignSelf: "stretch",
-    marginBottom: 12,
-  },
-  primaryGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 15,
-  },
-  primaryButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  secondaryButton: {
-    alignSelf: "stretch",
-    alignItems: "center",
-    paddingVertical: 14,
-    borderRadius: 25,
-    borderWidth: 1.5,
-    backgroundColor: "white",
-  },
-  secondaryButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  // ── Crisis support view ──────────────────────────────────────────────
-  supportHeartWrap: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: "#F3E8FF",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  supportHeart: {
-    fontSize: 48,
-  },
-  supportTitle: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#2D2640",
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  supportMessage: {
-    fontSize: 15,
-    color: "#4B4453",
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-  supportActions: {
-    alignSelf: "stretch",
-  },
-  emergencyButton: {
-    borderRadius: 25,
-    overflow: "hidden",
-    marginBottom: 12,
-  },
-  continueButton: {
-    alignSelf: "stretch",
-    alignItems: "center",
-    paddingVertical: 14,
-    borderRadius: 25,
-    marginBottom: 16,
-  },
-  continueButtonText: {
-    color: "#8A63D2",
-    fontSize: 16,
-    fontWeight: "700",
-    textDecorationLine: "underline",
-  },
-  supportNote: {
-    fontSize: 13,
-    color: "#8B7FA8",
-    textAlign: "center",
-    lineHeight: 19,
-  },
-  // ── Moderate support banner ──────────────────────────────────────────
-  moderateCard: {
-    alignSelf: "stretch",
-    backgroundColor: "#F3E8FF",
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 16,
-    ...(shadows.sm("#000") as any),
-  },
-  moderateHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
-  },
-  moderateEmoji: {
-    fontSize: 20,
-  },
-  moderateTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#6D28D9",
-  },
-  moderateMessage: {
-    fontSize: 14,
-    color: "#4B4453",
-    lineHeight: 21,
-    marginBottom: 10,
-  },
-  moderateLink: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#8A63D2",
-  },
-  card: {
-    alignSelf: "stretch",
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 16,
-    ...(shadows.sm("#000") as any),
-    borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.06)",
-  },
-  cardLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#8B7FA8",
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-    marginBottom: 12,
-  },
-  cardHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  reflectionCard: {
-    backgroundColor: "#F9F4FF",
-    borderColor: "#E9D5FF",
-  },
-  localBadge: {
-    backgroundColor: "#EDE6F7",
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  localBadgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#8A63D2",
-  },
-  reflectionText: {
-    fontSize: 15,
-    color: "#4B4453",
-    lineHeight: 24,
-  },
-  sectionBlock: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-    marginBottom: 14,
-  },
-  sectionEmoji: {
-    fontSize: 20,
-    marginTop: 1,
-  },
-  sectionBody: {
-    flex: 1,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#8A63D2",
-    textTransform: "uppercase",
-    letterSpacing: 0.3,
-    marginBottom: 3,
-  },
-  metaRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 14,
-  },
-  metaBadge: {
-    backgroundColor: "#EDE6F7",
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  metaBadgeText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#8A63D2",
-  },
-  entryHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 12,
-  },
-  moodCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  moodEmoji: {
-    fontSize: 26,
-  },
-  entryMeta: {
-    flex: 1,
-  },
-  entryTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#2D2640",
-    marginBottom: 6,
-  },
-  entryTags: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  entryTag: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#666",
-    backgroundColor: "#F5F3F8",
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  entryThoughts: {
-    fontSize: 14,
-    color: "#4B4453",
-    lineHeight: 21,
-  },
-  tipRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    marginBottom: 10,
-  },
-  tipText: {
-    flex: 1,
-    fontSize: 14,
-    color: "#4B4453",
-    lineHeight: 20,
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.background,
+    },
+    center: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    notFoundText: {
+      color: theme.secondaryText,
+      fontSize: 15,
+    },
+    backLink: {
+      color: theme.primary,
+      fontWeight: "600",
+      marginTop: 12,
+    },
+    scroll: {
+      flex: 1,
+    },
+    content: {
+      padding: 24,
+      alignItems: "center",
+    },
+    emojiWrap: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      backgroundColor: theme.softPurple,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 20,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    emoji: {
+      fontSize: 48,
+    },
+    title: {
+      fontSize: 26,
+      fontWeight: "800",
+      marginBottom: 8,
+      textAlign: "center",
+      color: theme.text,
+    },
+    subtitle: {
+      fontSize: 15,
+      textAlign: "center",
+      lineHeight: 22,
+      marginBottom: 8,
+      color: theme.secondaryText,
+    },
+    reassuranceText: {
+      fontSize: 13,
+      textAlign: "center",
+      marginBottom: 28,
+      fontWeight: "600",
+      color: theme.primary,
+    },
+    primaryButton: {
+      borderRadius: 25,
+      overflow: "hidden",
+      alignSelf: "stretch",
+      marginBottom: 12,
+    },
+    primaryGradient: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      paddingVertical: 15,
+    },
+    primaryButtonText: {
+      color: "white",
+      fontSize: 16,
+      fontWeight: "700",
+    },
+    secondaryButton: {
+      alignSelf: "stretch",
+      alignItems: "center",
+      paddingVertical: 14,
+      borderRadius: 25,
+      borderWidth: 1.5,
+      backgroundColor: theme.card,
+    },
+    secondaryButtonText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: theme.primary,
+    },
+    supportHeartWrap: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      backgroundColor: theme.softPurple,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 20,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    supportHeart: {
+      fontSize: 48,
+    },
+    supportTitle: {
+      fontSize: 26,
+      fontWeight: "800",
+      color: theme.text,
+      marginBottom: 12,
+      textAlign: "center",
+    },
+    supportMessage: {
+      fontSize: 15,
+      color: theme.secondaryText,
+      textAlign: "center",
+      lineHeight: 24,
+      marginBottom: 24,
+    },
+    supportActions: {
+      alignSelf: "stretch",
+    },
+    emergencyButton: {
+      borderRadius: 25,
+      overflow: "hidden",
+      marginBottom: 12,
+    },
+    continueButton: {
+      alignSelf: "stretch",
+      alignItems: "center",
+      paddingVertical: 14,
+      borderRadius: 25,
+      marginBottom: 16,
+      backgroundColor: theme.secondaryCard,
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    continueButtonText: {
+      color: theme.primary,
+      fontSize: 16,
+      fontWeight: "700",
+      textDecorationLine: "underline",
+    },
+    supportNote: {
+      fontSize: 13,
+      color: theme.secondaryText,
+      textAlign: "center",
+      lineHeight: 19,
+    },
+    moderateCard: {
+      alignSelf: "stretch",
+      backgroundColor: theme.softPurple,
+      borderWidth: 1,
+      borderColor: theme.border,
+      borderRadius: 20,
+      padding: 18,
+      marginBottom: 16,
+      ...(shadows.sm("#000") as any),
+    },
+    moderateHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 8,
+    },
+    moderateEmoji: {
+      fontSize: 20,
+    },
+    moderateTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: theme.primary,
+    },
+    moderateMessage: {
+      fontSize: 14,
+      color: theme.secondaryText,
+      lineHeight: 21,
+      marginBottom: 10,
+    },
+    moderateLink: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: theme.primary,
+    },
+    card: {
+      alignSelf: "stretch",
+      backgroundColor: theme.card,
+      borderRadius: 20,
+      padding: 18,
+      marginBottom: 16,
+      ...(shadows.sm("#000") as any),
+      borderWidth: 1,
+      borderColor: theme.border,
+    },
+    cardLabel: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: theme.secondaryText,
+      textTransform: "uppercase",
+      letterSpacing: 0.4,
+      marginBottom: 12,
+    },
+    cardHeaderRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    reflectionCard: {
+      backgroundColor: theme.secondaryCard,
+      borderColor: theme.border,
+    },
+    localBadge: {
+      backgroundColor: theme.softPurple,
+      borderRadius: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+    },
+    localBadgeText: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: theme.primary,
+    },
+    reflectionText: {
+      fontSize: 15,
+      color: theme.secondaryText,
+      lineHeight: 24,
+    },
+    sectionBlock: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 12,
+      marginBottom: 14,
+    },
+    sectionEmoji: {
+      fontSize: 20,
+      marginTop: 1,
+    },
+    sectionBody: {
+      flex: 1,
+    },
+    sectionTitle: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: theme.primary,
+      textTransform: "uppercase",
+      letterSpacing: 0.3,
+      marginBottom: 3,
+    },
+    metaRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginBottom: 14,
+    },
+    metaBadge: {
+      backgroundColor: "#EDE6F7",
+      borderRadius: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    metaBadgeText: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: "#8A63D2",
+    },
+    entryHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      marginBottom: 12,
+    },
+    moodCircle: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    moodEmoji: {
+      fontSize: 26,
+    },
+    entryMeta: {
+      flex: 1,
+    },
+    entryTitle: {
+      fontSize: 17,
+      fontWeight: "700",
+      color: "#2D2640",
+      marginBottom: 6,
+    },
+    entryTags: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    entryTag: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: "#666",
+      backgroundColor: "#F5F3F8",
+      borderRadius: 10,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    entryThoughts: {
+      fontSize: 14,
+      color: "#4B4453",
+      lineHeight: 21,
+    },
+    tipRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 10,
+      marginBottom: 10,
+    },
+    tipText: {
+      flex: 1,
+      fontSize: 14,
+      color: "#4B4453",
+      lineHeight: 20,
+    },
+  });

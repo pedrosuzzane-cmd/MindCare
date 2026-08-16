@@ -12,7 +12,6 @@ import { ConstellationStarView } from "./ConstellationStar";
 
 const LINE_THICKNESS = 1.2;
 const LINE_GLOW_THICKNESS = 4;
-const LINE_COLOR = "#A78BFA";
 const LINE_OPACITY = 0.25;
 const LINE_ACTIVE_OPACITY = 0.6;
 const LINE_ACTIVE_THICKNESS = 1.7;
@@ -62,6 +61,8 @@ export function ConstellationSky({
   lineLimit = CONNECTED_LINE_LIMIT,
 }: ConstellationSkyProps) {
   const [layout, setLayout] = useState({ width: 0, height: 0 });
+  const styles = createStyles(theme);
+  const lineColor = theme.accent.purple;
 
   const gradientColors = useMemo(
     () =>
@@ -164,7 +165,7 @@ export function ConstellationSky({
               y1={line.y1}
               x2={line.x2}
               y2={line.y2}
-              stroke={LINE_COLOR}
+              stroke={lineColor}
               strokeWidth={LINE_GLOW_THICKNESS}
               strokeOpacity={line.active ? 0.16 : 0.05}
               strokeLinecap="round"
@@ -174,7 +175,7 @@ export function ConstellationSky({
               y1={line.y1}
               x2={line.x2}
               y2={line.y2}
-              stroke={LINE_COLOR}
+              stroke={lineColor}
               strokeWidth={line.active ? LINE_ACTIVE_THICKNESS : LINE_THICKNESS}
               strokeOpacity={line.active ? LINE_ACTIVE_OPACITY : LINE_OPACITY}
               strokeLinecap="round"
@@ -200,17 +201,18 @@ export function ConstellationSky({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    overflow: "hidden",
-    borderRadius: 24,
-  },
-  backdrop: {
-    position: "absolute",
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: "#FFFFFF",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      overflow: "hidden",
+      borderRadius: 24,
+    },
+    backdrop: {
+      position: "absolute",
+      width: 3,
+      height: 3,
+      borderRadius: 1.5,
+      backgroundColor: theme.onPrimary,
+    },
+  });

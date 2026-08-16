@@ -10,6 +10,8 @@ import {
   Text,
   View,
 } from "react-native";
+import type { MindCareTheme } from "@/constants/theme";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 
 interface StudentSummary {
   uid: string;
@@ -47,6 +49,8 @@ export function StudentListModal({
   onClose,
   journalMode,
 }: StudentListModalProps) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const sortedStudents = [...students].sort((a, b) => {
     if (title.toLowerCase() === "survey assessment status") {
       const aTaken = a.assessmentsCount > 0 ? 1 : 0;
@@ -72,7 +76,7 @@ export function StudentListModal({
               {title}
             </Text>
             <Pressable style={styles.modalCloseButton} onPress={onClose}>
-              <Ionicons name="close" size={24} color="#0F172A" />
+              <Ionicons name="close" size={24} color={theme.text} />
             </Pressable>
           </View>
           <ScrollView
@@ -134,7 +138,7 @@ export function StudentListModal({
                               <Text style={styles.studentName} numberOfLines={1}>
                                 {student.name}
                               </Text>
-                              <Ionicons name="chevron-forward" size={14} color="#8A63D2" />
+                              <Ionicons name="chevron-forward" size={14} color={theme.primary} />
                             </View>
                             <Text style={styles.studentMeta} numberOfLines={1}>
                               {student.yearLevel} • {student.department}
@@ -165,7 +169,7 @@ export function StudentListModal({
                                   : "close-circle"
                               }
                               size={14}
-                              color={hasTakenAssessment ? "#15803D" : "#B91C1C"}
+                              color={hasTakenAssessment ? theme.status.success : theme.status.error}
                             />
                             <Text
                               style={[
@@ -186,7 +190,7 @@ export function StudentListModal({
                           <Ionicons
                             name="accessibility"
                             size={12}
-                            color="#7C3AED"
+                            color={theme.primary}
                           />
                           <Text style={styles.lsnBadgeText} numberOfLines={2}>
                             {formatLsnCategory(student.lsnCategory)}
@@ -238,178 +242,179 @@ export function StudentListModal({
   );
 }
 
-const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "flex-end",
-  },
-  modalContainer: {
-    backgroundColor: "#F1F5F9",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: "82%", // Replaced maxHeight with a dependable fixed height percentage
-    overflow: "hidden",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
-    backgroundColor: "white",
-  },
-  modalTitle: { fontSize: 18, fontWeight: "800", color: "#0F172A", flex: 1 },
-  modalCloseButton: {
-    padding: 8,
-    borderRadius: 999,
-    backgroundColor: "#F1F5F9",
-  },
-  modalScroll: { flex: 1 },
-  modalScrollContent: { padding: 16, paddingBottom: 40 },
-  studentCard: {
-    backgroundColor: "white",
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 14,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  leftSection: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  studentAvatarCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#8A63D2",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  studentAvatarText: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  studentIdentity: {
-    flex: 1,
-    minWidth: 0,
-  },
-  studentName: { fontSize: 16, fontWeight: "800", color: "#8A63D2" },
-  studentNameRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  rightSection: {
-    maxWidth: "42%",
-    alignItems: "flex-end",
-  },
-  studentId: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#0B3D91",
-    textAlign: "right",
-  },
-  studentMeta: { fontSize: 12, color: "#475569", marginTop: 2 },
-  lsnBadgeRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 6,
-    backgroundColor: "#EDE9FE",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginTop: 12,
-  },
-  lsnBadgeText: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#6D28D9",
-    lineHeight: 16,
-  },
-  cardFooter: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
-  },
-  footerStat: {
-    flex: 1,
-    minWidth: 0,
-  },
-  footerStatRight: {
-    alignItems: "flex-end",
-  },
-  scoreValue: {
-    fontSize: 15,
-    fontWeight: "800",
-    color: "#0B3D91",
-  },
-  statLabel: {
-    fontSize: 11,
-    color: "#64748B",
-    marginBottom: 4,
-    textTransform: "uppercase",
-  },
-  statValueHighlight: { fontSize: 15, fontWeight: "800", color: "#0B3D91" },
-  riskLow: { color: "#16A34A", fontWeight: "800" },
-  riskModerate: { color: "#D97706", fontWeight: "800" },
-  riskHigh: { color: "#EF4444", fontWeight: "800" },
-  stateCard: {
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  stateText: { marginTop: 12, color: "#334155", fontSize: 14 },
-  modalCountText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#64748B",
-    marginBottom: 12,
-  },
-  statusBadgeContainer: {
-    marginBottom: 12,
-    alignItems: "flex-start",
-  },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  badgeCompleted: {
-    backgroundColor: "#DCFCE7",
-    borderColor: "#BBF7D0",
-  },
-  badgeNotTaken: {
-    backgroundColor: "#FEE2E2",
-    borderColor: "#FECACA",
-  },
-  statusBadgeText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  textCompleted: {
-    color: "#15803D",
-  },
-  textNotTaken: {
-    color: "#B91C1C",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.6)",
+      justifyContent: "flex-end",
+    },
+    modalContainer: {
+      backgroundColor: theme.background,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      height: "82%", // Replaced maxHeight with a dependable fixed height percentage
+      overflow: "hidden",
+    },
+    modalHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingTop: 18,
+      paddingBottom: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+      backgroundColor: theme.card,
+    },
+    modalTitle: { fontSize: 18, fontWeight: "800", color: theme.text, flex: 1 },
+    modalCloseButton: {
+      padding: 8,
+      borderRadius: 999,
+      backgroundColor: theme.inputBg,
+    },
+    modalScroll: { flex: 1 },
+    modalScrollContent: { padding: 16, paddingBottom: 40 },
+    studentCard: {
+      backgroundColor: theme.card,
+      borderRadius: 18,
+      padding: 18,
+      marginBottom: 14,
+    },
+    cardHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    leftSection: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    studentAvatarCircle: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: theme.primary,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    studentAvatarText: {
+      color: theme.onPrimary,
+      fontSize: 18,
+      fontWeight: "700",
+    },
+    studentIdentity: {
+      flex: 1,
+      minWidth: 0,
+    },
+    studentName: { fontSize: 16, fontWeight: "800", color: theme.primary },
+    studentNameRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+    rightSection: {
+      maxWidth: "42%",
+      alignItems: "flex-end",
+    },
+    studentId: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: theme.text,
+      textAlign: "right",
+    },
+    studentMeta: { fontSize: 12, color: theme.secondaryText, marginTop: 2 },
+    lsnBadgeRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 6,
+      backgroundColor: theme.softPurple,
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      marginTop: 12,
+    },
+    lsnBadgeText: {
+      flex: 1,
+      fontSize: 12,
+      fontWeight: "700",
+      color: theme.primary,
+      lineHeight: 16,
+    },
+    cardFooter: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 12,
+      marginTop: 14,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: theme.borderSoft,
+    },
+    footerStat: {
+      flex: 1,
+      minWidth: 0,
+    },
+    footerStatRight: {
+      alignItems: "flex-end",
+    },
+    scoreValue: {
+      fontSize: 15,
+      fontWeight: "800",
+      color: theme.text,
+    },
+    statLabel: {
+      fontSize: 11,
+      color: theme.secondaryText,
+      marginBottom: 4,
+      textTransform: "uppercase",
+    },
+    statValueHighlight: { fontSize: 15, fontWeight: "800", color: theme.text },
+    riskLow: { color: theme.status.success, fontWeight: "800" },
+    riskModerate: { color: theme.status.warning, fontWeight: "800" },
+    riskHigh: { color: theme.status.error, fontWeight: "800" },
+    stateCard: {
+      backgroundColor: theme.card,
+      borderRadius: 16,
+      padding: 24,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 16,
+    },
+    stateText: { marginTop: 12, color: theme.text, fontSize: 14 },
+    modalCountText: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: theme.secondaryText,
+      marginBottom: 12,
+    },
+    statusBadgeContainer: {
+      marginBottom: 12,
+      alignItems: "flex-start",
+    },
+    statusBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 8,
+      borderWidth: 1,
+    },
+    badgeCompleted: {
+      backgroundColor: `${theme.status.success}1A`,
+      borderColor: `${theme.status.success}40`,
+    },
+    badgeNotTaken: {
+      backgroundColor: `${theme.status.error}1A`,
+      borderColor: `${theme.status.error}40`,
+    },
+    statusBadgeText: {
+      fontSize: 12,
+      fontWeight: "700",
+    },
+    textCompleted: {
+      color: theme.status.success,
+    },
+    textNotTaken: {
+      color: theme.status.error,
+    },
+  });

@@ -12,6 +12,8 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -19,6 +21,8 @@ interface ChatInputProps {
 }
 
 export default function ChatInput({ onSend, disabled }: ChatInputProps) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const [text, setText] = useState("");
 
   const handleSend = () => {
@@ -38,7 +42,7 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
           <TextInput
             style={styles.input}
             placeholder="Type a message..."
-            placeholderTextColor="#999"
+            placeholderTextColor={theme.secondaryText}
             value={text}
             onChangeText={setText}
             multiline
@@ -60,7 +64,9 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
           <Ionicons
             name="send"
             size={20}
-            color={text.trim() && !disabled ? "white" : "#BDBDBD"}
+            color={
+              text.trim() && !disabled ? theme.onPrimary : theme.secondaryText
+            }
           />
         </Pressable>
       </View>
@@ -68,40 +74,41 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#E0E0E0",
-    backgroundColor: "white",
-  },
-  inputWrapper: {
-    flex: 1,
-    backgroundColor: "#F5F5F5",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: Platform.OS === "ios" ? 10 : 8,
-    marginRight: 8,
-    maxHeight: 100,
-  },
-  input: {
-    fontSize: 15,
-    color: "#333",
-    maxHeight: 80,
-    padding: 0,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#8A63D2",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  sendButtonDisabled: {
-    backgroundColor: "#E0E0E0",
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.border,
+      backgroundColor: theme.card,
+    },
+    inputWrapper: {
+      flex: 1,
+      backgroundColor: theme.inputBg,
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingVertical: Platform.OS === "ios" ? 10 : 8,
+      marginRight: 8,
+      maxHeight: 100,
+    },
+    input: {
+      fontSize: 15,
+      color: theme.text,
+      maxHeight: 80,
+      padding: 0,
+    },
+    sendButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: theme.primary,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    sendButtonDisabled: {
+      backgroundColor: theme.inputBg,
+    },
+  });

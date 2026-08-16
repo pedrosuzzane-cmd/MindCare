@@ -1,5 +1,7 @@
 import { ConstellationStar } from "@/types/constellation";
 import { STAR_TYPE_CONFIG, formatJournalDate } from "@/utils/constellationOptions";
+import type { MindCareTheme } from "@/constants/theme";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
 import React, { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
@@ -33,6 +35,8 @@ export function ConstellationStarView({
   onPress,
   accessibilityLabel,
 }: ConstellationStarProps) {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
   const config = STAR_TYPE_CONFIG[star.type] ?? STAR_TYPE_CONFIG.sparkle;
   const color = star.color;
   const renderedGlyph = config.glyph;
@@ -138,7 +142,7 @@ export function ConstellationStarView({
                     width: coreSize,
                     height: coreSize,
                     borderRadius: coreSize / 2,
-                    backgroundColor: selected ? "#FFFFFF" : color,
+                    backgroundColor: selected ? theme.onPrimary : color,
                   },
                 ]}
               />
@@ -149,7 +153,7 @@ export function ConstellationStarView({
               styles.glyph,
               {
                 fontSize: config.sizePx,
-                color: selected ? "#FFFFFF" : color,
+                color: selected ? theme.onPrimary : color,
                 textShadowColor: config.glow || selected ? color : "transparent",
               },
             ]}
@@ -167,52 +171,53 @@ export function ConstellationStarView({
   );
 }
 
-const styles = StyleSheet.create({
-  anchor: {
-    position: "absolute",
-    width: 0,
-    height: 0,
-  },
-  touch: {
-    width: TOUCH_SIZE,
-    height: TOUCH_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pressable: {
-    width: TOUCH_SIZE,
-    height: TOUCH_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  glyph: {
-    fontWeight: "400",
-    textShadowRadius: 8,
-  },
-  glow: {
-    position: "absolute",
-  },
-  glowOuter: {
-    position: "absolute",
-  },
-  glowCore: {
-    position: "absolute",
-    opacity: 0.9,
-  },
-  newBadge: {
-    position: "absolute",
-    top: 4,
-    right: 2,
-    backgroundColor: "rgba(252, 211, 77, 0.22)",
-    borderRadius: 8,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-  },
-  newBadgeText: {
-    fontSize: 8,
-    fontWeight: "800",
-    color: "#FCD34D",
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    anchor: {
+      position: "absolute",
+      width: 0,
+      height: 0,
+    },
+    touch: {
+      width: TOUCH_SIZE,
+      height: TOUCH_SIZE,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    pressable: {
+      width: TOUCH_SIZE,
+      height: TOUCH_SIZE,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    glyph: {
+      fontWeight: "400",
+      textShadowRadius: 8,
+    },
+    glow: {
+      position: "absolute",
+    },
+    glowOuter: {
+      position: "absolute",
+    },
+    glowCore: {
+      position: "absolute",
+      opacity: 0.9,
+    },
+    newBadge: {
+      position: "absolute",
+      top: 4,
+      right: 2,
+      backgroundColor: `${theme.accent.amber}38`,
+      borderRadius: 8,
+      paddingHorizontal: 5,
+      paddingVertical: 1,
+    },
+    newBadgeText: {
+      fontSize: 8,
+      fontWeight: "800",
+      color: theme.accent.amber,
+      textTransform: "uppercase",
+      letterSpacing: 0.4,
+    },
+  });

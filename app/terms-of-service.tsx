@@ -4,12 +4,14 @@ import { router } from "expo-router";
 import React from "react";
 import {
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useMindCareTheme } from "@/contexts/ThemeContext";
+import type { MindCareTheme } from "@/constants/theme";
 
 const TERMS_OF_SERVICE_TEXT = {
   title: "Terms of Service for MindCare",
@@ -59,15 +61,18 @@ const TERMS_OF_SERVICE_TEXT = {
 };
 
 export default function TermsOfServiceScreen() {
+  const { theme } = useMindCareTheme();
+  const styles = createStyles(theme);
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
-        colors={["#F0F8FF", "#E8F4FD"]}
+        colors={theme.softGradient}
         style={styles.gradient}
       >
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#666" />
+            <Ionicons name="arrow-back" size={24} color={theme.secondaryText} />
           </Pressable>
           <Text style={styles.headerTitle}>Terms of Service</Text>
           <View style={{ width: 40 }} />
@@ -95,62 +100,63 @@ export default function TermsOfServiceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  gradient: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#333",
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#2196F3",
-    marginBottom: 8,
-  },
-  lastUpdated: {
-    fontSize: 12,
-    color: "#999",
-    marginBottom: 24,
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 8,
-  },
-  sectionContent: {
-    fontSize: 14,
-    color: "#666",
-    lineHeight: 22,
-  },
-});
+const createStyles = (theme: MindCareTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    gradient: {
+      flex: 1,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: theme.text,
+    },
+    scrollContainer: {
+      flex: 1,
+    },
+    scrollContent: {
+      padding: 20,
+    },
+    title: {
+      fontSize: 22,
+      fontWeight: "700",
+      color: theme.primary,
+      marginBottom: 8,
+    },
+    lastUpdated: {
+      fontSize: 12,
+      color: theme.secondaryText,
+      marginBottom: 24,
+    },
+    section: {
+      marginBottom: 20,
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: theme.text,
+      marginBottom: 8,
+    },
+    sectionContent: {
+      fontSize: 14,
+      color: theme.secondaryText,
+      lineHeight: 22,
+    },
+  });
