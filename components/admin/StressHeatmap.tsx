@@ -19,16 +19,16 @@ interface StressHeatmapProps {
   subtitle?: string;
 }
 
-function getColor(intensity: number): string {
-  if (intensity <= 0) return "#F1F5F9";
-  if (intensity <= 0.15) return "#E0F2FE";
-  if (intensity <= 0.3) return "#7DD3FC";
-  if (intensity <= 0.45) return "#38BDF8";
-  if (intensity <= 0.55) return "#FBBF24";
-  if (intensity <= 0.65) return "#FB923C";
-  if (intensity <= 0.75) return "#F87171";
-  if (intensity <= 0.85) return "#EF4444";
-  return "#B91C1C";
+function getColor(intensity: number, theme: MindCareTheme): string {
+  if (intensity <= 0) return theme.borderSoft;
+  if (intensity <= 0.15) return "#DBEAFE";
+  if (intensity <= 0.3) return "#93C5FD";
+  if (intensity <= 0.45) return "#60A5FA";
+  if (intensity <= 0.55) return theme.status.warning;
+  if (intensity <= 0.65) return theme.accent.amber;
+  if (intensity <= 0.75) return theme.status.error;
+  if (intensity <= 0.85) return "#DC2626";
+  return "#991B1B";
 }
 
 function getLabel(intensity: number): string {
@@ -116,7 +116,7 @@ export function StressHeatmap({ data, title, subtitle }: StressHeatmapProps) {
                     const cell = cells.find(
                       (c) => c.dayIndex === dIdx && c.hourIndex === hIdx,
                     ) || { dayIndex: dIdx, hourIndex: hIdx, intensity: 0, count: 0 };
-                    const color = getColor(cell.intensity);
+                    const color = getColor(cell.intensity, theme);
                     return (
                       <Pressable
                         key={`${dIdx}-${hIdx}`}
@@ -153,7 +153,7 @@ export function StressHeatmap({ data, title, subtitle }: StressHeatmapProps) {
             {DAYS[selectedCell.dayIndex]} at {HOURS[selectedCell.hourIndex]}
           </Text>
           <View style={styles.tooltipRow}>
-            <View style={[styles.tooltipDot, { backgroundColor: getColor(selectedCell.intensity) }]} />
+            <View style={[styles.tooltipDot, { backgroundColor: getColor(selectedCell.intensity, theme) }]} />
             <Text style={styles.tooltipText}>
               Stress Level: <Text style={styles.tooltipBold}>{getLabel(selectedCell.intensity)}</Text>
             </Text>
@@ -170,7 +170,7 @@ export function StressHeatmap({ data, title, subtitle }: StressHeatmapProps) {
       <View style={styles.legend}>
         <Text style={styles.legendLabel}>Low</Text>
         {[0, 0.2, 0.4, 0.55, 0.7, 0.85, 1].map((val) => (
-          <View key={val} style={[styles.legendSwatch, { backgroundColor: getColor(val) }]} />
+          <View key={val} style={[styles.legendSwatch, { backgroundColor: getColor(val, theme) }]} />
         ))}
         <Text style={styles.legendLabel}>High</Text>
       </View>
@@ -253,7 +253,7 @@ const createStyles = (theme: MindCareTheme) =>
     },
     cellCount: {
       fontWeight: "800",
-      color: "rgba(0,0,0,0.6)",
+      color: theme.text,
     },
     tooltip: {
       marginTop: 16,

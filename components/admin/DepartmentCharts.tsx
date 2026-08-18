@@ -59,7 +59,7 @@ export function DepartmentCorrelationScatter({ points }: ScatterPlotProps) {
   const { theme } = useMindCareTheme();
   const deptColors: Record<string, string> = {};
   const uniqueDepts = [...new Set(points.map((p) => p.department))];
-  const palette = ["#8A63D2", "#16A34A", "#D97706", "#0EA5E9", "#EC4899", "#F97316", "#06B6D4"];
+  const palette = [theme.primary, theme.status.success, theme.status.warning, theme.status.info, theme.accent.rose, theme.accent.amber, theme.accent.teal];
   uniqueDepts.forEach((d, i) => {
     deptColors[d] = palette[i % palette.length];
   });
@@ -84,19 +84,19 @@ function renderMobileBar(data: DeptComparisonMetric[], theme: MindCareTheme) {
             <View key={d.deptAbbr} style={[styles.mobileBarGroup, { width: groupWidth }]}>
               <Text style={styles.mobileBarLabel}>{d.deptAbbr}</Text>
               <View style={styles.mobileBarCol}>
-                <View style={[styles.mobileBar, { height: Math.max(4, (d.avgScore / maxScore) * 100), backgroundColor: "#8A63D2" }]} />
+                <View style={[styles.mobileBar, { height: Math.max(4, (d.avgScore / maxScore) * 100), backgroundColor: theme.primary }]} />
                 <Text style={styles.mobileBarVal}>{d.avgScore.toFixed(0)}</Text>
               </View>
               <View style={styles.mobileBarCol}>
-                <View style={[styles.mobileBar, { height: Math.max(4, (d.journalCount / maxJournal) * 100), backgroundColor: "#16A34A" }]} />
+                <View style={[styles.mobileBar, { height: Math.max(4, (d.journalCount / maxJournal) * 100), backgroundColor: theme.status.success }]} />
                 <Text style={styles.mobileBarVal}>{d.journalCount}</Text>
               </View>
               <View style={styles.mobileBarCol}>
-                <View style={[styles.mobileBar, { height: Math.max(4, (d.lsnCount / maxLsn) * 100), backgroundColor: "#D97706" }]} />
+                <View style={[styles.mobileBar, { height: Math.max(4, (d.lsnCount / maxLsn) * 100), backgroundColor: theme.status.warning }]} />
                 <Text style={styles.mobileBarVal}>{d.lsnCount}</Text>
               </View>
               <View style={styles.mobileBarCol}>
-                <View style={[styles.mobileBar, { height: Math.max(4, (d.assessmentCount / maxAssessment) * 100), backgroundColor: "#0EA5E9" }]} />
+                <View style={[styles.mobileBar, { height: Math.max(4, (d.assessmentCount / maxAssessment) * 100), backgroundColor: theme.status.info }]} />
                 <Text style={styles.mobileBarVal}>{d.assessmentCount}</Text>
               </View>
             </View>
@@ -105,10 +105,10 @@ function renderMobileBar(data: DeptComparisonMetric[], theme: MindCareTheme) {
       </ScrollView>
       <View style={styles.mobileBarLegend}>
         {[
-          { label: "Avg Score", color: "#8A63D2" },
-          { label: "Journals", color: "#16A34A" },
-          { label: "LSN", color: "#D97706" },
-          { label: "Assessments", color: "#0EA5E9" },
+          { label: "Avg Score", color: theme.primary },
+          { label: "Journals", color: theme.status.success },
+          { label: "LSN", color: theme.status.warning },
+          { label: "Assessments", color: theme.status.info },
         ].map((m) => (
           <View key={m.label} style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: m.color }]} />

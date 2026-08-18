@@ -147,10 +147,10 @@ export function DepartmentComparisonChart({ data }: ComparisonChartProps) {
           <YAxis tick={{ fill: theme.secondaryText, fontSize: 11.5 }} axisLine={false} tickLine={false} />
           <Tooltip content={<CustomTooltip />} />
           <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: 13, paddingTop: 12, color: theme.text }} />
-          <Bar dataKey="Avg Score" fill="#8A63D2" radius={[4, 4, 0, 0]} maxBarSize={24} />
-          <Bar dataKey="Journals" fill="#16A34A" radius={[4, 4, 0, 0]} maxBarSize={24} />
-          <Bar dataKey="LSN" fill="#D97706" radius={[4, 4, 0, 0]} maxBarSize={24} />
-          <Bar dataKey="Assessments" fill="#0EA5E9" radius={[4, 4, 0, 0]} maxBarSize={24} />
+          <Bar dataKey="Avg Score" fill={theme.primary} radius={[4, 4, 0, 0]} maxBarSize={24} />
+          <Bar dataKey="Journals" fill={theme.status.success} radius={[4, 4, 0, 0]} maxBarSize={24} />
+          <Bar dataKey="LSN" fill={theme.status.warning} radius={[4, 4, 0, 0]} maxBarSize={24} />
+          <Bar dataKey="Assessments" fill={theme.status.info} radius={[4, 4, 0, 0]} maxBarSize={24} />
         </BarChart>
       </ResponsiveContainer>
 
@@ -178,7 +178,7 @@ export function DepartmentCorrelationScatter({ points }: ScatterPlotProps) {
   };
   const deptColors: Record<string, string> = {};
   const uniqueDepts = [...new Set(points.map((p) => p.department))];
-  const palette = ["#8A63D2", "#16A34A", "#D97706", "#0EA5E9", "#EC4899", "#F97316", "#06B6D4"];
+  const palette = [theme.primary, theme.status.success, theme.status.warning, theme.status.info, theme.accent.rose, theme.accent.amber, theme.accent.teal];
   uniqueDepts.forEach((d, i) => {
     deptColors[d] = palette[i % palette.length];
   });
@@ -263,7 +263,7 @@ const createStyles = (theme: MindCareTheme) =>
       borderWidth: 1,
       borderColor: theme.border,
       elevation: 8,
-      shadowColor: "#000",
+      shadowColor: theme.text,
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.2,
       shadowRadius: 12,

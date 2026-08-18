@@ -290,18 +290,20 @@ function DescriptiveInsight({
   );
 }
 
-// ─── Shared Admin Design Tokens ──────────────────────────────────────────────
+// ─── Shared Admin Design Tokens (mapped from lightTheme) ─────────────────────
+import { lightTheme } from "@/constants/theme";
+
 const ADMIN_COLORS = {
-  bg: "#F8F7FC",
-  surface: "#FFFFFF",
-  border: "#EDE9FE",
-  borderStrong: "#E6DCF7",
-  purple: "#7C4DCC",
-  purpleDeep: "#5B3FA8",
-  purpleSoft: "#F0EBFB",
-  textPrimary: "#1E1B4B",
-  textMuted: "#6B7280",
-  textFaint: "#94A3B8",
+  bg: lightTheme.background,
+  surface: lightTheme.card,
+  border: lightTheme.border,
+  borderStrong: lightTheme.borderSoft,
+  purple: lightTheme.primary,
+  purpleDeep: lightTheme.primaryDeep,
+  purpleSoft: lightTheme.softPurple,
+  textPrimary: lightTheme.text,
+  textMuted: lightTheme.secondaryText,
+  textFaint: lightTheme.secondaryText,
 } as const;
 
 const TABS: {

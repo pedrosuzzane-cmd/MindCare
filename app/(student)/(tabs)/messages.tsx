@@ -346,18 +346,12 @@ export default function StudentMessagesScreen() {
   }, [activeConversation?.id, isNearBottom, scrollToBottom, userId, user]);
 
   // ── Scroll to newest message once when a conversation opens ──
-  // Reset scroll state synchronously during render (valid derived-state
-  // pattern, avoids cascading setState in the effect body).
-  const [prevConvId, setPrevConvId] = useState<string | null>(null);
-  if (activeConversation?.id && prevConvId !== activeConversation.id) {
-    setPrevConvId(activeConversation.id);
-    setIsNearBottom(true);
-    setShowScrollToBottom(false);
-  }
   useEffect(() => {
     if (!activeConversation?.id) return;
+    setIsNearBottom(true);
+    setShowScrollToBottom(false);
     scrollToBottom(false);
-  }, [activeConversation?.id, scrollToBottom, user]);
+  }, [activeConversation?.id, scrollToBottom]);
 
   // ── Set self as online on mount, offline on unmount ──
   useEffect(() => {
@@ -595,21 +589,48 @@ export default function StudentMessagesScreen() {
     const peerUid = item.participants?.find((u) => u !== userId);
     const isOnline = peerUid ? presenceMap[peerUid] : false;
 
+    // Prefer the peer's uploaded profile image; fall back to initials.
+    const peerProfile = isPeer && peerUid
+      ? allPeers.find((p) => p.uid === peerUid)
+      : undefined;
+    const avatarUrl =
+      peerUid && !failedAvatarUids[peerUid]
+        ? peerProfile?.profileImage
+        : undefined;
+    const avatarInitials = getInitials(partnerName);
+
     return (
       <Pressable style={styles.convRow} onPress={() => openConversation(item)}>
         <View style={styles.convAvatarWrapper}>
-          <View
-            style={[
-              styles.convAvatar,
-              isPeer ? styles.convAvatarPeer : styles.convAvatarAdmin,
-            ]}
-          >
-            <Ionicons
-              name={isPeer ? "person" : "shield-checkmark"}
-              size={22}
-              color={isPeer ? theme.primary : theme.accent.purple}
+          {avatarUrl ? (
+            <Image
+              source={{ uri: avatarUrl }}
+              style={styles.convAvatarImage}
+              onError={() =>
+                peerUid &&
+                setFailedAvatarUids((prev) => ({ ...prev, [peerUid]: true }))
+              }
             />
-          </View>
+          ) : (
+            <View
+              style={[
+                styles.convAvatar,
+                isPeer ? styles.convAvatarPeer : styles.convAvatarAdmin,
+              ]}
+            >
+              {avatarInitials ? (
+                <Text style={styles.convAvatarInitials}>
+                  {avatarInitials}
+                </Text>
+              ) : (
+                <Ionicons
+                  name={isPeer ? "person" : "shield-checkmark"}
+                  size={22}
+                  color={isPeer ? theme.primary : theme.accent.purple}
+                />
+              )}
+            </View>
+          )}
           <View
             style={[
               styles.convPresenceDot,
@@ -1483,6 +1504,16 @@ const createStyles = (theme: MindCareTheme) =>
   },
   convAvatarPeer: { backgroundColor: theme.softPurple },
   convAvatarAdmin: { backgroundColor: theme.secondaryCard },
+  convAvatarImage: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+  },
+  convAvatarInitials: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: theme.primary,
+  },
   convInfo: { flex: 1 },
   convTop: {
     flexDirection: "row",

@@ -368,17 +368,12 @@ export default function StudentMessagesScreen() {
   };
 
   const formatTime = (timestamp: number) => {
-    const now = Date.now();
-    const diff = now - timestamp;
     const date = new Date(timestamp);
 
-    if (diff < 86400000) {
-      return date.toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    }
-    return date.toLocaleDateString([], { month: "short", day: "numeric" });
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   // ─── Directory: User card row ────────────────────────────────────────────
