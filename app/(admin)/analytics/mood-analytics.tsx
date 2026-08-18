@@ -111,7 +111,7 @@ export default function MoodAnalyticsScreen() {
   const deptCompletionData = useMemo(() => {
     const deptMap = new Map<string, { total: number; assessed: number }>();
     studentSummaries.forEach((s) => {
-      const dept = s.department || "Unspecified";
+      const dept = getDepartmentCode(s.department || "Unspecified");
       if (!deptMap.has(dept)) {
         deptMap.set(dept, { total: 0, assessed: 0 });
       }

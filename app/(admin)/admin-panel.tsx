@@ -1088,7 +1088,7 @@ export default function AdminPanelScreen() {
       .filter((s) => s.assessmentsCount > 0 || s.journalCount > 0)
       .map((s) => ({
         studentId: s.uid,
-        department: s.department,
+        department: getDepartmentCode(s.department),
         journalCount: s.journalCount,
         avgScore: s.latestTotalScore ?? 0,
         riskLevel: (s.latestRiskLevel ?? "low") as "low" | "normal" | "high",

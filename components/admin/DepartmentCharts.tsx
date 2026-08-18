@@ -3,6 +3,7 @@ import React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import type { MindCareTheme } from "@/constants/theme";
 import { useMindCareTheme } from "@/contexts/ThemeContext";
+import { getDepartmentCode } from "@/utils/departmentMeta";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 export interface DeptComparisonMetric {
@@ -51,14 +52,13 @@ interface ScatterPlotProps {
 }
 
 function deptAbbr(full: string): string {
-  const match = full.match(/\(([^)]+)\)/);
-  return match ? match[1] : full.split(" ").slice(0, 3).join(" ");
+  return getDepartmentCode(full);
 }
 
 export function DepartmentCorrelationScatter({ points }: ScatterPlotProps) {
   const { theme } = useMindCareTheme();
   const deptColors: Record<string, string> = {};
-  const uniqueDepts = [...new Set(points.map((p) => p.department))];
+  const uniqueDepts = [...new Set(points.map((p) => getDepartmentCode(p.department)))];
   const palette = [theme.primary, theme.status.success, theme.status.warning, theme.status.info, theme.accent.rose, theme.accent.amber, theme.accent.teal];
   uniqueDepts.forEach((d, i) => {
     deptColors[d] = palette[i % palette.length];
@@ -137,7 +137,7 @@ function renderMobileScatter(points: ScatterPoint[], deptColors: Record<string, 
     if (row >= rows) row = rows - 1;
     const key = `${row}-${col}`;
     if (!cellMap.has(key)) {
-      cellMap.set(key, { points: [], dept: p.department, riskLevel: p.riskLevel });
+      cellMap.set(key, { points: [], dept: getDepartmentCode(p.department), riskLevel: p.riskLevel });
     }
     cellMap.get(key)!.points.push(p);
   });
@@ -152,7 +152,7 @@ function renderMobileScatter(points: ScatterPoint[], deptColors: Record<string, 
               const cellData = cellMap.get(key);
               const count = cellData ? cellData.points.length : 0;
               const primary = cellData ? cellData.points[0] : null;
-              const color = primary ? deptColors[primary.department] || "#8A63D2" : "transparent";
+              const color = primary ? deptColors[getDepartmentCode(primary.department)] || "#8A63D2" : "transparent";
 
               const jitterX = count > 1 ? (Math.random() - 0.5) * 6 : 0;
               const jitterY = count > 1 ? (Math.random() - 0.5) * 6 : 0;

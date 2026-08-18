@@ -9,7 +9,6 @@ import {
 } from "@/services/userService";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
-import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { onAuthStateChanged, sendEmailVerification } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -19,7 +18,6 @@ import {
     Alert,
     Image,
     KeyboardAvoidingView,
-    Linking,
     Modal,
     Platform,
     Pressable,
@@ -32,7 +30,6 @@ import {
     View,
 } from "react-native";
 
-const HEADER_HEIGHT = 280;
 const CONTENT_MAX_WIDTH = 1100;
 
 /** Compact label + value row used inside profile cards. */
@@ -418,110 +415,65 @@ export default function ProfileScreen() {
       <SafeAreaView
         style={[s.container, { backgroundColor: theme.background }]}
       >
-        {/* ─── Purple Header Banner ──────────────────────────────────── */}
-        <LinearGradient
-          colors={["#7B2CBF", "#9C27B0", "#AB47BC"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={s.headerGradient}
-        >
-          <View style={s.headerInner}>
-            {/* Top nav row */}
-            <View style={s.topNav}>
-              <Pressable style={s.navBtn} onPress={handleBack}>
-                <Ionicons name="arrow-back" size={24} color="white" />
-              </Pressable>
-              <Text style={s.navTitle}>Details</Text>
-              <View style={{ width: 40 }} />
-            </View>
-
-            {/* Avatar */}
-            <Pressable style={s.avatarContainer} onPress={handleAvatarPress}>
-              {Platform.OS === "web" && (
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display: "none" }}
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file || !uid) return;
-                    setUploadingImage(true);
-                    try {
-                      const collectionName = isAdmin ? "admins" : "users";
-                      const newUrl = await uploadProfileImageFromFile(
-                        file,
-                        uid,
-                        collectionName,
-                      );
-                      if (newUrl) {
-                        setProfile((p) => ({
-                          ...(p || {}),
-                          profileImage: newUrl,
-                        }));
-                      }
-                    } finally {
-                      setUploadingImage(false);
+        {/* ─── Compact Profile Header ──────────────────────────────────── */}
+        <View style={s.profileHeader}>
+          <Pressable style={s.avatarContainer} onPress={handleAvatarPress}>
+            {Platform.OS === "web" && (
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file || !uid) return;
+                  setUploadingImage(true);
+                  try {
+                    const collectionName = isAdmin ? "admins" : "users";
+                    const newUrl = await uploadProfileImageFromFile(
+                      file,
+                      uid,
+                      collectionName,
+                    );
+                    if (newUrl) {
+                      setProfile((p) => ({
+                        ...(p || {}),
+                        profileImage: newUrl,
+                      }));
                     }
-                    e.target.value = "";
-                  }}
-                />
-              )}
-              <View style={s.avatarRing}>
-                {profile?.profileImage ? (
-                  <Image
-                    source={{ uri: profile.profileImage }}
-                    style={s.avatarImage}
-                  />
-                ) : (
-                  <View style={s.avatar}>
-                    <Text style={s.avatarText}>
-                      {getInitials(profile?.fullName || "")}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <View style={s.cameraOverlay}>
-                {uploadingImage ? (
-                  <ActivityIndicator size="small" color="#7B2CBF" />
-                ) : (
-                  <Ionicons name="camera" size={14} color="#7B2CBF" />
-                )}
-              </View>
-            </Pressable>
-
-            {/* Name + Role */}
-            <Text style={s.userName}>{profile?.fullName || "No Name"}</Text>
-            <Text style={s.userRole}>
-              {roleLabel} / {deptLabel}
-            </Text>
-            {memberSince && (
-              <Text style={s.memberSince}>Member since {memberSince}</Text>
+                  } finally {
+                    setUploadingImage(false);
+                  }
+                  e.target.value = "";
+                }}
+              />
             )}
-
-            {/* Quick action buttons */}
-            <View style={s.quickActions}>
-              <Pressable
-                style={s.quickActionBtn}
-                onPress={() => Linking.openURL("mailto:support@mindcare.app")}
-              >
-                <Ionicons name="mail" size={20} color="#7B2CBF" />
-              </Pressable>
-              <Pressable
-                style={s.quickActionBtn}
-                onPress={() => Linking.openURL("tel:911")}
-              >
-                <Ionicons name="call" size={20} color="#7B2CBF" />
-              </Pressable>
-              <Pressable
-                style={s.quickActionBtn}
-                onPress={() => router.push("/(student)/(tabs)/messages")}
-              >
-                <Ionicons name="chatbubble" size={20} color="#7B2CBF" />
-              </Pressable>
+            <View style={s.avatarRing}>
+              {profile?.profileImage ? (
+                <Image
+                  source={{ uri: profile.profileImage }}
+                  style={s.avatarImage}
+                />
+              ) : (
+                <View style={s.avatar}>
+                  <Text style={s.avatarText}>
+                    {getInitials(profile?.fullName || "")}
+                  </Text>
+                </View>
+              )}
             </View>
-          </View>
-        </LinearGradient>
+            <View style={s.cameraOverlay}>
+              {uploadingImage ? (
+                <ActivityIndicator size="small" color="#7C3AED" />
+              ) : (
+                <Ionicons name="camera" size={12} color="#7C3AED" />
+              )}
+            </View>
+          </Pressable>
+          <Text style={s.userName}>{profile?.fullName || "No Name"}</Text>
+          <Text style={s.userRole}>{roleLabel}</Text>
+          <Text style={s.userDept}>{deptLabel}</Text>
+        </View>
 
         {/* ─── White Content Body ────────────────────────────────────── */}
         <ScrollView
@@ -531,6 +483,11 @@ export default function ProfileScreen() {
           showsVerticalScrollIndicator={true}
         >
           <View style={s.bodyInner}>
+            <Pressable onPress={handleBack} style={s.backLink}>
+              <Ionicons name="chevron-back" size={18} color={theme.primary} />
+              <Text style={[s.backLinkText, { color: theme.primary }]}>Back</Text>
+            </Pressable>
+            <Text style={[s.pageTitle, { color: theme.text }]}>Administrator Profile</Text>
             <View style={[s.gridRow, isWide && s.gridRowWide]}>
               {/* ── LEFT column: Personal + Contact ─────────────────── */}
               <View style={[s.gridCol, isWide && s.gridColWide]}>
@@ -1074,16 +1031,10 @@ export default function ProfileScreen() {
               </Pressable>
             </>
           ) : (
-            <>
-              <Pressable style={s.secondaryBtn} onPress={handleBack}>
-                <Ionicons name="arrow-back" size={18} color="#7B2CBF" />
-                <Text style={s.secondaryBtnText}>Back</Text>
-              </Pressable>
-              <Pressable style={s.editBtn} onPress={handleEditToggle}>
-                <Ionicons name="pencil" size={18} color="white" />
-                <Text style={s.editBtnText}>Edit Profile</Text>
-              </Pressable>
-            </>
+            <Pressable style={s.editBtn} onPress={handleEditToggle}>
+              <Ionicons name="pencil" size={18} color="white" />
+              <Text style={s.editBtnText}>Edit Profile</Text>
+            </Pressable>
           )}
         </View>
       </SafeAreaView>
@@ -1127,127 +1078,90 @@ export default function ProfileScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F2F8" },
+  container: { flex: 1, backgroundColor: "#F8F9FC" },
 
-  /* ── Header Banner ──────────────────────────────────────────────── */
-  headerGradient: {
-    paddingTop: 16,
-    paddingBottom: 40,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-  },
-  headerInner: {
-    width: "100%",
-    maxWidth: CONTENT_MAX_WIDTH,
-    alignSelf: "center",
+  /* ── Compact Profile Header ────────────────────────────────────── */
+  profileHeader: {
+    alignItems: "center",
+    paddingTop: 20,
+    paddingBottom: 20,
     paddingHorizontal: 20,
-  },
-  topNav: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: 8,
-    paddingBottom: 12,
-  },
-  navBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  navTitle: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "700",
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
   },
   avatarContainer: {
     alignSelf: "center",
-    marginTop: 8,
     marginBottom: 12,
     position: "relative",
   },
   avatarRing: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 3,
-    borderColor: "rgba(255,255,255,0.4)",
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2.5,
+    borderColor: "#E9D5FF",
     justifyContent: "center",
     alignItems: "center",
   },
   avatar: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: "#F3EAFF",
     justifyContent: "center",
     alignItems: "center",
   },
   avatarImage: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
   },
   avatarText: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: "white",
-    letterSpacing: 1,
+    fontSize: 26,
+    fontWeight: "700",
+    color: "#7C3AED",
+    letterSpacing: 0.5,
   },
   cameraOverlay: {
     position: "absolute",
-    bottom: 2,
-    right: 2,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "rgba(255,255,255,0.9)",
+    bottom: 0,
+    right: 0,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#FFFFFF",
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
   },
   userName: {
-    color: "white",
-    fontSize: 24,
-    fontWeight: "800",
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1F2937",
     textAlign: "center",
-    letterSpacing: 0.3,
   },
   userRole: {
-    color: "rgba(255,255,255,0.9)",
-    fontSize: 14,
-    fontWeight: "600",
-    textAlign: "center",
-    marginTop: 4,
-  },
-  memberSince: {
-    color: "rgba(255,255,255,0.7)",
     fontSize: 13,
-    fontWeight: "500",
+    fontWeight: "600",
+    color: "#6B7280",
     textAlign: "center",
-    marginTop: 4,
-    marginBottom: 16,
+    marginTop: 2,
   },
-  quickActions: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 16,
-  },
-  quickActionBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "white",
-    justifyContent: "center",
-    alignItems: "center",
-    // @ts-ignore
-    boxShadow: "0px 4px 12px rgba(0,0,0,0.1)",
+  userDept: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#9CA3AF",
+    textAlign: "center",
+    marginTop: 2,
+    fontStyle: "italic",
   },
 
   /* ── Body ────────────────────────────────────────────────────────── */
   bodyContent: {
-    paddingTop: 24,
+    paddingTop: 20,
+    paddingBottom: 100,
   },
   bodyInner: {
     width: "100%",
@@ -1256,14 +1170,31 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
   },
 
+  /* ── Back Link + Page Title ──────────────────────────────────────── */
+  backLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    marginBottom: 4,
+  },
+  backLinkText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  pageTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 16,
+  },
+
   /* ── Responsive two-column grid ─────────────────────────────────── */
   gridRow: {
     flexDirection: "column",
-    gap: 16,
+    gap: 14,
   },
   gridRowWide: {
     flexDirection: "row",
-    gap: 20,
+    gap: 16,
     alignItems: "flex-start",
   },
   gridCol: {
@@ -1277,32 +1208,33 @@ const s = StyleSheet.create({
 
   /* ── Section Cards ───────────────────────────────────────────────── */
   sectionCard: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 16,
-    // @ts-ignore
-    boxShadow: "0px 2px 12px rgba(138, 99, 210, 0.06)",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: "rgba(156, 126, 235, 0.05)",
+    borderColor: "#E5E7EB",
+    // @ts-ignore
+    boxShadow: "0px 1px 3px rgba(0,0,0,0.04)",
   },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 14,
-    gap: 10,
+    marginBottom: 12,
+    gap: 8,
   },
   sectionIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#F3F4F6",
     justifyContent: "center",
     alignItems: "center",
   },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "700",
-    color: "#1E1B4B",
+    color: "#1F2937",
   },
 
   /* ── Fields ───────────────────────────────────────────────────────── */
@@ -1312,23 +1244,23 @@ const s = StyleSheet.create({
     gap: 10,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(156, 126, 235, 0.06)",
+    borderBottomColor: "#F3F4F6",
   },
   fieldValue: {
-    fontSize: 16,
-    color: "#1E1B4B",
+    fontSize: 14,
+    color: "#1F2937",
     fontWeight: "500",
     flex: 1,
   },
 
   /* ── Compact key/value rows ─────────────────────────────────────── */
   kvBlock: {
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(167, 139, 250, 0.10)",
+    borderBottomColor: "#F3F4F6",
   },
   kvBlockLast: {
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   kvRow: {
     flexDirection: "row",
@@ -1337,13 +1269,15 @@ const s = StyleSheet.create({
     gap: 12,
   },
   kvLabel: {
-    fontSize: 13,
-    fontWeight: "600",
+    fontSize: 12,
+    fontWeight: "400",
+    color: "#6B7280",
     flexShrink: 0,
   },
   kvValue: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "600",
+    color: "#1F2937",
     flex: 1,
     textAlign: "right",
   },
@@ -1383,14 +1317,14 @@ const s = StyleSheet.create({
     fontWeight: "700",
   },
   input: {
-    backgroundColor: "#FAF8FF",
+    backgroundColor: "#F9FAFB",
     paddingHorizontal: 14,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#E9D5FF",
-    fontSize: 15,
-    color: "#1E1B4B",
+    borderColor: "#D1D5DB",
+    fontSize: 14,
+    color: "#1F2937",
     marginTop: 4,
   },
 
@@ -1406,66 +1340,44 @@ const s = StyleSheet.create({
     paddingBottom: Platform.OS === "ios" ? 32 : 24,
     backgroundColor: "#FFFFFF",
     borderTopWidth: 1,
-    borderTopColor: "rgba(156, 126, 235, 0.08)",
-    gap: 12,
+    borderTopColor: "#E5E7EB",
   },
   cancelBtn: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: "#F1F5F9",
+    borderRadius: 10,
+    backgroundColor: "#F3F4F6",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#D1D5DB",
   },
   cancelBtnText: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#64748B",
+    color: "#6B7280",
   },
   saveBtn: {
     flex: 1.5,
     paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: "#8A63D2",
+    borderRadius: 10,
+    backgroundColor: "#7C3AED",
     alignItems: "center",
     justifyContent: "center",
-    // @ts-ignore
-    boxShadow: "0px 4px 12px rgba(138, 99, 210, 0.3)",
   },
   saveBtnText: {
     fontSize: 15,
     fontWeight: "700",
     color: "white",
   },
-  secondaryBtn: {
+  editBtn: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: "#F5F0FF",
+    borderRadius: 10,
+    backgroundColor: "#7C3AED",
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 6,
-    borderWidth: 1,
-    borderColor: "#E9D5FF",
-  },
-  secondaryBtnText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#7B2CBF",
-  },
-  editBtn: {
-    flex: 1.5,
-    paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: "#8A63D2",
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 6,
-    // @ts-ignore
-    boxShadow: "0px 4px 12px rgba(138, 99, 210, 0.3)",
   },
   editBtnText: {
     fontSize: 15,
@@ -1483,32 +1395,32 @@ const s = StyleSheet.create({
   },
   modalCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 24,
+    borderRadius: 16,
     padding: 28,
     alignItems: "center",
     width: "100%",
     maxWidth: 360,
     gap: 12,
     // @ts-ignore
-    boxShadow: "0px 12px 32px rgba(138, 99, 210, 0.20)",
+    boxShadow: "0px 8px 24px rgba(0,0,0,0.12)",
   },
   modalIconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: "#F3EAFF",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 4,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#1E1B4B",
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#1F2937",
   },
   modalMessage: {
     fontSize: 14,
-    color: "#64748B",
+    color: "#6B7280",
     textAlign: "center",
     lineHeight: 20,
   },
@@ -1521,22 +1433,22 @@ const s = StyleSheet.create({
   modalCancelBtn: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: "#F1F5F9",
+    borderRadius: 10,
+    backgroundColor: "#F3F4F6",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: "#D1D5DB",
   },
   modalCancelText: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#64748B",
+    color: "#6B7280",
   },
   modalConfirmBtn: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: "#8A63D2",
+    borderRadius: 10,
+    backgroundColor: "#7C3AED",
     alignItems: "center",
   },
   modalConfirmText: {
@@ -1548,7 +1460,7 @@ const s = StyleSheet.create({
   /* ── LSN Document ──────────────────────────────────────────────── */
   lsnHintText: {
     fontSize: 13,
-    color: "#64748B",
+    color: "#6B7280",
     lineHeight: 19,
     marginTop: 4,
   },
@@ -1559,7 +1471,7 @@ const s = StyleSheet.create({
     marginTop: 10,
     paddingVertical: 8,
     paddingHorizontal: 14,
-    backgroundColor: "#F5F0FF",
+    backgroundColor: "#F5F3FF",
     borderRadius: 10,
     alignSelf: "flex-start",
     borderWidth: 1,
@@ -1568,7 +1480,7 @@ const s = StyleSheet.create({
   lsnReplaceText: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#7B2CBF",
+    color: "#7C3AED",
   },
   lsnProgressRow: {
     flexDirection: "row",
@@ -1579,19 +1491,19 @@ const s = StyleSheet.create({
   lsnProgressBar: {
     flex: 1,
     height: 8,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#F3F4F6",
     borderRadius: 4,
     overflow: "hidden",
   },
   lsnProgressFill: {
     height: "100%",
-    backgroundColor: "#8A63D2",
+    backgroundColor: "#7C3AED",
     borderRadius: 4,
   },
   lsnProgressText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#8A63D2",
+    color: "#7C3AED",
     width: 36,
     textAlign: "right",
   },
@@ -1606,8 +1518,8 @@ const s = StyleSheet.create({
     gap: 6,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    backgroundColor: "#F5F0FF",
-    borderRadius: 12,
+    backgroundColor: "#F5F3FF",
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: "#E9D5FF",
     borderStyle: "dashed",
@@ -1615,13 +1527,13 @@ const s = StyleSheet.create({
   lsnPickText: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#7B2CBF",
+    color: "#7C3AED",
   },
   lsnUploadBtn: {
     paddingVertical: 10,
     paddingHorizontal: 24,
-    backgroundColor: "#8A63D2",
-    borderRadius: 12,
+    backgroundColor: "#7C3AED",
+    borderRadius: 10,
     justifyContent: "center",
   },
   lsnUploadText: {

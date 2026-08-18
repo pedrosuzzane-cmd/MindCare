@@ -5,7 +5,6 @@ import {
   applyStudentFilters,
   buildTriageQueue,
   completeSupportWorkflow,
-  countAttentionStudents,
   fetchAdminDirectory,
   fetchStudentAuditLogs,
   listenForStudentManagementData,
@@ -655,6 +654,12 @@ export default function StudentManagementScreen() {
     [filtered, page],
   );
 
+  const attentionItems = useMemo(() => {
+    return buildTriageQueue(entries).filter(
+      (item) => item.priority === "high" || item.priority === "medium",
+    );
+  }, [entries]);
+
   const kpis = useMemo(() => {
     const byStatus = new Map<LifecycleStatus, number>();
     entries.forEach((e) => {
@@ -667,11 +672,9 @@ export default function StudentManagementScreen() {
       onLeave: byStatus.get("on_leave") ?? 0,
       graduated: byStatus.get("graduated") ?? 0,
       archived: byStatus.get("archived") ?? 0,
-      attention: countAttentionStudents(entries),
+      attention: attentionItems.length,
     };
-  }, [entries]);
-
-  const attentionItems = useMemo(() => buildTriageQueue(entries), [entries]);
+  }, [entries, attentionItems]);
 
   const entryById = useCallback(
     (uid: string) => entries.find((e) => e.uid === uid),

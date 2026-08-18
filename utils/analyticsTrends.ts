@@ -7,6 +7,7 @@
  */
 
 import { MIN_ANALYTICS_GROUP_SIZE } from "@/utils/analyticsPrivacy";
+import { getDepartmentCode } from "@/utils/departmentMeta";
 import type { StudentSummary } from "@/services/adminFirestoreService";
 
 export interface WellnessTrendPoint {
@@ -266,7 +267,7 @@ export function buildDepartmentTrendRows(
 ): DepartmentTrendRow[] {
   const byDept = new Map<string, StudentSummary[]>();
   students.forEach((s) => {
-    const dept = s.department || "Unspecified";
+    const dept = getDepartmentCode(s.department || "Unspecified");
     const arr = byDept.get(dept) ?? [];
     arr.push(s);
     byDept.set(dept, arr);

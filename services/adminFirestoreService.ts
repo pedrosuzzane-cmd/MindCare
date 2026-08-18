@@ -1,6 +1,7 @@
 import { db } from "@/constants/firebase";
 import { collection, getDocs, onSnapshot, query, orderBy } from "firebase/firestore";
 import { ASSESSMENT_INTERVAL_DAYS, bucketAssessments, riskFromScore } from "@/utils/assessmentTrend";
+import { getDepartmentCode } from "@/utils/departmentMeta";
 import {
   DEFAULT_LIFECYCLE_STATUS,
   DEFAULT_SUPPORT_STATUS,
@@ -146,7 +147,7 @@ export function listenForAdminDashboardData(
             name: userData.fullName || "Unknown Student",
             schoolId: userData.schoolId || "N/A",
             yearLevel: userData.yearLevel || "N/A",
-            department: userData.department || "Unspecified",
+            department: getDepartmentCode(userData.department || "Unspecified"),
             assessmentsCount: assessmentSnap.size,
             journalCount: journalSnap.size,
             latestJournalMood,
@@ -180,7 +181,7 @@ export function listenForAdminDashboardData(
               riskLevel: (aData.riskLevel as RiskLevel) || "low",
               totalScore: aData.totalScore || 0,
               createdAt,
-              department: userData.department || "Unspecified",
+              department: getDepartmentCode(userData.department || "Unspecified"),
               age: userData.age || "Unspecified",
               gender: userData.genderIdentity || "Unspecified",
               yearLevel: userData.yearLevel || "Unspecified",

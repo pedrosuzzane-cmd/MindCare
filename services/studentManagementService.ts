@@ -715,7 +715,9 @@ export function buildAttentionItems(
 }
 
 export function countAttentionStudents(entries: StudentManagementEntry[]): number {
-  return buildTriageQueue(entries).filter((i) => i.score > 0).length;
+  return buildTriageQueue(entries).filter(
+    (i) => i.priority === "high" || i.priority === "medium"
+  ).length;
 }
 
 // ─── Priority-based triage queue ────────────────────────────────────────────
@@ -753,7 +755,7 @@ export function buildTriageQueue(entries: StudentManagementEntry[]): TriageItem[
 
   for (const s of entries) {
     const status = s.status ?? DEFAULT_LIFECYCLE_STATUS;
-    if (status === "archived" || status === "inactive") continue;
+    if (status === "archived" || status === "inactive" || status === "graduated" || status === "on_leave") continue;
 
     const support = s.supportStatus ?? DEFAULT_SUPPORT_STATUS;
     const activeSupport = ACTIVE_SUPPORT_STATUSES.includes(support);
