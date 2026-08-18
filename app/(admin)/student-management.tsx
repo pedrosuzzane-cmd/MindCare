@@ -1370,13 +1370,6 @@ export default function StudentManagementScreen() {
               />
               <Text style={styles.headerBtnText}>Audit Log</Text>
             </Pressable>
-            <Pressable
-              style={styles.headerBtn}
-              onPress={() => setStatusFilter("All")}
-            >
-              <Ionicons name="people-outline" size={16} color="#6D28D9" />
-              <Text style={styles.headerBtnText}>All Students</Text>
-            </Pressable>
           </View>
         </View>
         {isSuperAdmin && (

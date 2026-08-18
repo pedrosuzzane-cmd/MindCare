@@ -10,6 +10,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, {
+  startTransition,
   useCallback,
   useEffect,
   useMemo,
@@ -44,6 +45,7 @@ import Toast from "@/components/Toast";
 
 import { useMindCareTheme } from "@/contexts/ThemeContext";
 import type { MindCareTheme } from "@/constants/theme";
+import { useNetwork } from "@/contexts/NetworkContext";
 import { useAuth } from "@/hooks/AuthContext";
 import { useStudentProfile } from "@/hooks/useStudentProfile";
 import {
@@ -60,6 +62,7 @@ import {
   sendMessage as sendMsg,
   startTyping,
 } from "@/services/messagingService";
+import { messageSyncService } from "@/services/messageSyncService";
 import {
   listenForPresence,
   setUserOffline,
@@ -112,6 +115,7 @@ export default function StudentMessagesScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useMindCareTheme();
   const styles = createStyles(theme);
+  const { isConnected } = useNetwork();
 
   // ── View state ──
   const [viewMode, setViewMode] = useState<ViewMode>("directory");
@@ -153,6 +157,14 @@ export default function StudentMessagesScreen() {
   const [sending, setSending] = useState(false);
   const [chatLoading, setChatLoading] = useState(true);
   const flatListRef = useRef<FlatList>(null);
+  const nowRef = useRef(0);
+
+  // Keep nowRef current so formatTime never calls Date.now() during render
+  useEffect(() => {
+    nowRef.current = Date.now();
+    const id = setInterval(() => { nowRef.current = Date.now(); }, 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const scrollToBottom = useCallback((animated = true) => {
     setTimeout(() => {
@@ -348,8 +360,10 @@ export default function StudentMessagesScreen() {
   // ── Scroll to newest message once when a conversation opens ──
   useEffect(() => {
     if (!activeConversation?.id) return;
-    setIsNearBottom(true);
-    setShowScrollToBottom(false);
+    startTransition(() => {
+      setIsNearBottom(true);
+      setShowScrollToBottom(false);
+    });
     scrollToBottom(false);
   }, [activeConversation?.id, scrollToBottom]);
 
@@ -361,6 +375,20 @@ export default function StudentMessagesScreen() {
       setUserOffline(user.uid);
     };
   }, [user]);
+
+  // ── Initialize offline message sync ──
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const cleanup = messageSyncService.initializeSync(
+      user.uid,
+      (remaining) => setPendingSyncCount(remaining),
+    );
+    // Also load initial pending count
+    messageSyncService.getPendingCount(user.uid).then(setPendingSyncCount);
+    return cleanup;
+  }, [user?.uid]);
 
   // ── Listen for partner presence ──
   useEffect(() => {
@@ -426,7 +454,7 @@ export default function StudentMessagesScreen() {
         setRecipientLoading(false);
       }
     },
-    [userId],
+    [userId, setRecipientResults, setRecipientLoading],
   );
 
   // ── Start a conversation with a selected recipient ──
@@ -483,37 +511,62 @@ export default function StudentMessagesScreen() {
         setStartingConversationId(null);
       }
     },
-    [user, startingConversationId, openConversation],
+    [user, startingConversationId, openConversation, setNewChatVisible, setRecipientQuery, setRecipientResults, setToast],
   );
 
-  // ─── Send with optimistic UI ─────────────────────────────────────────────
+  // ─── Send with optimistic UI + offline queue ──────────────────────────────
   const handleSend = useCallback(async () => {
     if (!inputText.trim() || !activeConversation || !userId || sending) return;
 
     const text = inputText.trim();
-    const tempId = `temp_${Date.now()}`;
+    const messageId = messageSyncService.generateMessageId();
     setInputText("");
 
+    const now = Date.now();
     const optMsg: OptimisticMessage = {
-      id: tempId,
+      id: messageId,
       senderId: userId,
       text,
-      createdAt: Date.now(),
+      createdAt: now,
       isAdmin: false,
       failed: false,
+      syncStatus: "pending",
     };
     setOptimistic((prev) => [...prev, optMsg]);
     setSending(true);
 
     try {
-      const realId = await sendMsg(activeConversation.id, text, userId, false);
-      setOptimistic((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, id: realId } : m)),
+      // Persist to AsyncStorage queue (survives app restart)
+      await messageSyncService.enqueueMessage({
+        id: messageId,
+        conversationId: activeConversation.id,
+        senderId: userId,
+        text,
+        isAdmin: false,
+      });
+
+      // Attempt Firestore write (may fail if offline — that's fine, queue handles retry)
+      const realId = await sendMsg(
+        activeConversation.id,
+        text,
+        userId,
+        false,
+        undefined,
+        messageId,
       );
+      // Success — remove from queue and update optimistic state
+      await messageSyncService.dequeueMessage(messageId);
+      setOptimistic((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, id: realId, syncStatus: "sent" } : m)),
+      );
+      setPendingSyncCount((c) => Math.max(0, c - 1));
     } catch (err) {
       console.error("Failed to send:", err);
+      await messageSyncService.updateMessageStatus(messageId, "failed", String(err));
       setOptimistic((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, failed: true } : m)),
+        prev.map((m) =>
+          m.id === messageId ? { ...m, failed: true, syncStatus: "failed" } : m,
+        ),
       );
     } finally {
       setSending(false);
@@ -526,22 +579,37 @@ export default function StudentMessagesScreen() {
       if (!activeConversation || !userId) return;
 
       setOptimistic((prev) =>
-        prev.map((m) => (m.id === msg.id ? { ...m, failed: false } : m)),
+        prev.map((m) => (m.id === msg.id ? { ...m, failed: false, syncStatus: "sending" } : m)),
       );
 
       try {
+        // Re-enqueue with the SAME messageId (idempotent)
+        await messageSyncService.enqueueMessage({
+          id: msg.id,
+          conversationId: activeConversation.id,
+          senderId: userId,
+          text: msg.text,
+          isAdmin: false,
+        });
+
         const realId = await sendMsg(
           activeConversation.id,
           msg.text,
           userId,
           false,
+          undefined,
+          msg.id,
         );
+        await messageSyncService.dequeueMessage(msg.id);
         setOptimistic((prev) =>
-          prev.map((m) => (m.id === msg.id ? { ...m, id: realId } : m)),
+          prev.map((m) => (m.id === msg.id ? { ...m, id: realId, syncStatus: "sent" } : m)),
         );
       } catch {
+        await messageSyncService.updateMessageStatus(msg.id, "failed");
         setOptimistic((prev) =>
-          prev.map((m) => (m.id === msg.id ? { ...m, failed: true } : m)),
+          prev.map((m) =>
+            m.id === msg.id ? { ...m, failed: true, syncStatus: "failed" } : m,
+          ),
         );
       }
     },
@@ -568,8 +636,7 @@ export default function StudentMessagesScreen() {
   };
 
   const formatTime = (timestamp: number) => {
-    const now = Date.now();
-    const diff = now - timestamp;
+    const diff = nowRef.current - timestamp;
     const date = new Date(timestamp);
 
     if (diff < 86400000) {
@@ -1063,15 +1130,28 @@ export default function StudentMessagesScreen() {
                     <View
                       style={[
                         styles.onlineDot,
-                        partnerOnline
-                          ? styles.onlineDotActive
-                          : styles.onlineDotInactive,
+                        !isConnected
+                          ? styles.onlineDotOffline
+                          : partnerOnline
+                            ? styles.onlineDotActive
+                            : styles.onlineDotInactive,
                       ]}
                     />
                     <Text style={styles.onlineText}>
-                      {partnerOnline ? "Online" : "Offline"}
+                      {!isConnected
+                        ? "No connection"
+                        : partnerOnline
+                          ? "Online"
+                          : "Offline"}
                     </Text>
                   </View>
+                  {pendingSyncCount > 0 && (
+                    <View style={styles.pendingBadge}>
+                      <Text style={styles.pendingBadgeText}>
+                        {pendingSyncCount}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               )}
             </View>
@@ -1365,10 +1445,28 @@ const createStyles = (theme: MindCareTheme) =>
   onlineDotInactive: {
     backgroundColor: "rgba(255,255,255,0.4)",
   },
+  onlineDotOffline: {
+    backgroundColor: theme.status.error,
+  },
   onlineText: {
     fontSize: 10,
     fontWeight: "500",
     color: "rgba(255,255,255,0.75)",
+  },
+  pendingBadge: {
+    backgroundColor: theme.status.warning,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    marginLeft: 6,
+  },
+  pendingBadgeText: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#fff",
   },
 
   // Empty state

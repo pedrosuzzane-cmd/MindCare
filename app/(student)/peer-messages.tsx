@@ -34,6 +34,7 @@ import {
 } from "@/services/contentModeration";
 
 import { useAuth } from "@/hooks/AuthContext";
+import { useNetwork } from "@/contexts/NetworkContext";
 import { useStudentProfile } from "@/hooks/useStudentProfile";
 import {
   deleteMessage,
@@ -46,6 +47,7 @@ import {
   searchUsers,
   sendMessage as sendMsg,
 } from "@/services/messagingService";
+import { messageSyncService } from "@/services/messageSyncService";
 import type {
   Conversation,
   Message,
@@ -65,6 +67,7 @@ export default function PeerMessagesScreen() {
   const { theme } = useMindCareTheme();
   const styles = createStyles(theme);
   const currentUserUid = user?.uid;
+  const { isConnected } = useNetwork();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("inbox");
   const [activeConversation, setActiveConversation] =
@@ -130,6 +133,19 @@ export default function PeerMessagesScreen() {
       setUserOffline(user.uid);
     };
   }, [user]);
+
+  // Initialize offline message sync
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const cleanup = messageSyncService.initializeSync(
+      user.uid,
+      (remaining) => setPendingSyncCount(remaining),
+    );
+    messageSyncService.getPendingCount(user.uid).then(setPendingSyncCount);
+    return cleanup;
+  }, [user?.uid]);
 
   // Listen for presence of conversation partners
   useEffect(() => {
@@ -266,35 +282,56 @@ export default function PeerMessagesScreen() {
     ) => {
       if (!activeConversation || !currentUserUid) return;
 
-      const tempId = `temp_${Date.now()}`;
+      const messageId = messageSyncService.generateMessageId();
       setInputText("");
       setModerationError(null);
 
+      const now = Date.now();
       const optMsg: OptimisticMessage = {
-        id: tempId,
+        id: messageId,
         senderId: currentUserUid,
         text,
-        createdAt: Date.now(),
+        createdAt: now,
         isAdmin: false,
         senderRole: "student",
         moderationStatus,
         failed: false,
+        syncStatus: "pending",
       };
       setOptimistic((prev) => [...prev, optMsg]);
       setSending(true);
 
       try {
+        await messageSyncService.enqueueMessage({
+          id: messageId,
+          conversationId: activeConversation.id,
+          senderId: currentUserUid,
+          text,
+          isAdmin: false,
+          senderRole: "student",
+          moderationStatus,
+        });
+
         await sendMsg(
           activeConversation.id,
           text,
           currentUserUid,
           false,
           moderationStatus,
+          messageId,
         );
+        await messageSyncService.dequeueMessage(messageId);
+        setOptimistic((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, syncStatus: "sent" } : m)),
+        );
+        setPendingSyncCount((c) => Math.max(0, c - 1));
       } catch (err) {
         console.error("Failed to send:", err);
+        await messageSyncService.updateMessageStatus(messageId, "failed", String(err));
         setOptimistic((prev) =>
-          prev.map((m) => (m.id === tempId ? { ...m, failed: true } : m)),
+          prev.map((m) =>
+            m.id === messageId ? { ...m, failed: true, syncStatus: "failed" } : m,
+          ),
         );
       } finally {
         setSending(false);
@@ -360,23 +397,38 @@ export default function PeerMessagesScreen() {
       if (!activeConversation || !currentUserUid) return;
 
       setOptimistic((prev) =>
-        prev.map((m) => (m.id === msg.id ? { ...m, failed: false } : m)),
+        prev.map((m) => (m.id === msg.id ? { ...m, failed: false, syncStatus: "sending" } : m)),
       );
 
       try {
-        const realId = await sendMsg(
+        await messageSyncService.enqueueMessage({
+          id: msg.id,
+          conversationId: activeConversation.id,
+          senderId: currentUserUid,
+          text: msg.text,
+          isAdmin: false,
+          senderRole: "student",
+          moderationStatus: msg.moderationStatus,
+        });
+
+        await sendMsg(
           activeConversation.id,
           msg.text,
           currentUserUid,
           false,
           msg.moderationStatus,
+          msg.id,
         );
+        await messageSyncService.dequeueMessage(msg.id);
         setOptimistic((prev) =>
-          prev.map((m) => (m.id === msg.id ? { ...m, id: realId } : m)),
+          prev.map((m) => (m.id === msg.id ? { ...m, syncStatus: "sent" } : m)),
         );
       } catch {
+        await messageSyncService.updateMessageStatus(msg.id, "failed");
         setOptimistic((prev) =>
-          prev.map((m) => (m.id === msg.id ? { ...m, failed: true } : m)),
+          prev.map((m) =>
+            m.id === msg.id ? { ...m, failed: true, syncStatus: "failed" } : m,
+          ),
         );
       }
     },

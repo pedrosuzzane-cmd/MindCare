@@ -19,11 +19,6 @@ export interface Message {
   relatedWorkflowId?: string;
 }
 
-/** Client-only fields added during optimistic send (not in Firestore). */
-export interface OptimisticMessage extends Message {
-  failed?: boolean; // True if Firestore write failed — shows retry button
-}
-
 export interface Conversation {
   id: string;
   studentId?: string;
@@ -66,4 +61,36 @@ export interface StudentSearchResult {
   department?: string;
   yearLevel?: string;
   profileImage?: string;
+}
+
+// ── Offline / sync types ─────────────────────────────────────────────────────
+
+/** Synchronisation status of an outgoing message. */
+export type MessageSyncStatus = "pending" | "sending" | "sent" | "failed";
+
+/**
+ * A message that has been queued locally but may not yet have been written to
+ * Firestore.  Persisted in AsyncStorage so it survives app restarts.
+ */
+export interface PendingMessage {
+  /** Permanent UUID — generated once, never changes, even across retries. */
+  id: string;
+  conversationId: string;
+  senderId: string;
+  text: string;
+  isAdmin: boolean;
+  senderRole?: "student" | "admin";
+  moderationStatus?: "safe" | "flagged" | "blocked";
+  /** Client-side timestamp at creation — used for local ordering while offline. */
+  clientCreatedAt: number;
+  syncStatus: MessageSyncStatus;
+  retryCount: number;
+  lastError?: string;
+}
+
+/** Client-only fields added during optimistic send (not in Firestore). */
+export interface OptimisticMessage extends Message {
+  failed?: boolean; // True if Firestore write failed — shows retry button
+  /** Sync status for offline queue integration. */
+  syncStatus?: MessageSyncStatus;
 }

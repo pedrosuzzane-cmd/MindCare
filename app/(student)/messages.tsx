@@ -31,6 +31,7 @@ import type { MindCareTheme } from "@/constants/theme";
 
 import EmojiPicker from "@/components/chat/EmojiPicker";
 
+import { useNetwork } from "@/contexts/NetworkContext";
 import { useAuth } from "@/hooks/AuthContext";
 import { useStudentProfile } from "@/hooks/useStudentProfile";
 import {
@@ -44,6 +45,7 @@ import {
   startTyping,
   listenForTyping,
 } from "@/services/messagingService";
+import { messageSyncService } from "@/services/messageSyncService";
 import {
   setUserOnline,
   setUserOffline,
@@ -67,6 +69,7 @@ export default function StudentMessagesScreen() {
   const { theme } = useMindCareTheme();
   const styles = createStyles(theme);
   const insets = useSafeAreaInsets();
+  const { isConnected } = useNetwork();
 
   // ── View state ──
   const [viewMode, setViewMode] = useState<ViewMode>("directory");
@@ -202,6 +205,19 @@ export default function StudentMessagesScreen() {
     };
   }, [user?.uid]);
 
+  // ── Initialize offline message sync ──
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const cleanup = messageSyncService.initializeSync(
+      user.uid,
+      (remaining) => setPendingSyncCount(remaining),
+    );
+    messageSyncService.getPendingCount(user.uid).then(setPendingSyncCount);
+    return cleanup;
+  }, [user?.uid]);
+
   // ── Listen for partner presence ──
   useEffect(() => {
     if (!activeConversation?.participants || !user?.uid) return;
@@ -285,35 +301,57 @@ export default function StudentMessagesScreen() {
     }
   };
 
-  // ─── Send with optimistic UI ─────────────────────────────────────────────
+  // ─── Send with optimistic UI + offline queue ──────────────────────────────
   const handleSend = useCallback(async () => {
     if (!inputText.trim() || !activeConversation || !user?.uid || sending)
       return;
 
     const text = inputText.trim();
-    const tempId = `temp_${Date.now()}`;
+    const messageId = messageSyncService.generateMessageId();
     setInputText("");
 
+    const now = Date.now();
     const optMsg: OptimisticMessage = {
-      id: tempId,
+      id: messageId,
       senderId: user.uid,
       text,
-      createdAt: Date.now(),
+      createdAt: now,
       isAdmin: false,
       failed: false,
+      syncStatus: "pending",
     };
     setOptimistic((prev) => [...prev, optMsg]);
     setSending(true);
 
     try {
-      const realId = await sendMsg(activeConversation.id, text, user.uid, false);
-      setOptimistic((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, id: realId } : m)),
+      await messageSyncService.enqueueMessage({
+        id: messageId,
+        conversationId: activeConversation.id,
+        senderId: user.uid,
+        text,
+        isAdmin: false,
+      });
+
+      const realId = await sendMsg(
+        activeConversation.id,
+        text,
+        user.uid,
+        false,
+        undefined,
+        messageId,
       );
+      await messageSyncService.dequeueMessage(messageId);
+      setOptimistic((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, id: realId, syncStatus: "sent" } : m)),
+      );
+      setPendingSyncCount((c) => Math.max(0, c - 1));
     } catch (err) {
       console.error("Failed to send:", err);
+      await messageSyncService.updateMessageStatus(messageId, "failed", String(err));
       setOptimistic((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, failed: true } : m)),
+        prev.map((m) =>
+          m.id === messageId ? { ...m, failed: true, syncStatus: "failed" } : m,
+        ),
       );
     } finally {
       setSending(false);
@@ -326,22 +364,36 @@ export default function StudentMessagesScreen() {
       if (!activeConversation || !user?.uid) return;
 
       setOptimistic((prev) =>
-        prev.map((m) => (m.id === msg.id ? { ...m, failed: false } : m)),
+        prev.map((m) => (m.id === msg.id ? { ...m, failed: false, syncStatus: "sending" } : m)),
       );
 
       try {
+        await messageSyncService.enqueueMessage({
+          id: msg.id,
+          conversationId: activeConversation.id,
+          senderId: user.uid,
+          text: msg.text,
+          isAdmin: false,
+        });
+
         const realId = await sendMsg(
           activeConversation.id,
           msg.text,
           user.uid,
           false,
+          undefined,
+          msg.id,
         );
+        await messageSyncService.dequeueMessage(msg.id);
         setOptimistic((prev) =>
-          prev.map((m) => (m.id === msg.id ? { ...m, id: realId } : m)),
+          prev.map((m) => (m.id === msg.id ? { ...m, id: realId, syncStatus: "sent" } : m)),
         );
       } catch {
+        await messageSyncService.updateMessageStatus(msg.id, "failed");
         setOptimistic((prev) =>
-          prev.map((m) => (m.id === msg.id ? { ...m, failed: true } : m)),
+          prev.map((m) =>
+            m.id === msg.id ? { ...m, failed: true, syncStatus: "failed" } : m,
+          ),
         );
       }
     },

@@ -78,6 +78,13 @@ export async function getOrCreateConversation(
 /**
  * Sends a message in a conversation.
  * Returns the message ID for optimistic UI tracking.
+ *
+ * @param explicitMessageId  Optional pre-generated UUID.  When supplied the
+ *                           message is written to this exact document path,
+ *                           making the write **idempotent** — retries with the
+ *                           same ID always target the same Firestore document.
+ *                           When omitted the legacy `${senderUid}_${Date.now()}`
+ *                           scheme is used for backward compatibility.
  */
 export async function sendMessage(
   conversationId: string,
@@ -85,6 +92,7 @@ export async function sendMessage(
   senderUid: string,
   isAdmin: boolean,
   moderationStatus?: "safe" | "flagged" | "blocked",
+  explicitMessageId?: string,
 ): Promise<string> {
   const messagesRef = collection(
     db,
@@ -94,7 +102,7 @@ export async function sendMessage(
   );
   const conversationRef = doc(db, "conversations", conversationId);
 
-  const messageId = `${senderUid}_${Date.now()}`;
+  const messageId = explicitMessageId || `${senderUid}_${Date.now()}`;
 
   await runTransaction(db, async (transaction) => {
     const conversationSnap = await transaction.get(conversationRef);
@@ -109,9 +117,11 @@ export async function sendMessage(
 
     const messageRef = doc(messagesRef, messageId);
     transaction.set(messageRef, {
+      id: messageId,
       senderId: senderUid,
       text: text.trim(),
       createdAt: Date.now(),
+      clientCreatedAt: Date.now(),
       isAdmin,
       deleted: false,
       moderationStatus: moderationStatus || "safe",
