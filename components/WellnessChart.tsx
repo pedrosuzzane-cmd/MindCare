@@ -1,4 +1,5 @@
 import { JournalEntry } from "@/services/journalService";
+import { moodWellnessScore } from "@/utils/moodScoring";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import {
@@ -66,7 +67,7 @@ export function WellnessChart({
       let score: number | null = null;
       if (entry && entry.mood) {
         const mood = MOODS.find((m) => m.id === entry.mood);
-        score = mood ? mood.wellness : null;
+        score = mood ? moodWellnessScore(mood.id) : null;
       }
       dailyScores.push({ day: d, score, date });
     }

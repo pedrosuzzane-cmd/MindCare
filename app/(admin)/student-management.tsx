@@ -58,6 +58,10 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  getAssessmentRiskLevel,
+  requiresAttention,
+} from "@/utils/concern";
 import { v4 as uuidv4 } from "uuid";
 import { useMindCareTheme } from "@/contexts/ThemeContext";
 import type { MindCareTheme } from "@/constants/theme";
@@ -656,7 +660,9 @@ export default function StudentManagementScreen() {
 
   const attentionItems = useMemo(() => {
     return buildTriageQueue(entries).filter(
-      (item) => item.priority === "high" || item.priority === "medium",
+      (item) =>
+        requiresAttention(item.student) &&
+        (item.priority === "high" || item.priority === "medium"),
     );
   }, [entries]);
 
@@ -1140,7 +1146,15 @@ export default function StudentManagementScreen() {
   };
 
   const renderRiskBadge = (s: StudentManagementEntry) => {
-    const rl = (s.latestRiskLevel ?? "low") as RiskLevel;
+    const rl = getAssessmentRiskLevel(s);
+    if (!rl) {
+      return (
+        <Badge
+          label="Not Assessed"
+          color={theme.secondaryText}
+        />
+      );
+    }
     return <Badge label={RISK_LABELS[rl]} color={RISK_COLORS(theme)[rl]} />;
   };
 
@@ -3213,7 +3227,7 @@ function StudentContext({ student }: { student?: StudentManagementEntry }) {
   if (!student) {
     return <Text style={styles.emptyText}>No student selected.</Text>;
   }
-  const risk = (student.latestRiskLevel ?? "low") as RiskLevel;
+  const risk = getAssessmentRiskLevel(student);
   const support = student.supportStatus ?? "no_action";
   const lastAssessed = daysSince(student.latestAssessmentDate);
 
@@ -3259,10 +3273,10 @@ function StudentContext({ student }: { student?: StudentManagementEntry }) {
           <Text
             style={[
               styles.contextChipValue,
-              { color: RISK_COLORS(theme)[risk] },
+              { color: risk ? RISK_COLORS(theme)[risk] : theme.secondaryText },
             ]}
           >
-            ● {CONCERN_LABELS[risk]}
+            ● {risk ? CONCERN_LABELS[risk] : "Not Assessed"}
           </Text>
         </Pressable>
         <View style={styles.contextChip}>
@@ -3394,7 +3408,7 @@ function StudentProfileModal({
 
   if (!uid || !student) return null;
 
-  const risk = (student.latestRiskLevel ?? "low") as RiskLevel;
+  const risk = getAssessmentRiskLevel(student);
   const support = student.supportStatus ?? "no_action";
   const moodSummary = Object.entries(student.moodCounts || {})
     .sort((a, b) => b[1] - a[1])
@@ -3481,8 +3495,12 @@ function StudentProfileModal({
             <ProfileSection title="Wellness Indicators" icon="pulse-outline">
               <View style={styles.profileBadges}>
                 <Badge
-                  label={`Risk: ${RISK_LABELS[risk]}`}
-                  color={RISK_COLORS(theme)[risk]}
+                  label={
+                    risk
+                      ? `Risk: ${RISK_LABELS[risk]}`
+                      : "Risk: Not Assessed"
+                  }
+                  color={risk ? RISK_COLORS(theme)[risk] : theme.secondaryText}
                 />
               </View>
               <ProfileRow

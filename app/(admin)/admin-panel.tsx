@@ -19,6 +19,7 @@ import {
 } from "@/utils/departmentMeta";
 import { useAuth } from "@/hooks/AuthContext";
 import { MIN_ANALYTICS_GROUP_SIZE } from "@/utils/analyticsPrivacy";
+import { getAssessmentRiskLevel } from "@/utils/concern";
 import { listenForAdminDashboardData } from "@/services/adminFirestoreService";
 import {
   cleanupExpiredAnnouncements,
@@ -31,21 +32,29 @@ import {
 } from "@/services/announcementService";
 import type { Announcement, AnnouncementLink } from "@/types/announcement";
 import { shadows } from "@/utils/shadows";
+import { downloadWorkbook } from "@/utils/exportAnalytics";
+import { exportReportWorkbook } from "@/services/adminExcelExportService";
 import {
-  downloadWorkbook,
-  type ExportStudentRow,
-} from "@/utils/exportAnalytics";
-import {
-  exportUniversityExcelReport,
-  type UniversityDeptComparison,
-  type UniversityExportData,
-  type UniversityRiskVarianceRow,
-  type UniversityStudentRecord,
-} from "@/services/adminExcelExportService";
-import {
+  buildNarrativeReportData,
   openNarrativeReport,
-  type NarrativeReportData,
+  openPdfReport,
 } from "@/services/adminWordReportService";
+import {
+  generateReportData,
+  type ReportData,
+} from "@/services/reportingService";
+import {
+  academicYears,
+  academicYearLabel,
+  academicYearFor,
+  resolveAnnualPeriod,
+  resolveCustomPeriod,
+  resolveMonthlyPeriod,
+  resolveTrimesterPeriod,
+  resolveWeeklyPeriod,
+  type ReportPeriodType,
+  type TrimesterNumber,
+} from "@/utils/academicCalendar";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -239,20 +248,6 @@ const matchesYearLevelFilter = (
 };
 
 // ─── Helper: Map a student summary into a row for spreadsheet export ─────────
-const toExportRow = (s: StudentSummary): ExportStudentRow => ({
-  uid: s.uid,
-  name: s.name,
-  schoolId: s.schoolId,
-  yearLevel: s.yearLevel,
-  department: s.department,
-  isLSN: s.isLSN,
-  lsnCategory: s.lsnCategory,
-  latestTotalScore: s.latestTotalScore,
-  latestRiskLevel: s.latestRiskLevel,
-  assessmentsCount: s.assessmentsCount,
-  journalCount: s.journalCount,
-});
-
 // ─── Descriptive text block rendered under analytics sections ────────────────
 interface InsightSection {
   label: string;
@@ -307,13 +302,36 @@ const ADMIN_COLORS = {
 } as const;
 
 const TABS: {
-  key: "students" | "analytics" | "announcements";
+  key: "students" | "analytics" | "reports" | "announcements";
   label: string;
 }[] = [
   { key: "students", label: "Student Lookup" },
   { key: "analytics", label: "Department Analytics" },
+  { key: "reports", label: "Reports" },
   { key: "announcements", label: "Announcements" },
 ];
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+function toLocalDateInput(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
 // ─── Pressable state that also exposes web hover/focus states ───────────────
 type WebPressableState = {
@@ -449,12 +467,51 @@ export default function AdminPanelScreen() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<
-    "students" | "analytics" | "announcements"
+    "students" | "analytics" | "reports" | "announcements"
   >("students");
   const [removingStudent, setRemovingStudent] = useState<string | null>(null);
   const [confirmRemoveUid, setConfirmRemoveUid] = useState<string | null>(null);
   const [confirmRemoveName, setConfirmRemoveName] = useState<string>("");
   const [removalStatus, setRemovalStatus] = useState<string>("");
+  const [reportPeriodType, setReportPeriodType] =
+    useState<ReportPeriodType>("monthly");
+  const [reportYear, setReportYear] = useState<number>(
+    academicYearFor(new Date()),
+  );
+  const [reportMonth, setReportMonth] = useState<number>(
+    new Date().getMonth(),
+  );
+  const [reportWeekStart, setReportWeekStart] = useState<Date>(
+    (() => {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      return d;
+    })(),
+  );
+  const [reportTrimester, setReportTrimester] = useState<TrimesterNumber>(1);
+  const [reportDepartment, setReportDepartment] = useState<string>("all");
+  const [reportDepartments, setReportDepartments] = useState<
+    { code: string; name: string }[]
+  >([]);
+  const [reportCustomStart, setReportCustomStart] = useState<Date>(
+    (() => {
+      const d = new Date();
+      d.setDate(1);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    })(),
+  );
+  const [reportCustomEnd, setReportCustomEnd] = useState<Date>(
+    (() => {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      return d;
+    })(),
+  );
+  const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [reportGenerating, setReportGenerating] = useState(false);
+  const [reportStatus, setReportStatus] = useState<string | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
   const [isCreateAdminModalVisible, setCreateAdminModalVisible] =
     useState(false);
   const [newAdminName, setNewAdminName] = useState("");
@@ -505,6 +562,34 @@ export default function AdminPanelScreen() {
       return [...withoutAll, code];
     });
   };
+
+  // Load the distinct departments present in the database for the report filter.
+  useEffect(() => {
+    let cancelled = false;
+    getDocs(collection(db, "users"))
+      .then((snap) => {
+        if (cancelled) return;
+        const map = new Map<string, string>();
+        for (const d of snap.docs) {
+          const dept = d.data().department;
+          if (typeof dept !== "string" || !dept.trim()) continue;
+          const code = getDepartmentCode(dept);
+          if (code === "UNSPECIFIED" || code === "N/A") continue;
+          if (!map.has(code)) map.set(code, code);
+        }
+        const list = Array.from(map.keys())
+          .map((code) => ({
+            code,
+            name: canonicalDeptName(code, code),
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        setReportDepartments(list);
+      })
+      .catch((err) => console.error("Failed to load departments:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -869,11 +954,15 @@ export default function AdminPanelScreen() {
 
   // ─── Computed Chart Data ───────────────────────────────────────────────────
   const donutData = useMemo((): DonutSlice[] => {
-    if (!analyticsData.department) return [];
-    const deptData = analyticsData.department;
-    const totalLow = deptData.reduce((s, d) => s + d.low, 0);
-    const totalNormal = deptData.reduce((s, d) => s + d.normal, 0);
-    const totalHigh = deptData.reduce((s, d) => s + d.high, 0);
+    const totalLow = studentSummaries.filter(
+      (s) => s.latestRiskLevel === "low",
+    ).length;
+    const totalNormal = studentSummaries.filter(
+      (s) => s.latestRiskLevel === "normal",
+    ).length;
+    const totalHigh = studentSummaries.filter(
+      (s) => s.latestRiskLevel === "high",
+    ).length;
     const total = totalLow + totalNormal + totalHigh || 1;
     return [
       {
@@ -895,7 +984,7 @@ export default function AdminPanelScreen() {
         color: "#EF4444",
       },
     ];
-  }, [analyticsData]);
+  }, [studentSummaries]);
 
   // Deduct unassessed students from survey completion percentage
   const surveyCompletionPct = useMemo(() => {
@@ -1091,7 +1180,7 @@ export default function AdminPanelScreen() {
         department: getDepartmentCode(s.department),
         journalCount: s.journalCount,
         avgScore: s.latestTotalScore ?? 0,
-        riskLevel: (s.latestRiskLevel ?? "low") as "low" | "normal" | "high",
+        riskLevel: getAssessmentRiskLevel(s) ?? "low",
       }));
   }, [studentSummaries]);
 
@@ -1187,7 +1276,7 @@ export default function AdminPanelScreen() {
           : "strong";
     const corrDirection = corrR >= 0 ? "positive" : "negative";
     const highConcernScatter = scatterPlotData.filter(
-      (p) => p.avgScore >= 51,
+      (p) => p.riskLevel === "high",
     ).length;
 
     const byDeptAssess = [...deptComparisonChartData].sort(
@@ -1439,399 +1528,87 @@ export default function AdminPanelScreen() {
     donutData,
   ]);
 
-  // ─── Hybrid Export: University Excel Workbook & Narrative Report ──────────
-  const universityExportData = useMemo((): UniversityExportData => {
-    const filtered =
-      yearLevelFilter === "All"
-        ? studentSummaries
-        : studentSummaries.filter((s) =>
-            matchesYearLevelFilter(s, yearLevelFilter),
-          );
+  // --- Reporting: one generation, Narrative + Excel from the same ReportData --
+  const handleGenerateReport = async () => {
+    if (reportGenerating) return;
 
-    const students: UniversityStudentRecord[] = filtered.map(toExportRow);
-
-    const totalStudents = students.length;
-    const studentsAssessed = students.filter(
-      (s) => s.assessmentsCount > 0,
-    ).length;
-    const completionRate = totalStudents
-      ? Math.round((studentsAssessed / totalStudents) * 100)
-      : 0;
-    const scoreSum = students.reduce(
-      (sum, s) => sum + (s.latestTotalScore ?? 0),
-      0,
-    );
-    const avgWellnessScore =
-      studentsAssessed > 0
-        ? +(scoreSum / studentsAssessed).toFixed(1)
-        : 0;
-    const totalJournalEntries = students.reduce(
-      (sum, s) => sum + s.journalCount,
-      0,
-    );
-
-    const pctChange = (current: number, baseline: number) =>
-      baseline > 0
-        ? Math.round(((current - baseline) / baseline) * 100)
-        : current > 0
-          ? 100
-          : 0;
-
-    const atRisk = students.filter(
-      (s) => s.latestRiskLevel === "high",
-    ).length;
-    const moderate = students.filter(
-      (s) => s.latestRiskLevel === "normal",
-    ).length;
-    const healthy = students.filter(
-      (s) => s.latestRiskLevel === "low",
-    ).length;
-    const totalLSN = students.filter((s) => s.isLSN).length;
-
-    const riskTrends = [
-      {
-        label: "Elevated Concern Indicators",
-        count: atRisk,
-        baseline: Math.round(atRisk * 0.9) || 1,
-        changePct: pctChange(atRisk, Math.round(atRisk * 0.9) || 1),
-      },
-      {
-        label: "Moderate Concern Indicators",
-        count: moderate,
-        baseline: Math.round(moderate * 0.9) || 1,
-        changePct: pctChange(moderate, Math.round(moderate * 0.9) || 1),
-      },
-      {
-        label: "Lower Concern Indicators",
-        count: healthy,
-        baseline: Math.round(healthy * 0.9) || 1,
-        changePct: pctChange(healthy, Math.round(healthy * 0.9) || 1),
-      },
-      {
-        label: "LSN Students",
-        count: totalLSN,
-        baseline: Math.round(totalLSN * 0.9) || 1,
-        changePct: pctChange(totalLSN, Math.round(totalLSN * 0.9) || 1),
-      },
-    ];
-
-    const positiveMoods = ["happy", "calm", "relaxed", "good"];
-    const distressedMoods = [
-      "stressed",
-      "burnout",
-      "very-upset",
-      "exhausted",
-      "overwhelmed",
-      "mad",
-      "fearful",
-      "flushed",
-    ];
-    const moodTotals: Record<string, number> = {};
-    let moodLoggers = 0;
-    let positiveMentions = 0;
-    let distressedMentions = 0;
-    filtered.forEach((s) => {
-      const entries = Object.entries(s.moodCounts || {});
-      if (entries.length > 0) moodLoggers += 1;
-      entries.forEach(([mood, count]) => {
-        moodTotals[mood] = (moodTotals[mood] || 0) + count;
-        const m = mood.toLowerCase();
-        if (positiveMoods.includes(m)) positiveMentions += count;
-        else if (distressedMoods.includes(m)) distressedMentions += count;
-      });
-    });
-    const moodSample = positiveMentions + distressedMentions;
-    const moodDistribution = Object.entries(moodTotals)
-      .map(([mood, count]) => ({ mood, count }))
-      .sort((a, b) => b.count - a.count);
-
-    const stressMetrics = [
-      { metric: "Students with Mood Logs", value: String(moodLoggers) },
-      { metric: "Positive Mood Mentions", value: String(positiveMentions) },
-      {
-        metric: "Distressed Mood Mentions",
-        value: String(distressedMentions),
-      },
-      {
-        metric: "Distress Ratio",
-        value:
-          moodSample > 0
-            ? `${Math.round((distressedMentions / moodSample) * 100)}%`
-            : "0%",
-      },
-      {
-        metric: "Mood Wellness Index",
-        value:
-          moodSample > 0
-            ? `${Math.round(
-                (((positiveMentions - distressedMentions) / moodSample + 1) /
-                  2) *
-                  100,
-              )}%`
-            : "50%",
-      },
-    ];
-
-    const assessmentDistribution = [
-      {
-        category: "No assessment taken",
-        count: filtered.filter((s) => s.assessmentsCount === 0).length,
-      },
-      {
-        category: "1 assessment",
-        count: filtered.filter((s) => s.assessmentsCount === 1).length,
-      },
-      {
-        category: "2 assessments",
-        count: filtered.filter((s) => s.assessmentsCount === 2).length,
-      },
-      {
-        category: "3-4 assessments",
-        count: filtered.filter(
-          (s) => s.assessmentsCount >= 3 && s.assessmentsCount <= 4,
-        ).length,
-      },
-      {
-        category: "5+ assessments",
-        count: filtered.filter((s) => s.assessmentsCount >= 5).length,
-      },
-    ];
-
-    const deptAcc = new Map<
-      string,
-      {
-        name: string;
-        abbr: string;
-        total: number;
-        assessed: number;
-        scoreSum: number;
-        journal: number;
-        lsn: number;
-        low: number;
-        normal: number;
-        high: number;
+    if (reportPeriodType === "custom") {
+      const start = new Date(reportCustomStart);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(reportCustomEnd);
+      end.setHours(0, 0, 0, 0);
+      if (start.getTime() > end.getTime()) {
+        setReportError(
+          "Invalid date range. The start date must be on or before the end date.",
+        );
+        return;
       }
-    >();
-    filtered.forEach((s) => {
-      const code = getDepartmentCode(s.department);
-      const entry = deptAcc.get(code) ?? {
-        name: canonicalDeptName(code, s.department),
-        abbr: code,
-        total: 0,
-        assessed: 0,
-        scoreSum: 0,
-        journal: 0,
-        lsn: 0,
-        low: 0,
-        normal: 0,
-        high: 0,
-      };
-      entry.total += 1;
-      if (s.assessmentsCount > 0) entry.assessed += 1;
-      if (s.latestTotalScore != null) entry.scoreSum += s.latestTotalScore;
-      entry.journal += s.journalCount;
-      if (s.isLSN) entry.lsn += 1;
-      if (s.latestRiskLevel === "low") entry.low += 1;
-      else if (s.latestRiskLevel === "normal") entry.normal += 1;
-      else if (s.latestRiskLevel === "high") entry.high += 1;
-      deptAcc.set(code, entry);
-    });
-
-    const departmentMetrics = Array.from(deptAcc.values())
-      .map((d) => ({
-        deptAbbr: d.abbr,
-        deptName: d.name,
-        avgScore: d.total > 0 ? +(d.scoreSum / d.total).toFixed(1) : 0,
-        assessmentCount: d.assessed,
-        journalCount: d.journal,
-        lsnCount: d.lsn,
-        participationRate:
-          d.total > 0 ? Math.round((d.assessed / d.total) * 100) : 0,
-        lowCount: d.low,
-        normalCount: d.normal,
-        highCount: d.high,
-      }))
-      .sort((a, b) => b.avgScore - a.avgScore);
-
-    const byScore = [...departmentMetrics].sort(
-      (a, b) => b.avgScore - a.avgScore,
-    );
-    const byActive = [...departmentMetrics].sort(
-      (a, b) => b.assessmentCount - a.assessmentCount,
-    );
-    const byLsn = [...departmentMetrics].sort(
-      (a, b) => b.lsnCount - a.lsnCount,
-    );
-
-    const departmentComparison: UniversityDeptComparison[] =
-      departmentMetrics.length > 0
-        ? [
-            {
-              indicator: "Highest Avg Score",
-              department: byScore[0].deptAbbr,
-              value: byScore[0].avgScore.toFixed(1),
-            },
-            {
-              indicator: "Lowest Avg Score",
-              department: byScore[byScore.length - 1].deptAbbr,
-              value: byScore[byScore.length - 1].avgScore.toFixed(1),
-            },
-            {
-              indicator: "Most Active",
-              department: byActive[0].deptAbbr,
-              value: `${byActive[0].assessmentCount} assessments`,
-            },
-            {
-              indicator: "Most LSN Students",
-              department: byLsn[0].deptAbbr,
-              value: `${byLsn[0].lsnCount} students`,
-            },
-          ]
-        : [];
-
-    const deptScores = new Map<string, number[]>();
-    filtered.forEach((s) => {
-      if (s.latestTotalScore == null) return;
-      const abbr = getDepartmentCode(s.department);
-      const arr = deptScores.get(abbr) ?? [];
-      arr.push(s.latestTotalScore);
-      deptScores.set(abbr, arr);
-    });
-
-    const riskVariance: UniversityRiskVarianceRow[] = Array.from(
-      deptScores.entries(),
-    )
-      .map(([department, scores]) => {
-        const sorted = [...scores].sort((a, b) => a - b);
-        const quantile = (f: number) =>
-          sorted[
-            Math.min(Math.floor(sorted.length * f), sorted.length - 1)
-          ];
-        return {
-          department,
-          min: sorted[0],
-          q1: quantile(0.25),
-          median: quantile(0.5),
-          q3: quantile(0.75),
-          max: sorted[sorted.length - 1],
-          count: sorted.length,
-        };
-      })
-      .sort((a, b) => b.median - a.median);
-
-    const corrPoints = filtered.filter(
-      (s) => s.assessmentsCount > 0 || s.journalCount > 0,
-    );
-    let corr = 0;
-    if (corrPoints.length >= 2) {
-      const n = corrPoints.length;
-      const mx =
-        corrPoints.reduce((sum, p) => sum + p.journalCount, 0) / n;
-      const my =
-        corrPoints.reduce(
-          (sum, p) => sum + (p.latestTotalScore ?? 0),
-          0,
-        ) / n;
-      let num = 0;
-      let dx = 0;
-      let dy = 0;
-      corrPoints.forEach((p) => {
-        const x = p.journalCount - mx;
-        const y = (p.latestTotalScore ?? 0) - my;
-        num += x * y;
-        dx += x * x;
-        dy += y * y;
-      });
-      corr = dx > 0 && dy > 0 ? num / Math.sqrt(dx * dy) : 0;
     }
 
-    const correlationMetrics = [
-      { metric: "Students Analyzed", value: String(corrPoints.length) },
-      {
-        metric: "Pearson Correlation (Score vs Journals)",
-        value: corr.toFixed(2),
-      },
-      {
-        metric: "Interpretation",
-        value:
-          Math.abs(corr) < 0.3
-            ? "Weak statistical association"
-            : Math.abs(corr) < 0.6
-              ? "Moderate statistical association"
-              : "Strong statistical association",
-      },
-    ];
-
-    const now = new Date();
-    return {
-      institutionName: "University of the Cordilleras",
-      reportTitle:
-        "UNIVERSITY OF THE CORDILLERAS - MENTAL WELLNESS ANALYTICS REPORT",
-      reportPeriod: `As of ${now.toLocaleDateString()}`,
-      generatedAt: now.toLocaleString(),
-      totalStudents,
-      studentsAssessed,
-      completionRate,
-      avgWellnessScore,
-      totalJournalEntries,
-      riskTrends,
-      stressMetrics,
-      moodDistribution,
-      assessmentDistribution,
-      riskVariance,
-      departmentMetrics,
-      departmentComparison,
-      correlationMetrics,
-      students,
-    };
-  }, [studentSummaries, yearLevelFilter]);
-
-  const narrativeReportData = useMemo((): NarrativeReportData => {
-    return {
-      ...universityExportData,
-      preparedBy: "Office of Guidance and Counselling",
-      narrativeSections: [
-        {
-          title: "1. Overall Participation and Wellness",
-          paragraphs: [descriptiveInsights.overall.body],
-        },
-        {
-          title: "2. Wellness & Concern Trend Indicators",
-          paragraphs: [descriptiveInsights.risk.body],
-        },
-        {
-          title: "3. Participation by Department",
-          paragraphs: [descriptiveInsights.participation.body],
-        },
-        {
-          title: "4. Department Insights",
-          paragraphs: [descriptiveInsights.insights.body],
-        },
-        {
-          title: "5. Institutional Comparison",
-          paragraphs: [descriptiveInsights.comparison.body],
-        },
-        {
-          title: "6. Visual Insights and Engagement",
-          paragraphs: [
-            descriptiveInsights.visual.donut,
-            descriptiveInsights.visual.radial,
-            descriptiveInsights.visual.engagement,
-          ],
-        },
-      ],
-    };
-  }, [universityExportData, descriptiveInsights]);
-
-  const handleExportUniversityExcel = async () => {
+    setReportGenerating(true);
+    setReportError(null);
+    setReportStatus("Generating report...");
+    setReportData(null);
     try {
-      const wb = exportUniversityExcelReport(universityExportData);
-      await downloadWorkbook(
-        wb,
-        "University_of_the_Cordilleras_Analytics_Report.xlsx",
-      );
+      let period;
+      if (reportPeriodType === "weekly") {
+        period = resolveWeeklyPeriod(reportWeekStart);
+      } else if (reportPeriodType === "monthly") {
+        period = resolveMonthlyPeriod(new Date(reportYear, reportMonth, 1));
+      } else if (reportPeriodType === "trimester") {
+        period = resolveTrimesterPeriod({
+          trimester: reportTrimester,
+          academicYear: reportYear,
+        });
+      } else if (reportPeriodType === "annual") {
+        period = resolveAnnualPeriod(reportYear);
+      } else {
+        const start = new Date(reportCustomStart);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(reportCustomEnd);
+        end.setHours(0, 0, 0, 0);
+        end.setDate(end.getDate() + 1); // exclusive upper bound
+        period = resolveCustomPeriod({ startDate: start, endDate: end });
+      }
+      setReportStatus("Analyzing student data...");
+      const data = await generateReportData({
+        periodType: period.type,
+        startDate: period.startDate,
+        endDate: period.endDate,
+        periodLabel: period.label,
+        departmentCode:
+          reportDepartment === "all" ? undefined : reportDepartment,
+      });
+      if (data.overview.totalStudents === 0) {
+        setReportData(null);
+        setReportError("No data available for the selected reporting period.");
+        setReportStatus(null);
+        setReportGenerating(false);
+        return;
+      }
+      setReportData(data);
+      setReportStatus(null);
     } catch (err) {
-      console.error("University analytics export failed:", err);
+      console.error("Report generation failed:", err);
+      setReportData(null);
+      setReportError(
+        err instanceof Error
+          ? err.message
+          : "Unable to generate the report. Please try again.",
+      );
+      setReportStatus(null);
+    } finally {
+      setReportGenerating(false);
+    }
+  };
+
+  const handleExportReportExcel = async () => {
+    if (!reportData) return;
+    try {
+      const wb = exportReportWorkbook(reportData);
+      await downloadWorkbook(wb, "MindCare_Administrative_Report.xlsx");
+    } catch (err) {
+      console.error("Excel export failed:", err);
       Alert.alert(
         "Export Failed",
         "Unable to generate the Excel workbook. Please try again.",
@@ -1839,11 +1616,13 @@ export default function AdminPanelScreen() {
     }
   };
 
-  const handleExportNarrativeReport = async () => {
+  const handleExportReportNarrative = async () => {
+    if (!reportData) return;
     try {
+      const narrative = buildNarrativeReportData(reportData);
       await openNarrativeReport(
-        narrativeReportData,
-        "University_of_the_Cordilleras_Narrative_Report.html",
+        narrative,
+        "MindCare_Administrative_Narrative_Report.html",
       );
     } catch (err) {
       console.error("Narrative report export failed:", err);
@@ -1853,6 +1632,20 @@ export default function AdminPanelScreen() {
       );
     }
   };
+
+  const handleExportReportPdf = async () => {
+    if (!reportData) return;
+    try {
+      await openPdfReport(reportData);
+    } catch (err) {
+      console.error("PDF report export failed:", err);
+      Alert.alert(
+        "Export Failed",
+        "Unable to generate the PDF report. Please try again.",
+      );
+    }
+  };
+
 
   const handleRemoveStudent = async (uid: string) => {
     setRemovingStudent(uid);
@@ -3371,6 +3164,455 @@ export default function AdminPanelScreen() {
                     ))
                   )}
                 </>
+              ) : activeTab === "reports" ? (
+                <>
+                  <View style={styles.lookupCard}>
+                    <View style={styles.lookupHeader}>
+                      <Text style={styles.sectionTitle}>
+                        Generate Administrative Report
+                      </Text>
+                    </View>
+
+                    <View style={styles.reportPeriodRow}>
+                      {(
+                        [
+                          "weekly",
+                          "monthly",
+                          "trimester",
+                          "annual",
+                          "custom",
+                        ] as ReportPeriodType[]
+                      ).map((t) => (
+                        <Pressable
+                          key={t}
+                          style={[
+                            styles.reportPeriodChip,
+                            reportPeriodType === t && styles.reportPeriodChipActive,
+                          ]}
+                          onPress={() => setReportPeriodType(t)}
+                        >
+                          <Text
+                            style={[
+                              styles.reportPeriodChipText,
+                              reportPeriodType === t &&
+                                styles.reportPeriodChipTextActive,
+                            ]}
+                          >
+                            {t === "weekly"
+                              ? "Weekly"
+                              : t === "monthly"
+                                ? "Monthly"
+                                : t === "trimester"
+                                  ? "By Trimester"
+                                  : t === "annual"
+                                    ? "Annual"
+                                    : "Custom"}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+
+                    <View style={styles.reportField}>
+                      <Text style={styles.reportLabel}>Academic Year</Text>
+                      <View style={styles.reportPickerRow}>
+                        {academicYears().map((y) => (
+                          <Pressable
+                            key={y}
+                            style={[
+                              styles.reportOption,
+                              reportYear === y && styles.reportPeriodChipActive,
+                            ]}
+                            onPress={() => setReportYear(y)}
+                          >
+                            <Text
+                              style={[
+                                styles.reportOptionText,
+                                reportYear === y &&
+                                  styles.reportPeriodChipTextActive,
+                              ]}
+                            >
+                              {academicYearLabel(y)}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+
+                    {reportPeriodType === "weekly" && (
+                      <View style={styles.reportField}>
+                        <Text style={styles.reportLabel}>Week</Text>
+                        <Text style={styles.reportValue}>
+                          {resolveWeeklyPeriod(reportWeekStart).label}
+                        </Text>
+                        <View style={styles.reportWeekNav}>
+                          <Pressable
+                            style={styles.reportWeekBtn}
+                            onPress={() =>
+                              setReportWeekStart((d) => {
+                                const next = new Date(d);
+                                next.setDate(next.getDate() - 7);
+                                return next;
+                              })
+                            }
+                          >
+                            <Ionicons name="chevron-back" size={16} color="#5B21B6" />
+                            <Text style={styles.reportWeekBtnText}>Prev Week</Text>
+                          </Pressable>
+                          <Pressable
+                            style={styles.reportWeekBtn}
+                            onPress={() =>
+                              setReportWeekStart((d) => {
+                                const next = new Date(d);
+                                next.setDate(next.getDate() + 7);
+                                return next;
+                              })
+                            }
+                          >
+                            <Text style={styles.reportWeekBtnText}>Next Week</Text>
+                            <Ionicons name="chevron-forward" size={16} color="#5B21B6" />
+                          </Pressable>
+                        </View>
+                      </View>
+                    )}
+
+                    {reportPeriodType === "monthly" && (
+                      <View style={styles.reportField}>
+                        <Text style={styles.reportLabel}>Month</Text>
+                        <View style={styles.reportPickerRow}>
+                          {MONTH_NAMES.map((m, idx) => (
+                            <Pressable
+                              key={m}
+                              style={[
+                                styles.reportOption,
+                                reportMonth === idx && styles.reportPeriodChipActive,
+                              ]}
+                              onPress={() => setReportMonth(idx)}
+                            >
+                              <Text
+                                style={[
+                                  styles.reportOptionText,
+                                  reportMonth === idx &&
+                                    styles.reportPeriodChipTextActive,
+                                ]}
+                              >
+                                {m}
+                              </Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {reportPeriodType === "trimester" && (
+                      <View style={styles.reportField}>
+                        <Text style={styles.reportLabel}>Trimester</Text>
+                        <View style={styles.reportPickerRow}>
+                          {([1, 2, 3] as const).map((s) => (
+                            <Pressable
+                              key={s}
+                              style={[
+                                styles.reportOption,
+                                reportTrimester === s &&
+                                  styles.reportPeriodChipActive,
+                              ]}
+                              onPress={() => setReportTrimester(s)}
+                            >
+                              <Text
+                                style={[
+                                  styles.reportOptionText,
+                                  reportTrimester === s &&
+                                    styles.reportPeriodChipTextActive,
+                                ]}
+                              >
+                                {s === 1
+                                  ? "1st Trimester"
+                                  : s === 2
+                                    ? "2nd Trimester"
+                                    : "3rd Trimester"}
+                              </Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {reportPeriodType === "custom" && (
+                      <View style={styles.reportField}>
+                        <Text style={styles.reportLabel}>Custom Date Range</Text>
+                        <Text style={styles.reportDateHint}>
+                          Start date must be on or before the end date.
+                        </Text>
+                        <View style={styles.reportDateRow}>
+                          <View style={styles.reportDateField}>
+                            <Text style={styles.reportDateFieldLabel}>
+                              Start Date
+                            </Text>
+                            <TextInput
+                              style={styles.reportDateInput}
+                              value={toLocalDateInput(reportCustomStart)}
+                              onChangeText={(text) => {
+                                const d = new Date(text + "T00:00:00");
+                                if (!Number.isNaN(d.getTime())) {
+                                  setReportCustomStart(d);
+                                }
+                              }}
+                              placeholder="YYYY-MM-DD"
+                            />
+                          </View>
+                          <View style={styles.reportDateField}>
+                            <Text style={styles.reportDateFieldLabel}>
+                              End Date
+                            </Text>
+                            <TextInput
+                              style={styles.reportDateInput}
+                              value={toLocalDateInput(reportCustomEnd)}
+                              onChangeText={(text) => {
+                                const d = new Date(text + "T00:00:00");
+                                if (!Number.isNaN(d.getTime())) {
+                                  setReportCustomEnd(d);
+                                }
+                              }}
+                              placeholder="YYYY-MM-DD"
+                            />
+                          </View>
+                        </View>
+                      </View>
+                    )}
+
+                    <View style={styles.reportField}>
+                      <Text style={styles.reportLabel}>
+                        Department / College
+                      </Text>
+                      <View style={styles.reportPickerRow}>
+                        <Pressable
+                          style={[
+                            styles.reportOption,
+                            reportDepartment === "all" &&
+                              styles.reportPeriodChipActive,
+                          ]}
+                          onPress={() => setReportDepartment("all")}
+                        >
+                          <Text
+                            style={[
+                              styles.reportOptionText,
+                              reportDepartment === "all" &&
+                                styles.reportPeriodChipTextActive,
+                            ]}
+                          >
+                            All Departments
+                          </Text>
+                        </Pressable>
+                        {reportDepartments.map((d) => (
+                          <Pressable
+                            key={d.code}
+                            style={[
+                              styles.reportOption,
+                              reportDepartment === d.code &&
+                                styles.reportPeriodChipActive,
+                            ]}
+                            onPress={() => setReportDepartment(d.code)}
+                          >
+                            <Text
+                              style={[
+                                styles.reportOptionText,
+                                reportDepartment === d.code &&
+                                  styles.reportPeriodChipTextActive,
+                              ]}
+                            >
+                              {d.code}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.generateReportBtn,
+                        reportGenerating && { opacity: 0.6 },
+                        pressed && { opacity: 0.85 },
+                      ]}
+                      disabled={reportGenerating}
+                      onPress={handleGenerateReport}
+                    >
+                      <Ionicons name="create-outline" size={18} color="#FFFFFF" />
+                      <Text style={styles.generateReportBtnText}>
+                        {reportGenerating ? "Generating..." : "Generate Report"}
+                      </Text>
+                    </Pressable>
+
+                    {reportStatus ? (
+                      <Text style={styles.reportStatus}>{reportStatus}</Text>
+                    ) : null}
+                    {reportError ? (
+                      <Text style={styles.reportError}>{reportError}</Text>
+                    ) : null}
+                  </View>
+
+                  {reportData && (
+                    <View style={[styles.lookupCard, { marginTop: 16 }]}>
+                      <View style={styles.lookupHeader}>
+                        <Text style={styles.sectionTitle}>
+                          Report Preview — {reportData.periodLabel}
+                        </Text>
+                      </View>
+                      <View style={styles.reportPreviewGrid}>
+                        {[
+                          ["Total Students", reportData.overview.totalStudents],
+                          ["Assessments", reportData.overview.totalAssessments],
+                          ["Low Concern", reportData.concernDistribution.low],
+                          [
+                            "Medium Concern",
+                            reportData.concernDistribution.medium,
+                          ],
+                          ["High Concern", reportData.concernDistribution.high],
+                          ["Attention Required", reportData.attentionRequired.count],
+                        ].map(([label, value]) => (
+                          <View
+                            key={label as string}
+                            style={styles.reportPreviewItem}
+                          >
+                            <Text style={styles.reportPreviewValue}>
+                              {value}
+                            </Text>
+                            <Text style={styles.reportPreviewLabel}>
+                              {label}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+
+                      <Text style={styles.reportSubsectionTitle}>
+                        Concern Distribution
+                      </Text>
+                      <View style={styles.concernBars}>
+                        {(
+                          [
+                            ["High", reportData.concernDistribution.high, "#DC2626"],
+                            [
+                              "Medium",
+                              reportData.concernDistribution.medium,
+                              "#EAB308",
+                            ],
+                            ["Low", reportData.concernDistribution.low, "#16A34A"],
+                          ] as [string, number, string][]
+                        ).map(([label, count, color]) => {
+                          const total =
+                            reportData.concernDistribution.low +
+                            reportData.concernDistribution.medium +
+                            reportData.concernDistribution.high;
+                          const widthPct =
+                            total > 0 ? Math.max((count / total) * 100, 2) : 0;
+                          return (
+                            <View key={label} style={styles.concernBarRow}>
+                              <Text style={styles.concernBarLabel}>{label}</Text>
+                              <View style={styles.concernBarTrack}>
+                                <View
+                                  style={[
+                                    styles.concernBarFill,
+                                    {
+                                      width: `${widthPct}%`,
+                                      backgroundColor: color,
+                                    },
+                                  ]}
+                                />
+                              </View>
+                              <Text style={styles.concernBarValue}>{count}</Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+
+                      {reportData.trendComparison.length > 0 && (
+                        <>
+                          <Text style={styles.reportSubsectionTitle}>
+                            Comparison vs Previous Period
+                          </Text>
+                          <View style={styles.comparisonTable}>
+                            {reportData.trendComparison.map((t) => (
+                              <View
+                                key={t.label}
+                                style={styles.comparisonRow}
+                              >
+                                <Text style={styles.comparisonMetric}>
+                                  {t.label}
+                                </Text>
+                                <Text style={styles.comparisonValue}>
+                                  {t.current}
+                                  {t.comparable && t.changePct !== 0 ? (
+                                    <Text
+                                      style={[
+                                        styles.comparisonDelta,
+                                        { color: t.direction === "up" ? "#DC2626" : "#16A34A" },
+                                      ]}
+                                    >
+                                      {" "}
+                                      {t.direction === "up" ? "▲" : "▼"}{" "}
+                                      {Math.abs(t.changePct)}%
+                                    </Text>
+                                  ) : null}
+                                </Text>
+                                <Text style={styles.comparisonPrev}>
+                                  prev: {t.previous}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+                        </>
+                      )}
+                      <View style={styles.exportActionsRow}>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.exportButton,
+                            pressed && { opacity: 0.85 },
+                          ]}
+                          onPress={handleExportReportExcel}
+                        >
+                          <Ionicons
+                            name="download-outline"
+                            size={18}
+                            color="#FFFFFF"
+                          />
+                          <Text style={styles.exportButtonText}>
+                            Export Excel Workbook
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.exportButtonSecondary,
+                            pressed && { opacity: 0.7 },
+                          ]}
+                          onPress={handleExportReportNarrative}
+                        >
+                          <Ionicons
+                            name="document-text-outline"
+                            size={18}
+                            color="#7C3AED"
+                          />
+                          <Text style={styles.exportButtonSecondaryText}>
+                            Export Narrative Report
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          style={({ pressed }) => [
+                            styles.exportButtonSecondary,
+                            pressed && { opacity: 0.7 },
+                          ]}
+                          onPress={handleExportReportPdf}
+                        >
+                          <Ionicons
+                            name="print-outline"
+                            size={18}
+                            color="#7C3AED"
+                          />
+                          <Text style={styles.exportButtonSecondaryText}>
+                            Export PDF
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  )}
+                </>
               ) : (
                 <>
                   <LinearGradient
@@ -3434,42 +3676,6 @@ export default function AdminPanelScreen() {
                       </View>
                     </View>
                   </LinearGradient>
-
-                  {/* ─── Hybrid Export Controls ─────────────────────────── */}
-                  <View style={styles.exportActionsRow}>
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.exportButton,
-                        pressed && { opacity: 0.85 },
-                      ]}
-                      onPress={handleExportUniversityExcel}
-                    >
-                      <Ionicons
-                        name="download-outline"
-                        size={18}
-                        color="#FFFFFF"
-                      />
-                      <Text style={styles.exportButtonText}>
-                        Download Excel Workbook (.xlsx)
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.exportButtonSecondary,
-                        pressed && { opacity: 0.7 },
-                      ]}
-                      onPress={handleExportNarrativeReport}
-                    >
-                      <Ionicons
-                        name="document-text-outline"
-                        size={18}
-                        color="#7C3AED"
-                      />
-                      <Text style={styles.exportButtonSecondaryText}>
-                        Download Narrative Report (Word/PDF)
-                      </Text>
-                    </Pressable>
-                  </View>
 
                   {/* ─── SECTION: Advanced Analytics Navigation ──────────── */}
                   <Text style={styles.sectionHeader}>Advanced Analytics</Text>
@@ -5476,6 +5682,248 @@ const styles = StyleSheet.create({
     color: "#7C3AED",
     fontSize: 14,
     fontWeight: "700",
+  },
+
+  // ─── Reports ────────────────────────────────────────────────────────────
+  reportPeriodRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 16,
+  },
+  reportPeriodChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: "#D8C7F5",
+    backgroundColor: "#F7F4FE",
+  },
+  reportPeriodChipActive: {
+    backgroundColor: "#7C3AED",
+    borderColor: "#7C3AED",
+  },
+  reportPeriodChipText: {
+    color: "#5B21B6",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  reportPeriodChipTextActive: {
+    color: "#FFFFFF",
+  },
+  reportField: {
+    marginBottom: 16,
+  },
+  reportLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#6B7280",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginBottom: 8,
+  },
+  reportValue: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#5B21B6",
+    marginBottom: 8,
+  },
+  reportDateHint: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginBottom: 8,
+  },
+  reportDateRow: {
+    flexDirection: "row",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  reportDateField: {
+    flex: 1,
+    minWidth: 150,
+  },
+  reportDateFieldLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#6B7280",
+    marginBottom: 6,
+  },
+  reportDateInput: {
+    borderWidth: 1,
+    borderColor: "#D8C7F5",
+    borderRadius: 10,
+    backgroundColor: "#F7F4FE",
+    color: "#5B21B6",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+  },
+  reportWeekNav: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  reportWeekBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#D8C7F5",
+    backgroundColor: "#F7F4FE",
+  },
+  reportWeekBtnText: {
+    color: "#5B21B6",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  reportPickerRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  reportOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#D8C7F5",
+    backgroundColor: "#F7F4FE",
+  },
+  reportOptionText: {
+    color: "#5B21B6",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  generateReportBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#7C3AED",
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginTop: 4,
+  },
+  generateReportBtnText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  reportStatus: {
+    marginTop: 12,
+    color: "#6B7280",
+    fontSize: 14,
+    fontStyle: "italic",
+    textAlign: "center",
+  },
+  reportError: {
+    marginTop: 12,
+    color: "#DC2626",
+    fontSize: 14,
+    textAlign: "center",
+  },
+  reportPreviewGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 16,
+  },
+  reportPreviewItem: {
+    flex: 1,
+    minWidth: 120,
+    backgroundColor: "#FBF7FF",
+    borderWidth: 1,
+    borderColor: "#EDE9FE",
+    borderRadius: 12,
+    padding: 12,
+  },
+  reportPreviewValue: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#5B21B6",
+  },
+  reportPreviewLabel: {
+    fontSize: 11,
+    color: "#6B7280",
+    marginTop: 2,
+  },
+  reportSubsectionTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#5B21B6",
+    marginTop: 18,
+    marginBottom: 10,
+  },
+  concernBars: {
+    marginBottom: 4,
+  },
+  concernBarRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginVertical: 5,
+  },
+  concernBarLabel: {
+    width: 64,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#1f2937",
+  },
+  concernBarTrack: {
+    flex: 1,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#F3F4F6",
+    overflow: "hidden",
+  },
+  concernBarFill: {
+    height: "100%",
+    borderRadius: 7,
+  },
+  concernBarValue: {
+    width: 44,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#1f2937",
+    textAlign: "right",
+  },
+  comparisonTable: {
+    borderWidth: 1,
+    borderColor: "#E9D5FF",
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  comparisonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0EAFE",
+  },
+  comparisonMetric: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1f2937",
+    flex: 1,
+  },
+  comparisonValue: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#5B21B6",
+    textAlign: "right",
+  },
+  comparisonDelta: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  comparisonPrev: {
+    fontSize: 11,
+    color: "#6B7280",
+    marginLeft: 10,
   },
 
   // ─── Descriptive Analysis Blocks ───────────────────────────────────────

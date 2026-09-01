@@ -175,11 +175,19 @@ export function listenForAdminDashboardData(
               ? aData.createdAt.toDate()
               : new Date();
 
+            const assessmentScore = aData.totalScore || 0;
+            const storedRisk = (aData.riskLevel as RiskLevel) as RiskLevel | undefined;
             const assessmentRecord: AssessmentRecord = {
               id: aDoc.id,
               uid,
-              riskLevel: (aData.riskLevel as RiskLevel) || "low",
-              totalScore: aData.totalScore || 0,
+              riskLevel:
+                typeof storedRisk === "string" &&
+                (storedRisk === "low" ||
+                  storedRisk === "normal" ||
+                  storedRisk === "high")
+                  ? storedRisk
+                  : riskFromScore(assessmentScore),
+              totalScore: assessmentScore,
               createdAt,
               department: getDepartmentCode(userData.department || "Unspecified"),
               age: userData.age || "Unspecified",

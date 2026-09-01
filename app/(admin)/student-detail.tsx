@@ -43,6 +43,10 @@ import {
 } from "firebase/firestore";
 import { changeProfileImage, uploadProfileImageFromFile } from "@/services/userService";
 import { bucketAssessments } from "@/utils/assessmentTrend";
+import {
+  getAssessmentRiskLevel,
+  type ConcernLevel,
+} from "@/utils/concern";
 
 interface JournalEntry {
   id: string;
@@ -137,12 +141,12 @@ interface ProfileData {
 
 // ─── Student Detail Design Tokens ────────────────────────────────────────────
 
-type RiskLevelType = "low" | "moderate" | "high";
+type ConcernLevelKey = "low" | "normal" | "high";
 
 const RISK_META = (
   theme: MindCareTheme,
 ): Record<
-  RiskLevelType,
+  ConcernLevelKey,
   { label: string; color: string; bg: string; dot: string }
 > => ({
   low: {
@@ -151,7 +155,7 @@ const RISK_META = (
     bg: "#E7F7F0",
     dot: theme.accent.green,
   },
-  moderate: {
+  normal: {
     label: "Moderate Concern",
     color: theme.status.warning,
     bg: "#FDF3E3",
@@ -165,11 +169,18 @@ const RISK_META = (
   },
 });
 
-const riskFromLatestScore = (score?: number): RiskLevelType | null => {
-  if (score === undefined || score === null) return null;
+const concernFromScore = (score?: number): ConcernLevelKey | null => {
+  if (score === undefined || score === null || Number.isNaN(score)) return null;
   if (score >= 51) return "high";
-  if (score >= 21) return "moderate";
+  if (score >= 21) return "normal";
   return "low";
+};
+
+const riskLevelToConcernLabel = (risk: ConcernLevelKey | null): ConcernLevel | null => {
+  if (risk === "high") return "HIGH";
+  if (risk === "normal") return "MEDIUM";
+  if (risk === "low") return "LOW";
+  return null;
 };
 
 const formatRelativeTime = (date?: Date): string => {
@@ -342,7 +353,7 @@ function SectionCard({
 }
 
 // ─── Concern level pill ───────────────────────────────────────────────────────
-function RiskPill({ risk }: { risk: RiskLevelType | null }) {
+function RiskPill({ risk }: { risk: ConcernLevelKey | null }) {
   const { theme } = useMindCareTheme();
   const styles = createStyles(theme);
   if (!risk) {
@@ -525,7 +536,10 @@ export default function StudentDetailScreen() {
 
   // ─── Derived presentation values (existing data only) ───────────────────
   const latestScore = latestAssessment?.totalScore;
-  const latestRisk = riskFromLatestScore(latestScore);
+  const latestRisk = getAssessmentRiskLevel({
+    latestRiskLevel: latestAssessment?.riskLevel,
+    latestTotalScore: latestScore,
+  });
   const prevAssessment =
     assessments.length >= 2 ? assessments[assessments.length - 2] : undefined;
   const prevScore = prevAssessment?.totalScore;
@@ -670,7 +684,7 @@ export default function StudentDetailScreen() {
       });
       const first = inBucket[0];
       const last = inBucket[inBucket.length - 1];
-      const concern = riskFromLatestScore(b.avgScore) ?? "low";
+      const concern = concernFromScore(b.avgScore) ?? "low";
       const meta = RISK_META(theme)[concern];
       return {
         x: xStart + i * xSpacing,
@@ -1167,7 +1181,7 @@ export default function StudentDetailScreen() {
                     ? RISK_META(theme)[latestRisk].bg
                     : theme.inputBg
                 }
-                value={latestRisk ? latestRisk.toUpperCase() : "—"}
+                value={riskLevelToConcernLabel(latestRisk) ?? "—"}
                 label="Concern"
                 sub={latestScore !== undefined ? `${latestScore}/80` : undefined}
               />
@@ -1344,7 +1358,7 @@ export default function StudentDetailScreen() {
                       >
                         {latestRisk === "high"
                           ? "HIGH CONCERN"
-                          : latestRisk === "moderate"
+                          : latestRisk === "normal"
                             ? "MODERATE CONCERN"
                             : "LOW CONCERN"}
                       </Text>

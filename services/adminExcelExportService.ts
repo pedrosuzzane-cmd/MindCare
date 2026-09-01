@@ -1,122 +1,27 @@
 import * as XLSX from "xlsx";
+import type { ReportData, ReportStudent } from "./reportingService";
 
-export type ExportRiskLevel = "low" | "normal" | "high";
+/**
+ * Generates the Excel workbook from a single validated `ReportData` object —
+ * the SAME object consumed by the narrative report. There is never a second,
+ * independently-computed statistics path in the workbook.
+ *
+ * NOTE (honest limitation): this project ships SheetJS Community Edition
+ * (`xlsx@0.18.5`), which persists column widths and autofilters but NOT cell
+ * styles (bold headers, fills, borders). The workbook therefore uses clear
+ * title rows, a bold-looking header convention, column widths, autofilters,
+ * and correct numeric/percent/date values, but cannot embed visual styling.
+ */
 
-export interface UniversityStudentRecord {
-  uid: string;
+export interface ExcelSheetSpec {
   name: string;
-  schoolId: string;
-  department: string;
-  yearLevel: string;
-  isLSN?: boolean;
-  lsnCategory?: string;
-  latestTotalScore?: number;
-  latestRiskLevel?: ExportRiskLevel;
-  assessmentsCount: number;
-  journalCount: number;
 }
 
-export interface UniversityRiskTrendRow {
-  label: string;
-  count: number;
-  baseline: number;
-  changePct: number;
-}
-
-export interface UniversityMoodSlice {
-  mood: string;
-  count: number;
-}
-
-export interface UniversityDeptMetric {
-  deptAbbr: string;
-  deptName: string;
-  avgScore: number;
-  assessmentCount: number;
-  journalCount: number;
-  lsnCount: number;
-  participationRate: number;
-  lowCount: number;
-  normalCount: number;
-  highCount: number;
-}
-
-export interface UniversityDeptComparison {
-  indicator: string;
-  department: string;
-  value: string;
-}
-
-export interface UniversityRiskVarianceRow {
-  department: string;
-  min: number;
-  q1: number;
-  median: number;
-  q3: number;
-  max: number;
-  count: number;
-}
-
-export interface UniversityCorrelationMetric {
-  metric: string;
-  value: string;
-}
-
-export interface UniversityExportData {
-  institutionName: string;
-  reportTitle: string;
-  reportPeriod: string;
-  generatedAt: string;
-  totalStudents: number;
-  studentsAssessed: number;
-  completionRate: number;
-  avgWellnessScore: number;
-  totalJournalEntries: number;
-  riskTrends: UniversityRiskTrendRow[];
-  stressMetrics: { metric: string; value: string }[];
-  moodDistribution: UniversityMoodSlice[];
-  assessmentDistribution: { category: string; count: number }[];
-  riskVariance: UniversityRiskVarianceRow[];
-  departmentMetrics: UniversityDeptMetric[];
-  departmentComparison: UniversityDeptComparison[];
-  correlationMetrics: UniversityCorrelationMetric[];
-  students: UniversityStudentRecord[];
-}
-
-const RISK_LABEL: Record<ExportRiskLevel, string> = {
-  low: "Lower Concern",
-  normal: "Moderate Concern",
-  high: "Elevated Concern",
-};
-
-const LSN_LABEL: Record<string, string> = {
-  "additional-needs": "Students with Additional Needs",
-  disabilities: "Students with Disabilities",
-};
-
-const DEFAULT_FILENAME = "University_of_the_Cordilleras_Analytics_Report.xlsx";
-
-function lsnLabel(s: UniversityStudentRecord): string {
-  if (s.lsnCategory) return LSN_LABEL[s.lsnCategory] || "LSN";
-  return s.isLSN ? "LSN" : "None";
-}
-
-function riskLabel(level?: ExportRiskLevel): string {
-  return level ? RISK_LABEL[level] : "Not Assessed";
-}
-
-function studentToSheetRow(
-  s: UniversityStudentRecord,
-): Record<string, string | number> {
-  return {
-    "Student ID": s.schoolId || "—",
-    Name: s.name,
-    Department: s.department,
-    "Year Level": s.yearLevel,
-    "LSN Category": lsnLabel(s),
-    "Concern Level": riskLabel(s.latestRiskLevel),
-    Score: s.latestTotalScore ?? "",
-  };
+function fmtConcern(level: ReportStudent["concernLevel"]): string {
+  if (level === "LOW") return "LOW";
+  if (level === "MEDIUM") return "MEDIUM";
+  if (level === "HIGH") return "HIGH";
+  return "Not Assessed";
 }
 
 function autoWidth(ws: XLSX.WorkSheet) {
@@ -137,124 +42,213 @@ function autoWidth(ws: XLSX.WorkSheet) {
   ws["!cols"] = widths.map((wch) => ({ wch }));
 }
 
-export function exportUniversityExcelReport(
-  data: UniversityExportData,
-  filename: string = DEFAULT_FILENAME,
-): XLSX.WorkBook {
+function enableFilter(ws: XLSX.WorkSheet) {
+  const ref = ws["!ref"];
+  if (!ref) return;
+  const range = XLSX.utils.decode_range(ref);
+  // Autofilter from the header row (row 1) to the last data row.
+  ws["!autofilter"] = {
+    ref: XLSX.utils.encode_range({
+      s: { r: range.s.r, c: range.s.c },
+      e: { r: range.e.r, c: range.e.c },
+    }),
+  };
+}
+
+function sheetFromRows(headers: string[], rows: (string | number | Date)[][]) {
+  const aoa: (string | number | Date)[][] = [headers, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  autoWidth(ws);
+  enableFilter(ws);
+  return ws;
+}
+
+export function exportReportWorkbook(report: ReportData): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
   wb.Props = {
-    Title: data.reportTitle,
-    Subject: "Mental Wellness Analytics",
-    Author: data.institutionName,
-    CreatedDate: new Date(),
+    Title: report.reportTitle,
+    Subject: "Administrative Wellness Report",
+    Author: report.institutionName,
+    CreatedDate: report.generatedAt,
   };
 
-  const wsSummary = XLSX.utils.json_to_sheet([
-    { Metric: "Institution", Value: data.institutionName },
-    { Metric: "Report Title", Value: data.reportTitle },
-    { Metric: "Reporting Period", Value: data.reportPeriod },
-    { Metric: "Generated On", Value: data.generatedAt },
-    {},
-    { Metric: "Total Students Tracked", Value: data.totalStudents },
-    { Metric: "Students Assessed", Value: data.studentsAssessed },
-    { Metric: "Assessment Completion Rate", Value: `${data.completionRate}%` },
-    { Metric: "Average Wellness Score", Value: data.avgWellnessScore },
-    { Metric: "Total Journal Entries", Value: data.totalJournalEntries },
-  ]);
-  autoWidth(wsSummary);
-  XLSX.utils.book_append_sheet(wb, wsSummary, "Executive Summary");
+  const period = report.periodLabel;
+  const o = report.overview;
+  const cd = report.concernDistribution;
+  const ar = report.attentionRequired;
 
-  const advancedRows: (string | number)[][] = [];
-  advancedRows.push(["Wellness & Concern Trend Indicators"]);
-  advancedRows.push(["Category", "Count", "Baseline", "Change (%)"]);
-  data.riskTrends.forEach((r) =>
-    advancedRows.push([r.label, r.count, r.baseline, r.changePct]),
+  // Sheet 1 — Executive Summary
+  const summary = sheetFromRows(
+    ["Metric", "Value"],
+    [
+      ["Institution", report.institutionName],
+      ["Report Title", report.reportTitle],
+      ["Academic Year", report.academicYearLabel],
+      ["Reporting Period", period],
+      ["Trimester", report.trimesterLabel ?? "—"],
+      ["Department / College", report.departmentFilter?.name ?? "All Departments"],
+      ["Generated On", report.generatedAt.toLocaleString()],
+      ["Prepared By", report.preparedBy],
+      [],
+      ["Total Students (active in period)", o.totalStudents],
+      ["Total Students Tracked", o.trackedStudents],
+      ["Students Assessed", o.assessed],
+      ["Assessment Completion Rate", `${o.completionRate}%`],
+      ["Low Concern", cd.low],
+      ["Medium Concern", cd.medium],
+      ["High Concern", cd.high],
+      ["Attention Required (Medium + High)", ar.count],
+      ["Total Assessments", o.totalAssessments],
+      ["Total Journal Entries", o.totalJournals],
+      ["Total Mood Entries", o.totalMoodEntries],
+      ["Total Survey Responses", o.totalSurveys],
+    ],
   );
-  advancedRows.push([]);
-  advancedRows.push(["Stress Heatmap Metrics"]);
-  advancedRows.push(["Metric", "Value"]);
-  data.stressMetrics.forEach((m) => advancedRows.push([m.metric, m.value]));
-  advancedRows.push([]);
-  advancedRows.push(["Mood Distribution"]);
-  advancedRows.push(["Mood Category", "Count"]);
-  data.moodDistribution.forEach((m) => advancedRows.push([m.mood, m.count]));
-  advancedRows.push([]);
-  advancedRows.push(["Assessment Distribution"]);
-  advancedRows.push(["Category", "Count"]);
-  data.assessmentDistribution.forEach((a) =>
-    advancedRows.push([a.category, a.count]),
-  );
-  advancedRows.push([]);
-  advancedRows.push(["Wellness Score Variance (Per Department)"]);
-  advancedRows.push([
-    "Department",
-    "Min",
-    "Q1",
-    "Median",
-    "Q3",
-    "Max",
-    "Assessed Students",
-  ]);
-  data.riskVariance.forEach((v) =>
-    advancedRows.push([
-      v.department,
-      v.min,
-      v.q1,
-      v.median,
-      v.q3,
-      v.max,
-      v.count,
-    ]),
-  );
-  const wsAdvanced = XLSX.utils.aoa_to_sheet(advancedRows);
-  autoWidth(wsAdvanced);
-  XLSX.utils.book_append_sheet(wb, wsAdvanced, "Risk & Advanced Analytics");
+  XLSX.utils.book_append_sheet(wb, summary, "Executive Summary");
 
-  const deptRows: (string | number)[][] = [];
-  deptRows.push(["Department Comparison & Insights"]);
-  deptRows.push(["Indicator", "Department", "Value"]);
-  data.departmentComparison.forEach((c) =>
-    deptRows.push([c.indicator, c.department, c.value]),
+  // Sheet 2 — Concern Distribution
+  const totalConcerned = cd.low + cd.medium + cd.high;
+  const pct = (n: number) =>
+    totalConcerned > 0 ? `${Math.round((n / totalConcerned) * 100)}%` : "0%";
+  const concern = sheetFromRows(
+    ["Concern Level", "Student Count", "Percentage"],
+    [
+      ["Low", cd.low, pct(cd.low)],
+      ["Medium", cd.medium, pct(cd.medium)],
+      ["High", cd.high, pct(cd.high)],
+      ["Not Assessed", cd.notAssessed, ""],
+    ],
   );
-  deptRows.push([]);
-  deptRows.push(["Score vs. Journal Frequency Correlation"]);
-  deptRows.push(["Metric", "Value"]);
-  data.correlationMetrics.forEach((c) => deptRows.push([c.metric, c.value]));
-  deptRows.push([]);
-  deptRows.push(["Multi-Metric Department Comparison"]);
-  deptRows.push([
-    "Department",
-    "Avg Score",
-    "Assessments",
-    "Journal Entries",
-    "LSN Students",
-    "Participation Rate",
-    "Low Concern",
-    "Moderate Concern",
-    "High Concern",
-  ]);
-  data.departmentMetrics.forEach((d) =>
-    deptRows.push([
-      d.deptAbbr,
-      d.avgScore,
-      d.assessmentCount,
-      d.journalCount,
-      d.lsnCount,
-      `${d.participationRate}%`,
-      d.lowCount,
-      d.normalCount,
-      d.highCount,
-    ]),
-  );
-  const wsDept = XLSX.utils.aoa_to_sheet(deptRows);
-  autoWidth(wsDept);
-  XLSX.utils.book_append_sheet(wb, wsDept, "Department Comparison");
+  XLSX.utils.book_append_sheet(wb, concern, "Concern Distribution");
 
-  const wsStudents = XLSX.utils.json_to_sheet(
-    data.students.map(studentToSheetRow),
+  // Sheet 3 — Department Analytics
+  const deptRows = report.departmentData.map((d) => [
+    d.code,
+    d.name,
+    d.totalStudents,
+    d.low,
+    d.medium,
+    d.high,
+    d.attentionRequired,
+    d.assessmentCount,
+    d.moodEntries,
+    d.journalEntries,
+    d.surveyResponses,
+  ]);
+  const dept = sheetFromRows(
+    [
+      "Department",
+      "Department Name",
+      "Total Students",
+      "Low",
+      "Medium",
+      "High",
+      "Attention Required",
+      "Assessments",
+      "Mood Entries",
+      "Journal Entries",
+      "Survey Responses",
+    ],
+    deptRows,
   );
-  autoWidth(wsStudents);
-  XLSX.utils.book_append_sheet(wb, wsStudents, "Student Dataset");
+  XLSX.utils.book_append_sheet(wb, dept, "Department Analytics");
+
+  // Sheet 4 — Student Lookup
+  const lookupRows = report.studentLookup.map((s) => [
+    s.schoolId || "—",
+    s.name,
+    s.departmentCode,
+    s.yearLevel,
+    fmtConcern(s.concernLevel),
+    s.latestTotalScore ?? "",
+    s.latestAssessmentDate
+      ? s.latestAssessmentDate.toLocaleDateString()
+      : "",
+    s.assessmentsCount,
+    s.journalCount,
+    s.surveyCount,
+  ]);
+  const lookup = sheetFromRows(
+    [
+      "Student ID",
+      "Student Name",
+      "Department",
+      "Year Level",
+      "Concern Level",
+      "Latest Assessment Score",
+      "Assessment Date",
+      "Assessments",
+      "Journal Entries",
+      "Surveys",
+    ],
+    lookupRows,
+  );
+  XLSX.utils.book_append_sheet(wb, lookup, "Student Lookup");
+
+  // Sheet 5 — Assessment Analytics
+  const assessmentRows = report.assessmentData.map((a) => [
+    a.type,
+    a.count,
+    a.avgScore,
+    a.low,
+    a.medium,
+    a.high,
+  ]);
+  const assessment = sheetFromRows(
+    ["Assessment Type", "Completed", "Average Score", "Low", "Medium", "High"],
+    assessmentRows,
+  );
+  XLSX.utils.book_append_sheet(wb, assessment, "Assessment Analytics");
+
+  // Sheet 6 — Mood Analytics
+  const moodRows = report.moodData.distribution.map((m) => [
+    m.mood,
+    m.count,
+  ]);
+  moodRows.push(["", ""], ["Average Mood Score (0-5)", report.moodData.avgScore]);
+  moodRows.push(["Positive Entries", report.moodData.positive]);
+  moodRows.push(["Neutral Entries", report.moodData.neutral]);
+  moodRows.push(["Distressed Entries", report.moodData.distressed]);
+  const mood = sheetFromRows(["Mood", "Count"], moodRows);
+  XLSX.utils.book_append_sheet(wb, mood, "Mood Analytics");
+
+  // Sheet 7 — Journal Analytics
+  const journalRows = [
+    ["Total Journal Entries", report.journalData.totalEntries],
+    ["Active Journal Users", report.journalData.activeUsers],
+    ["Average Entries per Student", report.journalData.avgPerStudent],
+    ["Positive Entries", report.journalData.positive],
+    ["Neutral Entries", report.journalData.neutral],
+    ["Negative Entries", report.journalData.negative],
+  ];
+  const journal = sheetFromRows(["Metric", "Value"], journalRows);
+  XLSX.utils.book_append_sheet(wb, journal, "Journal Analytics");
+
+  // Sheet 8 — Survey Analytics
+  const surveyRows = [
+    ["Total Survey Responses", report.surveyData.totalResponses],
+    ["Students with Survey Activity", report.surveyData.activeStudents],
+    ["Response Rate", `${report.surveyData.responseRate}%`],
+  ];
+  for (const q of report.surveyData.questionSummaries) {
+    surveyRows.push([`Question: ${q.question}`, q.responses]);
+  }
+  const survey = sheetFromRows(["Metric", "Value"], surveyRows);
+  XLSX.utils.book_append_sheet(wb, survey, "Survey Analytics");
+
+  // Sheet 9 — Comparison (current vs previous equivalent period)
+  const comparisonRows = report.trendComparison.map((t) => [
+    t.label,
+    t.current,
+    t.previous,
+    t.comparable ? `${t.changePct}%` : "N/A",
+    t.comparable ? t.direction : "—",
+  ]);
+  const comparison = sheetFromRows(
+    ["Metric", "Current", "Previous", "Change %", "Direction"],
+    comparisonRows,
+  );
+  XLSX.utils.book_append_sheet(wb, comparison, "Comparison");
 
   return wb;
 }

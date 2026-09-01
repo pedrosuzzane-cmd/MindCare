@@ -1,4 +1,5 @@
 import { StressHeatmap } from "@/components/admin/StressHeatmap";
+import { moodWellnessScore } from "@/utils/moodScoring";
 import type { StudentSummary } from "@/services/adminFirestoreService";
 import { listenForAdminDashboardData } from "@/services/adminFirestoreService";
 import { useAuth } from "@/hooks/AuthContext";
@@ -9,12 +10,6 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDi
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMindCareTheme } from "@/contexts/ThemeContext";
 import type { MindCareTheme } from "@/constants/theme";
-
-const MOOD_WELLNESS: Record<string, number> = {
-  happy: 5, calm: 5, relaxed: 5, good: 4, neutral: 3,
-  worried: 2, sad: 2, overwhelmed: 1, exhausted: 1,
-  stressed: 0, burnout: 0, mad: 0, fearful: 1, flushed: 2, "very-upset": 0,
-};
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -74,7 +69,7 @@ export default function StressHeatmapScreen() {
       let moodCount = 0;
 
       Object.entries(moods).forEach(([mood, count]) => {
-        const wellness = MOOD_WELLNESS[mood.toLowerCase()] ?? 3;
+        const wellness = moodWellnessScore(mood);
         totalMoodScore += (5 - wellness) * count;
         moodCount += count;
       });
@@ -84,7 +79,7 @@ export default function StressHeatmapScreen() {
       const avgStress = totalMoodScore / (moodCount * 5);
 
       Object.entries(moods).forEach(([mood, count]) => {
-        const wellness = MOOD_WELLNESS[mood.toLowerCase()] ?? 3;
+        const wellness = moodWellnessScore(mood);
         const intensity = (5 - wellness) / 5;
         const dayOffset = Math.floor(Math.random() * 7);
         const hourOffset = Math.floor(Math.random() * 12);
