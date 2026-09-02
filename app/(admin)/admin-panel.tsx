@@ -55,6 +55,7 @@ import {
   type ReportPeriodType,
   type TrimesterNumber,
 } from "@/utils/academicCalendar";
+import { formatReportingDay } from "@/utils/reportCore";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -1554,7 +1555,7 @@ export default function AdminPanelScreen() {
       if (reportPeriodType === "weekly") {
         period = resolveWeeklyPeriod(reportWeekStart);
       } else if (reportPeriodType === "monthly") {
-        period = resolveMonthlyPeriod(new Date(reportYear, reportMonth, 1));
+        period = resolveMonthlyPeriod(reportYear, reportMonth);
       } else if (reportPeriodType === "trimester") {
         period = resolveTrimesterPeriod({
           trimester: reportTrimester,
@@ -3449,13 +3450,97 @@ export default function AdminPanelScreen() {
                     ) : null}
                   </View>
 
-                  {reportData && (
+{reportData && (
                     <View style={[styles.lookupCard, { marginTop: 16 }]}>
                       <View style={styles.lookupHeader}>
                         <Text style={styles.sectionTitle}>
                           Report Preview — {reportData.periodLabel}
                         </Text>
                       </View>
+
+                      {/* ─── REPORT SCOPE (auditable) ─────────────────────── */}
+                      <View style={styles.reportScopeBox}>
+                        <Text style={styles.reportScopeTitle}>REPORT SCOPE</Text>
+                        {(() => {
+                          const dq = reportData.dataQuality;
+                          const scopeRows: [string, string][] = [
+                            [
+                              "Period",
+                              `${reportData.periodType === "weekly"
+                                ? "Weekly"
+                                : reportData.periodType === "monthly"
+                                  ? "Monthly"
+                                  : reportData.periodType === "trimester"
+                                    ? "By Trimester"
+                                    : reportData.periodType === "annual"
+                                      ? "Annual"
+                                      : "Custom"}`,
+                            ],
+                            [
+                              "Reporting Period",
+                              `${formatReportingDay(reportData.dateRange.startDate)} – ${formatReportingDay(
+                                new Date(reportData.dateRange.endDate.getTime() - 1),
+                              )}`,
+                            ],
+                            [
+                              "Academic Year",
+                              reportData.academicYearLabel,
+                            ],
+                            [
+                              "Trimester",
+                              reportData.periodType === "monthly" ||
+                              reportData.periodType === "weekly"
+                                ? `${reportData.trimesterLabel ?? "—"} (derived from selected month/week)`
+                                : (reportData.trimesterLabel ?? "—"),
+                            ],
+                            [
+                              "Department",
+                              reportData.departmentFilter?.name ??
+                                "All Departments",
+                            ],
+                            [
+                              "Covered Records",
+                              `${dq.valid} valid`,
+                            ],
+                          ];
+                          return (
+                            <View>
+                              {scopeRows.map(([k, v]) => (
+                                <View key={k} style={styles.reportScopeRow}>
+                                  <Text style={styles.reportScopeKey}>{k}</Text>
+                                  <Text style={styles.reportScopeValue}>{v}</Text>
+                                </View>
+                              ))}
+                              {dq.missingDate > 0 ||
+                              dq.missingDepartment > 0 ||
+                              dq.missingStudentId > 0 ? (
+                                <View style={styles.reportQualityNotice}>
+                                  <Ionicons
+                                    name="information-circle-outline"
+                                    size={14}
+                                    color="#92400E"
+                                  />
+                                  <Text style={styles.reportQualityText}>
+                                    Data-quality notice:{" "}
+                                    {[
+                                      dq.missingDate > 0 &&
+                                        `${dq.missingDate} record(s) missing a valid event date`,
+                                      dq.missingDepartment > 0 &&
+                                        `${dq.missingDepartment} record(s) missing a department`,
+                                      dq.missingStudentId > 0 &&
+                                        `${dq.missingStudentId} record(s) missing a student reference`,
+                                    ]
+                                      .filter(Boolean)
+                                      .join("; ")}{" "}
+                                    were excluded from this report.
+                                  </Text>
+                                </View>
+                              ) : null}
+                            </View>
+                          );
+                        })()}
+                      </View>
+
                       <View style={styles.reportPreviewGrid}>
                         {[
                           ["Total Students", reportData.overview.totalStudents],
@@ -5829,6 +5914,59 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 12,
     marginBottom: 16,
+  },
+  reportScopeBox: {
+    backgroundColor: "#F5F3FF",
+    borderWidth: 1,
+    borderColor: "#DDD6FE",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+  },
+  reportScopeTitle: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#6D28D9",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 10,
+  },
+  reportScopeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 6,
+  },
+  reportScopeKey: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#6B7280",
+    flexShrink: 0,
+  },
+  reportScopeValue: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#1f2937",
+    textAlign: "right",
+  },
+  reportQualityNotice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    backgroundColor: "#FEF3C7",
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 8,
+  },
+  reportQualityText: {
+    flex: 1,
+    fontSize: 11,
+    color: "#92400E",
+    lineHeight: 15,
   },
   reportPreviewItem: {
     flex: 1,

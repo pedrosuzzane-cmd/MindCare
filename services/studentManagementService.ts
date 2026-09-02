@@ -41,6 +41,7 @@ import {
   type SupportActionType,
   type SupportStatus,
 } from "@/services/studentTypes";
+import { normalizeDepartment } from "@/utils/departmentMeta";
 
 // ─── Extended student entry ─────────────────────────────────────────────────
 
@@ -559,7 +560,12 @@ export function applyStudentFilters(
       const hay = `${s.name} ${s.schoolId} ${s.email ?? ""}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
-    if (filters.department !== "All" && s.department !== filters.department) return false;
+    if (
+      filters.department !== "All" &&
+      normalizeDepartment(s.department) !== normalizeDepartment(filters.department)
+    ) {
+      return false;
+    }
     if (filters.yearLevel !== "All" && s.yearLevel !== filters.yearLevel) return false;
     if (filters.status !== "All" && (s.status ?? DEFAULT_LIFECYCLE_STATUS) !== filters.status) return false;
     if (filters.riskLevel !== "All" && s.latestRiskLevel !== filters.riskLevel) return false;

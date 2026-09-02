@@ -7,6 +7,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "test": "node scripts/reportTests.mjs",
     "postinstall": "patch-package"
   },
   "dependencies": {

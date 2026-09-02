@@ -2,18 +2,27 @@ import { db } from "@/constants/firebase";
 import { collection, getDocs } from "firebase/firestore";
 import { riskFromScore } from "@/utils/assessmentTrend";
 import {
-  getDepartmentCode,
   canonicalDeptName,
+  normalizeDepartment,
 } from "@/utils/departmentMeta";
 import { getStudentConcernLevel, type ConcernLevel } from "@/utils/concern";
 import { moodWellnessScore, moodBucket } from "@/utils/moodScoring";
 import {
   academicYearLabel,
   academicYearFor,
+  getTrimester,
   previousPeriodOf,
+  trimesterLabel,
   type ReportPeriodInfo,
   type ReportPeriodType,
 } from "@/utils/academicCalendar";
+import {
+  applyReportFilters,
+  resolveRecordEventDate,
+  type ReportDataQuality,
+  type ReportDateRange,
+  type ReportRecord,
+} from "@/utils/reportCore";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -143,6 +152,7 @@ export interface OverviewInfo {
 export interface ReportData {
   period: ReportPeriodInfo;
   periodType: ReportPeriodType;
+  dateRange: ReportDateRange;
   academicYearLabel: string;
   trimesterLabel: string | null;
   departmentFilter: { code: string; name: string } | null;
@@ -161,6 +171,7 @@ export interface ReportData {
   surveyData: SurveyReport;
   studentLookup: ReportStudent[];
   trendComparison: TrendRow[];
+  dataQuality: ReportDataQuality;
   validation: {
     lowPlusMediumPlusHigh: number;
     attentionMatches: boolean;
@@ -185,32 +196,8 @@ interface RawStudent {
   name: string;
   schoolId: string;
   yearLevel: string;
-  department: string;
+  department: string; // normalized code ("" when missing)
   isLSN: boolean;
-}
-
-interface RawAssessment {
-  uid: string;
-  totalScore: number;
-  riskLevel?: string;
-  createdAt: Date;
-}
-
-interface RawJournal {
-  uid: string;
-  mood?: string;
-  sentiment?: "positive" | "neutral" | "negative";
-  createdAt: Date;
-}
-
-function toDate(value: unknown): Date {
-  if (!value) return new Date(0);
-  if (value instanceof Date) return value;
-  if (typeof value === "object" && value !== null && "toDate" in value) {
-    return (value as { toDate: () => Date }).toDate();
-  }
-  if (typeof value === "number") return new Date(value);
-  return new Date(0);
 }
 
 const DEPT_FULL_NAMES: Record<string, string> = {
@@ -231,42 +218,58 @@ function deptName(code: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Firestore fetch
+// Fetch + central filter — THE single report query
 // ---------------------------------------------------------------------------
 
 /**
- * Fetches the raw, DATED records required for a report in a single pass.
- * Only records whose `createdAt` falls within [startDate, endDate) are kept.
+ * Resolves the report date range for the selected filters. Pure — used by the
+ * report generator and by previews so the exact scope is always identical.
  */
-async function fetchRawDataset(
-  startDate: Date,
-  endDate: Date,
+export function resolveReportDateRange(
+  params: Pick<GenerateReportParams, "periodType" | "startDate" | "endDate" | "periodLabel">,
+): ReportDateRange {
+  return {
+    startDate: params.startDate,
+    endDate: params.endDate,
+    label: params.periodLabel,
+    periodType: params.periodType,
+  };
+}
+
+interface RawReportSource {
+  students: RawStudent[];
+  records: ReportRecord[];
+}
+
+/**
+ * Fetches the complete set of reportable records (students + their dated
+ * assessments/journals/surveys) WITHOUT applying the report filter. The single
+ * date+department filter is applied afterwards by `applyReportFilters()` so
+ * every record that reaches aggregation has passed through one code path.
+ */
+async function fetchRawReportSource(
   departmentCode?: string,
   limit?: number,
-): Promise<{
-  students: RawStudent[];
-  assessments: RawAssessment[];
-  journals: RawJournal[];
-  surveyCounts: Map<string, number>;
-}> {
+): Promise<RawReportSource> {
   const usersSnap = await getDocs(collection(db, "users"));
+
+  const normalizedFilter = departmentCode ? normalizeDepartment(departmentCode) : null;
+
   const studentDocs = usersSnap.docs.filter((d) => {
     if (d.data().role === "admin") return false;
-    if (departmentCode) {
-      return getDepartmentCode(d.data().department) === departmentCode;
-    }
+    const code = normalizeDepartment(d.data().department);
+    if (normalizedFilter) return code === normalizedFilter;
     return true;
   });
 
   // Pagination cap to avoid unbounded downloads; the caller decides the limit.
   const docs = limit ? studentDocs.slice(0, limit) : studentDocs;
 
-  const surveyCounts = new Map<string, number>();
-
   const perStudent = await Promise.all(
     docs.map(async (doc) => {
       const data = doc.data();
       const uid = doc.id;
+      const deptCode = normalizeDepartment(data.department);
 
       const [assessmentSnap, journalSnap, surveySnap] = await Promise.all([
         getDocs(collection(db, "users", uid, "selfAssessments")),
@@ -274,44 +277,41 @@ async function fetchRawDataset(
         getDocs(collection(db, "users", uid, "initialProfileSurveys")),
       ]);
 
-      const assessments: RawAssessment[] = [];
+      const records: ReportRecord[] = [];
+
       for (const aDoc of assessmentSnap.docs) {
         const a = aDoc.data();
-        const createdAt = toDate(a.createdAt);
-        if (createdAt.getTime() < startDate.getTime()) continue;
-        if (createdAt.getTime() >= endDate.getTime()) continue;
-        const totalScore = Number(a.totalScore) || 0;
-        assessments.push({
-          uid,
-          totalScore,
+        records.push({
+          studentId: uid,
+          department: deptCode,
+          source: "assessment",
+          eventDate: resolveRecordEventDate("assessment", a),
+          totalScore: Number(a.totalScore) || 0,
           riskLevel: typeof a.riskLevel === "string" ? a.riskLevel : undefined,
-          createdAt,
         });
       }
 
-      const journals: RawJournal[] = [];
       for (const jDoc of journalSnap.docs) {
         const j = jDoc.data();
-        const createdAt = toDate(j.createdAt);
-        if (createdAt.getTime() < startDate.getTime()) continue;
-        if (createdAt.getTime() >= endDate.getTime()) continue;
-        journals.push({
-          uid,
+        records.push({
+          studentId: uid,
+          department: deptCode,
+          source: "journal",
+          eventDate: resolveRecordEventDate("journal", j),
           mood: typeof j.mood === "string" ? j.mood : undefined,
           sentiment: j.reflectionLocal?.sentiment,
-          createdAt,
         });
       }
 
-      let surveyCount = 0;
       for (const sDoc of surveySnap.docs) {
         const s = sDoc.data();
-        const createdAt = toDate(s.createdAt);
-        if (createdAt.getTime() < startDate.getTime()) continue;
-        if (createdAt.getTime() >= endDate.getTime()) continue;
-        surveyCount += 1;
+        records.push({
+          studentId: uid,
+          department: deptCode,
+          source: "survey",
+          eventDate: resolveRecordEventDate("survey", s),
+        });
       }
-      if (surveyCount > 0) surveyCounts.set(uid, surveyCount);
 
       return {
         student: {
@@ -319,27 +319,25 @@ async function fetchRawDataset(
           name: data.fullName || "Unknown Student",
           schoolId: data.schoolId || "N/A",
           yearLevel: data.yearLevel || "N/A",
-          department: data.department || "Unspecified",
+          department: deptCode,
           isLSN: !!data.isLSN,
         },
-        assessments,
-        journals,
+        records,
       };
     }),
   );
 
-  const students = perStudent.map((p) => p.student);
-  const assessments = perStudent.flatMap((p) => p.assessments);
-  const journals = perStudent.flatMap((p) => p.journals);
-
-  return { students, assessments, journals, surveyCounts };
+  return {
+    students: perStudent.map((p) => p.student),
+    records: perStudent.flatMap((p) => p.records),
+  };
 }
 
 // ---------------------------------------------------------------------------
 // Concern helpers (reuse canonical logic)
 // ---------------------------------------------------------------------------
 
-function concernForAssessments(assessments: RawAssessment[]): {
+function concernForAssessments(assessments: ReportRecord[]): {
   concern: ConcernLevel | null;
   latestScore?: number;
   latestDate?: Date;
@@ -348,19 +346,24 @@ function concernForAssessments(assessments: RawAssessment[]): {
     return { concern: null };
   }
   const latest = assessments.reduce((a, b) =>
-    a.createdAt.getTime() >= b.createdAt.getTime() ? a : b,
+    (a.eventDate as Date).getTime() >= (b.eventDate as Date).getTime() ? a : b,
   );
+  const latestTotalScore = typeof latest.totalScore === "number" ? latest.totalScore : 0;
   const risk =
     latest.riskLevel === "low" ||
     latest.riskLevel === "normal" ||
     latest.riskLevel === "high"
       ? latest.riskLevel
-      : riskFromScore(latest.totalScore);
+      : riskFromScore(latestTotalScore);
   const concern = getStudentConcernLevel({
     latestRiskLevel: risk,
-    latestTotalScore: latest.totalScore,
+    latestTotalScore: latestTotalScore,
   });
-  return { concern, latestScore: latest.totalScore, latestDate: latest.createdAt };
+  return {
+    concern,
+    latestScore: latestTotalScore,
+    latestDate: latest.eventDate as Date,
+  };
 }
 
 /** Best-effort sentiment bucket for a journal entry that has no stored sentiment. */
@@ -372,7 +375,7 @@ function sentimentFromMood(mood?: string): "positive" | "neutral" | "negative" {
   return "negative";
 }
 
-function avgStudentMood(journals: RawJournal[]): number {
+function avgStudentMood(journals: ReportRecord[]): number {
   if (journals.length === 0) return 0;
   const sum = journals.reduce(
     (acc, j) => acc + moodWellnessScore(j.mood),
@@ -382,35 +385,44 @@ function avgStudentMood(journals: RawJournal[]): number {
 }
 
 // ---------------------------------------------------------------------------
-// Aggregation
+// Aggregation (consumes ONLY the filtered dataset)
 // ---------------------------------------------------------------------------
 
 function buildReport(
   period: ReportPeriodInfo,
-  raw: {
+  source: {
     students: RawStudent[];
-    assessments: RawAssessment[];
-    journals: RawJournal[];
-    surveyCounts: Map<string, number>;
+    records: ReportRecord[];
   },
   preparedBy: string,
   departmentCode?: string,
+  dataQuality?: ReportDataQuality,
 ): ReportData {
-  const { students, assessments, journals, surveyCounts } = raw;
+  const { students, records } = source;
+
+  const assessments = records.filter((r) => r.source === "assessment");
+  const journals = records.filter((r) => r.source === "journal");
+  const surveys = records.filter((r) => r.source === "survey");
+
+  // Survey response counts per student (only in-period surveys).
+  const surveyCounts = new Map<string, number>();
+  for (const s of surveys) {
+    surveyCounts.set(s.studentId, (surveyCounts.get(s.studentId) ?? 0) + 1);
+  }
 
   // Group by student
   const byUid = new Map<
     string,
-    { student: RawStudent; assessments: RawAssessment[]; journals: RawJournal[] }
+    { student: RawStudent; assessments: ReportRecord[]; journals: ReportRecord[] }
   >();
   for (const s of students) {
     byUid.set(s.uid, { student: s, assessments: [], journals: [] });
   }
   for (const a of assessments) {
-    byUid.get(a.uid)?.assessments.push(a);
+    byUid.get(a.studentId)?.assessments.push(a);
   }
   for (const j of journals) {
-    byUid.get(j.uid)?.journals.push(j);
+    byUid.get(j.studentId)?.journals.push(j);
   }
 
   const reportStudents: ReportStudent[] = [];
@@ -450,7 +462,7 @@ function buildReport(
   const allMoodScores: number[] = [];
 
   for (const { student, assessments: sAssess, journals: sJournals } of byUid.values()) {
-    const code = getDepartmentCode(student.department);
+    const code = normalizeDepartment(student.department) || "UNSPECIFIED";
     const moodEntries = sJournals.length;
     totalJournals += sJournals.length;
     totalMoodEntries += moodEntries;
@@ -563,7 +575,7 @@ function buildReport(
   // Assessment analytics (single generic type)
   const assessmentScores = assessments
     .filter((a) => typeof a.totalScore === "number")
-    .map((a) => a.totalScore);
+    .map((a) => a.totalScore as number);
   let assessmentLow = 0;
   let assessmentMedium = 0;
   let assessmentHigh = 0;
@@ -666,13 +678,21 @@ function buildReport(
   return {
     period,
     periodType: period.type,
+    dateRange: {
+      startDate: period.startDate,
+      endDate: period.endDate,
+      label: period.label,
+      periodType: period.type,
+    },
     academicYearLabel: academicYearLabel(academicYearFor(period.startDate)),
     trimesterLabel:
       period.type === "trimester"
         ? period.label.split(" AY")[0]
-        : null,
+        : period.type === "monthly" || period.type === "weekly"
+          ? trimesterLabel(getTrimester(period.startDate))
+          : null,
     departmentFilter: departmentCode
-      ? { code: departmentCode, name: deptName(departmentCode) }
+      ? { code: normalizeDepartment(departmentCode), name: deptName(normalizeDepartment(departmentCode)) }
       : null,
     generatedAt: new Date(),
     institutionName: "University of the Cordilleras",
@@ -690,11 +710,24 @@ function buildReport(
     surveyData: surveyReport,
     studentLookup: reportStudents,
     trendComparison: [],
+    dataQuality: dataQuality ?? emptyDataQuality(),
     validation: {
       lowPlusMediumPlusHigh,
       attentionMatches: attentionRequired.count === commonAttention(concernDistribution),
       deptTotalMatches,
     },
+  };
+}
+
+function emptyDataQuality(): ReportDataQuality {
+  return {
+    totalRecords: 0,
+    valid: 0,
+    excludedOutOfRange: 0,
+    excludedDepartment: 0,
+    missingDate: 0,
+    missingDepartment: 0,
+    missingStudentId: 0,
   };
 }
 
@@ -786,6 +819,17 @@ function buildTrendComparison(
 // Public API
 // ---------------------------------------------------------------------------
 
+/**
+ * THE central report query. Everything — KPI cards, charts, narrative, Excel,
+ * PDF, student lookup, department analytics, and the preview — is derived from
+ * the dataset this function returns. Nothing downstream re-filters.
+ *
+ * Flow:
+ *   filters ──▶ resolveReportDateRange(filters)
+ *                  ──▶ fetchRawReportSource()            (unfiltered raw records)
+ *                  ──▶ applyReportFilters(records, range, department)
+ *                  ──▶ buildReport(filtered dataset)
+ */
 export async function generateReportData(
   params: GenerateReportParams,
   opts?: { limit?: number; preparedBy?: string },
@@ -793,34 +837,51 @@ export async function generateReportData(
   const preparedBy = opts?.preparedBy ?? "Office of Guidance and Counselling";
   const period: ReportPeriodInfo = {
     type: params.periodType,
+    periodType: params.periodType,
     startDate: params.startDate,
     endDate: params.endDate,
     label: params.periodLabel,
   };
+  const dateRange = resolveReportDateRange(params);
 
-  const raw = await fetchRawDataset(
-    params.startDate,
-    params.endDate,
-    params.departmentCode,
-    opts?.limit,
+  const source = await fetchRawReportSource(params.departmentCode, opts?.limit);
+
+  // THE single date + department filter. Every record in the report passed
+  // through this one function.
+  const filtered = applyReportFilters(
+    source.records,
+    dateRange,
+    params.departmentCode ?? "ALL",
   );
-  const report = buildReport(period, raw, preparedBy, params.departmentCode);
 
-  // Previous equivalent period — same aggregation, same department filter.
+  const report = buildReport(
+    period,
+    { students: source.students, records: filtered.included },
+    preparedBy,
+    params.departmentCode,
+    filtered.dataQuality,
+  );
+
+  // Previous equivalent period — same aggregation, same department filter,
+  // same central filter function. Its records stay isolated for comparison.
   const previousPeriod = previousPeriodOf(period);
   if (previousPeriod) {
     try {
-      const prevRaw = await fetchRawDataset(
-        previousPeriod.startDate,
-        previousPeriod.endDate,
-        params.departmentCode,
-        opts?.limit,
+      const prevSource = await fetchRawReportSource(params.departmentCode, opts?.limit);
+      const prevFiltered = applyReportFilters(
+        prevSource.records,
+        {
+          startDate: previousPeriod.startDate,
+          endDate: previousPeriod.endDate,
+        },
+        params.departmentCode ?? "ALL",
       );
       const previousReport = buildReport(
         previousPeriod,
-        prevRaw,
+        { students: prevSource.students, records: prevFiltered.included },
         preparedBy,
         params.departmentCode,
+        prevFiltered.dataQuality,
       );
       report.trendComparison = buildTrendComparison(report, previousReport);
     } catch (err) {

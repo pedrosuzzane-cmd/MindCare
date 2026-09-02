@@ -11,22 +11,30 @@
  * therefore crosses calendar years by design — it is never treated as calendar
  * quarters.
  *
- * All period boundaries are computed here — never hardcoded into reports.
- * This is the application's single academic-year calculation.
+ * Every resolver returns a full `ReportDateRange` (startDate, EXCLUSIVE
+ * endDate, label, periodType) whose boundaries are expressed in the explicit
+ * reporting timezone (Asia/Manila) — never the browser/server timezone. The
+ * official membership rule used everywhere is:
+ *
+ *   startDate <= eventDate < endDate
  */
 
-export type ReportPeriodType =
-  | "weekly"
-  | "monthly"
-  | "trimester"
-  | "annual"
-  | "custom";
+import {
+  addReportingDays,
+  addReportingMonths,
+  buildReportingInstant,
+  formatReportingDay,
+  reportingDateParts,
+  reportingWeekStart,
+  type ReportDateRange,
+  type ReportPeriodType,
+} from "./reportCore";
 
-export interface ResolvedReportPeriod {
+export type { ReportDateRange, ReportPeriodType };
+
+export interface ResolvedReportPeriod extends ReportDateRange {
+  /** Backwards-compatible alias kept for older consumers (same as periodType). */
   type: ReportPeriodType;
-  startDate: Date;
-  endDate: Date; // exclusive upper bound
-  label: string;
 }
 
 export type ReportPeriodInfo = ResolvedReportPeriod;
@@ -64,62 +72,69 @@ export function academicYears(count: number = 4): number[] {
 }
 
 /**
- * Resolves the academic-year start year for a given calendar date.
- * Since the AY starts in September, a date before September belongs to the
- * previous year's AY.
+ * Resolves the academic-year start year for a given calendar date (assessed in
+ * the reporting timezone). Since the AY starts in September, a date before
+ * September belongs to the previous year's AY.
  */
 export function academicYearFor(date: Date): number {
-  return date.getMonth() >= ACADEMIC_YEAR_START_MONTH
-    ? date.getFullYear()
-    : date.getFullYear() - 1;
+  const { year, month } = reportingDateParts(date);
+  return month >= ACADEMIC_YEAR_START_MONTH ? year : year - 1;
+}
+
+/**
+ * Trimester of a given calendar date (reporting timezone):
+ *   September–December -> 1 (1st Trimester)
+ *   January–April      -> 2 (2nd Trimester)
+ *   May–August         -> 3 (3rd Trimester)
+ *
+ * This alone is period classification; the selected Academic Year (via
+ * `resolveTrimesterPeriod`) supplies the concrete date range.
+ */
+export function getTrimester(date: Date): TrimesterNumber {
+  const month = reportingDateParts(date).month + 1;
+  if (month >= 9 && month <= 12) return 1;
+  if (month >= 1 && month <= 4) return 2;
+  return 3;
 }
 
 function startOfAy(ayStartYear: number): Date {
-  return new Date(ayStartYear, ACADEMIC_YEAR_START_MONTH, 1, 0, 0, 0, 0);
+  return buildReportingInstant(ayStartYear, ACADEMIC_YEAR_START_MONTH, 1);
 }
 
 /** Exclusive end of the AY: Sep 1 of the following calendar year. */
 function endOfAy(ayStartYear: number): Date {
-  return new Date(ayStartYear + 1, ACADEMIC_YEAR_START_MONTH, 1, 0, 0, 0, 0);
-}
-
-function prevMonday(d: Date): Date {
-  const out = new Date(d);
-  out.setHours(0, 0, 0, 0);
-  const day = out.getDay(); // 0=Sun..6=Sat
-  const delta = day === 0 ? 6 : day - 1;
-  out.setDate(out.getDate() - delta);
-  return out;
+  return buildReportingInstant(ayStartYear + 1, ACADEMIC_YEAR_START_MONTH, 1);
 }
 
 function formatShort(d: Date): string {
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: d.getFullYear() !== new Date().getFullYear() ? "numeric" : undefined,
-  });
+  return formatReportingDay(d, { month: "short", day: "numeric", year: "numeric" });
 }
 
 export function resolveWeeklyPeriod(weekStart: Date): ResolvedReportPeriod {
-  const start = prevMonday(weekStart);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 7);
+  const start = reportingWeekStart(weekStart);
+  const end = addReportingDays(start, 7);
   return {
     type: "weekly",
+    periodType: "weekly",
     startDate: start,
     endDate: end,
-    label: `${formatShort(start)} – ${formatShort(new Date(end.getTime() - 1))}`,
+    label: `${formatShort(start)} – ${formatShort(addReportingDays(end, -1))}`,
   };
 }
 
-export function resolveMonthlyPeriod(month: Date): ResolvedReportPeriod {
-  const start = new Date(month.getFullYear(), month.getMonth(), 1, 0, 0, 0, 0);
-  const end = new Date(month.getFullYear(), month.getMonth() + 1, 1, 0, 0, 0, 0);
+/** Explicit (year, monthIndex) selection -> e.g. (2026, 7) = August 2026. */
+export function resolveMonthlyPeriod(
+  year: number,
+  monthIndex: number,
+): ResolvedReportPeriod {
+  const start = buildReportingInstant(year, monthIndex, 1);
+  const end = addReportingMonths(start, 1);
   return {
     type: "monthly",
+    periodType: "monthly",
     startDate: start,
     endDate: end,
-    label: `${MONTHS[month.getMonth()]} ${month.getFullYear()}`,
+    label: `${MONTHS[monthIndex]} ${year}`,
   };
 }
 
@@ -130,15 +145,15 @@ export interface TrimesterSelection {
 
 function trimesterStart(sel: TrimesterSelection): Date {
   const ay = sel.academicYear;
-  if (sel.trimester === 1) return new Date(ay, 8, 1, 0, 0, 0, 0); // Sep 1
-  if (sel.trimester === 2) return new Date(ay + 1, 0, 1, 0, 0, 0, 0); // Jan 1
-  return new Date(ay + 1, 4, 1, 0, 0, 0, 0); // May 1
+  if (sel.trimester === 1) return buildReportingInstant(ay, 8, 1); // Sep 1
+  if (sel.trimester === 2) return buildReportingInstant(ay + 1, 0, 1); // Jan 1
+  return buildReportingInstant(ay + 1, 4, 1); // May 1
 }
 
 function trimesterEnd(sel: TrimesterSelection): Date {
-  if (sel.trimester === 1) return new Date(sel.academicYear + 1, 0, 1, 0, 0, 0, 0); // Jan 1
-  if (sel.trimester === 2) return new Date(sel.academicYear + 1, 4, 1, 0, 0, 0, 0); // May 1
-  return endOfAy(sel.academicYear); // Sep 1
+  if (sel.trimester === 1) return buildReportingInstant(sel.academicYear + 1, 0, 1); // Jan 1 (exclusive)
+  if (sel.trimester === 2) return buildReportingInstant(sel.academicYear + 1, 4, 1); // May 1 (exclusive)
+  return endOfAy(sel.academicYear); // Sep 1 (exclusive)
 }
 
 export function trimesterLabel(trimester: TrimesterNumber): string {
@@ -156,6 +171,7 @@ export function resolveTrimesterPeriod(
 ): ResolvedReportPeriod {
   return {
     type: "trimester",
+    periodType: "trimester",
     startDate: trimesterStart(sel),
     endDate: trimesterEnd(sel),
     label: `${trimesterLabel(sel.trimester)} AY ${academicYearLabel(
@@ -164,9 +180,14 @@ export function resolveTrimesterPeriod(
   };
 }
 
+/**
+ * Annual report = the AY (September start) unless a calendar year is
+ * explicitly requested. Academic Year 2025–2026 = Sep 1, 2025 .. Sep 1, 2026.
+ */
 export function resolveAnnualPeriod(academicYear: number): ResolvedReportPeriod {
   return {
     type: "annual",
+    periodType: "annual",
     startDate: startOfAy(academicYear),
     endDate: endOfAy(academicYear),
     label: `Academic Year ${academicYearLabel(academicYear)}`,
@@ -178,15 +199,33 @@ export interface CustomRangeSelection {
   endDate: Date; // exclusive
 }
 
+/**
+ * Custom range: the passed dates' calendar fields (year/month/day, taken from
+ * the picker) are interpreted as calendar days in the REPORTING timezone, so
+ * the range is stable on any device timezone.
+ */
 export function resolveCustomPeriod(
   sel: CustomRangeSelection,
 ): ResolvedReportPeriod {
+  const start = new Date(sel.startDate.getFullYear(), sel.startDate.getMonth(), sel.startDate.getDate());
+  const end = new Date(sel.endDate.getFullYear(), sel.endDate.getMonth(), sel.endDate.getDate());
+  const startInstant = buildReportingInstant(
+    start.getFullYear(),
+    start.getMonth(),
+    start.getDate(),
+  );
+  const endInstant = buildReportingInstant(
+    end.getFullYear(),
+    end.getMonth(),
+    end.getDate() + 1, // exclusive upper bound
+  );
   return {
     type: "custom",
-    startDate: sel.startDate,
-    endDate: sel.endDate,
-    label: `Custom Range: ${formatShort(sel.startDate)} – ${formatShort(
-      sel.endDate,
+    periodType: "custom",
+    startDate: startInstant,
+    endDate: endInstant,
+    label: `Custom Range: ${formatShort(startInstant)} – ${formatShort(
+      endInstant,
     )}`,
   };
 }
@@ -203,19 +242,20 @@ export function resolveCustomPeriod(
 export function previousPeriodOf(
   period: ResolvedReportPeriod,
 ): ResolvedReportPeriod | null {
-  const start = new Date(period.startDate);
+  const start = period.startDate;
   if (period.type === "weekly") {
-    const prev = new Date(start);
-    prev.setDate(prev.getDate() - 7);
-    return resolveWeeklyPeriod(prev);
+    return resolveWeeklyPeriod(addReportingDays(start, -7));
   }
   if (period.type === "monthly") {
-    const prev = new Date(start.getFullYear(), start.getMonth() - 1, 1);
-    return resolveMonthlyPeriod(prev);
+    const { year, month } = reportingDateParts(start);
+    const prev =
+      month === 0
+        ? { year: year - 1, monthIndex: 11 }
+        : { year, monthIndex: month - 1 };
+    return resolveMonthlyPeriod(prev.year, prev.monthIndex);
   }
   if (period.type === "trimester") {
-    // Month 8 (Sep) starts T1; month 0 (Jan) starts T2; month 4 (May) starts T3.
-    const month = start.getMonth();
+    const { month } = reportingDateParts(start);
     const ay = academicYearFor(start);
     if (month === 8) return resolveTrimesterPeriod({ trimester: 3, academicYear: ay - 1 });
     if (month === 0) return resolveTrimesterPeriod({ trimester: 1, academicYear: ay });
@@ -226,10 +266,43 @@ export function previousPeriodOf(
   }
   if (period.type === "custom") {
     const diff = period.endDate.getTime() - start.getTime();
+    const prevStart = new Date(start.getTime() - diff);
+    // ResolveCustomPeriod treats endDate as the LAST INCLUDED calendar day.
+    // The previous window must therefore end the day before the current start.
+    const sx = reportingDateParts(prevStart);
+    const sxAfter = reportingDateParts(start);
     return resolveCustomPeriod({
-      startDate: new Date(start.getTime() - diff),
-      endDate: new Date(start.getTime()),
+      startDate: new Date(sx.year, sx.month, sx.day),
+      endDate: new Date(sxAfter.year, sxAfter.month, sxAfter.day - 1),
     });
   }
   return null;
+}
+
+function daysInMonth(year: number, monthIndex: number): number {
+  return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+}
+
+/** Calendar helpers for the reporting timezone (used by filters/previews). */
+export function startOfMonthInReportingTz(
+  year: number,
+  monthIndex: number,
+): Date {
+  return buildReportingInstant(year, monthIndex, 1);
+}
+
+export function endOfMonthInReportingTz(
+  year: number,
+  monthIndex: number,
+): Date {
+  // Exclusive: first instant of the following month.
+  return buildReportingInstant(
+    monthIndex === 11 ? year + 1 : year,
+    (monthIndex + 1) % 12,
+    1,
+  );
+}
+
+export function daysInReportingMonth(year: number, monthIndex: number): number {
+  return daysInMonth(year, monthIndex);
 }

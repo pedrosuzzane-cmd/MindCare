@@ -18,18 +18,46 @@ const DEPARTMENT_FULL_NAMES: Record<string, string> = {
 // Legacy or non-standard codes that map onto the same department.
 const DEPARTMENT_CODE_ALIASES: Record<string, string> = {
   CN: "CON",
+  NCN: "CON",
+  "COLLEGE OF NURSING": "CON",
   CEA: "COE",
 };
 
 /**
+ * THE single department normalizer for analytics/reporting.
+ *
+ * Handle College of Nursing consistently: every occurrence — "CN", "NCN",
+ * "College of Nursing", "College of Nursing (NCN)" — must resolve to the
+ * canonical code "CON". It is never allowed to appear as "CN" or "NCN" in any
+ * department analytics/reporting output.
+ *
+ * Behavior:
+ *   - "College of Criminal Justice Education (CCJE)" -> "CCJE"
+ *   - "CN" / "NCN" / "College of Nursing (NCN)" / "College of Nursing" -> "CON"
+ *   - "College of Engineering (CEA)" -> "COE" (legacy alias)
+ *   - empty/blank input -> ""
+ *
+ * Apply this BEFORE filtering, grouping, counting, chart generation, narrative
+ * generation, Excel export, PDF export, student lookup and department
+ * analytics. Screens must not maintain their own variants.
+ */
+export function normalizeDepartment(department?: string | null): string {
+  const value = (department || "").trim().toUpperCase();
+  if (!value) return "";
+  const match = value.match(/\(([^)]+)\)/);
+  const raw = (match ? match[1] : value).trim().toUpperCase();
+  return DEPARTMENT_CODE_ALIASES[raw] ?? raw;
+}
+
+/**
  * Extracts the stable department code from a stored department string.
  * e.g. "College of Criminal Justice Education (CCJE)" -> "CCJE".
+ * Routes through `normalizeDepartment` so legacy aliases (CN/NCN/CEA) share a
+ * single normalization path with the reporting pipeline.
  * Falls back to the trimmed input when no parenthetical code is present.
  */
 export function getDepartmentCode(fullName: string): string {
-  const match = fullName.match(/\(([^)]+)\)/);
-  const raw = (match ? match[1] : fullName).trim().toUpperCase();
-  return DEPARTMENT_CODE_ALIASES[raw] ?? raw;
+  return normalizeDepartment(fullName);
 }
 
 /** Extracts the abbreviation from a stored department string (no normalization). */
