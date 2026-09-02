@@ -60,6 +60,7 @@ import { formatReportingDay } from "@/utils/reportCore";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import { createPortal } from "react-dom";
 import {
   collection,
   deleteDoc,
@@ -70,6 +71,7 @@ import {
 } from "firebase/firestore";
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -80,13 +82,15 @@ import {
   Alert,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   useWindowDimensions,
-  View
+  View,
+  type ViewStyle
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context"; // This was already correct
 
@@ -335,39 +339,339 @@ function toLocalDateInput(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-// ─── Reusable compact dropdown used by the "Report Filters" card ──────────────
+// ─── Report filter dropdown ────────────────────────────────────────────────
+// Open state is CONTROLLED by the parent (a single `openField` id), so opening
+// one menu always closes the previously-open one. On web the menu is portaled
+// into document.body: it escapes the ScrollView's overflow clipping and every
+// card stacking context, is positioned with `position: fixed` against the
+// trigger's viewport rect, and flips upward when there is not enough room
+// below. On native it falls back to an inline absolutely-positioned menu.
 interface ReportSelectOption {
   value: string;
   label: string;
 }
 
+const REPORT_MENU_MAX_HEIGHT = 300;
+
+type ReportAnchorRef = { current: View | null };
+
+// Align and size the menu to the trigger, keeping it inside the viewport.
+function measureMenuLayout(
+  anchor: View | null,
+  wide: boolean,
+  menuHeight: number,
+): { top: number; left: number; width: number } | null {
+  if (!anchor) return null;
+  const el = anchor as unknown as HTMLDivElement;
+  const r = el.getBoundingClientRect();
+  if (r.width === 0 && r.height === 0) return null;
+  const viewW = window.innerWidth;
+  const viewH = window.innerHeight;
+  const width = Math.min(Math.max(r.width, wide ? 320 : r.width), 380);
+  const left = Math.max(8, Math.min(r.left, viewW - width - 8));
+  const spaceBelow = viewH - r.bottom;
+  const spaceAbove = r.top;
+  const openUp = spaceBelow < REPORT_MENU_MAX_HEIGHT + 4 && spaceAbove >= spaceBelow;
+  const top =
+    openUp && menuHeight > 0
+      ? Math.max(8, r.top - menuHeight - 4)
+      : r.bottom + 4;
+  return { top, left, width };
+}
+
+// Position the portaled (web-only) menu. `position: "fixed"` and
+// `overflow: "auto"` are valid web values that the RN types do not know about,
+// so this passes through a cast instead of living in StyleSheet.create (a type
+// error there would taint every other style in the sheet).
+function portalMenuStyle(layout: { top: number; left: number; width: number }): ViewStyle {
+  return {
+    position: "fixed",
+    top: layout.top,
+    left: layout.left,
+    width: layout.width,
+    maxHeight: REPORT_MENU_MAX_HEIGHT,
+    overflow: "auto",
+  } as unknown as ViewStyle;
+}
+
+function ReportSelectOptions({
+  options,
+  value,
+  onSelect,
+  optionRefs,
+}: {
+  options: ReportSelectOption[];
+  value: string;
+  onSelect: (value: string) => void;
+  optionRefs?: { current: Array<HTMLDivElement | null> };
+}) {
+  return (
+    <>
+      {options.map((o, i) => {
+        const active = o.value === value;
+        return (
+          <Pressable
+            key={o.value}
+            ref={
+              optionRefs
+                ? (node) => {
+                    optionRefs.current[i] = node as unknown as HTMLDivElement;
+                  }
+                : undefined
+            }
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            style={({ pressed }) => [
+              styles.reportSelectOption,
+              active && styles.reportSelectOptionActive,
+              pressed && styles.reportSelectOptionPressed,
+            ]}
+            onPress={() => onSelect(o.value)}
+          >
+            <Text
+              style={[
+                styles.reportSelectOptionText,
+                active && styles.reportSelectOptionTextActive,
+              ]}
+              numberOfLines={1}
+            >
+              {o.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </>
+  );
+}
+
+// Web-only: renders the menu through a document.body portal so no ancestor can
+// clip it, with viewport-aware positioning, outside-click / scroll / resize
+// handling, direction flip, scrolling, and keyboard navigation.
+function ReportSelectMenu({
+  anchorRef,
+  options,
+  value,
+  wide,
+  onSelect,
+  onClose,
+}: {
+  anchorRef: ReportAnchorRef;
+  options: ReportSelectOption[];
+  value: string;
+  wide: boolean;
+  onSelect: (value: string) => void;
+  onClose: () => void;
+}) {
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const optionRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+
+  // Seeded synchronously so the menu never flashes at a wrong position.
+  const [layout, setLayout] = useState<{ top: number; left: number; width: number } | null>(
+    () => measureMenuLayout(anchorRef.current, wide, REPORT_MENU_MAX_HEIGHT),
+  );
+
+  // Re-anchor on scroll (capture-phase catches the RN-web ScrollView's inner
+  // scrolling) and on resize, and correct after the menu's real height is known.
+  useLayoutEffect(() => {
+    const update = () => {
+      const anchor = anchorRef.current;
+      if (!anchor) return;
+      const menuHeight = menuRef.current?.offsetHeight ?? REPORT_MENU_MAX_HEIGHT;
+      setLayout(measureMenuLayout(anchor, wide, menuHeight));
+    };
+    window.addEventListener("resize", update);
+    document.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      document.removeEventListener("scroll", update, true);
+    };
+  }, [anchorRef, wide]);
+
+  // Close when clicking outside the menu or its trigger. The trigger itself is
+  // skipped so toggling it keeps working (its own press handler closes).
+  useLayoutEffect(() => {
+    const onDocMouseDown = (e: MouseEvent) => {
+      const anchor = anchorRef.current as unknown as HTMLElement | null;
+      const menu = menuRef.current;
+      const target = e.target as Node | null;
+      if (menu && menu.contains(target)) return;
+      if (anchor && anchor.contains(target)) return;
+      onCloseRef.current();
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [anchorRef]);
+
+  // Keyboard: Escape closes; ArrowDown/ArrowUp/Home/End navigate options;
+  // Enter/Space selects the focused option. Only responds while focus is on the
+  // trigger or inside the menu.
+  useLayoutEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const anchor = anchorRef.current as unknown as HTMLElement | null;
+      const menu = menuRef.current;
+      const active = document.activeElement as HTMLElement | null;
+      const optionsRefs = optionRefs.current;
+      const focusInMenu = !!(menu && active && menu.contains(active));
+
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        onCloseRef.current();
+        anchor?.focus();
+        return;
+      }
+      if (!focusInMenu) {
+        if (!anchor || active !== anchor) return;
+        if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault();
+          const selectedIdx = Math.max(
+            0,
+            options.findIndex((o) => o.value === value),
+          );
+          optionsRefs[selectedIdx]?.focus({ preventScroll: true });
+        }
+        return;
+      }
+      const idx = optionsRefs.indexOf(active as HTMLDivElement);
+      const count = optionsRefs.length;
+      if (count === 0) return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        optionsRefs[(idx + 1) % count]?.focus({ preventScroll: true });
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        optionsRefs[(idx - 1 + count) % count]?.focus({ preventScroll: true });
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        optionsRefs[0]?.focus({ preventScroll: true });
+      } else if (e.key === "End") {
+        e.preventDefault();
+        optionsRefs[count - 1]?.focus({ preventScroll: true });
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        const o = options[Math.max(0, idx)];
+        if (o) {
+          onSelectRef.current(o.value);
+          onCloseRef.current();
+          anchor?.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [anchorRef, options, value]);
+
+  // Once the real menu height is known, reposition so an upward-opening menu
+  // hugs the trigger instead of floating at the assumed max height.
+  useLayoutEffect(() => {
+    const anchor = anchorRef.current;
+    const menu = menuRef.current;
+    if (!anchor || !menu) return;
+    const raf = window.requestAnimationFrame(() => {
+      const height = menu.offsetHeight;
+      if (height > 0 && height !== REPORT_MENU_MAX_HEIGHT) {
+        setLayout(measureMenuLayout(anchor, wide, height));
+      }
+    });
+    return () => window.cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Focus the selected option (or the first) on open, without scrolling the page.
+  useLayoutEffect(() => {
+    const selectedIdx = Math.max(0, options.findIndex((o) => o.value === value));
+    optionRefs.current[selectedIdx]?.focus({ preventScroll: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (!layout) return null;
+
+  return createPortal(
+    <View
+      ref={(node) => {
+        menuRef.current = node as unknown as HTMLDivElement;
+      }}
+      style={[styles.reportSelectMenuBase, portalMenuStyle(layout)]}
+    >
+      <ReportSelectOptions
+        options={options}
+        value={value}
+        optionRefs={optionRefs}
+        onSelect={(v) => {
+          onSelect(v);
+          onClose();
+        }}
+      />
+    </View>,
+    document.body,
+  );
+}
+
 function ReportSelectField({
+  id,
   label,
   placeholder,
   options,
   value,
   onSelect,
+  open,
+  onOpenChange,
+  wide = false,
 }: {
+  id: string;
   label: string;
   placeholder?: string;
   options: ReportSelectOption[];
   value: string;
   onSelect: (value: string) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  wide?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<View | null>(null);
   const selected = options.find((o) => o.value === value);
+  void id;
+
+  // While closed, allow the trigger to open via keyboard (Enter/Space/arrows).
+  useEffect(() => {
+    if (Platform.OS !== "web" || open) return;
+    const node = triggerRef.current as unknown as HTMLElement | null;
+    if (!node) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        onOpenChange(true);
+      }
+    };
+    node.addEventListener("keydown", onKey);
+    return () => node.removeEventListener("keydown", onKey);
+  }, [open, onOpenChange]);
+
   return (
-    <View style={styles.reportSelectField}>
+    <View style={[styles.reportSelectField, open && styles.reportSelectFieldOpen]}>
       <Text style={styles.reportLabel}>{label}</Text>
       <Pressable
-        style={styles.reportSelectTrigger}
-        onPress={() => setOpen((o) => !o)}
+        ref={triggerRef}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={`${label}: ${selected ? selected.label : "No selection"}`}
+        style={({ pressed }) => [
+          styles.reportSelectTrigger,
+          open && styles.reportSelectTriggerOpen,
+          pressed && styles.reportSelectTriggerPressed,
+        ]}
+        onPress={() => onOpenChange(!open)}
       >
         <Text
           style={[
             styles.reportSelectTriggerText,
-            !selected && { color: "#9CA3AF" },
+            !selected && styles.reportSelectTriggerPlaceholder,
           ]}
+          numberOfLines={1}
         >
           {selected ? selected.label : (placeholder ?? "Select…")}
         </Text>
@@ -377,34 +681,25 @@ function ReportSelectField({
           color="#5B21B6"
         />
       </Pressable>
-      {open ? (
-        <View style={styles.reportSelectList}>
-          {options.map((o) => {
-            const active = o.value === value;
-            return (
-              <Pressable
-                key={o.value}
-                style={[
-                  styles.reportSelectOption,
-                  active && styles.reportSelectOptionActive,
-                ]}
-                onPress={() => {
-                  onSelect(o.value);
-                  setOpen(false);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.reportSelectOptionText,
-                    active && styles.reportSelectOptionTextActive,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {o.label}
-                </Text>
-              </Pressable>
-            );
-          })}
+      {open && Platform.OS === "web" ? (
+        <ReportSelectMenu
+          anchorRef={triggerRef}
+          options={options}
+          value={value}
+          wide={wide}
+          onSelect={onSelect}
+          onClose={() => onOpenChange(false)}
+        />
+      ) : open ? (
+        <View style={[styles.reportSelectMenuBase, styles.reportSelectMenuInline]}>
+          <ReportSelectOptions
+            options={options}
+            value={value}
+            onSelect={(v) => {
+              onSelect(v);
+              onOpenChange(false);
+            }}
+          />
         </View>
       ) : null}
     </View>
@@ -690,6 +985,9 @@ export default function AdminPanelScreen() {
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportEmpty, setReportEmpty] = useState(false);
   const [reportExportOpen, setReportExportOpen] = useState(false);
+  // Single-source dropdown state: only one filter menu can be open at a time.
+  // Values: "period" | "academicYear" | "month" | "trimester" | "department".
+  const [reportFilterOpen, setReportFilterOpen] = useState<string | null>(null);
   const [reportAppliedChips, setReportAppliedChips] = useState<string[] | null>(null);
   const [isCreateAdminModalVisible, setCreateAdminModalVisible] =
     useState(false);
@@ -3406,6 +3704,7 @@ if (data.overview.totalStudents === 0) {
 
                     <View style={styles.reportFiltersGrid}>
                       <ReportSelectField
+                        id="period"
                         label="Period"
                         options={([
                           "weekly",
@@ -3428,18 +3727,29 @@ if (data.overview.totalStudents === 0) {
                         }))}
                         value={reportPeriodType}
                         onSelect={(v) => setReportPeriodType(v as ReportPeriodType)}
+                        open={reportFilterOpen === "period"}
+                        onOpenChange={(o) =>
+                          setReportFilterOpen(o ? "period" : null)
+                        }
                       />
                       <ReportSelectField
+                        id="academicYear"
                         label="Academic Year"
+                        placeholder="Select academic year…"
                         options={academicYears().map((y) => ({
                           value: String(y),
                           label: academicYearLabel(y),
                         }))}
                         value={String(reportYear)}
                         onSelect={(v) => setReportYear(Number(v))}
+                        open={reportFilterOpen === "academicYear"}
+                        onOpenChange={(o) =>
+                          setReportFilterOpen(o ? "academicYear" : null)
+                        }
                       />
                       {reportPeriodType === "monthly" ? (
                         <ReportSelectField
+                          id="month"
                           label="Month"
                           options={MONTH_NAMES.map((m, idx) => ({
                             value: String(idx),
@@ -3447,10 +3757,15 @@ if (data.overview.totalStudents === 0) {
                           }))}
                           value={String(reportMonth)}
                           onSelect={(v) => setReportMonth(Number(v))}
+                          open={reportFilterOpen === "month"}
+                          onOpenChange={(o) =>
+                            setReportFilterOpen(o ? "month" : null)
+                          }
                         />
                       ) : null}
                       {reportPeriodType === "trimester" ? (
                         <ReportSelectField
+                          id="trimester"
                           label="Trimester"
                           options={([1, 2, 3] as TrimesterNumber[]).map((s) => ({
                             value: String(s),
@@ -3465,9 +3780,14 @@ if (data.overview.totalStudents === 0) {
                           onSelect={(v) =>
                             setReportTrimester(Number(v) as TrimesterNumber)
                           }
+                          open={reportFilterOpen === "trimester"}
+                          onOpenChange={(o) =>
+                            setReportFilterOpen(o ? "trimester" : null)
+                          }
                         />
                       ) : null}
                       <ReportSelectField
+                        id="department"
                         label="Department / College"
                         options={[
                           { value: "all", label: "All Departments" },
@@ -3478,6 +3798,11 @@ if (data.overview.totalStudents === 0) {
                         ]}
                         value={reportDepartment}
                         onSelect={(v) => setReportDepartment(v)}
+                        open={reportFilterOpen === "department"}
+                        onOpenChange={(o) =>
+                          setReportFilterOpen(o ? "department" : null)
+                        }
+                        wide
                       />
                     </View>
 
@@ -6282,13 +6607,16 @@ const styles = StyleSheet.create({
     flexBasis: 220,
     minWidth: 200,
     position: "relative",
-    zIndex: 30,
+  },
+  reportSelectFieldOpen: {
+    zIndex: 40,
   },
   reportSelectTrigger: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 8,
+    minHeight: 44,
     borderWidth: 1,
     borderColor: "#D8C7F5",
     borderRadius: 10,
@@ -6296,30 +6624,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 11,
   },
+  reportSelectTriggerOpen: {
+    borderColor: "#7C3AED",
+    backgroundColor: "#F3EDFF",
+  },
+  reportSelectTriggerPressed: {
+    opacity: 0.85,
+  },
   reportSelectTriggerText: {
     color: "#5B21B6",
     fontSize: 14,
     fontWeight: "700",
     flexShrink: 1,
   },
-  reportSelectList: {
-    position: "absolute",
-    zIndex: 50,
-    top: "100%",
-    left: 0,
-    right: 0,
-    marginTop: 4,
+  reportSelectTriggerPlaceholder: {
+    color: "#9CA3AF",
+    fontWeight: "600",
+  },
+  reportSelectMenuBase: {
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#D8C7F5",
     backgroundColor: "#FFFFFF",
     shadowColor: "#000000",
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
     paddingVertical: 4,
-    maxHeight: 240,
+    maxHeight: REPORT_MENU_MAX_HEIGHT,
+  },
+  reportSelectMenuInline: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
+    marginTop: 4,
+    zIndex: 50,
+    overflow: "scroll",
   },
   reportSelectOption: {
     paddingHorizontal: 12,
@@ -6328,6 +6670,9 @@ const styles = StyleSheet.create({
   },
   reportSelectOptionActive: {
     backgroundColor: "#F3EDFF",
+  },
+  reportSelectOptionPressed: {
+    backgroundColor: "#EDE4FF",
   },
   reportSelectOptionText: {
     color: "#374151",
@@ -7832,3 +8177,4 @@ const styles = StyleSheet.create({
     color: "#64748B",
   },
 });
+
