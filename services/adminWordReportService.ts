@@ -509,8 +509,12 @@ export function generateWordNarrativeReport(
       <div class="kpi-label">Total Students</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-value">${esc(o.totalAssessments)}</div>
-      <div class="kpi-label">Assessments</div>
+      <div class="kpi-value">${esc(o.activeStudents)}</div>
+      <div class="kpi-label">Active Students</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-value">${esc(o.assessed)}</div>
+      <div class="kpi-label">Students Assessed</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-value">${esc(cd.low)}</div>
@@ -760,7 +764,8 @@ export function generatePdfReportHtml(report: ReportData): string {
   <h2>Executive Summary</h2>
   <div class="kpi-grid">
     <div class="kpi-card"><div class="kpi-value">${esc(o.totalStudents)}</div><div class="kpi-label">Total Students</div></div>
-    <div class="kpi-card"><div class="kpi-value">${esc(o.totalAssessments)}</div><div class="kpi-label">Assessments</div></div>
+    <div class="kpi-card"><div class="kpi-value">${esc(o.activeStudents)}</div><div class="kpi-label">Active Students</div></div>
+    <div class="kpi-card"><div class="kpi-value">${esc(o.assessed)}</div><div class="kpi-label">Students Assessed</div></div>
     <div class="kpi-card"><div class="kpi-value">${esc(cd.high)}</div><div class="kpi-label">High Concern</div></div>
     <div class="kpi-card"><div class="kpi-value">${esc(cd.medium)}</div><div class="kpi-label">Medium Concern</div></div>
     <div class="kpi-card"><div class="kpi-value">${esc(cd.low)}</div><div class="kpi-label">Low Concern</div></div>

@@ -42,6 +42,7 @@ import {
 import {
   generateReportData,
   type ReportData,
+  type TrendRow,
 } from "@/services/reportingService";
 import {
   academicYears,
@@ -334,6 +335,180 @@ function toLocalDateInput(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+// ─── Reusable compact dropdown used by the "Report Filters" card ──────────────
+interface ReportSelectOption {
+  value: string;
+  label: string;
+}
+
+function ReportSelectField({
+  label,
+  placeholder,
+  options,
+  value,
+  onSelect,
+}: {
+  label: string;
+  placeholder?: string;
+  options: ReportSelectOption[];
+  value: string;
+  onSelect: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((o) => o.value === value);
+  return (
+    <View style={styles.reportSelectField}>
+      <Text style={styles.reportLabel}>{label}</Text>
+      <Pressable
+        style={styles.reportSelectTrigger}
+        onPress={() => setOpen((o) => !o)}
+      >
+        <Text
+          style={[
+            styles.reportSelectTriggerText,
+            !selected && { color: "#9CA3AF" },
+          ]}
+        >
+          {selected ? selected.label : (placeholder ?? "Select…")}
+        </Text>
+        <Ionicons
+          name={open ? "chevron-up" : "chevron-down"}
+          size={16}
+          color="#5B21B6"
+        />
+      </Pressable>
+      {open ? (
+        <View style={styles.reportSelectList}>
+          {options.map((o) => {
+            const active = o.value === value;
+            return (
+              <Pressable
+                key={o.value}
+                style={[
+                  styles.reportSelectOption,
+                  active && styles.reportSelectOptionActive,
+                ]}
+                onPress={() => {
+                  onSelect(o.value);
+                  setOpen(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.reportSelectOptionText,
+                    active && styles.reportSelectOptionTextActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {o.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+// ─── Active-filter summary chips for the report preview ───────────────────────
+function buildAppliedFilterChips(
+  periodType: ReportPeriodType,
+  month: number,
+  trimester: TrimesterNumber,
+  year: number,
+  weekStart: Date,
+  customStart: Date,
+  customEnd: Date,
+  departmentCode: string,
+  departments: { code: string; name: string }[],
+): string[] {
+  let periodParts: string[];
+  switch (periodType) {
+    case "weekly":
+      periodParts = ["Weekly", resolveWeeklyPeriod(weekStart).label];
+      break;
+    case "monthly":
+      periodParts = ["Monthly", `${MONTH_NAMES[month]} ${year}`];
+      break;
+    case "trimester":
+      periodParts = [
+        "Trimester",
+        `${trimester === 1 ? "1st" : trimester === 2 ? "2nd" : "3rd"} Trimester`,
+      ];
+      break;
+    case "annual":
+      periodParts = ["Annual"];
+      break;
+    case "custom":
+      periodParts = [
+        "Custom",
+        `${toLocalDateInput(customStart)} – ${toLocalDateInput(customEnd)}`,
+      ];
+      break;
+    default:
+      periodParts = [periodType];
+  }
+  const deptPart =
+    departmentCode === "all"
+      ? "All Departments"
+      : departments.find((d) => d.code === departmentCode)?.code ??
+        departmentCode;
+  return [...periodParts, academicYearLabel(year), deptPart];
+}
+
+// ─── Dynamic preview title derived from the ACTIVE FILTERS ────────────────────
+function reportPreviewTitle(
+  reportData: ReportData,
+): string {
+  const start = reportData.dateRange.startDate;
+  const startLabel = formatReportingDay(start, {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  const deptSuffix = reportData.departmentFilter
+    ? ` — ${reportData.departmentFilter.code}`
+    : "";
+  const ay = reportData.academicYearLabel;
+  switch (reportData.periodType) {
+    case "weekly":
+      return `${startLabel} Weekly Wellness Report${deptSuffix}`;
+    case "monthly":
+      return `${formatReportingDay(start, { month: "long", year: "numeric" })} Wellness Report${deptSuffix}`;
+    case "trimester":
+      return `${reportData.trimesterLabel ?? "Trimester"} ${ay} Wellness Report${deptSuffix}`;
+    case "annual":
+      return `Academic Year ${ay} Wellness Report${deptSuffix}`;
+    case "custom":
+      return `${startLabel} – ${formatReportingDay(
+        new Date(reportData.dateRange.endDate.getTime() - 1),
+        { month: "long", day: "numeric", year: "numeric" },
+      )} Wellness Report${deptSuffix}`;
+    default:
+      return `${reportData.periodLabel} Wellness Report${deptSuffix}`;
+  }
+}
+
+// ─── Change badge for the previous-period comparison ──────────────────────────
+function comparisonChangeLabel(row: TrendRow): {
+  text: string;
+  tone: string;
+} {
+  if (row.previous === 0 && row.current === 0) {
+    return { text: "—", tone: "muted" };
+  }
+  if (row.previous === 0) {
+    return { text: `+${row.current} (New)`, tone: "up" };
+  }
+  const diff = row.current - row.previous;
+  if (diff === 0) return { text: "no change", tone: "muted" };
+  return {
+    text: `${diff > 0 ? "+" : ""}${diff} (${Math.abs(row.changePct)}%)`,
+    tone: diff > 0 ? "up" : "down",
+  };
+}
+
 // ─── Pressable state that also exposes web hover/focus states ───────────────
 type WebPressableState = {
   pressed: boolean;
@@ -513,6 +688,9 @@ export default function AdminPanelScreen() {
   const [reportGenerating, setReportGenerating] = useState(false);
   const [reportStatus, setReportStatus] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [reportEmpty, setReportEmpty] = useState(false);
+  const [reportExportOpen, setReportExportOpen] = useState(false);
+  const [reportAppliedChips, setReportAppliedChips] = useState<string[] | null>(null);
   const [isCreateAdminModalVisible, setCreateAdminModalVisible] =
     useState(false);
   const [newAdminName, setNewAdminName] = useState("");
@@ -1548,8 +1726,8 @@ export default function AdminPanelScreen() {
 
     setReportGenerating(true);
     setReportError(null);
-    setReportStatus("Generating report...");
-    setReportData(null);
+    setReportEmpty(false);
+    setReportStatus("Updating report...");
     try {
       let period;
       if (reportPeriodType === "weekly") {
@@ -1580,27 +1758,76 @@ export default function AdminPanelScreen() {
         departmentCode:
           reportDepartment === "all" ? undefined : reportDepartment,
       });
-      if (data.overview.totalStudents === 0) {
+if (data.overview.totalStudents === 0) {
+        // Distinguish a genuinely empty period (no qualifying records) from a
+        // failure: both clear the dataset, but the UI renders a dedicated
+        // empty state instead of misleading zeros or an error.
         setReportData(null);
-        setReportError("No data available for the selected reporting period.");
+        setReportEmpty(true);
+        setReportAppliedChips(
+          buildAppliedFilterChips(
+            reportPeriodType,
+            reportMonth,
+            reportTrimester,
+            reportYear,
+            reportWeekStart,
+            reportCustomStart,
+            reportCustomEnd,
+            reportDepartment,
+            reportDepartments,
+          ),
+        );
         setReportStatus(null);
-        setReportGenerating(false);
         return;
       }
+      // Keep the previous dataset untouched while this one loads; it is swapped
+      // only on success so stale metrics never appear as the new filter set.
       setReportData(data);
+      setReportAppliedChips(
+        buildAppliedFilterChips(
+          reportPeriodType,
+          reportMonth,
+          reportTrimester,
+          reportYear,
+          reportWeekStart,
+          reportCustomStart,
+          reportCustomEnd,
+          reportDepartment,
+          reportDepartments,
+        ),
+      );
       setReportStatus(null);
     } catch (err) {
       console.error("Report generation failed:", err);
       setReportData(null);
-      setReportError(
-        err instanceof Error
-          ? err.message
-          : "Unable to generate the report. Please try again.",
-      );
+      setReportAppliedChips(null);
+      setReportError("Unable to generate report. Please try again.");
       setReportStatus(null);
     } finally {
       setReportGenerating(false);
     }
+  };
+
+  // Restores the default report filters and regenerates the preview without
+  // touching any unrelated application state.
+  const handleResetReport = () => {
+    setReportPeriodType("monthly");
+    setReportYear(academicYearFor(new Date()));
+    setReportMonth(new Date().getMonth());
+    const week = new Date();
+    week.setHours(0, 0, 0, 0);
+    setReportWeekStart(week);
+    setReportTrimester(1);
+    setReportDepartment("all");
+    const start = new Date();
+    start.setDate(1);
+    start.setHours(0, 0, 0, 0);
+    setReportCustomStart(start);
+    const end = new Date();
+    end.setHours(0, 0, 0, 0);
+    setReportCustomEnd(end);
+    setReportExportOpen(false);
+    handleGenerateReport();
   };
 
   const handleExportReportExcel = async () => {
@@ -3169,37 +3396,27 @@ export default function AdminPanelScreen() {
                 <>
                   <View style={styles.lookupCard}>
                     <View style={styles.lookupHeader}>
-                      <Text style={styles.sectionTitle}>
-                        Generate Administrative Report
-                      </Text>
+                      <Text style={styles.sectionTitle}>Report Filters</Text>
+                      <Ionicons
+                        name="options-outline"
+                        size={18}
+                        color={ADMIN_COLORS.purple}
+                      />
                     </View>
 
-                    <View style={styles.reportPeriodRow}>
-                      {(
-                        [
+                    <View style={styles.reportFiltersGrid}>
+                      <ReportSelectField
+                        label="Period"
+                        options={([
                           "weekly",
                           "monthly",
                           "trimester",
                           "annual",
                           "custom",
-                        ] as ReportPeriodType[]
-                      ).map((t) => (
-                        <Pressable
-                          key={t}
-                          style={[
-                            styles.reportPeriodChip,
-                            reportPeriodType === t && styles.reportPeriodChipActive,
-                          ]}
-                          onPress={() => setReportPeriodType(t)}
-                        >
-                          <Text
-                            style={[
-                              styles.reportPeriodChipText,
-                              reportPeriodType === t &&
-                                styles.reportPeriodChipTextActive,
-                            ]}
-                          >
-                            {t === "weekly"
+                        ] as ReportPeriodType[]).map((t) => ({
+                          value: t,
+                          label:
+                            t === "weekly"
                               ? "Weekly"
                               : t === "monthly"
                                 ? "Monthly"
@@ -3207,36 +3424,61 @@ export default function AdminPanelScreen() {
                                   ? "By Trimester"
                                   : t === "annual"
                                     ? "Annual"
-                                    : "Custom"}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-
-                    <View style={styles.reportField}>
-                      <Text style={styles.reportLabel}>Academic Year</Text>
-                      <View style={styles.reportPickerRow}>
-                        {academicYears().map((y) => (
-                          <Pressable
-                            key={y}
-                            style={[
-                              styles.reportOption,
-                              reportYear === y && styles.reportPeriodChipActive,
-                            ]}
-                            onPress={() => setReportYear(y)}
-                          >
-                            <Text
-                              style={[
-                                styles.reportOptionText,
-                                reportYear === y &&
-                                  styles.reportPeriodChipTextActive,
-                              ]}
-                            >
-                              {academicYearLabel(y)}
-                            </Text>
-                          </Pressable>
-                        ))}
-                      </View>
+                                    : "Custom",
+                        }))}
+                        value={reportPeriodType}
+                        onSelect={(v) => setReportPeriodType(v as ReportPeriodType)}
+                      />
+                      <ReportSelectField
+                        label="Academic Year"
+                        options={academicYears().map((y) => ({
+                          value: String(y),
+                          label: academicYearLabel(y),
+                        }))}
+                        value={String(reportYear)}
+                        onSelect={(v) => setReportYear(Number(v))}
+                      />
+                      {reportPeriodType === "monthly" ? (
+                        <ReportSelectField
+                          label="Month"
+                          options={MONTH_NAMES.map((m, idx) => ({
+                            value: String(idx),
+                            label: m,
+                          }))}
+                          value={String(reportMonth)}
+                          onSelect={(v) => setReportMonth(Number(v))}
+                        />
+                      ) : null}
+                      {reportPeriodType === "trimester" ? (
+                        <ReportSelectField
+                          label="Trimester"
+                          options={([1, 2, 3] as TrimesterNumber[]).map((s) => ({
+                            value: String(s),
+                            label:
+                              s === 1
+                                ? "1st Trimester"
+                                : s === 2
+                                  ? "2nd Trimester"
+                                  : "3rd Trimester",
+                          }))}
+                          value={String(reportTrimester)}
+                          onSelect={(v) =>
+                            setReportTrimester(Number(v) as TrimesterNumber)
+                          }
+                        />
+                      ) : null}
+                      <ReportSelectField
+                        label="Department / College"
+                        options={[
+                          { value: "all", label: "All Departments" },
+                          ...reportDepartments.map((d) => ({
+                            value: d.code,
+                            label: `${d.code} — ${d.name}`,
+                          })),
+                        ]}
+                        value={reportDepartment}
+                        onSelect={(v) => setReportDepartment(v)}
+                      />
                     </View>
 
                     {reportPeriodType === "weekly" && (
@@ -3272,67 +3514,6 @@ export default function AdminPanelScreen() {
                             <Text style={styles.reportWeekBtnText}>Next Week</Text>
                             <Ionicons name="chevron-forward" size={16} color="#5B21B6" />
                           </Pressable>
-                        </View>
-                      </View>
-                    )}
-
-                    {reportPeriodType === "monthly" && (
-                      <View style={styles.reportField}>
-                        <Text style={styles.reportLabel}>Month</Text>
-                        <View style={styles.reportPickerRow}>
-                          {MONTH_NAMES.map((m, idx) => (
-                            <Pressable
-                              key={m}
-                              style={[
-                                styles.reportOption,
-                                reportMonth === idx && styles.reportPeriodChipActive,
-                              ]}
-                              onPress={() => setReportMonth(idx)}
-                            >
-                              <Text
-                                style={[
-                                  styles.reportOptionText,
-                                  reportMonth === idx &&
-                                    styles.reportPeriodChipTextActive,
-                                ]}
-                              >
-                                {m}
-                              </Text>
-                            </Pressable>
-                          ))}
-                        </View>
-                      </View>
-                    )}
-
-                    {reportPeriodType === "trimester" && (
-                      <View style={styles.reportField}>
-                        <Text style={styles.reportLabel}>Trimester</Text>
-                        <View style={styles.reportPickerRow}>
-                          {([1, 2, 3] as const).map((s) => (
-                            <Pressable
-                              key={s}
-                              style={[
-                                styles.reportOption,
-                                reportTrimester === s &&
-                                  styles.reportPeriodChipActive,
-                              ]}
-                              onPress={() => setReportTrimester(s)}
-                            >
-                              <Text
-                                style={[
-                                  styles.reportOptionText,
-                                  reportTrimester === s &&
-                                    styles.reportPeriodChipTextActive,
-                                ]}
-                              >
-                                {s === 1
-                                  ? "1st Trimester"
-                                  : s === 2
-                                    ? "2nd Trimester"
-                                    : "3rd Trimester"}
-                              </Text>
-                            </Pressable>
-                          ))}
                         </View>
                       </View>
                     )}
@@ -3380,73 +3561,54 @@ export default function AdminPanelScreen() {
                       </View>
                     )}
 
-                    <View style={styles.reportField}>
-                      <Text style={styles.reportLabel}>
-                        Department / College
-                      </Text>
-                      <View style={styles.reportPickerRow}>
-                        <Pressable
-                          style={[
-                            styles.reportOption,
-                            reportDepartment === "all" &&
-                              styles.reportPeriodChipActive,
-                          ]}
-                          onPress={() => setReportDepartment("all")}
-                        >
-                          <Text
-                            style={[
-                              styles.reportOptionText,
-                              reportDepartment === "all" &&
-                                styles.reportPeriodChipTextActive,
-                            ]}
-                          >
-                            All Departments
-                          </Text>
-                        </Pressable>
-                        {reportDepartments.map((d) => (
-                          <Pressable
-                            key={d.code}
-                            style={[
-                              styles.reportOption,
-                              reportDepartment === d.code &&
-                                styles.reportPeriodChipActive,
-                            ]}
-                            onPress={() => setReportDepartment(d.code)}
-                          >
-                            <Text
-                              style={[
-                                styles.reportOptionText,
-                                reportDepartment === d.code &&
-                                  styles.reportPeriodChipTextActive,
-                              ]}
-                            >
-                              {d.code}
-                            </Text>
-                          </Pressable>
-                        ))}
-                      </View>
+                    <View style={styles.reportActionsRow}>
+                      <Pressable
+                        style={({ pressed }) => [
+                          styles.generateReportBtn,
+                          reportGenerating && { opacity: 0.6 },
+                          pressed && { opacity: 0.85 },
+                        ]}
+                        disabled={reportGenerating}
+                        onPress={handleGenerateReport}
+                      >
+                        <Ionicons name="filter-outline" size={18} color="#FFFFFF" />
+                        <Text style={styles.generateReportBtnText}>
+                          {reportGenerating ? "Updating..." : "Apply Filters"}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        style={({ pressed }) => [
+                          styles.resetReportBtn,
+                          reportGenerating && { opacity: 0.6 },
+                          pressed && { opacity: 0.85 },
+                        ]}
+                        disabled={reportGenerating}
+                        onPress={handleResetReport}
+                      >
+                        <Ionicons name="refresh-outline" size={18} color="#7C3AED" />
+                        <Text style={styles.resetReportBtnText}>Reset Filters</Text>
+                      </Pressable>
                     </View>
-
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.generateReportBtn,
-                        reportGenerating && { opacity: 0.6 },
-                        pressed && { opacity: 0.85 },
-                      ]}
-                      disabled={reportGenerating}
-                      onPress={handleGenerateReport}
-                    >
-                      <Ionicons name="create-outline" size={18} color="#FFFFFF" />
-                      <Text style={styles.generateReportBtnText}>
-                        {reportGenerating ? "Generating..." : "Generate Report"}
-                      </Text>
-                    </Pressable>
 
                     {reportStatus ? (
                       <Text style={styles.reportStatus}>{reportStatus}</Text>
                     ) : null}
-                    {reportError ? (
-                      <Text style={styles.reportError}>{reportError}</Text>
+
+                    {reportAppliedChips && reportAppliedChips.length > 0 ? (
+                      <View style={styles.activeFiltersRow}>
+                        <Text style={styles.activeFiltersLabel}>
+                          Active filters:
+                        </Text>
+                        <View style={styles.activeFiltersWrap}>
+                          {reportAppliedChips.map((c) => (
+                            <View key={c} style={styles.activeFilterChip}>
+                              <Text style={styles.activeFilterChipText}>
+                                {c}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
                     ) : null}
                   </View>
 
@@ -3454,12 +3616,35 @@ export default function AdminPanelScreen() {
                     <View style={[styles.lookupCard, { marginTop: 16 }]}>
                       <View style={styles.lookupHeader}>
                         <Text style={styles.sectionTitle}>
-                          Report Preview — {reportData.periodLabel}
+                          {reportPreviewTitle(reportData)}
                         </Text>
+                        {reportGenerating ? (
+                          <View style={styles.previewPendingBadge}>
+                            <Ionicons
+                              name="hourglass-outline"
+                              size={13}
+                              color="#5B21B6"
+                            />
+                            <Text style={styles.previewPendingText}>
+                              Updating…
+                            </Text>
+                          </View>
+                        ) : null}
                       </View>
+                      {reportGenerating ? (
+                        <Text style={styles.reportUpdatingNote}>
+                          Updating report… Loading latest data for the selected
+                          filters.
+                        </Text>
+                      ) : null}
 
                       {/* ─── REPORT SCOPE (auditable) ─────────────────────── */}
-                      <View style={styles.reportScopeBox}>
+                      <View
+                        style={[
+                          styles.reportScopeBox,
+                          reportGenerating && styles.reportStale,
+                        ]}
+                      >
                         <Text style={styles.reportScopeTitle}>REPORT SCOPE</Text>
                         {(() => {
                           const dq = reportData.dataQuality;
@@ -3471,7 +3656,7 @@ export default function AdminPanelScreen() {
                                 : reportData.periodType === "monthly"
                                   ? "Monthly"
                                   : reportData.periodType === "trimester"
-                                    ? "By Trimester"
+                                    ? "Trimester"
                                     : reportData.periodType === "annual"
                                       ? "Annual"
                                       : "Custom"}`,
@@ -3487,7 +3672,7 @@ export default function AdminPanelScreen() {
                               reportData.academicYearLabel,
                             ],
                             [
-                              "Trimester",
+                              "Academic Trimester",
                               reportData.periodType === "monthly" ||
                               reportData.periodType === "weekly"
                                 ? `${reportData.trimesterLabel ?? "—"} (derived from selected month/week)`
@@ -3499,8 +3684,12 @@ export default function AdminPanelScreen() {
                                 "All Departments",
                             ],
                             [
-                              "Covered Records",
-                              `${dq.valid} valid`,
+                              "Population",
+                              `${reportData.overview.totalStudents} students`,
+                            ],
+                            [
+                              "Active Students",
+                              `${reportData.overview.activeStudents} students`,
                             ],
                           ];
                           return (
@@ -3541,117 +3730,221 @@ export default function AdminPanelScreen() {
                         })()}
                       </View>
 
-                      <View style={styles.reportPreviewGrid}>
-                        {[
-                          ["Total Students", reportData.overview.totalStudents],
-                          ["Assessments", reportData.overview.totalAssessments],
-                          ["Low Concern", reportData.concernDistribution.low],
+                      {/* ─── KPI GRID (7 cards) ─────────────────────────── */}
+                      <View
+                        style={[
+                          styles.reportPreviewGrid,
+                          reportGenerating && styles.reportStale,
+                        ]}
+                      >
+                        {(
                           [
-                            "Medium Concern",
-                            reportData.concernDistribution.medium,
-                          ],
-                          ["High Concern", reportData.concernDistribution.high],
-                          ["Attention Required", reportData.attentionRequired.count],
-                        ].map(([label, value]) => (
+                            { label: "Total Students", value: reportData.overview.totalStudents, icon: "people-outline" },
+                            { label: "Active Students", value: reportData.overview.activeStudents, icon: "pulse-outline" },
+                            { label: "Students Assessed", value: reportData.overview.assessed, icon: "clipboard-outline" },
+                            { label: "Low Concern", value: reportData.concernDistribution.low, icon: "leaf-outline" },
+                            { label: "Medium Concern", value: reportData.concernDistribution.medium, icon: "warning-outline" },
+                            { label: "High Concern", value: reportData.concernDistribution.high, icon: "alert-circle-outline" },
+                            { label: "Attention Required", value: reportData.attentionRequired.count, icon: "flag-outline" },
+                          ] as {
+                            label: string;
+                            value: number;
+                            icon: keyof typeof Ionicons.glyphMap;
+                          }[]
+                        ).map((card) => (
                           <View
-                            key={label as string}
+                            key={card.label}
                             style={styles.reportPreviewItem}
                           >
+                            <Ionicons
+                              name={card.icon}
+                              size={16}
+                              color="#7C3AED"
+                            />
                             <Text style={styles.reportPreviewValue}>
-                              {value}
+                              {card.value}
                             </Text>
                             <Text style={styles.reportPreviewLabel}>
-                              {label}
+                              {card.label}
                             </Text>
                           </View>
                         ))}
                       </View>
 
+                      {/* ─── CONCERN DISTRIBUTION (compact cards) ───────── */}
                       <Text style={styles.reportSubsectionTitle}>
                         Concern Distribution
                       </Text>
-                      <View style={styles.concernBars}>
-                        {(
-                          [
-                            ["High", reportData.concernDistribution.high, "#DC2626"],
+                      {reportData.overview.assessed > 0 ? (
+                        <View
+                          style={[
+                            styles.concernCards,
+                            reportGenerating && styles.reportStale,
+                          ]}
+                        >
+                          {(
                             [
-                              "Medium",
-                              reportData.concernDistribution.medium,
-                              "#EAB308",
-                            ],
-                            ["Low", reportData.concernDistribution.low, "#16A34A"],
-                          ] as [string, number, string][]
-                        ).map(([label, count, color]) => {
-                          const total =
-                            reportData.concernDistribution.low +
-                            reportData.concernDistribution.medium +
-                            reportData.concernDistribution.high;
-                          const widthPct =
-                            total > 0 ? Math.max((count / total) * 100, 2) : 0;
-                          return (
-                            <View key={label} style={styles.concernBarRow}>
-                              <Text style={styles.concernBarLabel}>{label}</Text>
-                              <View style={styles.concernBarTrack}>
+                              { label: "High Concern", count: reportData.concernDistribution.high, color: "#DC2626" },
+                              { label: "Medium Concern", count: reportData.concernDistribution.medium, color: "#EAB308" },
+                              { label: "Low Concern", count: reportData.concernDistribution.low, color: "#16A34A" },
+                            ] as {
+                              label: string;
+                              count: number;
+                              color: string;
+                            }[]
+                          ).map(({ label, count, color }) => {
+                            const assessed = reportData.overview.assessed;
+                            const pct =
+                              assessed > 0
+                                ? Math.round((count / assessed) * 100)
+                                : 0;
+                            return (
+                              <View key={label} style={styles.concernCard}>
                                 <View
                                   style={[
-                                    styles.concernBarFill,
-                                    {
-                                      width: `${widthPct}%`,
-                                      backgroundColor: color,
-                                    },
+                                    styles.concernCardDot,
+                                    { backgroundColor: color },
                                   ]}
                                 />
+                                <Text style={styles.concernCardLabel}>
+                                  {label}
+                                </Text>
+                                <Text style={styles.concernCardValue}>
+                                  {count}
+                                </Text>
+                                <Text style={styles.concernCardPct}>
+                                  {pct}% of assessed
+                                </Text>
                               </View>
-                              <Text style={styles.concernBarValue}>{count}</Text>
-                            </View>
-                          );
-                        })}
+                            );
+                          })}
+                        </View>
+                      ) : (
+                        <View style={styles.reportEmptyInline}>
+                          <Ionicons
+                            name="document-outline"
+                            size={20}
+                            color="#9CA3AF"
+                          />
+                          <Text style={styles.reportEmptyInlineText}>
+                            No assessment data available for this reporting
+                            period.
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* ─── ACTIVITY IN PERIOD ─────────────────────────── */}
+                      <Text style={styles.reportSubsectionTitle}>
+                        Activity in Period
+                      </Text>
+                      <View
+                        style={[
+                          styles.activityRows,
+                          reportGenerating && styles.reportStale,
+                        ]}
+                      >
+                        {(
+                          [
+                            { label: "Assessments (records)", value: reportData.overview.totalAssessments },
+                            { label: "Mood Entries", value: reportData.overview.totalMoodEntries },
+                            { label: "Journal Entries", value: reportData.overview.totalJournals },
+                            { label: "Survey Responses", value: reportData.overview.totalSurveys },
+                          ] as { label: string; value: number }[]
+                        ).map((row) => (
+                          <View key={row.label} style={styles.activityRow}>
+                            <Ionicons
+                              name="disc-outline"
+                              size={14}
+                              color="#8B5CF6"
+                              style={styles.activityRowIcon}
+                            />
+                            <Text style={styles.activityRowLabel}>
+                              {row.label}
+                            </Text>
+                            <Text style={styles.activityRowValue}>
+                              {row.value}
+                            </Text>
+                          </View>
+                        ))}
                       </View>
 
-                      {reportData.trendComparison.length > 0 && (
+                      {/* ─── COMPARISON vs PREVIOUS PERIOD ─────────────── */}
+                      {reportData.trendComparison.length > 0 ? (
                         <>
                           <Text style={styles.reportSubsectionTitle}>
                             Comparison vs Previous Period
                           </Text>
-                          <View style={styles.comparisonTable}>
-                            {reportData.trendComparison.map((t) => (
-                              <View
-                                key={t.label}
-                                style={styles.comparisonRow}
-                              >
-                                <Text style={styles.comparisonMetric}>
-                                  {t.label}
-                                </Text>
-                                <Text style={styles.comparisonValue}>
-                                  {t.current}
-                                  {t.comparable && t.changePct !== 0 ? (
-                                    <Text
-                                      style={[
-                                        styles.comparisonDelta,
-                                        { color: t.direction === "up" ? "#DC2626" : "#16A34A" },
-                                      ]}
-                                    >
-                                      {" "}
-                                      {t.direction === "up" ? "▲" : "▼"}{" "}
-                                      {Math.abs(t.changePct)}%
-                                    </Text>
-                                  ) : null}
-                                </Text>
-                                <Text style={styles.comparisonPrev}>
-                                  prev: {t.previous}
-                                </Text>
-                              </View>
-                            ))}
+                          <Text style={styles.reportSubsectionCaption}>
+                            {reportData.previousPeriod?.label ??
+                              "Previous period"}
+                          </Text>
+                          <View
+                            style={[
+                              styles.comparisonTable,
+                              reportGenerating && styles.reportStale,
+                            ]}
+                          >
+                            <View style={styles.comparisonHeader}>
+                              <Text style={styles.comparisonHeaderMetric}>
+                                Metric
+                              </Text>
+                              <Text style={styles.comparisonHeaderValue}>
+                                Current
+                              </Text>
+                              <Text style={styles.comparisonHeaderValue}>
+                                Previous
+                              </Text>
+                              <Text style={styles.comparisonHeaderChange}>
+                                Change
+                              </Text>
+                            </View>
+                            {reportData.trendComparison.map((t) => {
+                              const change = comparisonChangeLabel(t);
+                              return (
+                                <View
+                                  key={t.label}
+                                  style={styles.comparisonRow}
+                                >
+                                  <Text style={styles.comparisonMetric}>
+                                    {t.label}
+                                  </Text>
+                                  <Text style={styles.comparisonValue}>
+                                    {t.current}
+                                  </Text>
+                                  <Text style={styles.comparisonPrev}>
+                                    {t.previous}
+                                  </Text>
+                                  <Text
+                                    style={[
+                                      styles.comparisonChange,
+                                      change.tone === "up" && {
+                                        color: "#DC2626",
+                                      },
+                                      change.tone === "down" && {
+                                        color: "#16A34A",
+                                      },
+                                      change.tone === "muted" && {
+                                        color: "#9CA3AF",
+                                      },
+                                    ]}
+                                  >
+                                    {change.text}
+                                  </Text>
+                                </View>
+                              );
+                            })}
                           </View>
                         </>
-                      )}
+                      ) : null}
+
+                      {/* ─── EXPORT DROPDOWN ───────────────────────────── */}
                       <View style={styles.exportActionsRow}>
                         <Pressable
                           style={({ pressed }) => [
                             styles.exportButton,
                             pressed && { opacity: 0.85 },
                           ]}
-                          onPress={handleExportReportExcel}
+                          onPress={() => setReportExportOpen((o) => !o)}
                         >
                           <Ionicons
                             name="download-outline"
@@ -3659,44 +3952,111 @@ export default function AdminPanelScreen() {
                             color="#FFFFFF"
                           />
                           <Text style={styles.exportButtonText}>
-                            Export Excel Workbook
+                            Export Report
                           </Text>
-                        </Pressable>
-                        <Pressable
-                          style={({ pressed }) => [
-                            styles.exportButtonSecondary,
-                            pressed && { opacity: 0.7 },
-                          ]}
-                          onPress={handleExportReportNarrative}
-                        >
                           <Ionicons
-                            name="document-text-outline"
-                            size={18}
-                            color="#7C3AED"
+                            name={reportExportOpen ? "chevron-up" : "chevron-down"}
+                            size={16}
+                            color="#FFFFFF"
                           />
-                          <Text style={styles.exportButtonSecondaryText}>
-                            Export Narrative Report
-                          </Text>
                         </Pressable>
-                        <Pressable
-                          style={({ pressed }) => [
-                            styles.exportButtonSecondary,
-                            pressed && { opacity: 0.7 },
-                          ]}
-                          onPress={handleExportReportPdf}
-                        >
-                          <Ionicons
-                            name="print-outline"
-                            size={18}
-                            color="#7C3AED"
-                          />
-                          <Text style={styles.exportButtonSecondaryText}>
-                            Export PDF
-                          </Text>
-                        </Pressable>
+                        {reportExportOpen ? (
+                          <View style={styles.exportMenu}>
+                            <Pressable
+                              style={styles.exportMenuItem}
+                              onPress={() => {
+                                setReportExportOpen(false);
+                                handleExportReportExcel();
+                              }}
+                            >
+                              <Ionicons
+                                name="grid-outline"
+                                size={16}
+                                color="#5B21B6"
+                              />
+                              <Text style={styles.exportMenuItemText}>
+                                Excel Workbook (.xlsx)
+                              </Text>
+                            </Pressable>
+                            <Pressable
+                              style={styles.exportMenuItem}
+                              onPress={() => {
+                                setReportExportOpen(false);
+                                handleExportReportNarrative();
+                              }}
+                            >
+                              <Ionicons
+                                name="document-text-outline"
+                                size={16}
+                                color="#5B21B6"
+                              />
+                              <Text style={styles.exportMenuItemText}>
+                                Narrative Report (.html)
+                              </Text>
+                            </Pressable>
+                            <Pressable
+                              style={styles.exportMenuItem}
+                              onPress={() => {
+                                setReportExportOpen(false);
+                                handleExportReportPdf();
+                              }}
+                            >
+                              <Ionicons
+                                name="print-outline"
+                                size={16}
+                                color="#5B21B6"
+                              />
+                              <Text style={styles.exportMenuItemText}>
+                                PDF (.pdf)
+                              </Text>
+                            </Pressable>
+                          </View>
+                        ) : null}
                       </View>
                     </View>
                   )}
+
+                  {/* ─── EMPTY STATE (no records in filters) ─────────── */}
+                  {reportEmpty ? (
+                    <View style={[styles.lookupCard, { marginTop: 16 }]}>
+                      <View style={styles.reportStateBox}>
+                        <Ionicons
+                          name="document-outline"
+                          size={28}
+                          color="#9CA3AF"
+                        />
+                        <Text style={styles.reportStateTitle}>
+                          No report data available
+                        </Text>
+                        <Text style={styles.reportStateText}>
+                          No qualifying records were found for the selected
+                          reporting period and department.
+                        </Text>
+                        <Text style={styles.reportStateHint}>
+                          Try a different reporting period or department.
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {/* ─── ERROR STATE ───────────────────────────────────── */}
+                  {reportError ? (
+                    <View style={[styles.lookupCard, { marginTop: 16 }]}>
+                      <View style={styles.reportStateBox}>
+                        <Ionicons
+                          name="alert-circle-outline"
+                          size={28}
+                          color="#DC2626"
+                        />
+                        <Text style={styles.reportStateTitle}>
+                          Unable to generate report
+                        </Text>
+                        <Text style={styles.reportStateText}>
+                          {reportError}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
                 </>
               ) : (
                 <>
@@ -5732,6 +6092,8 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 20,
     marginTop: -8,
+    position: "relative",
+    zIndex: 40,
   },
   exportButton: {
     flexDirection: "row",
@@ -5907,6 +6269,341 @@ const styles = StyleSheet.create({
     marginTop: 12,
     color: "#DC2626",
     fontSize: 14,
+    textAlign: "center",
+  },
+  reportFiltersGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 16,
+  },
+  reportSelectField: {
+    flexGrow: 1,
+    flexBasis: 220,
+    minWidth: 200,
+    position: "relative",
+    zIndex: 30,
+  },
+  reportSelectTrigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#D8C7F5",
+    borderRadius: 10,
+    backgroundColor: "#F7F4FE",
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  reportSelectTriggerText: {
+    color: "#5B21B6",
+    fontSize: 14,
+    fontWeight: "700",
+    flexShrink: 1,
+  },
+  reportSelectList: {
+    position: "absolute",
+    zIndex: 50,
+    top: "100%",
+    left: 0,
+    right: 0,
+    marginTop: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#D8C7F5",
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000000",
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+    paddingVertical: 4,
+    maxHeight: 240,
+  },
+  reportSelectOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 6,
+  },
+  reportSelectOptionActive: {
+    backgroundColor: "#F3EDFF",
+  },
+  reportSelectOptionText: {
+    color: "#374151",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  reportSelectOptionTextActive: {
+    color: "#5B21B6",
+    fontWeight: "800",
+  },
+  reportActionsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4,
+  },
+  resetReportBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#D8C7F5",
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+  },
+  resetReportBtnText: {
+    color: "#7C3AED",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  activeFiltersRow: {
+    marginTop: 16,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  activeFiltersLabel: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#6B7280",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    paddingTop: 4,
+  },
+  activeFiltersWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    flex: 1,
+  },
+  activeFilterChip: {
+    backgroundColor: "#F3EDFF",
+    borderWidth: 1,
+    borderColor: "#D8C7F5",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  activeFilterChipText: {
+    color: "#5B21B6",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  previewPendingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#F3EDFF",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  previewPendingText: {
+    color: "#5B21B6",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  reportUpdatingNote: {
+    marginBottom: 12,
+    color: "#7C3AED",
+    fontSize: 13,
+    fontStyle: "italic",
+  },
+  reportStale: {
+    opacity: 0.55,
+  },
+  concernCards: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 8,
+  },
+  concernCard: {
+    flexGrow: 1,
+    flexBasis: 180,
+    minWidth: 160,
+    borderWidth: 1,
+    borderColor: "#D8C7F5",
+    borderRadius: 14,
+    backgroundColor: "#FAF8FF",
+    padding: 14,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8,
+  },
+  concernCardDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  concernCardLabel: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#374151",
+  },
+  concernCardValue: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#1F2937",
+  },
+  concernCardPct: {
+    flexBasis: "100%",
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+  reportEmptyInline: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  reportEmptyInlineText: {
+    color: "#6B7280",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  activityRows: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    marginBottom: 8,
+  },
+  activityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F1F2F4",
+  },
+  activityRowIcon: {
+    width: 22,
+  },
+  activityRowLabel: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#374151",
+  },
+  activityRowValue: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#5B21B6",
+  },
+  reportSubsectionCaption: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#9C9EB0",
+    marginBottom: 10,
+    marginTop: -8,
+  },
+  comparisonHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#F3EDFF",
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  comparisonHeaderMetric: {
+    flex: 1.6,
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#5B21B6",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  comparisonHeaderValue: {
+    flex: 0.8,
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#5B21B6",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    textAlign: "right",
+  },
+  comparisonHeaderChange: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#5B21B6",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    textAlign: "right",
+  },
+  comparisonChange: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "800",
+    textAlign: "right",
+  },
+  exportMenu: {
+    position: "absolute",
+    zIndex: 50,
+    top: "100%",
+    left: 0,
+    marginTop: 6,
+    minWidth: 240,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#D8C7F5",
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000000",
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+    paddingVertical: 6,
+  },
+  exportMenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  exportMenuItemText: {
+    color: "#374151",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  reportStateBox: {
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+  },
+  reportStateTitle: {
+    fontSize: 17,
+    fontWeight: "900",
+    color: "#1F2937",
+    textAlign: "center",
+  },
+  reportStateText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#6B7280",
+    textAlign: "center",
+  },
+  reportStateHint: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#9CA3AF",
     textAlign: "center",
   },
   reportPreviewGrid: {

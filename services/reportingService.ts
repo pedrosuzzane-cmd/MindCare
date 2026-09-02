@@ -133,6 +133,30 @@ export interface TrendRow {
   comparable: boolean;
 }
 
+/**
+ * THE authoritative report counts. Every KPI card, chart, narrative sentence,
+ * Excel cell, PDF grid, and the preview MUST read these values.
+ *
+ *   totalStudents      = UNIQUE student UIDs in the selected population (dept)
+ *   trackedStudents    = population alias (== totalStudents)
+ *   activeStudents     = UNIQUE students with >=1 qualifying record in period
+ *                        (assessment OR mood OR journal OR survey)
+ *   assessed           = studentsAssessed: UNIQUE students with >=1 valid
+ *                        assessment result in the period
+ *   totalAssessments   = assessmentCount: number of assessment RECORDS (may
+ *                        exceed `assessed` when a student retakes)
+ *   low/medium/high    = UNIQUE students whose authoritative (latest) concern
+ *                        is LOW / MEDIUM / HIGH (never raw record counts)
+ *   attentionRequired  = mediumConcern + highConcern (LOW is NEVER included)
+ *   completionRate     = assessed / totalStudents (%)
+ *
+ * validation invariants (enforced in validateReport):
+ *   assessed === low + medium + high
+ *   totalAssessments >= assessed
+ *   activeStudents   >= assessed
+ *   activeStudents   <= totalStudents
+ *   attentionRequired === medium + high
+ */
 export interface OverviewInfo {
   totalStudents: number;
   trackedStudents: number;
@@ -154,8 +178,20 @@ export interface ReportData {
   periodType: ReportPeriodType;
   dateRange: ReportDateRange;
   academicYearLabel: string;
+  /** "Academic Trimester" contextual label: the trimester the period falls in,
+   *  or the selected trimester itself for trimester reports. */
   trimesterLabel: string | null;
   departmentFilter: { code: string; name: string } | null;
+  /** The exact filter combination that produced this dataset (traceability). */
+  filters: {
+    periodType: ReportPeriodType;
+    academicYear: number | null;
+    academicTrimester: 1 | 2 | 3 | null;
+    departmentCode: string | null;
+  };
+  /** The previous equivalent reporting period, when one exists. Its dataset is
+   *  built by the same builder and fed to `trendComparison` only. */
+  previousPeriod: ReportDateRange | null;
   generatedAt: Date;
   institutionName: string;
   reportTitle: string;
@@ -176,6 +212,8 @@ export interface ReportData {
     lowPlusMediumPlusHigh: number;
     attentionMatches: boolean;
     deptTotalMatches: boolean;
+    uniqueAssessedMatchesDistribution: boolean;
+    recordsAtLeastUniqueStudents: boolean;
   };
 }
 
@@ -337,6 +375,21 @@ async function fetchRawReportSource(
 // Concern helpers (reuse canonical logic)
 // ---------------------------------------------------------------------------
 
+/**
+ * AUTHORITATIVE concern resolution — the ONLY concern source for the report.
+ *
+ * Rule (identical to Student Management / Student Details / Department and Mood
+ * analytics): a student's concern is derived from their LATEST assessment
+ * within the reporting period. When multiple assessments exist for one student,
+ * only the most recent one (by event date) determines the concern; the count
+ * of concern buckets below is UNIQUE STUDENTS, never raw assessment records.
+ *
+ * The latest assessment's stored riskLevel (low/normal/high) is authoritative;
+ * riskFromScore is used only as the established fallback when the stored level
+ * is missing. Concern values are normalized to exactly LOW | MEDIUM | HIGH via
+ * getStudentConcernLevel — the same function used everywhere else in MindCare.
+ * Journal sentiment, mood entries and activity volume NEVER affect concern.
+ */
 function concernForAssessments(assessments: ReportRecord[]): {
   concern: ConcernLevel | null;
   latestScore?: number;
@@ -694,6 +747,18 @@ function buildReport(
     departmentFilter: departmentCode
       ? { code: normalizeDepartment(departmentCode), name: deptName(normalizeDepartment(departmentCode)) }
       : null,
+    filters: {
+      periodType: period.type,
+      academicYear: academicYearFor(period.startDate),
+      academicTrimester:
+        period.type === "trimester"
+          ? getTrimester(period.startDate)
+          : period.type === "monthly" || period.type === "weekly"
+            ? getTrimester(period.startDate)
+            : null,
+      departmentCode: departmentCode ? normalizeDepartment(departmentCode) : null,
+    },
+    previousPeriod: null,
     generatedAt: new Date(),
     institutionName: "University of the Cordilleras",
     reportTitle:
@@ -715,6 +780,9 @@ function buildReport(
       lowPlusMediumPlusHigh,
       attentionMatches: attentionRequired.count === commonAttention(concernDistribution),
       deptTotalMatches,
+      uniqueAssessedMatchesDistribution:
+        assessedStudents === lowPlusMediumPlusHigh,
+      recordsAtLeastUniqueStudents: totalAssessments >= assessedStudents,
     },
   };
 }
@@ -883,6 +951,12 @@ export async function generateReportData(
         params.departmentCode,
         prevFiltered.dataQuality,
       );
+      report.previousPeriod = {
+        startDate: previousPeriod.startDate,
+        endDate: previousPeriod.endDate,
+        label: previousPeriod.label,
+        periodType: previousPeriod.periodType,
+      };
       report.trendComparison = buildTrendComparison(report, previousReport);
     } catch (err) {
       console.error("Previous-period comparison failed:", err);
@@ -936,6 +1010,28 @@ export function validateReport(report: ReportData): void {
   if (lookupConcerned !== low + medium + high) {
     throw new Error(
       "Report data integrity error: student lookup concern counts do not reconcile.",
+    );
+  }
+
+  const o = report.overview;
+  if (o.assessed !== low + medium + high) {
+    throw new Error(
+      "Report data integrity error: students assessed != low + medium + high (unique-student concern distribution mismatch).",
+    );
+  }
+  if (o.totalAssessments < o.assessed) {
+    throw new Error(
+      "Report data integrity error: assessment records cannot be fewer than unique assessed students.",
+    );
+  }
+  if (o.activeStudents < o.assessed) {
+    throw new Error(
+      "Report data integrity error: active students cannot be fewer than assessed students.",
+    );
+  }
+  if (o.activeStudents > o.totalStudents) {
+    throw new Error(
+      "Report data integrity error: active students cannot exceed total students.",
     );
   }
 }
