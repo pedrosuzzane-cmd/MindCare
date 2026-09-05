@@ -48,12 +48,11 @@ import {
   academicYears,
   academicYearLabel,
   academicYearFor,
-  resolveAnnualPeriod,
-  resolveCustomPeriod,
-  resolveMonthlyPeriod,
-  resolveTrimesterPeriod,
+  resolveReportDateRange,
   resolveWeeklyPeriod,
+  type ReportFilterSelection,
   type ReportPeriodType,
+  type ResolvedReportFilters,
   type TrimesterNumber,
 } from "@/utils/academicCalendar";
 import { formatReportingDay } from "@/utils/reportCore";
@@ -723,9 +722,13 @@ function buildAppliedFilterChips(
     case "weekly":
       periodParts = ["Weekly", resolveWeeklyPeriod(weekStart).label];
       break;
-    case "monthly":
-      periodParts = ["Monthly", `${MONTH_NAMES[month]} ${year}`];
+    case "monthly": {
+      // Months Jan–Aug of AY 2025–2026 live in CALENDAR year 2026. The chip
+      // must show the resolved calendar year, not the AY start year.
+      const calendarYear = month >= 8 ? year : year + 1;
+      periodParts = ["Monthly", `${MONTH_NAMES[month]} ${calendarYear}`];
       break;
+    }
     case "trimester":
       periodParts = [
         "Trimester",
@@ -750,6 +753,47 @@ function buildAppliedFilterChips(
       : departments.find((d) => d.code === departmentCode)?.code ??
         departmentCode;
   return [...periodParts, academicYearLabel(year), deptPart];
+}
+
+// Chip values derived from the RESOLVED selection + resolved academic year, so
+// showing the chips never lags behind the report (avoids stale pre-setState
+// values when the report was run from the Reset handler).
+function chipsFromSelection(
+  selection: ReportFilterSelection,
+  resolved: ResolvedReportFilters,
+  departmentCode: string | undefined,
+  departments: { code: string; name: string }[],
+): string[] {
+  const year = resolved.academicYear;
+  const dept = departmentCode ?? "all";
+  const now = new Date();
+  switch (selection.periodType) {
+    case "weekly":
+      return buildAppliedFilterChips(
+        "weekly", 0, 1 as TrimesterNumber, year,
+        selection.startDate ?? now, now, now, dept, departments,
+      );
+    case "monthly":
+      return buildAppliedFilterChips(
+        "monthly", selection.month ?? 0, 1 as TrimesterNumber, year,
+        now, now, now, dept, departments,
+      );
+    case "trimester":
+      return buildAppliedFilterChips(
+        "trimester", 0, (selection.trimester ?? 1) as TrimesterNumber, year,
+        now, now, now, dept, departments,
+      );
+    case "annual":
+      return buildAppliedFilterChips(
+        "annual", 0, 1 as TrimesterNumber, year,
+        now, now, now, dept, departments,
+      );
+    case "custom":
+      return buildAppliedFilterChips(
+        "custom", 0, 1 as TrimesterNumber, year,
+        now, selection.startDate ?? now, selection.endDate ?? now, dept, departments,
+      );
+  }
 }
 
 // ─── Dynamic preview title derived from the ACTIVE FILTERS ────────────────────
@@ -984,6 +1028,7 @@ export default function AdminPanelScreen() {
   const [reportStatus, setReportStatus] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportEmpty, setReportEmpty] = useState(false);
+  const [reportEmptyLabel, setReportEmptyLabel] = useState<string | null>(null);
   const [reportExportOpen, setReportExportOpen] = useState(false);
   // Single-source dropdown state: only one filter menu can be open at a time.
   // Values: "period" | "academicYear" | "month" | "trimester" | "department".
@@ -2006,13 +2051,27 @@ export default function AdminPanelScreen() {
   ]);
 
   // --- Reporting: one generation, Narrative + Excel from the same ReportData --
-  const handleGenerateReport = async () => {
+  //
+  // The SINGLE report-period engine. Every period type is resolved by
+  // `resolveReportDateRange()` (utils/academicCalendar.ts) which maps
+  // AY/month/trimester to an authoritative date range. The same engine is used
+  // by the current period AND the previous-period comparison inside
+  // `generateReportData`, so there is exactly one academic-period calculation.
+  //
+  // `runReport` ALWAYS takes the selection it should run — never reads React
+  // state after it has been set — so a "Reset Filters" or an "Apply Filters"
+  // click can never generate from stale filter state (see the old bug where
+  // handleResetReport regenerated with the pre-reset values).
+  const runReport = async (
+    selection: ReportFilterSelection,
+    departmentCode?: string,
+  ) => {
     if (reportGenerating) return;
 
-    if (reportPeriodType === "custom") {
-      const start = new Date(reportCustomStart);
+    if (selection.periodType === "custom") {
+      const start = new Date(selection.startDate ?? new Date());
       start.setHours(0, 0, 0, 0);
-      const end = new Date(reportCustomEnd);
+      const end = new Date(selection.endDate ?? new Date());
       end.setHours(0, 0, 0, 0);
       if (start.getTime() > end.getTime()) {
         setReportError(
@@ -2027,53 +2086,49 @@ export default function AdminPanelScreen() {
     setReportEmpty(false);
     setReportStatus("Updating report...");
     try {
-      let period;
-      if (reportPeriodType === "weekly") {
-        period = resolveWeeklyPeriod(reportWeekStart);
-      } else if (reportPeriodType === "monthly") {
-        period = resolveMonthlyPeriod(reportYear, reportMonth);
-      } else if (reportPeriodType === "trimester") {
-        period = resolveTrimesterPeriod({
-          trimester: reportTrimester,
-          academicYear: reportYear,
+      const resolved = resolveReportDateRange(selection);
+      if (__DEV__) {
+        // Development-only traceability: log the exact filter -> range mapping
+        // and per-collection record counts so a wrong count can be traced to
+        // the query that produced it.
+        const parts = (d: Date) =>
+          `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+        console.info("[Report] filters", {
+          period: selection.periodType,
+          academicYear: selection.academicYear,
+          month: selection.month,
+          trimester: selection.trimester,
+          department: departmentCode ?? "ALL",
         });
-      } else if (reportPeriodType === "annual") {
-        period = resolveAnnualPeriod(reportYear);
-      } else {
-        const start = new Date(reportCustomStart);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(reportCustomEnd);
-        end.setHours(0, 0, 0, 0);
-        end.setDate(end.getDate() + 1); // exclusive upper bound
-        period = resolveCustomPeriod({ startDate: start, endDate: end });
+        console.info("[Report] resolved", {
+          label: resolved.label,
+          start: parts(resolved.startDate),
+          end: parts(resolved.endDate),
+          academicYear: resolved.academicYear,
+          trimester: resolved.trimester,
+        });
       }
       setReportStatus("Analyzing student data...");
       const data = await generateReportData({
-        periodType: period.type,
-        startDate: period.startDate,
-        endDate: period.endDate,
-        periodLabel: period.label,
-        departmentCode:
-          reportDepartment === "all" ? undefined : reportDepartment,
+        periodType: resolved.periodType,
+        startDate: resolved.startDate,
+        endDate: resolved.endDate,
+        periodLabel: resolved.label,
+        departmentCode,
       });
-if (data.overview.totalStudents === 0) {
-        // Distinguish a genuinely empty period (no qualifying records) from a
-        // failure: both clear the dataset, but the UI renders a dedicated
-        // empty state instead of misleading zeros or an error.
+      if (__DEV__) {
+        console.info("[Report] data coverage", data.dataQuality);
+      }
+      if (data.overview.totalStudents === 0) {
+        // Distinguish a genuinely empty period (no qualifying student
+        // population in the selected department) from a failure: both clear
+        // the dataset, but the UI renders a dedicated empty state instead of
+        // misleading zeros or an error.
         setReportData(null);
         setReportEmpty(true);
+        setReportEmptyLabel(resolved.label);
         setReportAppliedChips(
-          buildAppliedFilterChips(
-            reportPeriodType,
-            reportMonth,
-            reportTrimester,
-            reportYear,
-            reportWeekStart,
-            reportCustomStart,
-            reportCustomEnd,
-            reportDepartment,
-            reportDepartments,
-          ),
+          chipsFromSelection(selection, resolved, departmentCode, reportDepartments),
         );
         setReportStatus(null);
         return;
@@ -2082,17 +2137,7 @@ if (data.overview.totalStudents === 0) {
       // only on success so stale metrics never appear as the new filter set.
       setReportData(data);
       setReportAppliedChips(
-        buildAppliedFilterChips(
-          reportPeriodType,
-          reportMonth,
-          reportTrimester,
-          reportYear,
-          reportWeekStart,
-          reportCustomStart,
-          reportCustomEnd,
-          reportDepartment,
-          reportDepartments,
-        ),
+        chipsFromSelection(selection, resolved, departmentCode, reportDepartments),
       );
       setReportStatus(null);
     } catch (err) {
@@ -2106,26 +2151,57 @@ if (data.overview.totalStudents === 0) {
     }
   };
 
-  // Restores the default report filters and regenerates the preview without
-  // touching any unrelated application state.
-  const handleResetReport = () => {
-    setReportPeriodType("monthly");
-    setReportYear(academicYearFor(new Date()));
-    setReportMonth(new Date().getMonth());
-    const week = new Date();
-    week.setHours(0, 0, 0, 0);
-    setReportWeekStart(week);
-    setReportTrimester(1);
-    setReportDepartment("all");
-    const start = new Date();
+  const handleGenerateReport = async () => {
+    if (reportGenerating) return;
+    await runReport(
+      {
+        periodType: reportPeriodType,
+        academicYear: reportYear,
+        month: reportMonth,
+        trimester: reportTrimester,
+        startDate: reportCustomStart,
+        endDate: reportCustomEnd,
+      },
+      reportDepartment === "all" ? undefined : reportDepartment,
+    );
+  };
+
+  // Restores the default report filters and regenerates the preview WITHOUT
+  // relying on post-setState state. The selection is built explicitly and the
+  // matching state is committed alongside it, so the preview always matches the
+  // reset controls in the same tick.
+  const handleResetReport = async () => {
+    if (reportGenerating) return;
+    const now = new Date();
+    const resetMonth = now.getMonth();
+    const resetYear = academicYearFor(now);
+    const weekStart = new Date(now);
+    weekStart.setHours(0, 0, 0, 0);
+    const start = new Date(now);
     start.setDate(1);
     start.setHours(0, 0, 0, 0);
-    setReportCustomStart(start);
-    const end = new Date();
+    const end = new Date(now);
     end.setHours(0, 0, 0, 0);
+    setReportPeriodType("monthly");
+    setReportYear(resetYear);
+    setReportMonth(resetMonth);
+    setReportWeekStart(weekStart);
+    setReportTrimester(1);
+    setReportDepartment("all");
+    setReportCustomStart(start);
     setReportCustomEnd(end);
     setReportExportOpen(false);
-    handleGenerateReport();
+    await runReport(
+      {
+        periodType: "monthly",
+        academicYear: resetYear,
+        month: resetMonth,
+        trimester: 1,
+        startDate: start,
+        endDate: end,
+      },
+      undefined,
+    );
   };
 
   const handleExportReportExcel = async () => {
@@ -4354,8 +4430,9 @@ if (data.overview.totalStudents === 0) {
                           No report data available
                         </Text>
                         <Text style={styles.reportStateText}>
-                          No qualifying records were found for the selected
-                          reporting period and department.
+                          {reportEmptyLabel
+                            ? `No student population exists for ${reportEmptyLabel} in the selected department.`
+                            : "No qualifying records were found for the selected reporting period and department."}
                         </Text>
                         <Text style={styles.reportStateHint}>
                           Try a different reporting period or department.
